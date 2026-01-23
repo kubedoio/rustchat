@@ -117,6 +117,9 @@ async fn update_user(
     if input.avatar_url.is_some() {
         updates.push(format!("avatar_url = ${}", param_count));
     }
+    if input.custom_status.is_some() {
+        updates.push(format!("custom_status = ${}", param_count));
+    }
 
     if updates.is_empty() {
         return Err(AppError::BadRequest("No fields to update".to_string()));
@@ -126,6 +129,13 @@ async fn update_user(
     if let Some(ref username) = input.username {
         sqlx::query("UPDATE users SET username = $1 WHERE id = $2")
             .bind(username)
+            .bind(id)
+            .execute(&state.db)
+            .await?;
+    }
+    if let Some(ref custom_status) = input.custom_status {
+        sqlx::query("UPDATE users SET custom_status = $1 WHERE id = $2")
+            .bind(custom_status)
             .bind(id)
             .execute(&state.db)
             .await?;
