@@ -133,16 +133,16 @@ pub async fn create_post(
         user_id: None,
         exclude_user_id: None,
     });
-    
+
     state.ws_hub.broadcast(broadcast).await;
-    
+
     // If reply, broadcast update to root post
     if let Some(r_id) = root_post_id {
          let root_update = WsEnvelope::event(
             EventType::MessageUpdated,
             serde_json::json!({
                 "id": r_id,
-                "reply_count_inc": 1, 
+                "reply_count_inc": 1,
                 "last_reply_at": post.created_at
             }),
             Some(channel_id)
@@ -174,19 +174,19 @@ pub async fn create_post(
 
     if !mentions.is_empty() {
         // We could store these in the DB if we wanted persistent notifications
-        // For now, we'll just include them in the broadcast if needed, 
+        // For now, we'll just include them in the broadcast if needed,
         // but the frontend already parses them from the message string.
         // Let's at least update the props to include mentions metadata.
         let mut props = response.props.as_object().cloned().unwrap_or_default();
         props.insert("mentions".to_string(), serde_json::json!(mentions));
-        
+
         // Update DB with the new props
         sqlx::query("UPDATE posts SET props = $1 WHERE id = $2")
             .bind(serde_json::Value::Object(props.clone()))
             .bind(post.id)
             .execute(&state.db)
             .await.ok();
-            
+
         response.props = serde_json::Value::Object(props);
     }
 
@@ -275,8 +275,6 @@ async fn check_playbook_triggers(state: &AppState, channel_id: Uuid, message: &s
 
         let lower_message = message.to_lowercase();
 
-        let lower_message = message.to_lowercase();
-
         for playbook in playbooks {
              if let Some(triggers) = &playbook.keyword_triggers {
                 for trigger in triggers {
@@ -285,7 +283,7 @@ async fn check_playbook_triggers(state: &AppState, channel_id: Uuid, message: &s
                         let system_msg = format!(
                             "**Playbook Trigger**: Keyword '{}' detected.\n[Start Run for {}](/playbooks/{}/start)",
                             trigger, playbook.name, playbook.id
-                        ); 
+                        );
 
                         // Insert post
                          sqlx::query(
@@ -295,7 +293,7 @@ async fn check_playbook_triggers(state: &AppState, channel_id: Uuid, message: &s
                             "#
                         )
                         .bind(channel_id)
-                        .bind(bot_user.unwrap_or_else(|| Uuid::nil())) 
+                        .bind(bot_user.unwrap_or_else(|| Uuid::nil()))
                         .bind(&system_msg)
                         .bind(serde_json::json!({
                             "type": "system_playbook_trigger",
@@ -304,7 +302,7 @@ async fn check_playbook_triggers(state: &AppState, channel_id: Uuid, message: &s
                         }))
                         .execute(&state.db)
                         .await.ok();
-                        
+
                         return Ok(());
                     }
                 }
