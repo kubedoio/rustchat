@@ -7,12 +7,20 @@ mod common;
 async fn register_user_success() {
     let app = spawn_app().await;
 
+    let org_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)")
+        .bind(org_id)
+        .bind("Test Org")
+        .execute(&app.db_pool)
+        .await
+        .expect("Failed to create organization");
+
     let user_data = serde_json::json!({
         "username": "testuser",
         "email": "test@example.com",
         "password": "Password123!",
         "display_name": "Test User",
-        "org_id": Uuid::new_v4()
+        "org_id": org_id
     });
 
     let response = app
@@ -31,6 +39,12 @@ async fn login_user_success() {
     let app = spawn_app().await;
 
     let org_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)")
+        .bind(org_id)
+        .bind("Login Org")
+        .execute(&app.db_pool)
+        .await
+        .expect("Failed to create organization");
 
     // Register first
     let user_data = serde_json::json!({

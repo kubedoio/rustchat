@@ -1,8 +1,6 @@
 use once_cell::sync::Lazy;
 use rustchat::{api, realtime::WsHub, storage::S3Client};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
-use std::sync::Arc;
 use uuid::Uuid;
 
 // Ensure tracing is initialized only once
@@ -22,19 +20,18 @@ pub struct TestApp {
 pub async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
 
-    let db_url = std::env::var("RUSTCHAT_DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://rustchat:rustchat@localhost:5432/rustchat".to_string());
+    let db_url = std::env::var("RUSTMUST_DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://rustmust:rustmust@localhost:5432/rustmust".to_string());
 
     // Configure database
     let db_pool = configure_database(&db_url).await;
 
     // Create a random socket address
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
-
-    // Convert to tokio listener
-    let listener = tokio::net::TcpListener::from_std(listener).expect("Failed to convert listener");
 
     // Initialize dependencies
     let ws_hub = WsHub::new();
