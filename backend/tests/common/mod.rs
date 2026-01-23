@@ -20,8 +20,8 @@ pub struct TestApp {
 pub async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
 
-    let db_url = std::env::var("RUSTMUST_DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://rustmust:rustmust@localhost:5432/rustmust".to_string());
+    let db_url = std::env::var("RUSTCHAT_DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://rustchat:rustchat@localhost:5432/rustchat".to_string());
 
     // Configure database
     let db_pool = configure_database(&db_url).await;

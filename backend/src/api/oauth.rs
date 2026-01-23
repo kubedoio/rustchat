@@ -23,7 +23,7 @@ pub fn router() -> Router<AppState> {
 async fn list_providers(State(state): State<AppState>) -> ApiResult<Json<Vec<OAuthProvider>>> {
     // Query enabled SSO configs from DB
     let configs: Vec<SsoConfigRow> =
-        sqlx::query_as("SELECT * FROM sso_configs WHERE enabled = true")
+        sqlx::query_as("SELECT * FROM sso_configs WHERE is_active = true")
             .fetch_all(&state.db)
             .await?;
 
@@ -48,13 +48,14 @@ pub struct OAuthProvider {
 
 #[derive(Debug, sqlx::FromRow)]
 struct SsoConfigRow {
-    _id: Uuid,
+    id: Uuid,
+    org_id: Uuid,
     provider: String,
     display_name: Option<String>,
     issuer_url: Option<String>,
     client_id: String,
     client_secret_encrypted: String,
-    _enabled: bool,
+    is_active: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,7 +71,7 @@ async fn oauth_login(
 ) -> Result<Redirect, AppError> {
     // Get SSO config for provider
     let config: SsoConfigRow =
-        sqlx::query_as("SELECT * FROM sso_configs WHERE provider = $1 AND enabled = true")
+        sqlx::query_as("SELECT * FROM sso_configs WHERE provider = $1 AND is_active = true")
             .bind(&provider)
             .fetch_optional(&state.db)
             .await?
@@ -158,7 +159,7 @@ async fn oauth_callback(
 
     // Get SSO config
     let config: SsoConfigRow =
-        sqlx::query_as("SELECT * FROM sso_configs WHERE provider = $1 AND enabled = true")
+        sqlx::query_as("SELECT * FROM sso_configs WHERE provider = $1 AND is_active = true")
             .bind(&provider)
             .fetch_optional(&state.db)
             .await?
