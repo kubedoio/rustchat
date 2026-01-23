@@ -14,6 +14,7 @@ use crate::error::{ApiResult, AppError};
 use crate::models::{
     CreateIncomingWebhook, CreateOutgoingWebhook, CreateSlashCommand, CreateBot,
     IncomingWebhook, OutgoingWebhook, SlashCommand, Bot, BotToken, WebhookPayload,
+    ExecuteCommand, CommandResponse, OutgoingWebhookPayload,
 };
 
 /// Generate a secure random token
@@ -45,6 +46,7 @@ pub fn router() -> Router<AppState> {
         // Slash commands
         .route("/commands", get(list_slash_commands).post(create_slash_command))
         .route("/commands/{id}", get(get_slash_command).delete(delete_slash_command))
+        .route("/commands/execute", post(execute_command))
         // Bots
         .route("/bots", get(list_bots).post(create_bot))
         .route("/bots/{id}", get(get_bot).delete(delete_bot))
@@ -346,6 +348,126 @@ async fn delete_slash_command(
         .await?;
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
+}
+
+async fn execute_command(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(payload): Json<ExecuteCommand>,
+) -> ApiResult<Json<CommandResponse>> {
+    // 1. Parse trigger
+    let parts: Vec<&str> = payload.command.trim().split_whitespace().collect();
+    if parts.is_empty() {
+         return Err(AppError::BadRequest("Empty command".to_string()));
+    }
+
+    let trigger = parts[0].trim_start_matches('/');
+    let args = if parts.len() > 1 { parts[1..].join(" ") } else { String::new() };
+
+    // 2. Handle built-in commands
+    match trigger {
+        "echo" => {
+            return Ok(Json(CommandResponse {
+                response_type: "ephemeral".to_string(),
+                text: format!("Echo: {}", args),
+                username: None, icon_url: None, goto_location: None, attachments: None
+            }));
+        },
+        "shrug" => {
+             return Ok(Json(CommandResponse {
+                response_type: "in_channel".to_string(),
+                text: format!("{} ¯\\_(ツ)_/¯", args),
+                username: None, icon_url: None, goto_location: None, attachments: None
+            }));
+        },
+        "invite" => {
+            // Mock invite
+             return Ok(Json(CommandResponse {
+                response_type: "ephemeral".to_string(),
+                text: format!("Invitation sent to {}", args),
+                username: None, icon_url: None, goto_location: None, attachments: None
+            }));
+        }
+        _ => {}
+    }
+
+    // 3. Look up custom slash commands
+    // We need team_id. If not provided in payload (it's optional), try to get from channel.
+    let team_id = if let Some(tid) = payload.team_id {
+        tid
+    } else {
+        let channel = sqlx::query!("SELECT team_id FROM channels WHERE id = $1", payload.channel_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+        channel.team_id
+    };
+
+    let command = sqlx::query_as::<_, SlashCommand>(
+        "SELECT * FROM slash_commands WHERE team_id = $1 AND trigger = $2"
+    )
+    .bind(team_id)
+    .bind(trigger)
+    .fetch_optional(&state.db)
+    .await?;
+
+    if let Some(cmd) = command {
+        // Fetch username
+        let user_name = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+            .bind(auth.user_id)
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        // Fetch channel name
+        let channel_name = sqlx::query_scalar::<_, String>("SELECT name FROM channels WHERE id = $1")
+            .bind(payload.channel_id)
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        // Execute external command (HTTP POST)
+        let client = reqwest::Client::new();
+
+        let payload_out = OutgoingWebhookPayload {
+            token: cmd.token.clone(),
+            team_id: cmd.team_id,
+            channel_id: payload.channel_id,
+            channel_name,
+            user_id: auth.user_id,
+            user_name,
+            text: args,
+            trigger_word: trigger.to_string(),
+        };
+
+        let res = client.post(&cmd.url)
+            .json(&payload_out)
+            .send()
+            .await
+            .map_err(|e| AppError::Internal(format!("Command execution failed: {}", e)))?;
+
+        if res.status().is_success() {
+             let resp_body: CommandResponse = res.json::<CommandResponse>().await
+                .unwrap_or_else(|_| CommandResponse {
+                    response_type: "ephemeral".to_string(),
+                    text: "Command executed successfully (no response body)".to_string(),
+                    username: None, icon_url: None, goto_location: None, attachments: None
+                });
+             return Ok(Json(resp_body));
+        } else {
+             return Ok(Json(CommandResponse {
+                response_type: "ephemeral".to_string(),
+                text: format!("Command failed with status: {}", res.status()),
+                username: None, icon_url: None, goto_location: None, attachments: None
+            }));
+        }
+    }
+
+    Ok(Json(CommandResponse {
+        response_type: "ephemeral".to_string(),
+        text: format!("Command /{} not found", trigger),
+        username: None, icon_url: None, goto_location: None, attachments: None
+    }))
 }
 
 // ============ Bots ============

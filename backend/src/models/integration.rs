@@ -152,3 +152,22 @@ pub struct OutgoingWebhookPayload {
     pub text: String,
     pub trigger_word: String,
 }
+
+/// Command execution request
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExecuteCommand {
+    pub command: String,
+    pub channel_id: Uuid,
+    pub team_id: Option<Uuid>,
+}
+
+/// Command execution response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandResponse {
+    pub response_type: String, // "in_channel" or "ephemeral"
+    pub text: String,
+    pub username: Option<String>,
+    pub icon_url: Option<String>,
+    pub goto_location: Option<String>,
+    pub attachments: Option<serde_json::Value>,
+}

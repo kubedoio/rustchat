@@ -38,6 +38,7 @@ pub struct User {
     pub is_active: bool,
     pub role: String,
     pub presence: String, // 'online', 'away', 'dnd', 'offline'
+    pub custom_status: Option<serde_json::Value>,
     pub last_login_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -55,6 +56,7 @@ pub struct UserResponse {
     pub is_bot: bool,
     pub role: String,
     pub presence: String,
+    pub custom_status: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -70,6 +72,7 @@ impl From<User> for UserResponse {
             is_bot: user.is_bot,
             role: user.role,
             presence: user.presence,
+            custom_status: user.custom_status,
             created_at: user.created_at,
         }
     }
@@ -91,6 +94,7 @@ pub struct UpdateUser {
     pub username: Option<String>,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    pub custom_status: Option<serde_json::Value>,
 }
 
 /// DTO for changing password
