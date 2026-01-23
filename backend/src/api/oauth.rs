@@ -47,6 +47,7 @@ pub struct OAuthProvider {
 }
 
 #[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)]
 struct SsoConfigRow {
     id: Uuid,
     org_id: Uuid,
