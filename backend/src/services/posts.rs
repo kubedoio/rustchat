@@ -275,8 +275,6 @@ async fn check_playbook_triggers(state: &AppState, channel_id: Uuid, message: &s
 
         let lower_message = message.to_lowercase();
 
-        let lower_message = message.to_lowercase();
-
         for playbook in playbooks {
              if let Some(triggers) = &playbook.keyword_triggers {
                 for trigger in triggers {
