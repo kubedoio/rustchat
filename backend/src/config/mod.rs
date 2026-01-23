@@ -25,6 +25,9 @@ pub struct Config {
     /// JWT secret key
     pub jwt_secret: String,
 
+    /// Encryption key for sensitive data
+    pub encryption_key: String,
+
     /// JWT token expiry in hours
     #[serde(default = "default_jwt_expiry")]
     pub jwt_expiry_hours: u64,
