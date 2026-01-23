@@ -6,21 +6,16 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 /// User roles for RBAC
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[sqlx(type_name = "varchar", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum UserRole {
     SystemAdmin,
     OrgAdmin,
     TeamAdmin,
+    #[default]
     Member,
     Guest,
-}
-
-impl Default for UserRole {
-    fn default() -> Self {
-        Self::Member
-    }
 }
 
 /// User entity from database
@@ -102,8 +97,6 @@ pub struct UpdateUser {
 pub struct ChangePassword {
     pub new_password: String,
 }
-
-
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LoginRequest {

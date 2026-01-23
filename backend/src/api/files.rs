@@ -5,11 +5,11 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use sha2::{Sha256, Digest};
-use serde::Deserialize;
-use uuid::Uuid;
 use image::{GenericImageView, ImageFormat};
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::io::Cursor;
+use uuid::Uuid;
 
 use super::AppState;
 use crate::auth::AuthUser;
@@ -39,23 +39,29 @@ async fn upload_file(
 ) -> ApiResult<Json<FileUploadResponse>> {
     let mut file_data: Option<(String, String, Vec<u8>)> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| {
-        AppError::BadRequest(format!("Multipart error: {}", e))
-    })? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Multipart error: {}", e)))?
+    {
         let name = field.name().unwrap_or("").to_string();
         if name == "file" {
             let filename = field.file_name().unwrap_or("unknown").to_string();
-            let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
-            let data = field.bytes().await.map_err(|e| {
-                AppError::BadRequest(format!("Read error: {}", e))
-            })?;
+            let content_type = field
+                .content_type()
+                .unwrap_or("application/octet-stream")
+                .to_string();
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?;
             file_data = Some((filename, content_type, data.to_vec()));
             break;
         }
     }
 
-    let (filename, content_type, data) = file_data
-        .ok_or_else(|| AppError::BadRequest("No file provided".to_string()))?;
+    let (filename, content_type, data) =
+        file_data.ok_or_else(|| AppError::BadRequest("No file provided".to_string()))?;
 
     // Generate unique key
     let file_id = Uuid::new_v4();
@@ -70,7 +76,10 @@ async fn upload_file(
     let size = data.len() as i64;
 
     // Upload to S3
-    state.s3_client.upload(&key, data.clone(), &content_type).await?;
+    state
+        .s3_client
+        .upload(&key, data.clone(), &content_type)
+        .await?;
 
     // Save metadata to DB
     let file_info: FileInfo = sqlx::query_as(
@@ -112,12 +121,24 @@ async fn upload_file(
                 let thumb = img.thumbnail(400, 400);
                 let mut thumb_data = Vec::new();
                 // Encode as WebP for efficiency if possible, or same as original
-                if let Ok(_) = thumb.write_to(&mut Cursor::new(&mut thumb_data), ImageFormat::WebP) {
+                if thumb
+                    .write_to(&mut Cursor::new(&mut thumb_data), ImageFormat::WebP)
+                    .is_ok()
+                {
                     let t_key = format!("thumbnails/{}/{}.webp", auth.user_id, file_id);
-                    if let Ok(_) = state.s3_client.upload(&t_key, thumb_data, "image/webp").await {
+                    if state
+                        .s3_client
+                        .upload(&t_key, thumb_data, "image/webp")
+                        .await
+                        .is_ok()
+                    {
                         has_thumbnail = true;
                         thumbnail_key = Some(t_key.clone());
-                        thumbnail_url = state.s3_client.presigned_download_url(&t_key, 3600).await.ok();
+                        thumbnail_url = state
+                            .s3_client
+                            .presigned_download_url(&t_key, 3600)
+                            .await
+                            .ok();
                     }
                 }
             }
@@ -164,7 +185,8 @@ async fn get_presigned_upload(
     let extension = input.filename.rsplit('.').next().unwrap_or("");
     let key = format!("files/{}/{}.{}", auth.user_id, file_id, extension);
 
-    let upload_url = state.s3_client
+    let upload_url = state
+        .s3_client
         .presigned_upload_url(&key, &input.content_type, 3600)
         .await?;
 
@@ -202,7 +224,10 @@ async fn download_file(
         .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
 
-    let url = state.s3_client.presigned_download_url(&file.key, 3600).await?;
+    let url = state
+        .s3_client
+        .presigned_download_url(&file.key, 3600)
+        .await?;
 
     Ok(Json(serde_json::json!({
         "url": url,

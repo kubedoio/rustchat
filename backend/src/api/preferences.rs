@@ -15,7 +15,7 @@ use crate::models::{
     ChannelNotificationSetting, CreateStatusPreset, StatusPreset, UpdateChannelNotification,
     UpdatePreferences, UpdateStatus, UserPreferences, UserStatus,
 };
-use crate::realtime::{WsEnvelope, EventType, PresenceEvent};
+use crate::realtime::{EventType, PresenceEvent, WsEnvelope};
 
 /// Build preferences routes
 pub fn router() -> Router<AppState> {
@@ -31,10 +31,19 @@ pub fn router() -> Router<AppState> {
         // Status presets
         .route("/users/me/status/presets", get(list_status_presets))
         .route("/users/me/status/presets", post(create_status_preset))
-        .route("/users/me/status/presets/{preset_id}", axum::routing::delete(delete_status_preset))
+        .route(
+            "/users/me/status/presets/{preset_id}",
+            axum::routing::delete(delete_status_preset),
+        )
         // Channel notifications
-        .route("/channels/{channel_id}/notifications", get(get_channel_notifications))
-        .route("/channels/{channel_id}/notifications", put(update_channel_notifications))
+        .route(
+            "/channels/{channel_id}/notifications",
+            get(get_channel_notifications),
+        )
+        .route(
+            "/channels/{channel_id}/notifications",
+            put(update_channel_notifications),
+        )
 }
 
 /// Get current user's status
@@ -42,8 +51,16 @@ async fn get_my_status(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> ApiResult<Json<UserStatus>> {
-    let user = sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<chrono::DateTime<Utc>>)>(
-        "SELECT presence, status_text, status_emoji, status_expires_at FROM users WHERE id = $1"
+    let user = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<chrono::DateTime<Utc>>,
+        ),
+    >(
+        "SELECT presence, status_text, status_emoji, status_expires_at FROM users WHERE id = $1",
     )
     .bind(auth.user_id)
     .fetch_optional(&state.db)
@@ -64,33 +81,33 @@ async fn update_my_status(
     auth: AuthUser,
     Json(payload): Json<UpdateStatus>,
 ) -> ApiResult<Json<UserStatus>> {
-    let expires_at = payload.duration_minutes.map(|mins| {
-        Utc::now() + Duration::minutes(mins as i64)
-    });
+    let expires_at = payload
+        .duration_minutes
+        .map(|mins| Utc::now() + Duration::minutes(mins as i64));
 
-    // We only update presence if it's provided. 
+    // We only update presence if it's provided.
     // If text/emoji are provided, we update them.
     // This allows updating just presence or just status message.
-    
+
     // First get current values to merge if needed, or we can just run dynamic query
     let mut builder = sqlx::QueryBuilder::new("UPDATE users SET updated_at = NOW()");
-    
+
     if let Some(ref p) = payload.presence {
         builder.push(", presence = ");
         builder.push_bind(p);
     }
-    
+
     if payload.text.is_some() || payload.emoji.is_some() {
         // If updating custom status, always update these fields
         // Note: passing None for text/emoji clears them (which is what we want if user clears status)
-        // But the DTO has Option, so if it's missing (None), it might mean "don't change". 
-        // We need to clarify behavior. 
-        // Ideally: 
+        // But the DTO has Option, so if it's missing (None), it might mean "don't change".
+        // We need to clarify behavior.
+        // Ideally:
         // - presence: Update if Some
-        // - text/emoji: Update if Some. To clear, client should send Some("") or explicit null? 
+        // - text/emoji: Update if Some. To clear, client should send Some("") or explicit null?
         // For simplicity, let's assume client sends all fields they want to change.
         // But typical "set status" UI might only send text/emoji. "Set presence" UI only sends presence.
-        
+
         if let Some(ref t) = payload.text {
             builder.push(", status_text = ");
             builder.push_bind(t);
@@ -100,8 +117,8 @@ async fn update_my_status(
             builder.push_bind(e);
         }
         if expires_at.is_some() {
-             builder.push(", status_expires_at = ");
-             builder.push_bind(expires_at);
+            builder.push(", status_expires_at = ");
+            builder.push_bind(expires_at);
         }
     }
 
@@ -109,11 +126,19 @@ async fn update_my_status(
     builder.push_bind(auth.user_id);
     builder.push(" RETURNING presence, status_text, status_emoji, status_expires_at");
 
-    let query = builder.build_query_as::<(String, Option<String>, Option<String>, Option<chrono::DateTime<Utc>>)>();
+    let query = builder.build_query_as::<(
+        String,
+        Option<String>,
+        Option<String>,
+        Option<chrono::DateTime<Utc>>,
+    )>();
     let user = query.fetch_one(&state.db).await?;
 
     // Update Hub and broadcast presence change
-    state.ws_hub.set_presence(auth.user_id, user.0.clone()).await;
+    state
+        .ws_hub
+        .set_presence(auth.user_id, user.0.clone())
+        .await;
     let event = WsEnvelope::event(
         EventType::UserPresence,
         PresenceEvent {
@@ -145,7 +170,10 @@ async fn clear_my_status(
     .await?;
 
     // Update Hub and broadcast presence change
-    state.ws_hub.set_presence(auth.user_id, user.0.clone()).await;
+    state
+        .ws_hub
+        .set_presence(auth.user_id, user.0.clone())
+        .await;
     let event = WsEnvelope::event(
         EventType::UserPresence,
         PresenceEvent {
@@ -170,8 +198,16 @@ async fn get_user_status(
     _auth: AuthUser,
     Path(user_id): Path<Uuid>,
 ) -> ApiResult<Json<UserStatus>> {
-    let user = sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<chrono::DateTime<Utc>>)>(
-        "SELECT presence, status_text, status_emoji, status_expires_at FROM users WHERE id = $1"
+    let user = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<chrono::DateTime<Utc>>,
+        ),
+    >(
+        "SELECT presence, status_text, status_emoji, status_expires_at FROM users WHERE id = $1",
     )
     .bind(user_id)
     .fetch_optional(&state.db)
@@ -182,7 +218,7 @@ async fn get_user_status(
     let mut text = user.1;
     let mut emoji = user.2;
     let expires = user.3;
-    
+
     if let Some(exp) = expires {
         if exp < Utc::now() {
             text = None;
@@ -204,12 +240,11 @@ async fn get_my_preferences(
     auth: AuthUser,
 ) -> ApiResult<Json<UserPreferences>> {
     // Try to get existing preferences
-    let prefs = sqlx::query_as::<_, UserPreferences>(
-        "SELECT * FROM user_preferences WHERE user_id = $1"
-    )
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let prefs =
+        sqlx::query_as::<_, UserPreferences>("SELECT * FROM user_preferences WHERE user_id = $1")
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?;
 
     match prefs {
         Some(p) => Ok(Json(p)),
@@ -219,7 +254,7 @@ async fn get_my_preferences(
                 r#"
                 INSERT INTO user_preferences (user_id) VALUES ($1)
                 RETURNING *
-                "#
+                "#,
             )
             .bind(auth.user_id)
             .fetch_one(&state.db)
@@ -317,7 +352,7 @@ async fn delete_status_preset(
     Path(preset_id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let result = sqlx::query(
-        "DELETE FROM status_presets WHERE id = $1 AND user_id = $2 AND is_default = false"
+        "DELETE FROM status_presets WHERE id = $1 AND user_id = $2 AND is_default = false",
     )
     .bind(preset_id)
     .bind(auth.user_id)
@@ -325,7 +360,9 @@ async fn delete_status_preset(
     .await?;
 
     if result.rows_affected() == 0 {
-        return Err(AppError::NotFound("Preset not found or cannot be deleted".to_string()));
+        return Err(AppError::NotFound(
+            "Preset not found or cannot be deleted".to_string(),
+        ));
     }
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
@@ -338,7 +375,7 @@ async fn get_channel_notifications(
     Path(channel_id): Path<Uuid>,
 ) -> ApiResult<Json<Option<ChannelNotificationSetting>>> {
     let setting = sqlx::query_as::<_, ChannelNotificationSetting>(
-        "SELECT * FROM channel_notification_settings WHERE user_id = $1 AND channel_id = $2"
+        "SELECT * FROM channel_notification_settings WHERE user_id = $1 AND channel_id = $2",
     )
     .bind(auth.user_id)
     .bind(channel_id)

@@ -38,10 +38,18 @@ pub struct SiteConfig {
     pub default_timezone: String,
 }
 
-fn default_site_name() -> String { "RustChat".to_string() }
-fn default_max_file_size() -> i32 { 50 }
-fn default_locale() -> String { "en".to_string() }
-fn default_timezone() -> String { "UTC".to_string() }
+fn default_site_name() -> String {
+    "RustChat".to_string()
+}
+fn default_max_file_size() -> i32 {
+    50
+}
+fn default_locale() -> String {
+    "en".to_string()
+}
+fn default_timezone() -> String {
+    "UTC".to_string()
+}
 
 /// Authentication configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,9 +74,15 @@ pub struct AuthConfig {
     pub session_length_hours: i32,
 }
 
-fn default_true() -> bool { true }
-fn default_password_min_length() -> i32 { 8 }
-fn default_session_length() -> i32 { 24 }
+fn default_true() -> bool {
+    true
+}
+fn default_password_min_length() -> i32 {
+    8
+}
+fn default_session_length() -> i32 {
+    24
+}
 
 impl Default for AuthConfig {
     fn default() -> Self {
@@ -101,8 +115,12 @@ pub struct IntegrationsConfig {
     pub webhook_payload_size_kb: i32,
 }
 
-fn default_max_webhooks() -> i32 { 10 }
-fn default_webhook_payload() -> i32 { 100 }
+fn default_max_webhooks() -> i32 {
+    10
+}
+fn default_webhook_payload() -> i32 {
+    100
+}
 
 impl Default for IntegrationsConfig {
     fn default() -> Self {
@@ -144,7 +162,9 @@ pub struct EmailConfig {
     pub from_name: String,
 }
 
-fn default_smtp_port() -> i32 { 587 }
+fn default_smtp_port() -> i32 {
+    587
+}
 
 /// DTO for updating a specific config category
 #[derive(Debug, Clone, Deserialize)]

@@ -11,9 +11,16 @@ use super::AppState;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    AuditLog, AuditLogQuery, CreateRetentionPolicy, CreateSsoConfig,
-    Permission, RetentionPolicy, SsoConfig, ServerConfig, ServerConfigResponse,
+    AuditLog,
+    AuditLogQuery,
+    CreateRetentionPolicy,
+    CreateSsoConfig,
+    Permission,
+    RetentionPolicy,
+    ServerConfig,
+    ServerConfigResponse,
     // SiteConfig, AuthConfig, IntegrationsConfig, ComplianceConfig, EmailConfig,
+    SsoConfig,
 };
 use sqlx::FromRow;
 
@@ -26,23 +33,46 @@ pub fn router() -> Router<AppState> {
         // Audit logs
         .route("/admin/audit", get(list_audit_logs))
         // SSO
-        .route("/admin/sso", get(get_sso_config).post(create_sso_config).put(update_sso_config))
+        .route(
+            "/admin/sso",
+            get(get_sso_config)
+                .post(create_sso_config)
+                .put(update_sso_config),
+        )
         // Retention
-        .route("/admin/retention", get(list_retention_policies).post(create_retention_policy))
-        .route("/admin/retention/{id}", get(get_retention_policy).delete(delete_retention_policy))
+        .route(
+            "/admin/retention",
+            get(list_retention_policies).post(create_retention_policy),
+        )
+        .route(
+            "/admin/retention/{id}",
+            get(get_retention_policy).delete(delete_retention_policy),
+        )
         // Permissions
         .route("/admin/permissions", get(list_permissions))
         .route("/admin/roles/{role}/permissions", get(get_role_permissions))
         // Users management
         .route("/admin/users", get(list_users).post(create_admin_user))
         .route("/admin/users/{id}", patch(update_admin_user))
-        .route("/admin/users/{id}/deactivate", axum::routing::post(deactivate_user))
-        .route("/admin/users/{id}/reactivate", axum::routing::post(reactivate_user))
+        .route(
+            "/admin/users/{id}/deactivate",
+            axum::routing::post(deactivate_user),
+        )
+        .route(
+            "/admin/users/{id}/reactivate",
+            axum::routing::post(reactivate_user),
+        )
         // Teams & Channels management
         .route("/admin/teams", get(list_admin_teams))
-        .route("/admin/teams/{id}", get(get_admin_team).delete(delete_admin_team))
+        .route(
+            "/admin/teams/{id}",
+            get(get_admin_team).delete(delete_admin_team),
+        )
         .route("/admin/channels", get(list_admin_channels))
-        .route("/admin/channels/{id}", axum::routing::delete(delete_admin_channel))
+        .route(
+            "/admin/channels/{id}",
+            axum::routing::delete(delete_admin_channel),
+        )
         // Stats & Health
         .route("/admin/stats", get(get_stats))
         .route("/admin/health", get(get_health))
@@ -102,15 +132,14 @@ async fn get_sso_config(
 ) -> ApiResult<Json<Option<SsoConfig>>> {
     require_admin(&auth)?;
 
-    let org_id = auth.org_id
+    let org_id = auth
+        .org_id
         .ok_or_else(|| AppError::BadRequest("No organization context".to_string()))?;
 
-    let config: Option<SsoConfig> = sqlx::query_as(
-        "SELECT * FROM sso_configs WHERE org_id = $1"
-    )
-    .bind(org_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let config: Option<SsoConfig> = sqlx::query_as("SELECT * FROM sso_configs WHERE org_id = $1")
+        .bind(org_id)
+        .fetch_optional(&state.db)
+        .await?;
 
     Ok(Json(config))
 }
@@ -122,19 +151,24 @@ async fn create_sso_config(
 ) -> ApiResult<Json<SsoConfig>> {
     require_admin(&auth)?;
 
-    let org_id = auth.org_id
+    let org_id = auth
+        .org_id
         .ok_or_else(|| AppError::BadRequest("No organization context".to_string()))?;
 
     // Validate provider
     if input.provider != "oidc" && input.provider != "saml" {
-        return Err(AppError::Validation("Provider must be 'oidc' or 'saml'".to_string()));
+        return Err(AppError::Validation(
+            "Provider must be 'oidc' or 'saml'".to_string(),
+        ));
     }
 
-    let scopes = input.scopes.unwrap_or_else(|| vec![
-        "openid".to_string(), 
-        "profile".to_string(), 
-        "email".to_string()
-    ]);
+    let scopes = input.scopes.unwrap_or_else(|| {
+        vec![
+            "openid".to_string(),
+            "profile".to_string(),
+            "email".to_string(),
+        ]
+    });
 
     let config: SsoConfig = sqlx::query_as(
         r#"
@@ -178,7 +212,7 @@ async fn list_retention_policies(
 
     let policies: Vec<RetentionPolicy> = if let Some(org_id) = auth.org_id {
         sqlx::query_as(
-            "SELECT * FROM retention_policies WHERE org_id = $1 ORDER BY created_at DESC"
+            "SELECT * FROM retention_policies WHERE org_id = $1 ORDER BY created_at DESC",
         )
         .bind(org_id)
         .fetch_all(&state.db)
@@ -208,7 +242,9 @@ async fn create_retention_policy(
         .count();
 
     if scope_count != 1 {
-        return Err(AppError::Validation("Exactly one of org_id, team_id, or channel_id required".to_string()));
+        return Err(AppError::Validation(
+            "Exactly one of org_id, team_id, or channel_id required".to_string(),
+        ));
     }
 
     let policy: RetentionPolicy = sqlx::query_as(
@@ -268,11 +304,10 @@ async fn list_permissions(
 ) -> ApiResult<Json<Vec<Permission>>> {
     require_admin(&auth)?;
 
-    let permissions: Vec<Permission> = sqlx::query_as(
-        "SELECT * FROM permissions ORDER BY category, id"
-    )
-    .fetch_all(&state.db)
-    .await?;
+    let permissions: Vec<Permission> =
+        sqlx::query_as("SELECT * FROM permissions ORDER BY category, id")
+            .fetch_all(&state.db)
+            .await?;
 
     Ok(Json(permissions))
 }
@@ -284,18 +319,18 @@ async fn get_role_permissions(
 ) -> ApiResult<Json<Vec<String>>> {
     require_admin(&auth)?;
 
-    let permissions: Vec<(String,)> = sqlx::query_as(
-        "SELECT permission_id FROM role_permissions WHERE role = $1"
-    )
-    .bind(&role)
-    .fetch_all(&state.db)
-    .await?;
+    let permissions: Vec<(String,)> =
+        sqlx::query_as("SELECT permission_id FROM role_permissions WHERE role = $1")
+            .bind(&role)
+            .fetch_all(&state.db)
+            .await?;
 
     Ok(Json(permissions.into_iter().map(|p| p.0).collect()))
 }
 
 /// Helper function to log audit events
 #[allow(dead_code)]
+#[allow(clippy::too_many_arguments)]
 pub async fn log_audit_event(
     db: &sqlx::PgPool,
     actor_user_id: Option<Uuid>,
@@ -333,11 +368,9 @@ async fn get_config(
 ) -> ApiResult<Json<ServerConfigResponse>> {
     require_admin(&auth)?;
 
-    let config: ServerConfig = sqlx::query_as(
-        "SELECT * FROM server_config WHERE id = 'default'"
-    )
-    .fetch_one(&state.db)
-    .await?;
+    let config: ServerConfig = sqlx::query_as("SELECT * FROM server_config WHERE id = 'default'")
+        .fetch_one(&state.db)
+        .await?;
 
     Ok(Json(config.into()))
 }
@@ -357,7 +390,12 @@ async fn update_config(
         "compliance" => "compliance",
         "email" => "email",
         "experimental" => "experimental",
-        _ => return Err(AppError::BadRequest(format!("Invalid config category: {}", category))),
+        _ => {
+            return Err(AppError::BadRequest(format!(
+                "Invalid config category: {}",
+                category
+            )))
+        }
     };
 
     let query = format!(
@@ -382,7 +420,7 @@ async fn update_config(
     );
     state.ws_hub.broadcast(event).await;
 
-    Ok(Json(result.0.0))
+    Ok(Json(result.0 .0))
 }
 
 // ============ User Management ============
@@ -439,7 +477,10 @@ async fn list_users(
         .fetch_one(&state.db)
         .await?;
 
-    Ok(Json(UsersListResponse { users, total: total.0 }))
+    Ok(Json(UsersListResponse {
+        users,
+        total: total.0,
+    }))
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -554,24 +595,34 @@ pub struct SystemStats {
     pub files_count: i64,
 }
 
-async fn get_stats(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> ApiResult<Json<SystemStats>> {
+async fn get_stats(State(state): State<AppState>, auth: AuthUser) -> ApiResult<Json<SystemStats>> {
     require_admin(&auth)?;
 
     let total_users: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")
-        .fetch_one(&state.db).await.unwrap_or((0,));
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or((0,));
     let active_users: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE is_active = true")
-        .fetch_one(&state.db).await.unwrap_or((0,));
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or((0,));
     let total_teams: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM teams")
-        .fetch_one(&state.db).await.unwrap_or((0,));
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or((0,));
     let total_channels: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM channels")
-        .fetch_one(&state.db).await.unwrap_or((0,));
-    let messages_24h: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM posts WHERE created_at > NOW() - INTERVAL '24 hours'")
-        .fetch_one(&state.db).await.unwrap_or((0,));
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or((0,));
+    let messages_24h: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM posts WHERE created_at > NOW() - INTERVAL '24 hours'")
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or((0,));
     let files_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM files")
-        .fetch_one(&state.db).await.unwrap_or((0,));
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or((0,));
 
     Ok(Json(SystemStats {
         total_users: total_users.0,
@@ -623,7 +674,11 @@ async fn get_health(
     let db_latency = start.elapsed().as_millis() as u64;
 
     Ok(Json(HealthStatus {
-        status: if db_ok { "healthy".to_string() } else { "degraded".to_string() },
+        status: if db_ok {
+            "healthy".to_string()
+        } else {
+            "degraded".to_string()
+        },
         database: DatabaseHealth {
             connected: db_ok,
             latency_ms: db_latency,
@@ -696,7 +751,10 @@ async fn list_admin_teams(
         .fetch_one(&state.db)
         .await?;
 
-    Ok(Json(AdminTeamsListResponse { teams, total: total.0 }))
+    Ok(Json(AdminTeamsListResponse {
+        teams,
+        total: total.0,
+    }))
 }
 
 async fn get_admin_team(
@@ -789,12 +847,16 @@ async fn list_admin_channels(
     .fetch_all(&state.db)
     .await?;
 
-    let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM channels WHERE ($1::UUID IS NULL OR team_id = $1)")
-        .bind(query.team_id)
-        .fetch_one(&state.db)
-        .await?;
+    let total: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM channels WHERE ($1::UUID IS NULL OR team_id = $1)")
+            .bind(query.team_id)
+            .fetch_one(&state.db)
+            .await?;
 
-    Ok(Json(AdminChannelsListResponse { channels, total: total.0 }))
+    Ok(Json(AdminChannelsListResponse {
+        channels,
+        total: total.0,
+    }))
 }
 
 async fn delete_admin_channel(

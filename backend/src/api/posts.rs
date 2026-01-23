@@ -2,23 +2,31 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post, delete},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use super::AppState;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
-use crate::models::{ChannelMember, CreatePost, CreateReaction, Post, PostResponse, Reaction, UpdatePost};
+use crate::models::{
+    ChannelMember, CreatePost, CreateReaction, Post, PostResponse, Reaction, UpdatePost,
+};
 
 /// Build posts routes
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/channels/{channel_id}/posts", get(list_posts).post(create_post))
-        .route("/posts/{id}", get(get_post).put(update_post).delete(delete_post))
+        .route(
+            "/channels/{channel_id}/posts",
+            get(list_posts).post(create_post),
+        )
+        .route(
+            "/posts/{id}",
+            get(get_post).put(update_post).delete(delete_post),
+        )
         .route("/posts/{id}/reactions", post(add_reaction))
         .route("/posts/{id}/reactions/{emoji}", delete(remove_reaction))
         .route("/posts/{id}/thread", get(get_thread))
@@ -44,27 +52,28 @@ async fn list_posts(
     Query(query): Query<ListPostsQuery>,
 ) -> ApiResult<Json<Vec<PostResponse>>> {
     // Check membership
-    let _: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     let limit = query.limit.unwrap_or(50).min(100);
 
-    let mut sql = String::from(r#"
+    let mut sql = String::from(
+        r#"
         SELECT p.*, u.username, u.avatar_url, u.email
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.channel_id = $1 AND p.deleted_at IS NULL AND p.root_post_id IS NULL
-    "#);
+    "#,
+    );
 
     let mut arg_index = 2;
-    
-    if let Some(_) = query.is_pinned {
+
+    if query.is_pinned.is_some() {
         sql.push_str(&format!(" AND p.is_pinned = ${}", arg_index));
         arg_index += 1;
     }
@@ -75,14 +84,21 @@ async fn list_posts(
     }
 
     if query.before.is_some() {
-        sql.push_str(&format!(" AND p.created_at < (SELECT created_at FROM posts WHERE id = ${})", arg_index));
+        sql.push_str(&format!(
+            " AND p.created_at < (SELECT created_at FROM posts WHERE id = ${})",
+            arg_index
+        ));
         arg_index += 1;
     } else if query.after.is_some() {
-        sql.push_str(&format!(" AND p.created_at > (SELECT created_at FROM posts WHERE id = ${})", arg_index));
+        sql.push_str(&format!(
+            " AND p.created_at > (SELECT created_at FROM posts WHERE id = ${})",
+            arg_index
+        ));
         arg_index += 1;
     }
 
-    sql.push_str(&format!(" ORDER BY p.created_at {} LIMIT ${}", 
+    sql.push_str(&format!(
+        " ORDER BY p.created_at {} LIMIT ${}",
         if query.after.is_some() { "ASC" } else { "DESC" },
         arg_index
     ));
@@ -96,7 +112,7 @@ async fn list_posts(
     if let Some(ref search_term) = query.q {
         q = q.bind(format!("%{}%", search_term));
     }
-    
+
     if let Some(before) = query.before {
         q = q.bind(before);
     } else if let Some(after) = query.after {
@@ -120,10 +136,10 @@ async fn create_post(
     Path(channel_id): Path<Uuid>,
     Json(input): Json<CreatePost>,
 ) -> ApiResult<Json<PostResponse>> {
-    let post = crate::services::posts::create_post(&state, auth.user_id, channel_id, input, None).await?;
+    let post =
+        crate::services::posts::create_post(&state, auth.user_id, channel_id, input, None).await?;
     Ok(Json(post))
 }
-
 
 /// Get a specific post
 async fn get_post(
@@ -138,14 +154,13 @@ async fn get_post(
         .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check membership
-    let _: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(post.channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(post.channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     Ok(Json(post))
 }
@@ -169,7 +184,7 @@ async fn update_post(
     }
 
     let updated: Post = sqlx::query_as(
-        "UPDATE posts SET message = $1, edited_at = NOW() WHERE id = $2 RETURNING *"
+        "UPDATE posts SET message = $1, edited_at = NOW() WHERE id = $2 RETURNING *",
     )
     .bind(&input.message)
     .bind(id)
@@ -186,7 +201,8 @@ async fn update_post(
             "edited_at": updated.edited_at
         }),
         Some(updated.channel_id),
-    ).with_broadcast(crate::realtime::WsBroadcast {
+    )
+    .with_broadcast(crate::realtime::WsBroadcast {
         channel_id: Some(updated.channel_id),
         team_id: None,
         user_id: None,
@@ -227,7 +243,8 @@ async fn delete_post(
             "channel_id": post.channel_id
         }),
         Some(post.channel_id),
-    ).with_broadcast(crate::realtime::WsBroadcast {
+    )
+    .with_broadcast(crate::realtime::WsBroadcast {
         channel_id: Some(post.channel_id),
         team_id: None,
         user_id: None,
@@ -244,21 +261,21 @@ async fn get_thread(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Vec<PostResponse>>> {
-    let root_post: Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let root_post: Post =
+        sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check membership
-    let _: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(root_post.channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(root_post.channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     let replies: Vec<PostResponse> = sqlx::query_as(
         r#"
@@ -267,7 +284,7 @@ async fn get_thread(
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
         ORDER BY p.created_at
-        "#
+        "#,
     )
     .bind(id)
     .fetch_all(&state.db)
@@ -295,14 +312,13 @@ async fn add_reaction(
         .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check membership
-    let _: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(post.channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(post.channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     let reaction: Reaction = sqlx::query_as(
         r#"
@@ -323,7 +339,8 @@ async fn add_reaction(
         crate::realtime::EventType::ReactionAdded,
         reaction.clone(),
         Some(post.channel_id),
-    ).with_broadcast(crate::realtime::WsBroadcast {
+    )
+    .with_broadcast(crate::realtime::WsBroadcast {
         channel_id: Some(post.channel_id),
         team_id: None,
         user_id: None,
@@ -340,23 +357,21 @@ async fn remove_reaction(
     auth: AuthUser,
     Path((id, emoji)): Path<(Uuid, String)>,
 ) -> ApiResult<Json<serde_json::Value>> {
-     // Get post to find channel_id for broadcast
-     let post: Option<Post> = sqlx::query_as("SELECT * FROM posts WHERE id = $1")
+    // Get post to find channel_id for broadcast
+    let post: Option<Post> = sqlx::query_as("SELECT * FROM posts WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.db)
         .await?;
-        
-    sqlx::query(
-        "DELETE FROM reactions WHERE post_id = $1 AND user_id = $2 AND emoji_name = $3"
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .bind(&emoji)
-    .execute(&state.db)
-    .await?;
 
-     if let Some(p) = post {
-         let broadcast = crate::realtime::WsEnvelope::event(
+    sqlx::query("DELETE FROM reactions WHERE post_id = $1 AND user_id = $2 AND emoji_name = $3")
+        .bind(id)
+        .bind(auth.user_id)
+        .bind(&emoji)
+        .execute(&state.db)
+        .await?;
+
+    if let Some(p) = post {
+        let broadcast = crate::realtime::WsEnvelope::event(
             crate::realtime::EventType::ReactionRemoved,
             serde_json::json!({
                 "post_id": id,
@@ -364,14 +379,15 @@ async fn remove_reaction(
                 "emoji_name": emoji
             }),
             Some(p.channel_id),
-        ).with_broadcast(crate::realtime::WsBroadcast {
+        )
+        .with_broadcast(crate::realtime::WsBroadcast {
             channel_id: Some(p.channel_id),
             team_id: None,
             user_id: None,
             exclude_user_id: None,
         });
         state.ws_hub.broadcast(broadcast).await;
-     }
+    }
 
     Ok(Json(serde_json::json!({"status": "removed"})))
 }
@@ -389,23 +405,23 @@ async fn pin_post(
         .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check admin membership
-    let member: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(post.channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let member: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(post.channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     if member.role != "admin" && auth.role != "system_admin" {
         return Err(AppError::Forbidden("Only admins can pin posts".to_string()));
     }
 
-    let pinned: Post = sqlx::query_as("UPDATE posts SET is_pinned = true WHERE id = $1 RETURNING *")
-        .bind(id)
-        .fetch_one(&state.db)
-        .await?;
+    let pinned: Post =
+        sqlx::query_as("UPDATE posts SET is_pinned = true WHERE id = $1 RETURNING *")
+            .bind(id)
+            .fetch_one(&state.db)
+            .await?;
 
     // Broadcast pin change
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -416,7 +432,8 @@ async fn pin_post(
             "is_pinned": true
         }),
         Some(pinned.channel_id),
-    ).with_broadcast(crate::realtime::WsBroadcast {
+    )
+    .with_broadcast(crate::realtime::WsBroadcast {
         channel_id: Some(pinned.channel_id),
         team_id: None,
         user_id: None,
@@ -440,23 +457,25 @@ async fn unpin_post(
         .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check admin membership
-    let member: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(post.channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let member: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(post.channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     if member.role != "admin" && auth.role != "system_admin" {
-        return Err(AppError::Forbidden("Only admins can unpin posts".to_string()));
+        return Err(AppError::Forbidden(
+            "Only admins can unpin posts".to_string(),
+        ));
     }
 
-    let unpinned: Post = sqlx::query_as("UPDATE posts SET is_pinned = false WHERE id = $1 RETURNING *")
-        .bind(id)
-        .fetch_one(&state.db)
-        .await?;
+    let unpinned: Post =
+        sqlx::query_as("UPDATE posts SET is_pinned = false WHERE id = $1 RETURNING *")
+            .bind(id)
+            .fetch_one(&state.db)
+            .await?;
 
     // Broadcast pin change
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -467,7 +486,8 @@ async fn unpin_post(
             "is_pinned": false
         }),
         Some(unpinned.channel_id),
-    ).with_broadcast(crate::realtime::WsBroadcast {
+    )
+    .with_broadcast(crate::realtime::WsBroadcast {
         channel_id: Some(unpinned.channel_id),
         team_id: None,
         user_id: None,
@@ -479,10 +499,7 @@ async fn unpin_post(
 }
 
 /// Helper to populate files for posts
-async fn populate_files(
-    state: &AppState,
-    posts: &mut [PostResponse],
-) -> ApiResult<()> {
+async fn populate_files(state: &AppState, posts: &mut [PostResponse]) -> ApiResult<()> {
     crate::services::posts::populate_files(state, posts).await
 }
 
@@ -499,7 +516,7 @@ async fn save_post(
         .await?
         .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
-    // Check if membership is needed? Usually saving implies you can see it. 
+    // Check if membership is needed? Usually saving implies you can see it.
     // If list_posts filters by membership, saving implies you have access.
     // We can skip explicit membership check here if we assume valid post ID is sufficient.
     // Let's add a quick membership check.
@@ -508,17 +525,16 @@ async fn save_post(
         .fetch_one(&state.db)
         .await?;
 
-    let _: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     sqlx::query(
-        "INSERT INTO saved_posts (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+        "INSERT INTO saved_posts (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
     )
     .bind(auth.user_id)
     .bind(id)
@@ -534,13 +550,11 @@ async fn unsave_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    sqlx::query(
-        "DELETE FROM saved_posts WHERE user_id = $1 AND post_id = $2"
-    )
-    .bind(auth.user_id)
-    .bind(id)
-    .execute(&state.db)
-    .await?;
+    sqlx::query("DELETE FROM saved_posts WHERE user_id = $1 AND post_id = $2")
+        .bind(auth.user_id)
+        .bind(id)
+        .execute(&state.db)
+        .await?;
 
     Ok(Json(serde_json::json!({"status": "unsaved"})))
 }
@@ -558,7 +572,7 @@ async fn get_saved_posts(
         LEFT JOIN users u ON p.user_id = u.id
         WHERE s.user_id = $1 AND p.deleted_at IS NULL
         ORDER BY s.created_at DESC
-        "#
+        "#,
     )
     .bind(auth.user_id)
     .fetch_all(&state.db)
@@ -576,22 +590,18 @@ async fn get_saved_posts(
 }
 
 /// Helper to populate reactions status
-async fn populate_reactions(
-    state: &AppState,
-    posts: &mut [PostResponse],
-) -> ApiResult<()> {
+async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> ApiResult<()> {
     if posts.is_empty() {
         return Ok(());
     }
 
     let post_ids: Vec<Uuid> = posts.iter().map(|p| p.id).collect();
 
-    let reactions: Vec<Reaction> = sqlx::query_as(
-        "SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY created_at"
-    )
-    .bind(&post_ids)
-    .fetch_all(&state.db)
-    .await?;
+    let reactions: Vec<Reaction> =
+        sqlx::query_as("SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY created_at")
+            .bind(&post_ids)
+            .fetch_all(&state.db)
+            .await?;
 
     let mut reaction_map: HashMap<Uuid, Vec<Reaction>> = HashMap::new();
     for r in reactions {
@@ -601,17 +611,19 @@ async fn populate_reactions(
     for post in posts {
         let post_reactions = reaction_map.remove(&post.id).unwrap_or_default();
         let mut aggregated: HashMap<String, crate::models::ReactionResponse> = HashMap::new();
-        
+
         for r in post_reactions {
-            let entry = aggregated.entry(r.emoji_name.clone()).or_insert_with(|| crate::models::ReactionResponse {
-                emoji: r.emoji_name,
-                count: 0,
-                users: vec![],
+            let entry = aggregated.entry(r.emoji_name.clone()).or_insert_with(|| {
+                crate::models::ReactionResponse {
+                    emoji: r.emoji_name,
+                    count: 0,
+                    users: vec![],
+                }
             });
             entry.count += 1;
             entry.users.push(r.user_id);
         }
-        
+
         post.reactions = aggregated.into_values().collect();
     }
 
@@ -631,7 +643,7 @@ async fn populate_saved_status(
     let post_ids: Vec<Uuid> = posts.iter().map(|p| p.id).collect();
 
     let saved_ids: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT post_id FROM saved_posts WHERE user_id = $1 AND post_id = ANY($2)"
+        "SELECT post_id FROM saved_posts WHERE user_id = $1 AND post_id = ANY($2)",
     )
     .bind(user_id)
     .bind(&post_ids)

@@ -9,9 +9,9 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
-use crate::auth::{AuthUser, hash_password};
+use crate::auth::{hash_password, AuthUser};
 use crate::error::{ApiResult, AppError};
-use crate::models::{UpdateUser, User, UserResponse, ChangePassword};
+use crate::models::{ChangePassword, UpdateUser, User, UserResponse};
 
 /// Build users routes
 pub fn router() -> Router<AppState> {
@@ -40,17 +40,15 @@ async fn list_users(
 
     let users: Vec<User> = if auth.role == "system_admin" {
         // System admin can see all users
-        sqlx::query_as(
-            "SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2"
-        )
-        .bind(per_page as i64)
-        .bind(offset)
-        .fetch_all(&state.db)
-        .await?
+        sqlx::query_as("SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2")
+            .bind(per_page as i64)
+            .bind(offset)
+            .fetch_all(&state.db)
+            .await?
     } else if let Some(org_id) = auth.org_id {
         // Regular users see their org members
         sqlx::query_as(
-            "SELECT * FROM users WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+            "SELECT * FROM users WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
         )
         .bind(org_id)
         .bind(per_page as i64)
@@ -70,13 +68,11 @@ async fn get_user(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<UserResponse>> {
-    let user: User = sqlx::query_as(
-        "SELECT * FROM users WHERE id = $1"
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     // Check access: same user, same org, or system admin
     let can_view = auth.user_id == user.id
@@ -167,7 +163,8 @@ async fn update_user(
         crate::realtime::events::EventType::UserUpdated,
         user_response.clone(),
         None,
-    ).with_broadcast(crate::realtime::events::WsBroadcast {
+    )
+    .with_broadcast(crate::realtime::events::WsBroadcast {
         team_id: None,
         channel_id: None,
         user_id: None, // Broadcast to everyone
@@ -187,7 +184,9 @@ async fn change_password(
 ) -> ApiResult<Json<serde_json::Value>> {
     // Only the user themselves can change their password
     if auth.user_id != id {
-        return Err(AppError::Forbidden("Cannot change password for another user".to_string()));
+        return Err(AppError::Forbidden(
+            "Cannot change password for another user".to_string(),
+        ));
     }
 
     // Fetch user with current password hash (still needed to ensure user exists and for other potential logic)
@@ -202,15 +201,14 @@ async fn change_password(
 
     // Hash and update
     let new_hash = hash_password(&input.new_password)?;
-    
+
     sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
         .bind(new_hash)
         .bind(id)
         .execute(&state.db)
         .await?;
 
-    Ok(Json(serde_json::json!({ "status": "success", "message": "Password updated successfully" })))
+    Ok(Json(
+        serde_json::json!({ "status": "success", "message": "Password updated successfully" }),
+    ))
 }
-
-
-

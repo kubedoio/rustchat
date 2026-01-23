@@ -41,7 +41,9 @@ async fn search_messages(
     Query(query): Query<SearchQuery>,
 ) -> ApiResult<Json<SearchResult>> {
     if query.q.trim().is_empty() {
-        return Err(AppError::Validation("Search query cannot be empty".to_string()));
+        return Err(AppError::Validation(
+            "Search query cannot be empty".to_string(),
+        ));
     }
 
     let page = query.page.unwrap_or(1).max(1);

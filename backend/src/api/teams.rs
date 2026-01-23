@@ -2,17 +2,17 @@
 
 use axum::{
     extract::{Path, State},
-    routing::{get, delete, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use uuid::Uuid;
 
+use super::AppState;
 use crate::{
     auth::middleware::AuthUser,
     error::AppError,
-    models::team::{Team, CreateTeam, TeamMember, AddTeamMember, TeamMemberResponse},
+    models::team::{AddTeamMember, CreateTeam, Team, TeamMember, TeamMemberResponse},
 };
-use super::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -37,7 +37,7 @@ async fn list_teams(
         INNER JOIN team_members tm ON t.id = tm.team_id
         WHERE tm.user_id = $1
         ORDER BY t.name
-        "#
+        "#,
     )
     .bind(auth.user_id)
     .fetch_all(&state.db)
@@ -60,7 +60,7 @@ async fn create_team(
     } else {
         // User has no org, create one based on team info
         let new_org_id = Uuid::new_v4();
-        
+
         let _ = sqlx::query(
             "INSERT INTO organizations (id, name, display_name, description) VALUES ($1, $2, $3, $4)"
         )
@@ -77,7 +77,7 @@ async fn create_team(
             .bind(auth.user_id)
             .execute(&state.db)
             .await?;
-            
+
         new_org_id
     };
 
@@ -86,7 +86,7 @@ async fn create_team(
         INSERT INTO teams (id, org_id, name, display_name, description)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *
-        "#
+        "#,
     )
     .bind(team_id)
     .bind(org_id)
@@ -101,7 +101,7 @@ async fn create_team(
         r#"
         INSERT INTO team_members (team_id, user_id, role)
         VALUES ($1, $2, 'admin')
-        "#
+        "#,
     )
     .bind(team_id)
     .bind(auth.user_id)
@@ -117,13 +117,11 @@ async fn get_team(
     _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Team>, AppError> {
-    let team = sqlx::query_as::<_, Team>(
-        "SELECT * FROM teams WHERE id = $1"
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Team not found".into()))?;
+    let team = sqlx::query_as::<_, Team>("SELECT * FROM teams WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Team not found".into()))?;
 
     Ok(Json(team))
 }
@@ -156,7 +154,7 @@ async fn get_members(
         JOIN users u ON tm.user_id = u.id
         WHERE tm.team_id = $1
         ORDER BY u.username
-        "#
+        "#,
     )
     .bind(id)
     .fetch_all(&state.db)
@@ -177,7 +175,7 @@ async fn add_member(
         INSERT INTO team_members (team_id, user_id, role)
         VALUES ($1, $2, $3)
         RETURNING *
-        "#
+        "#,
     )
     .bind(id)
     .bind(payload.user_id)
@@ -192,7 +190,7 @@ async fn add_member(
         SELECT c.id, $1 FROM channels c
         WHERE c.team_id = $2 AND c.channel_type = 'public'
         ON CONFLICT (channel_id, user_id) DO NOTHING
-        "#
+        "#,
     )
     .bind(payload.user_id)
     .bind(id)
@@ -227,7 +225,7 @@ async fn list_team_channels(
         r#"
         SELECT * FROM channels WHERE team_id = $1
         ORDER BY name
-        "#
+        "#,
     )
     .bind(team_id)
     .fetch_all(&state.db)
@@ -247,7 +245,7 @@ async fn list_public_teams(
         SELECT t.* FROM teams t
         WHERE t.is_public = true
         ORDER BY t.name
-        "#
+        "#,
     )
     .fetch_all(&state.db)
     .await?;
@@ -262,26 +260,25 @@ async fn join_team(
     Path(id): Path<Uuid>,
 ) -> Result<Json<TeamMember>, AppError> {
     // Check if team exists and is public
-    let team = sqlx::query_as::<_, Team>(
-        "SELECT * FROM teams WHERE id = $1"
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Team not found".into()))?;
+    let team = sqlx::query_as::<_, Team>("SELECT * FROM teams WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Team not found".into()))?;
 
     if !team.is_public && !team.allow_open_invite {
-        return Err(AppError::Forbidden("This team does not allow open joining".into()));
+        return Err(AppError::Forbidden(
+            "This team does not allow open joining".into(),
+        ));
     }
 
     // Check if already a member
-    let existing: Option<TeamMember> = sqlx::query_as(
-        "SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2"
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let existing: Option<TeamMember> =
+        sqlx::query_as("SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?;
 
     if existing.is_some() {
         return Err(AppError::BadRequest("Already a member of this team".into()));
@@ -293,7 +290,7 @@ async fn join_team(
         INSERT INTO team_members (team_id, user_id, role)
         VALUES ($1, $2, 'member')
         RETURNING *
-        "#
+        "#,
     )
     .bind(id)
     .bind(auth.user_id)
@@ -307,7 +304,7 @@ async fn join_team(
         SELECT c.id, $1 FROM channels c
         WHERE c.team_id = $2 AND c.channel_type = 'public'
         ON CONFLICT (channel_id, user_id) DO NOTHING
-        "#
+        "#,
     )
     .bind(auth.user_id)
     .bind(id)
@@ -330,7 +327,7 @@ async fn leave_team(
         WHERE user_id = $1 AND channel_id IN (
             SELECT id FROM channels WHERE team_id = $2
         )
-        "#
+        "#,
     )
     .bind(auth.user_id)
     .bind(id)
@@ -346,7 +343,6 @@ async fn leave_team(
 
     Ok(Json(serde_json::json!({"status": "left"})))
 }
-
 
 /// DTO for updating a team
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -366,17 +362,20 @@ async fn update_team(
     Json(payload): Json<UpdateTeam>,
 ) -> Result<Json<Team>, AppError> {
     // Check if user is admin of the team
-    let member: Option<TeamMember> = sqlx::query_as(
-        "SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2"
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let member: Option<TeamMember> =
+        sqlx::query_as("SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?;
 
     match member {
-        Some(m) if m.role == "admin" || m.role == "owner" => {},
-        _ => return Err(AppError::Forbidden("Only team admins can update team settings".into())),
+        Some(m) if m.role == "admin" || m.role == "owner" => {}
+        _ => {
+            return Err(AppError::Forbidden(
+                "Only team admins can update team settings".into(),
+            ))
+        }
     }
 
     let team = sqlx::query_as::<_, Team>(
@@ -390,7 +389,7 @@ async fn update_team(
             updated_at = NOW()
         WHERE id = $6
         RETURNING *
-        "#
+        "#,
     )
     .bind(payload.name)
     .bind(payload.display_name)

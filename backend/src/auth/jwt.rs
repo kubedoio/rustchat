@@ -26,7 +26,13 @@ pub struct Claims {
 
 impl Claims {
     /// Create new claims for a user
-    pub fn new(user_id: Uuid, email: String, role: String, org_id: Option<Uuid>, expiry_hours: u64) -> Self {
+    pub fn new(
+        user_id: Uuid,
+        email: String,
+        role: String,
+        org_id: Option<Uuid>,
+        expiry_hours: u64,
+    ) -> Self {
         let now = Utc::now();
         let exp = now + Duration::hours(expiry_hours as i64);
 
@@ -50,7 +56,13 @@ pub fn create_token(
     secret: &str,
     expiry_hours: u64,
 ) -> Result<String, AppError> {
-    let claims = Claims::new(user_id, email.to_string(), role.to_string(), org_id, expiry_hours);
+    let claims = Claims::new(
+        user_id,
+        email.to_string(),
+        role.to_string(),
+        org_id,
+        expiry_hours,
+    );
 
     encode(
         &Header::default(),

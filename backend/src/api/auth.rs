@@ -6,7 +6,6 @@ use axum::{
     Json, Router,
 };
 
-
 use super::AppState;
 use crate::auth::{create_token, hash_password, verify_password, AuthUser};
 use crate::error::{ApiResult, AppError};
@@ -36,9 +35,11 @@ async fn register(
 ) -> ApiResult<Json<AuthResponse>> {
     // Validate input
     if input.username.len() < 3 {
-        return Err(AppError::Validation("Username must be at least 3 characters".to_string()));
+        return Err(AppError::Validation(
+            "Username must be at least 3 characters".to_string(),
+        ));
     }
-    
+
     // Enforce password complexity
     let config = crate::services::auth_config::get_password_rules(&state.db).await?;
     crate::services::auth_config::validate_password(&input.password, &config)?;
@@ -48,24 +49,20 @@ async fn register(
     }
 
     // Check if email already exists
-    let existing: Option<User> = sqlx::query_as(
-        "SELECT * FROM users WHERE email = $1"
-    )
-    .bind(&input.email)
-    .fetch_optional(&state.db)
-    .await?;
+    let existing: Option<User> = sqlx::query_as("SELECT * FROM users WHERE email = $1")
+        .bind(&input.email)
+        .fetch_optional(&state.db)
+        .await?;
 
     if existing.is_some() {
         return Err(AppError::Conflict("Email already registered".to_string()));
     }
 
     // Check if username already exists
-    let existing_username: Option<User> = sqlx::query_as(
-        "SELECT * FROM users WHERE username = $1"
-    )
-    .bind(&input.username)
-    .fetch_optional(&state.db)
-    .await?;
+    let existing_username: Option<User> = sqlx::query_as("SELECT * FROM users WHERE username = $1")
+        .bind(&input.username)
+        .fetch_optional(&state.db)
+        .await?;
 
     if existing_username.is_some() {
         return Err(AppError::Conflict("Username already taken".to_string()));
@@ -86,7 +83,7 @@ async fn register(
     .bind(&input.email)
     .bind(&password_hash)
     .bind(&input.display_name)
-    .bind(&input.org_id)
+    .bind(input.org_id)
     .fetch_one(&state.db)
     .await?;
 
@@ -114,17 +111,17 @@ async fn login(
     Json(input): Json<LoginRequest>,
 ) -> ApiResult<Json<AuthResponse>> {
     // Find user by email
-    let user: User = sqlx::query_as(
-        "SELECT * FROM users WHERE email = $1 AND is_active = true"
-    )
-    .bind(&input.email)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Unauthorized("Invalid email or password".to_string()))?;
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE email = $1 AND is_active = true")
+        .bind(&input.email)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::Unauthorized("Invalid email or password".to_string()))?;
 
     // Verify password
     if !verify_password(&input.password, &user.password_hash)? {
-        return Err(AppError::Unauthorized("Invalid email or password".to_string()));
+        return Err(AppError::Unauthorized(
+            "Invalid email or password".to_string(),
+        ));
     }
 
     // Update last login
@@ -152,16 +149,11 @@ async fn login(
 }
 
 /// Get current authenticated user
-async fn me(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> ApiResult<Json<UserResponse>> {
-    let user: User = sqlx::query_as(
-        "SELECT * FROM users WHERE id = $1"
-    )
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+async fn me(State(state): State<AppState>, auth: AuthUser) -> ApiResult<Json<UserResponse>> {
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
 
     Ok(Json(UserResponse::from(user)))
 }

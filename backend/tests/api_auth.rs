@@ -15,7 +15,8 @@ async fn register_user_success() {
         "org_id": Uuid::new_v4()
     });
 
-    let response = app.api_client
+    let response = app
+        .api_client
         .post(&format!("{}/api/v1/auth/register", &app.address))
         .json(&user_data)
         .send()
@@ -53,7 +54,8 @@ async fn login_user_success() {
         "password": "Password123!"
     });
 
-    let response = app.api_client
+    let response = app
+        .api_client
         .post(&format!("{}/api/v1/auth/login", &app.address))
         .json(&login_data)
         .send()

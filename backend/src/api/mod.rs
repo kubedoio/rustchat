@@ -21,10 +21,7 @@ mod ws;
 
 use std::sync::Arc;
 
-use axum::{
-    http::Method,
-    Router,
-};
+use axum::{http::Method, Router};
 use sqlx::PgPool;
 use tower_http::{
     compression::CompressionLayer,
@@ -48,13 +45,13 @@ pub struct AppState {
 
 /// Build the main application router
 pub fn router(
-    db: PgPool, 
-    jwt_secret: String, 
-    jwt_expiry_hours: u64, 
+    db: PgPool,
+    jwt_secret: String,
+    jwt_expiry_hours: u64,
     ws_hub: Arc<WsHub>,
     s3_client: S3Client,
 ) -> Router {
-    let state = AppState { 
+    let state = AppState {
         db,
         jwt_secret,
         jwt_expiry_hours,
@@ -66,7 +63,13 @@ pub fn router(
     // CORS configuration
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::PATCH])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+        ])
         .allow_headers(Any);
 
     // API v1 routes

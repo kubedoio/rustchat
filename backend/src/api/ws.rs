@@ -16,8 +16,8 @@ use serde::Deserialize;
 use super::AppState;
 use crate::auth::validate_token;
 use crate::realtime::{
-    ClientEnvelope, EventType, PresenceEvent, TypingEvent, WsBroadcast, WsEnvelope,
-    TypingCommandData,
+    ClientEnvelope, EventType, PresenceEvent, TypingCommandData, TypingEvent, WsBroadcast,
+    WsEnvelope,
 };
 
 /// Build WebSocket routes
@@ -48,7 +48,7 @@ async fn ws_handler(
     };
 
     let user_id = claims.sub;
-    
+
     // Fetch username
     let username = match sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
         .bind(user_id)
@@ -77,7 +77,10 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
 
     let presence_evt = WsEnvelope::event(
         EventType::UserPresence,
-        PresenceEvent { user_id, status: "online".to_string() },
+        PresenceEvent {
+            user_id,
+            status: "online".to_string(),
+        },
         None,
     );
     state.ws_hub.broadcast(presence_evt).await;
@@ -111,80 +114,89 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
                         match envelope.event.as_str() {
                             "send_message" => {
                                 if let Some(cid) = channel_id {
-                                    if let Ok(input) = serde_json::from_value::<crate::models::CreatePost>(envelope.data.clone()) {
+                                    if let Ok(input) =
+                                        serde_json::from_value::<crate::models::CreatePost>(
+                                            envelope.data.clone(),
+                                        )
+                                    {
                                         // Process message sending
                                         match crate::services::posts::create_post(
-                                            &state_for_receive, 
-                                            user_id, 
-                                            cid, 
+                                            &state_for_receive,
+                                            user_id,
+                                            cid,
                                             input,
-                                            envelope.client_msg_id
-                                        ).await {
+                                            envelope.client_msg_id,
+                                        )
+                                        .await
+                                        {
                                             Ok(_) => {
                                                 // Message created and broadcasted by service.
                                                 // We can optionally send an Ack here if needed, but not strictly required as per plan.
-                                            },
+                                            }
                                             Err(e) => {
                                                 // Send error back
                                                 let err_msg = e.to_string();
                                                 let err = WsEnvelope::error(&err_msg);
                                                 // Direct response to user (broadcast with target user_id)
-                                                hub_for_receive.broadcast(
-                                                    err.with_broadcast(WsBroadcast {
+                                                hub_for_receive
+                                                    .broadcast(err.with_broadcast(WsBroadcast {
                                                         user_id: Some(user_id),
                                                         channel_id: None,
                                                         team_id: None,
-                                                        exclude_user_id: None
-                                                    })
-                                                ).await;
+                                                        exclude_user_id: None,
+                                                    }))
+                                                    .await;
                                             }
                                         }
                                     }
                                 }
-                            },
+                            }
                             "subscribe_channel" => {
                                 if let Some(cid) = channel_id {
                                     hub_for_receive.subscribe_channel(user_id, cid).await;
                                     // Ack? Or just emit event? Spec says server->client event "channel_subscribed"
                                     let evt = WsEnvelope::event(
-                                        EventType::ChannelSubscribed, 
-                                        serde_json::json!({ "channel_id": cid }), 
-                                        None // Direct response
+                                        EventType::ChannelSubscribed,
+                                        serde_json::json!({ "channel_id": cid }),
+                                        None, // Direct response
                                     );
                                     // To send direct response, we'd need access to 'sender' but that's in another task...
                                     // Actually WsHub.broadcast with user_id target can do it.
-                                    hub_for_receive.broadcast(
-                                        evt.with_broadcast(WsBroadcast { 
-                                            user_id: Some(user_id), 
-                                            channel_id: None, 
-                                            team_id: None, 
-                                            exclude_user_id: None 
-                                        })
-                                    ).await;
+                                    hub_for_receive
+                                        .broadcast(evt.with_broadcast(WsBroadcast {
+                                            user_id: Some(user_id),
+                                            channel_id: None,
+                                            team_id: None,
+                                            exclude_user_id: None,
+                                        }))
+                                        .await;
                                 }
-                            },
+                            }
                             "unsubscribe_channel" => {
                                 if let Some(cid) = channel_id {
                                     hub_for_receive.unsubscribe_channel(user_id, cid).await;
                                     let evt = WsEnvelope::event(
-                                        EventType::ChannelUnsubscribed, 
-                                        serde_json::json!({ "channel_id": cid }), 
-                                        None
+                                        EventType::ChannelUnsubscribed,
+                                        serde_json::json!({ "channel_id": cid }),
+                                        None,
                                     );
-                                     hub_for_receive.broadcast(
-                                        evt.with_broadcast(WsBroadcast { 
-                                            user_id: Some(user_id), 
-                                            channel_id: None, 
-                                            team_id: None, 
-                                            exclude_user_id: None 
-                                        })
-                                    ).await;
+                                    hub_for_receive
+                                        .broadcast(evt.with_broadcast(WsBroadcast {
+                                            user_id: Some(user_id),
+                                            channel_id: None,
+                                            team_id: None,
+                                            exclude_user_id: None,
+                                        }))
+                                        .await;
                                 }
-                            },
+                            }
                             "typing" | "typing_start" => {
                                 // prompt requests "typing_start" but let's handle "typing" for backward compat if needed
                                 if let Some(cid) = channel_id {
-                                    let thread_root_id = if let Ok(data) = serde_json::from_value::<TypingCommandData>(envelope.data.clone()) {
+                                    let thread_root_id = if let Ok(data) =
+                                        serde_json::from_value::<TypingCommandData>(
+                                            envelope.data.clone(),
+                                        ) {
                                         data.thread_root_id
                                     } else {
                                         None
@@ -197,22 +209,25 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
                                             display_name: username.clone(),
                                             thread_root_id,
                                         },
-                                        Some(cid)
+                                        Some(cid),
                                     );
-                                    
-                                    hub_for_receive.broadcast(
-                                        event.with_broadcast(WsBroadcast { 
-                                            channel_id: Some(cid), 
-                                            user_id: None, 
-                                            team_id: None, 
-                                            exclude_user_id: Some(user_id) // Don't echo valid typing to self
-                                        })
-                                    ).await;
+
+                                    hub_for_receive
+                                        .broadcast(event.with_broadcast(WsBroadcast {
+                                            channel_id: Some(cid),
+                                            user_id: None,
+                                            team_id: None,
+                                            exclude_user_id: Some(user_id), // Don't echo valid typing to self
+                                        }))
+                                        .await;
                                 }
-                            },
-                             "typing_stop" => {
+                            }
+                            "typing_stop" => {
                                 if let Some(cid) = channel_id {
-                                    let thread_root_id = if let Ok(data) = serde_json::from_value::<TypingCommandData>(envelope.data.clone()) {
+                                    let thread_root_id = if let Ok(data) =
+                                        serde_json::from_value::<TypingCommandData>(
+                                            envelope.data.clone(),
+                                        ) {
                                         data.thread_root_id
                                     } else {
                                         None
@@ -225,54 +240,68 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
                                             display_name: username.clone(),
                                             thread_root_id,
                                         },
-                                        Some(cid)
+                                        Some(cid),
                                     );
-                                    
-                                    hub_for_receive.broadcast(
-                                        event.with_broadcast(WsBroadcast { 
-                                            channel_id: Some(cid), 
-                                            user_id: None, 
-                                            team_id: None, 
-                                            exclude_user_id: Some(user_id)
-                                        })
-                                    ).await;
+
+                                    hub_for_receive
+                                        .broadcast(event.with_broadcast(WsBroadcast {
+                                            channel_id: Some(cid),
+                                            user_id: None,
+                                            team_id: None,
+                                            exclude_user_id: Some(user_id),
+                                        }))
+                                        .await;
                                 }
-                            },
+                            }
                             "presence" => {
-                                if let Some(status) = envelope.data.get("status").and_then(|v| v.as_str()) {
-                                    hub_for_receive.set_presence(user_id, status.to_string()).await;
+                                if let Some(status) =
+                                    envelope.data.get("status").and_then(|v| v.as_str())
+                                {
+                                    hub_for_receive
+                                        .set_presence(user_id, status.to_string())
+                                        .await;
                                     let event = WsEnvelope::event(
                                         EventType::UserPresence,
-                                        PresenceEvent { user_id, status: status.to_string() },
+                                        PresenceEvent {
+                                            user_id,
+                                            status: status.to_string(),
+                                        },
                                         None,
                                     );
                                     // Presence is global? or per team? Usually broadcast to known connections.
                                     // For now, broadcast global or we'd need team context.
-                                    hub_for_receive.broadcast(event).await; 
+                                    hub_for_receive.broadcast(event).await;
                                 }
-                            },
+                            }
                             "ping" => {
                                 // Should reply with Pong
                                 // Since we can't easily access 'sender', assume axum handles low level ping frames,
                                 // but for application level ping/pong:
                                 let pong = WsEnvelope::pong();
-                                hub_for_receive.broadcast(
-                                    pong.with_broadcast(WsBroadcast {
+                                hub_for_receive
+                                    .broadcast(pong.with_broadcast(WsBroadcast {
                                         user_id: Some(user_id),
-                                        channel_id: None, team_id: None, exclude_user_id: None
-                                    })
-                                ).await;
-                            },
-                            _ => { 
+                                        channel_id: None,
+                                        team_id: None,
+                                        exclude_user_id: None,
+                                    }))
+                                    .await;
+                            }
+                            _ => {
                                 // Unknown command
                                 let err = WsEnvelope::error("Unknown command");
-                                hub_for_receive.broadcast(
-                                    err.with_broadcast(WsBroadcast { user_id: Some(user_id), channel_id: None, team_id: None, exclude_user_id: None })
-                                ).await;
+                                hub_for_receive
+                                    .broadcast(err.with_broadcast(WsBroadcast {
+                                        user_id: Some(user_id),
+                                        channel_id: None,
+                                        team_id: None,
+                                        exclude_user_id: None,
+                                    }))
+                                    .await;
                             }
                         }
                     } else {
-                         println!("DEBUG: Failed to parse ClientEnvelope: {}", text);
+                        println!("DEBUG: Failed to parse ClientEnvelope: {}", text);
                     }
                 }
                 Ok(Message::Close(_)) => break,
@@ -299,7 +328,10 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
 
     let presence_evt = WsEnvelope::event(
         EventType::UserPresence,
-        PresenceEvent { user_id, status: "offline".to_string() },
+        PresenceEvent {
+            user_id,
+            status: "offline".to_string(),
+        },
         None,
     );
     state.ws_hub.broadcast(presence_evt).await;

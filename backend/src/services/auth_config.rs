@@ -1,18 +1,17 @@
 //! Service for handling authentication configuration and password validation
 
-use sqlx::PgPool;
 use crate::error::AppError;
 use crate::models::AuthConfig;
+use sqlx::PgPool;
 
 /// Get the current password policy from server configuration
 pub async fn get_password_rules(db: &PgPool) -> Result<AuthConfig, AppError> {
-    let config: (sqlx::types::Json<AuthConfig>,) = sqlx::query_as(
-        "SELECT authentication FROM server_config WHERE id = 'default'"
-    )
-    .fetch_one(db)
-    .await?;
+    let config: (sqlx::types::Json<AuthConfig>,) =
+        sqlx::query_as("SELECT authentication FROM server_config WHERE id = 'default'")
+            .fetch_one(db)
+            .await?;
 
-    Ok(config.0.0)
+    Ok(config.0 .0)
 }
 
 /// Validate a password against the provided configuration

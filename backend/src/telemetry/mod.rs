@@ -11,8 +11,8 @@ use tracing_subscriber::{
 
 /// Initialize telemetry (logging and tracing)
 pub fn init(log_level: &str) {
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(log_level));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
     let fmt_layer = fmt::layer()
         .with_target(true)
