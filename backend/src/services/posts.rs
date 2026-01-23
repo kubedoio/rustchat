@@ -1,10 +1,10 @@
-use uuid::Uuid;
 use std::collections::HashMap;
+use uuid::Uuid;
 
-use crate::error::{ApiResult, AppError};
-use crate::models::{Post, PostResponse, CreatePost, ChannelMember, FileUploadResponse};
-use crate::realtime::{WsEnvelope, EventType, WsBroadcast};
 use crate::api::AppState;
+use crate::error::{ApiResult, AppError};
+use crate::models::{ChannelMember, CreatePost, FileUploadResponse, Post, PostResponse};
+use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 
 /// Create a new post
 pub async fn create_post(
@@ -15,14 +15,13 @@ pub async fn create_post(
     client_msg_id: Option<String>,
 ) -> ApiResult<PostResponse> {
     // Check membership
-    let _: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     // Validate message
     if input.message.trim().is_empty() && input.file_ids.is_empty() {
@@ -32,13 +31,12 @@ pub async fn create_post(
     // Validate root_post_id if provided
     let root_post_id = input.root_post_id;
     if let Some(r_id) = root_post_id {
-        let root_post: Option<Post> = sqlx::query_as(
-            "SELECT * FROM posts WHERE id = $1 AND channel_id = $2"
-        )
-        .bind(r_id)
-        .bind(channel_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let root_post: Option<Post> =
+            sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND channel_id = $2")
+                .bind(r_id)
+                .bind(channel_id)
+                .fetch_optional(&state.db)
+                .await?;
 
         if root_post.is_none() {
             return Err(AppError::BadRequest("Invalid root post".to_string()));
@@ -65,7 +63,7 @@ pub async fn create_post(
     // If this is a reply, update the root post
     if let Some(r_id) = root_post_id {
         sqlx::query(
-            "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1"
+            "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1",
         )
         .bind(r_id)
         .execute(&state.db)
@@ -80,12 +78,11 @@ pub async fn create_post(
         email: String,
     }
 
-    let user: PostUser = sqlx::query_as(
-        "SELECT username, avatar_url, email FROM users WHERE id = $1"
-    )
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let user: PostUser =
+        sqlx::query_as("SELECT username, avatar_url, email FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await?;
 
     let mut response = PostResponse {
         id: post.id,
@@ -112,7 +109,7 @@ pub async fn create_post(
 
     // Populate files if any
     if !response.file_ids.is_empty() {
-         populate_files(state, &mut std::slice::from_mut(&mut response)).await?;
+        populate_files(state, std::slice::from_mut(&mut response)).await?;
     }
 
     // Broadcast new message
@@ -122,31 +119,28 @@ pub async fn create_post(
         EventType::MessageCreated
     };
 
-    let broadcast = WsEnvelope::event(
-        event_type,
-        response.clone(),
-        Some(channel_id),
-    )
-    .with_broadcast(WsBroadcast {
-        channel_id: Some(channel_id),
-        team_id: None,
-        user_id: None,
-        exclude_user_id: None,
-    });
-    
+    let broadcast = WsEnvelope::event(event_type, response.clone(), Some(channel_id))
+        .with_broadcast(WsBroadcast {
+            channel_id: Some(channel_id),
+            team_id: None,
+            user_id: None,
+            exclude_user_id: None,
+        });
+
     state.ws_hub.broadcast(broadcast).await;
-    
+
     // If reply, broadcast update to root post
     if let Some(r_id) = root_post_id {
-         let root_update = WsEnvelope::event(
+        let root_update = WsEnvelope::event(
             EventType::MessageUpdated,
             serde_json::json!({
                 "id": r_id,
-                "reply_count_inc": 1, 
+                "reply_count_inc": 1,
                 "last_reply_at": post.created_at
             }),
-            Some(channel_id)
-        ).with_broadcast(WsBroadcast {
+            Some(channel_id),
+        )
+        .with_broadcast(WsBroadcast {
             channel_id: Some(channel_id),
             team_id: None,
             user_id: None,
@@ -161,11 +155,16 @@ pub async fn create_post(
     }
 
     // Parse mentions (simple parsing for now)
-    let mentions: Vec<String> = response.message
+    let mentions: Vec<String> = response
+        .message
         .split_whitespace()
         .filter_map(|word| {
             if word.starts_with('@') && word.len() > 1 {
-                Some(word[1..].trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+                Some(
+                    word[1..]
+                        .trim_matches(|c: char| !c.is_alphanumeric())
+                        .to_string(),
+                )
             } else {
                 None
             }
@@ -174,19 +173,20 @@ pub async fn create_post(
 
     if !mentions.is_empty() {
         // We could store these in the DB if we wanted persistent notifications
-        // For now, we'll just include them in the broadcast if needed, 
+        // For now, we'll just include them in the broadcast if needed,
         // but the frontend already parses them from the message string.
         // Let's at least update the props to include mentions metadata.
         let mut props = response.props.as_object().cloned().unwrap_or_default();
         props.insert("mentions".to_string(), serde_json::json!(mentions));
-        
+
         // Update DB with the new props
         sqlx::query("UPDATE posts SET props = $1 WHERE id = $2")
             .bind(serde_json::Value::Object(props.clone()))
             .bind(post.id)
             .execute(&state.db)
-            .await.ok();
-            
+            .await
+            .ok();
+
         response.props = serde_json::Value::Object(props);
     }
 
@@ -194,14 +194,9 @@ pub async fn create_post(
 }
 
 /// Helper to populate files for posts
-pub async fn populate_files(
-    state: &AppState,
-    posts: &mut [PostResponse],
-) -> ApiResult<()> {
+pub async fn populate_files(state: &AppState, posts: &mut [PostResponse]) -> ApiResult<()> {
     // 1. Collect all file IDs
-    let all_file_ids: Vec<Uuid> = posts.iter()
-        .flat_map(|p| p.file_ids.clone())
-        .collect();
+    let all_file_ids: Vec<Uuid> = posts.iter().flat_map(|p| p.file_ids.clone()).collect();
 
     if all_file_ids.is_empty() {
         return Ok(());
@@ -209,35 +204,44 @@ pub async fn populate_files(
 
     // 2. Fetch file infos
     // crate::models::FileInfo is needed, ensure it is pub
-    let files: Vec<crate::models::FileInfo> = sqlx::query_as(
-        "SELECT * FROM files WHERE id = ANY($1)"
-    )
-    .bind(&all_file_ids)
-    .fetch_all(&state.db)
-    .await?;
+    let files: Vec<crate::models::FileInfo> =
+        sqlx::query_as("SELECT * FROM files WHERE id = ANY($1)")
+            .bind(&all_file_ids)
+            .fetch_all(&state.db)
+            .await?;
 
     // 3. Generate presigned URLs and map to posts
     let mut file_map = HashMap::new();
     for file in files {
-         let url = state.s3_client.presigned_download_url(&file.key, 3600).await?;
-         let thumbnail_url = if file.has_thumbnail {
-             if let Some(t_key) = &file.thumbnail_key {
-                 state.s3_client.presigned_download_url(t_key, 3600).await.ok()
-             } else {
-                 None
-             }
-         } else {
-             None
-         };
+        let url = state
+            .s3_client
+            .presigned_download_url(&file.key, 3600)
+            .await?;
+        let thumbnail_url = if file.has_thumbnail {
+            if let Some(t_key) = &file.thumbnail_key {
+                state
+                    .s3_client
+                    .presigned_download_url(t_key, 3600)
+                    .await
+                    .ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
-         file_map.insert(file.id, FileUploadResponse {
-             id: file.id,
-             name: file.name,
-             mime_type: file.mime_type,
-             size: file.size,
-             url,
-             thumbnail_url
-         });
+        file_map.insert(
+            file.id,
+            FileUploadResponse {
+                id: file.id,
+                name: file.name,
+                mime_type: file.mime_type,
+                size: file.size,
+                url,
+                thumbnail_url,
+            },
+        );
     }
 
     for post in posts {
@@ -252,7 +256,11 @@ pub async fn populate_files(
     Ok(())
 }
 
-async fn check_playbook_triggers(state: &AppState, channel_id: Uuid, message: &str) -> ApiResult<()> {
+async fn check_playbook_triggers(
+    state: &AppState,
+    channel_id: Uuid,
+    message: &str,
+) -> ApiResult<()> {
     // 1. Get team_id
     let channel_info = sqlx::query!("SELECT team_id FROM channels WHERE id = $1", channel_id)
         .fetch_optional(&state.db)
@@ -276,24 +284,24 @@ async fn check_playbook_triggers(state: &AppState, channel_id: Uuid, message: &s
         let lower_message = message.to_lowercase();
 
         for playbook in playbooks {
-             if let Some(triggers) = &playbook.keyword_triggers {
+            if let Some(triggers) = &playbook.keyword_triggers {
                 for trigger in triggers {
                     if !trigger.is_empty() && lower_message.contains(&trigger.to_lowercase()) {
                         // Match found
                         let system_msg = format!(
                             "**Playbook Trigger**: Keyword '{}' detected.\n[Start Run for {}](/playbooks/{}/start)",
                             trigger, playbook.name, playbook.id
-                        ); 
+                        );
 
                         // Insert post
-                         sqlx::query(
+                        sqlx::query(
                             r#"
                             INSERT INTO posts (channel_id, user_id, message, props)
                             VALUES ($1, $2, $3, $4)
-                            "#
+                            "#,
                         )
                         .bind(channel_id)
-                        .bind(bot_user.unwrap_or_else(|| Uuid::nil())) 
+                        .bind(bot_user.unwrap_or_else(Uuid::nil))
                         .bind(&system_msg)
                         .bind(serde_json::json!({
                             "type": "system_playbook_trigger",
@@ -301,12 +309,13 @@ async fn check_playbook_triggers(state: &AppState, channel_id: Uuid, message: &s
                             "playbook_id": playbook.id
                         }))
                         .execute(&state.db)
-                        .await.ok();
-                        
+                        .await
+                        .ok();
+
                         return Ok(());
                     }
                 }
-             }
+            }
         }
     }
     Ok(())

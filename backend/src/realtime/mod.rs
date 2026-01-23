@@ -2,8 +2,8 @@
 //!
 //! Provides WebSocket hub for presence, typing indicators, and event fan-out.
 
-pub mod hub;
 pub mod events;
+pub mod hub;
 
-pub use hub::*;
 pub use events::*;
+pub use hub::*;

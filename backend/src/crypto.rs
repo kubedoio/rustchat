@@ -1,6 +1,6 @@
 //! Cryptography utilities
-use magic_crypt::{new_magic_crypt, MagicCryptTrait};
 use crate::error::AppError;
+use magic_crypt::{new_magic_crypt, MagicCryptTrait};
 
 /// Encrypts a plaintext string using AES-GCM
 pub fn encrypt(plaintext: &str, key: &str) -> String {

@@ -19,7 +19,10 @@ use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_channels).post(create_channel))
-        .route("/{id}", get(get_channel).put(update_channel).delete(archive_channel))
+        .route(
+            "/{id}",
+            get(get_channel).put(update_channel).delete(archive_channel),
+        )
         .route("/{id}/members", get(list_members).post(add_member))
         .route("/{id}/members/{user_id}", delete(remove_member))
 }
@@ -42,13 +45,12 @@ async fn list_channels(
 
     if available_to_join {
         // First check if user is a member of the team
-        let team_member = sqlx::query(
-            "SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2"
-        )
-        .bind(query.team_id)
-        .bind(auth.user_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let team_member =
+            sqlx::query("SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2")
+                .bind(query.team_id)
+                .bind(auth.user_id)
+                .fetch_optional(&state.db)
+                .await?;
 
         if team_member.is_none() {
             return Err(AppError::Forbidden("Not a member of this team".to_string()));
@@ -126,7 +128,7 @@ async fn create_channel(
 
         // Check if DM channel already exists in this team
         let existing = sqlx::query_as::<_, Channel>(
-            "SELECT * FROM channels WHERE team_id = $1 AND name = $2 AND type = 'direct'"
+            "SELECT * FROM channels WHERE team_id = $1 AND name = $2 AND type = 'direct'",
         )
         .bind(input.team_id)
         .bind(&dm_name)
@@ -134,24 +136,25 @@ async fn create_channel(
         .await?;
 
         if let Some(channel) = existing {
-             // Even if it exists, the requesting user might not have it in their local list if they just switched devices
-             // But usually we just return it. The user will be redirected.
-             // If we really want to be safe, we could send the event to the requester again.
-             // But for now, just return.
+            // Even if it exists, the requesting user might not have it in their local list if they just switched devices
+            // But usually we just return it. The user will be redirected.
+            // If we really want to be safe, we could send the event to the requester again.
+            // But for now, just return.
             return Ok(Json(channel));
         }
 
         // Validate target user exists in the team
-        let is_target_member = sqlx::query(
-            "SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2"
-        )
-        .bind(input.team_id)
-        .bind(target_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let is_target_member =
+            sqlx::query("SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2")
+                .bind(input.team_id)
+                .bind(target_id)
+                .fetch_optional(&state.db)
+                .await?;
 
         if is_target_member.is_none() {
-            return Err(AppError::Forbidden("Target user is not a member of this team".to_string()));
+            return Err(AppError::Forbidden(
+                "Target user is not a member of this team".to_string(),
+            ));
         }
 
         // Create DM channel
@@ -164,7 +167,12 @@ async fn create_channel(
         )
         .bind(input.team_id)
         .bind(&dm_name)
-        .bind(input.display_name.as_ref().unwrap_or(&"Direct Message".to_string()))
+        .bind(
+            input
+                .display_name
+                .as_ref()
+                .unwrap_or(&"Direct Message".to_string()),
+        )
         .bind(&input.purpose)
         .bind(input.channel_type)
         .bind(auth.user_id)
@@ -180,18 +188,16 @@ async fn create_channel(
             .bind(user_id)
             .execute(&state.db)
             .await?;
-            
+
             // Broadcast event to each user individually
-             let event = WsEnvelope::event(
-                EventType::ChannelCreated,
-                channel.clone(),
-                Some(channel.id),
-            ).with_broadcast(WsBroadcast {
-                user_id: Some(user_id),
-                channel_id: None,
-                team_id: None,
-                exclude_user_id: None,
-            });
+            let event =
+                WsEnvelope::event(EventType::ChannelCreated, channel.clone(), Some(channel.id))
+                    .with_broadcast(WsBroadcast {
+                        user_id: Some(user_id),
+                        channel_id: None,
+                        team_id: None,
+                        exclude_user_id: None,
+                    });
             state.ws_hub.broadcast(event).await;
         }
 
@@ -200,17 +206,17 @@ async fn create_channel(
 
     // Standard channel creation (Public/Private)
     if input.name.len() < 2 {
-        return Err(AppError::Validation("Channel name must be at least 2 characters".to_string()));
+        return Err(AppError::Validation(
+            "Channel name must be at least 2 characters".to_string(),
+        ));
     }
 
     // Check if team exists and user is member
-    let member = sqlx::query(
-        "SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2"
-    )
-    .bind(input.team_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let member = sqlx::query("SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2")
+        .bind(input.team_id)
+        .bind(auth.user_id)
+        .fetch_optional(&state.db)
+        .await?;
 
     if member.is_none() {
         return Err(AppError::Forbidden("Not a member of this team".to_string()));
@@ -234,13 +240,11 @@ async fn create_channel(
     .await?;
 
     // Add creator as admin member
-    sqlx::query(
-        "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'admin')"
-    )
-    .bind(channel.id)
-    .bind(auth.user_id)
-    .execute(&state.db)
-    .await?;
+    sqlx::query("INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'admin')")
+        .bind(channel.id)
+        .bind(auth.user_id)
+        .execute(&state.db)
+        .await?;
 
     // Broadcast event
     let broadcast = if channel.channel_type == crate::models::ChannelType::Public {
@@ -261,12 +265,9 @@ async fn create_channel(
         }
     };
 
-    let event = WsEnvelope::event(
-        EventType::ChannelCreated,
-        channel.clone(),
-        Some(channel.id),
-    ).with_broadcast(broadcast);
-    
+    let event = WsEnvelope::event(EventType::ChannelCreated, channel.clone(), Some(channel.id))
+        .with_broadcast(broadcast);
+
     state.ws_hub.broadcast(event).await;
 
     Ok(Json(channel))
@@ -279,14 +280,13 @@ async fn get_channel(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Channel>> {
     // Check membership
-    let _member: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _member: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     let channel: Channel = sqlx::query_as("SELECT * FROM channels WHERE id = $1")
         .bind(id)
@@ -304,17 +304,18 @@ async fn update_channel(
     Json(input): Json<UpdateChannel>,
 ) -> ApiResult<Json<Channel>> {
     // Check admin membership
-    let member: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let member: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     if member.role != "admin" && auth.role != "system_admin" {
-        return Err(AppError::Forbidden("Not an admin of this channel".to_string()));
+        return Err(AppError::Forbidden(
+            "Not an admin of this channel".to_string(),
+        ));
     }
 
     // Update fields
@@ -355,25 +356,25 @@ async fn archive_channel(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Channel>> {
     // Check admin
-    let member: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let member: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     if member.role != "admin" && auth.role != "system_admin" {
-        return Err(AppError::Forbidden("Not an admin of this channel".to_string()));
+        return Err(AppError::Forbidden(
+            "Not an admin of this channel".to_string(),
+        ));
     }
 
-    let channel: Channel = sqlx::query_as(
-        "UPDATE channels SET is_archived = true WHERE id = $1 RETURNING *"
-    )
-    .bind(id)
-    .fetch_one(&state.db)
-    .await?;
+    let channel: Channel =
+        sqlx::query_as("UPDATE channels SET is_archived = true WHERE id = $1 RETURNING *")
+            .bind(id)
+            .fetch_one(&state.db)
+            .await?;
 
     Ok(Json(channel))
 }
@@ -385,14 +386,13 @@ async fn list_members(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Vec<ChannelMember>>> {
     // Check membership
-    let _: ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     let members: Vec<ChannelMember> = sqlx::query_as(
         r#"
@@ -424,10 +424,10 @@ async fn add_member(
             .bind(id)
             .fetch_one(&state.db)
             .await?;
-        
+
         if channel.channel_type != crate::models::ChannelType::Public {
-             let member: ChannelMember = sqlx::query_as(
-                "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
+            let member: ChannelMember = sqlx::query_as(
+                "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2",
             )
             .bind(id)
             .bind(auth.user_id)
@@ -436,23 +436,26 @@ async fn add_member(
             .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
             if member.role != "admin" && auth.role != "system_admin" {
-                return Err(AppError::Forbidden("Cannot join private channel without invite".to_string()));
+                return Err(AppError::Forbidden(
+                    "Cannot join private channel without invite".to_string(),
+                ));
             }
         }
         // If public, allow proceed
     } else {
         // Adding someone else - require admin
-        let member: ChannelMember = sqlx::query_as(
-            "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-        )
-        .bind(id)
-        .bind(auth.user_id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+        let member: ChannelMember =
+            sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+                .bind(id)
+                .bind(auth.user_id)
+                .fetch_optional(&state.db)
+                .await?
+                .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
         if member.role != "admin" && auth.role != "system_admin" {
-            return Err(AppError::Forbidden("Not an admin of this channel".to_string()));
+            return Err(AppError::Forbidden(
+                "Not an admin of this channel".to_string(),
+            ));
         }
     }
 
@@ -487,17 +490,18 @@ async fn remove_member(
 ) -> ApiResult<Json<serde_json::Value>> {
     // Check admin membership (or user removing themselves)
     if auth.user_id != user_id {
-        let member: ChannelMember = sqlx::query_as(
-            "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-        )
-        .bind(channel_id)
-        .bind(auth.user_id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+        let member: ChannelMember =
+            sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+                .bind(channel_id)
+                .bind(auth.user_id)
+                .fetch_optional(&state.db)
+                .await?
+                .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
         if member.role != "admin" && auth.role != "system_admin" {
-            return Err(AppError::Forbidden("Not an admin of this channel".to_string()));
+            return Err(AppError::Forbidden(
+                "Not an admin of this channel".to_string(),
+            ));
         }
     }
 

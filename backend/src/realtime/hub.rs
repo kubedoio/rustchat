@@ -38,18 +38,22 @@ impl WsHub {
     }
 
     /// Add a new connection
-    pub async fn add_connection(&self, user_id: Uuid, username: String) -> broadcast::Receiver<String> {
+    pub async fn add_connection(
+        &self,
+        user_id: Uuid,
+        username: String,
+    ) -> broadcast::Receiver<String> {
         let (tx, rx) = broadcast::channel(100);
-        
+
         let mut connections = self.connections.write().await;
         connections.insert(user_id, tx);
-        
+
         let mut presence = self.presence.write().await;
         presence.insert(user_id, "online".to_string());
-        
+
         let mut usernames = self.usernames.write().await;
         usernames.insert(user_id, username);
-        
+
         rx
     }
 
@@ -57,10 +61,10 @@ impl WsHub {
     pub async fn remove_connection(&self, user_id: Uuid) {
         let mut connections = self.connections.write().await;
         connections.remove(&user_id);
-        
+
         let mut presence = self.presence.write().await;
         presence.remove(&user_id);
-        
+
         let mut usernames = self.usernames.write().await;
         usernames.remove(&user_id);
     }

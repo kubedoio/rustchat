@@ -3,10 +3,10 @@
 //! Handles sending emails via SMTP based on server configuration.
 
 use lettre::{
-    transport::smtp::authentication::Credentials,
-    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    transport::smtp::authentication::Credentials, AsyncSmtpTransport, AsyncTransport, Message,
+    Tokio1Executor,
 };
-use tracing::{info, error};
+use tracing::{error, info};
 
 use crate::models::server_config::EmailConfig;
 
@@ -22,8 +22,14 @@ pub async fn send_email(
     }
 
     let email = Message::builder()
-        .from(format!("{} <{}>", config.from_name, config.from_address).parse().map_err(|e| format!("Invalid from address: {}", e))?)
-        .to(to_address.parse().map_err(|e| format!("Invalid to address: {}", e))?)
+        .from(
+            format!("{} <{}>", config.from_name, config.from_address)
+                .parse()
+                .map_err(|e| format!("Invalid from address: {}", e))?,
+        )
+        .to(to_address
+            .parse()
+            .map_err(|e| format!("Invalid to address: {}", e))?)
         .subject(subject)
         .body(body.to_string())
         .map_err(|e| format!("Failed to build email: {}", e))?;
@@ -33,11 +39,12 @@ pub async fn send_email(
         config.smtp_password_encrypted.clone(), // In a real app, decrypt this first
     );
 
-    let mailer: AsyncSmtpTransport<Tokio1Executor> = AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
-        .map_err(|e| format!("Failed to create transport: {}", e))?
-        .credentials(creds)
-        .port(config.smtp_port as u16)
-        .build();
+    let mailer: AsyncSmtpTransport<Tokio1Executor> =
+        AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
+            .map_err(|e| format!("Failed to create transport: {}", e))?
+            .credentials(creds)
+            .port(config.smtp_port as u16)
+            .build();
 
     // Use Result here to capture sending error
     match mailer.send(email).await {

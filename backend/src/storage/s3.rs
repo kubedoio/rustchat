@@ -39,7 +39,8 @@ impl S3Client {
             .force_path_style(true);
 
         if let Some(creds) = credentials {
-            config_builder = config_builder.credentials_provider(SharedCredentialsProvider::new(creds));
+            config_builder =
+                config_builder.credentials_provider(SharedCredentialsProvider::new(creds));
         }
 
         if let Some(ref ep) = endpoint {

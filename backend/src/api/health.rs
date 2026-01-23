@@ -2,11 +2,7 @@
 //!
 //! Provides liveness and readiness probes for Kubernetes/Docker.
 
-use axum::{
-    extract::State,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, routing::get, Json, Router};
 use serde::Serialize;
 
 use super::AppState;
@@ -45,6 +41,10 @@ async fn readiness(State(state): State<AppState>) -> Json<ReadinessResponse> {
 
     Json(ReadinessResponse {
         status: if db_healthy { "ok" } else { "degraded" },
-        database: if db_healthy { "connected" } else { "disconnected" },
+        database: if db_healthy {
+            "connected"
+        } else {
+            "disconnected"
+        },
     })
 }

@@ -6,20 +6,15 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 /// Channel types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[sqlx(type_name = "channel_type", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum ChannelType {
+    #[default]
     Public,
     Private,
     Direct,
     Group,
-}
-
-impl Default for ChannelType {
-    fn default() -> Self {
-        Self::Public
-    }
 }
 
 /// Channel entity

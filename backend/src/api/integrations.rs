@@ -12,16 +12,16 @@ use super::AppState;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    CreateIncomingWebhook, CreateOutgoingWebhook, CreateSlashCommand, CreateBot,
-    IncomingWebhook, OutgoingWebhook, SlashCommand, Bot, BotToken, WebhookPayload,
-    ExecuteCommand, CommandResponse, OutgoingWebhookPayload,
+    Bot, BotToken, CommandResponse, CreateBot, CreateIncomingWebhook, CreateOutgoingWebhook,
+    CreateSlashCommand, ExecuteCommand, IncomingWebhook, OutgoingWebhook, OutgoingWebhookPayload,
+    SlashCommand, WebhookPayload,
 };
 
 /// Generate a secure random token
 fn generate_token() -> String {
     use std::collections::hash_map::RandomState;
     use std::hash::{BuildHasher, Hasher};
-    
+
     let mut token = String::with_capacity(32);
     let hasher_builder = RandomState::new();
     for _ in 0..4 {
@@ -37,20 +37,41 @@ fn generate_token() -> String {
 pub fn router() -> Router<AppState> {
     Router::new()
         // Incoming webhooks
-        .route("/hooks/incoming", get(list_incoming_webhooks).post(create_incoming_webhook))
-        .route("/hooks/incoming/{id}", get(get_incoming_webhook).delete(delete_incoming_webhook))
+        .route(
+            "/hooks/incoming",
+            get(list_incoming_webhooks).post(create_incoming_webhook),
+        )
+        .route(
+            "/hooks/incoming/{id}",
+            get(get_incoming_webhook).delete(delete_incoming_webhook),
+        )
         .route("/hooks/{token}", post(execute_incoming_webhook))
         // Outgoing webhooks
-        .route("/hooks/outgoing", get(list_outgoing_webhooks).post(create_outgoing_webhook))
-        .route("/hooks/outgoing/{id}", get(get_outgoing_webhook).delete(delete_outgoing_webhook))
+        .route(
+            "/hooks/outgoing",
+            get(list_outgoing_webhooks).post(create_outgoing_webhook),
+        )
+        .route(
+            "/hooks/outgoing/{id}",
+            get(get_outgoing_webhook).delete(delete_outgoing_webhook),
+        )
         // Slash commands
-        .route("/commands", get(list_slash_commands).post(create_slash_command))
-        .route("/commands/{id}", get(get_slash_command).delete(delete_slash_command))
+        .route(
+            "/commands",
+            get(list_slash_commands).post(create_slash_command),
+        )
+        .route(
+            "/commands/{id}",
+            get(get_slash_command).delete(delete_slash_command),
+        )
         .route("/commands/execute", post(execute_command))
         // Bots
         .route("/bots", get(list_bots).post(create_bot))
         .route("/bots/{id}", get(get_bot).delete(delete_bot))
-        .route("/bots/{id}/tokens", get(list_bot_tokens).post(create_bot_token))
+        .route(
+            "/bots/{id}/tokens",
+            get(list_bot_tokens).post(create_bot_token),
+        )
         .route("/bots/{bot_id}/tokens/{token_id}", delete(revoke_bot_token))
 }
 
@@ -67,7 +88,7 @@ async fn list_incoming_webhooks(
     Query(query): Query<TeamQuery>,
 ) -> ApiResult<Json<Vec<IncomingWebhook>>> {
     let webhooks: Vec<IncomingWebhook> = sqlx::query_as(
-        "SELECT * FROM incoming_webhooks WHERE team_id = $1 ORDER BY created_at DESC"
+        "SELECT * FROM incoming_webhooks WHERE team_id = $1 ORDER BY created_at DESC",
     )
     .bind(query.team_id)
     .fetch_all(&state.db)
@@ -129,7 +150,9 @@ async fn delete_incoming_webhook(
         .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
 
     if webhook.creator_id != auth.user_id && auth.role != "system_admin" {
-        return Err(AppError::Forbidden("Cannot delete this webhook".to_string()));
+        return Err(AppError::Forbidden(
+            "Cannot delete this webhook".to_string(),
+        ));
     }
 
     sqlx::query("DELETE FROM incoming_webhooks WHERE id = $1")
@@ -146,13 +169,12 @@ async fn execute_incoming_webhook(
     Path(token): Path<String>,
     Json(payload): Json<WebhookPayload>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let webhook: IncomingWebhook = sqlx::query_as(
-        "SELECT * FROM incoming_webhooks WHERE token = $1 AND is_active = true"
-    )
-    .bind(&token)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Unauthorized("Invalid webhook token".to_string()))?;
+    let webhook: IncomingWebhook =
+        sqlx::query_as("SELECT * FROM incoming_webhooks WHERE token = $1 AND is_active = true")
+            .bind(&token)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Unauthorized("Invalid webhook token".to_string()))?;
 
     // Create a post in the channel
     sqlx::query(
@@ -179,7 +201,7 @@ async fn list_outgoing_webhooks(
     Query(query): Query<TeamQuery>,
 ) -> ApiResult<Json<Vec<OutgoingWebhook>>> {
     let webhooks: Vec<OutgoingWebhook> = sqlx::query_as(
-        "SELECT * FROM outgoing_webhooks WHERE team_id = $1 ORDER BY created_at DESC"
+        "SELECT * FROM outgoing_webhooks WHERE team_id = $1 ORDER BY created_at DESC",
     )
     .bind(query.team_id)
     .fetch_all(&state.db)
@@ -195,7 +217,9 @@ async fn create_outgoing_webhook(
     Json(input): Json<CreateOutgoingWebhook>,
 ) -> ApiResult<Json<OutgoingWebhook>> {
     if input.callback_urls.is_empty() {
-        return Err(AppError::Validation("At least one callback URL required".to_string()));
+        return Err(AppError::Validation(
+            "At least one callback URL required".to_string(),
+        ));
     }
 
     let token = generate_token();
@@ -249,7 +273,9 @@ async fn delete_outgoing_webhook(
         .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
 
     if webhook.creator_id != auth.user_id && auth.role != "system_admin" {
-        return Err(AppError::Forbidden("Cannot delete this webhook".to_string()));
+        return Err(AppError::Forbidden(
+            "Cannot delete this webhook".to_string(),
+        ));
     }
 
     sqlx::query("DELETE FROM outgoing_webhooks WHERE id = $1")
@@ -267,12 +293,11 @@ async fn list_slash_commands(
     _auth: AuthUser,
     Query(query): Query<TeamQuery>,
 ) -> ApiResult<Json<Vec<SlashCommand>>> {
-    let commands: Vec<SlashCommand> = sqlx::query_as(
-        "SELECT * FROM slash_commands WHERE team_id = $1 ORDER BY trigger"
-    )
-    .bind(query.team_id)
-    .fetch_all(&state.db)
-    .await?;
+    let commands: Vec<SlashCommand> =
+        sqlx::query_as("SELECT * FROM slash_commands WHERE team_id = $1 ORDER BY trigger")
+            .bind(query.team_id)
+            .fetch_all(&state.db)
+            .await?;
 
     Ok(Json(commands))
 }
@@ -339,7 +364,9 @@ async fn delete_slash_command(
         .ok_or_else(|| AppError::NotFound("Command not found".to_string()))?;
 
     if command.creator_id != auth.user_id && auth.role != "system_admin" {
-        return Err(AppError::Forbidden("Cannot delete this command".to_string()));
+        return Err(AppError::Forbidden(
+            "Cannot delete this command".to_string(),
+        ));
     }
 
     sqlx::query("DELETE FROM slash_commands WHERE id = $1")
@@ -356,13 +383,17 @@ async fn execute_command(
     Json(payload): Json<ExecuteCommand>,
 ) -> ApiResult<Json<CommandResponse>> {
     // 1. Parse trigger
-    let parts: Vec<&str> = payload.command.trim().split_whitespace().collect();
+    let parts: Vec<&str> = payload.command.split_whitespace().collect();
     if parts.is_empty() {
-         return Err(AppError::BadRequest("Empty command".to_string()));
+        return Err(AppError::BadRequest("Empty command".to_string()));
     }
 
     let trigger = parts[0].trim_start_matches('/');
-    let args = if parts.len() > 1 { parts[1..].join(" ") } else { String::new() };
+    let args = if parts.len() > 1 {
+        parts[1..].join(" ")
+    } else {
+        String::new()
+    };
 
     // 2. Handle built-in commands
     match trigger {
@@ -370,22 +401,31 @@ async fn execute_command(
             return Ok(Json(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Echo: {}", args),
-                username: None, icon_url: None, goto_location: None, attachments: None
+                username: None,
+                icon_url: None,
+                goto_location: None,
+                attachments: None,
             }));
-        },
+        }
         "shrug" => {
-             return Ok(Json(CommandResponse {
+            return Ok(Json(CommandResponse {
                 response_type: "in_channel".to_string(),
                 text: format!("{} ¯\\_(ツ)_/¯", args),
-                username: None, icon_url: None, goto_location: None, attachments: None
+                username: None,
+                icon_url: None,
+                goto_location: None,
+                attachments: None,
             }));
-        },
+        }
         "invite" => {
             // Mock invite
-             return Ok(Json(CommandResponse {
+            return Ok(Json(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Invitation sent to {}", args),
-                username: None, icon_url: None, goto_location: None, attachments: None
+                username: None,
+                icon_url: None,
+                goto_location: None,
+                attachments: None,
             }));
         }
         _ => {}
@@ -396,15 +436,18 @@ async fn execute_command(
     let team_id = if let Some(tid) = payload.team_id {
         tid
     } else {
-        let channel = sqlx::query!("SELECT team_id FROM channels WHERE id = $1", payload.channel_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+        let channel = sqlx::query!(
+            "SELECT team_id FROM channels WHERE id = $1",
+            payload.channel_id
+        )
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
         channel.team_id
     };
 
     let command = sqlx::query_as::<_, SlashCommand>(
-        "SELECT * FROM slash_commands WHERE team_id = $1 AND trigger = $2"
+        "SELECT * FROM slash_commands WHERE team_id = $1 AND trigger = $2",
     )
     .bind(team_id)
     .bind(trigger)
@@ -420,11 +463,12 @@ async fn execute_command(
             .unwrap_or_else(|_| "unknown".to_string());
 
         // Fetch channel name
-        let channel_name = sqlx::query_scalar::<_, String>("SELECT name FROM channels WHERE id = $1")
-            .bind(payload.channel_id)
-            .fetch_one(&state.db)
-            .await
-            .unwrap_or_else(|_| "unknown".to_string());
+        let channel_name =
+            sqlx::query_scalar::<_, String>("SELECT name FROM channels WHERE id = $1")
+                .bind(payload.channel_id)
+                .fetch_one(&state.db)
+                .await
+                .unwrap_or_else(|_| "unknown".to_string());
 
         // Execute external command (HTTP POST)
         let client = reqwest::Client::new();
@@ -440,25 +484,34 @@ async fn execute_command(
             trigger_word: trigger.to_string(),
         };
 
-        let res = client.post(&cmd.url)
+        let res = client
+            .post(&cmd.url)
             .json(&payload_out)
             .send()
             .await
             .map_err(|e| AppError::Internal(format!("Command execution failed: {}", e)))?;
 
         if res.status().is_success() {
-             let resp_body: CommandResponse = res.json::<CommandResponse>().await
-                .unwrap_or_else(|_| CommandResponse {
-                    response_type: "ephemeral".to_string(),
-                    text: "Command executed successfully (no response body)".to_string(),
-                    username: None, icon_url: None, goto_location: None, attachments: None
-                });
-             return Ok(Json(resp_body));
+            let resp_body: CommandResponse =
+                res.json::<CommandResponse>()
+                    .await
+                    .unwrap_or_else(|_| CommandResponse {
+                        response_type: "ephemeral".to_string(),
+                        text: "Command executed successfully (no response body)".to_string(),
+                        username: None,
+                        icon_url: None,
+                        goto_location: None,
+                        attachments: None,
+                    });
+            return Ok(Json(resp_body));
         } else {
-             return Ok(Json(CommandResponse {
+            return Ok(Json(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Command failed with status: {}", res.status()),
-                username: None, icon_url: None, goto_location: None, attachments: None
+                username: None,
+                icon_url: None,
+                goto_location: None,
+                attachments: None,
             }));
         }
     }
@@ -466,16 +519,16 @@ async fn execute_command(
     Ok(Json(CommandResponse {
         response_type: "ephemeral".to_string(),
         text: format!("Command /{} not found", trigger),
-        username: None, icon_url: None, goto_location: None, attachments: None
+        username: None,
+        icon_url: None,
+        goto_location: None,
+        attachments: None,
     }))
 }
 
 // ============ Bots ============
 
-async fn list_bots(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> ApiResult<Json<Vec<Bot>>> {
+async fn list_bots(State(state): State<AppState>, auth: AuthUser) -> ApiResult<Json<Vec<Bot>>> {
     let bots: Vec<Bot> = if auth.role == "system_admin" {
         sqlx::query_as("SELECT * FROM bots ORDER BY created_at DESC")
             .fetch_all(&state.db)
@@ -496,7 +549,10 @@ async fn create_bot(
     Json(input): Json<CreateBot>,
 ) -> ApiResult<Json<Bot>> {
     // Create a user account for the bot
-    let bot_username = format!("bot_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
+    let bot_username = format!(
+        "bot_{}",
+        uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
+    );
     let bot_email = format!("{}@bot.rustchat.local", bot_username);
 
     let bot_user_id: (Uuid,) = sqlx::query_as(
@@ -580,12 +636,11 @@ async fn list_bot_tokens(
         return Err(AppError::Forbidden("Cannot access this bot".to_string()));
     }
 
-    let tokens: Vec<BotToken> = sqlx::query_as(
-        "SELECT * FROM bot_tokens WHERE bot_id = $1 ORDER BY created_at DESC"
-    )
-    .bind(id)
-    .fetch_all(&state.db)
-    .await?;
+    let tokens: Vec<BotToken> =
+        sqlx::query_as("SELECT * FROM bot_tokens WHERE bot_id = $1 ORDER BY created_at DESC")
+            .bind(id)
+            .fetch_all(&state.db)
+            .await?;
 
     Ok(Json(tokens))
 }

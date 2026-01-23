@@ -20,7 +20,7 @@ pub struct Post {
     pub created_at: DateTime<Utc>,
     pub edited_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
-    #[sqlx(default)] 
+    #[sqlx(default)]
     pub reply_count: i32, // use i32 or i64, DB is INT (i32) usually, but BIGINT is i64
     pub last_reply_at: Option<DateTime<Utc>>,
 }

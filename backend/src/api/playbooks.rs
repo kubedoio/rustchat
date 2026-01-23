@@ -2,7 +2,7 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post, put, delete},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use uuid::Uuid;
@@ -11,13 +11,9 @@ use super::AppState;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    Playbook, CreatePlaybook, UpdatePlaybook,
-    PlaybookChecklist, CreateChecklist,
-    PlaybookTask, CreateTask,
-    PlaybookRun, StartRun, UpdateRun,
-    RunTask, UpdateRunTask,
-    RunStatusUpdate, CreateStatusUpdate,
-    PlaybookFull, ChecklistWithTasks, RunWithTasks, RunProgress,
+    ChecklistWithTasks, CreateChecklist, CreatePlaybook, CreateStatusUpdate, CreateTask, Playbook,
+    PlaybookChecklist, PlaybookFull, PlaybookRun, PlaybookTask, RunProgress, RunStatusUpdate,
+    RunTask, RunWithTasks, StartRun, UpdatePlaybook, UpdateRun, UpdateRunTask,
 };
 
 #[derive(serde::Deserialize)]
@@ -35,8 +31,14 @@ pub fn router() -> Router<AppState> {
         .route("/playbooks/{id}", put(update_playbook))
         .route("/playbooks/{id}", delete(delete_playbook))
         // Checklists
-        .route("/playbooks/{playbook_id}/checklists", post(create_checklist))
-        .route("/playbooks/{playbook_id}/checklists/{id}", delete(delete_checklist))
+        .route(
+            "/playbooks/{playbook_id}/checklists",
+            post(create_checklist),
+        )
+        .route(
+            "/playbooks/{playbook_id}/checklists/{id}",
+            delete(delete_checklist),
+        )
         // Tasks
         .route("/checklists/{checklist_id}/tasks", post(create_task))
         .route("/tasks/{id}", put(update_task))
@@ -72,7 +74,7 @@ async fn list_playbooks(
             OR ($2 = ANY(member_ids))
           )
         ORDER BY name
-        "#
+        "#,
     )
     .bind(query.team_id)
     .bind(auth.user_id)
@@ -123,7 +125,7 @@ async fn get_playbook(
             OR created_by = $2 
             OR ($2 = ANY(member_ids))
           )
-        "#
+        "#,
     )
     .bind(id)
     .bind(auth.user_id)
@@ -132,7 +134,7 @@ async fn get_playbook(
     .ok_or_else(|| AppError::NotFound("Playbook not found or access denied".to_string()))?;
 
     let checklists = sqlx::query_as::<_, PlaybookChecklist>(
-        "SELECT * FROM playbook_checklists WHERE playbook_id = $1 ORDER BY sort_order"
+        "SELECT * FROM playbook_checklists WHERE playbook_id = $1 ORDER BY sort_order",
     )
     .bind(id)
     .fetch_all(&state.db)
@@ -141,7 +143,7 @@ async fn get_playbook(
     let mut checklists_with_tasks = Vec::new();
     for checklist in checklists {
         let tasks = sqlx::query_as::<_, PlaybookTask>(
-            "SELECT * FROM playbook_tasks WHERE checklist_id = $1 ORDER BY sort_order"
+            "SELECT * FROM playbook_tasks WHERE checklist_id = $1 ORDER BY sort_order",
         )
         .bind(checklist.id)
         .fetch_all(&state.db)
@@ -168,9 +170,11 @@ async fn update_playbook(
         .fetch_optional(&state.db)
         .await?
         .ok_or_else(|| AppError::NotFound("Playbook not found".to_string()))?;
-        
+
     if current.created_by != auth.user_id && auth.role != "system_admin" {
-        return Err(AppError::Forbidden("Only the creator can edit this playbook".to_string()));
+        return Err(AppError::Forbidden(
+            "Only the creator can edit this playbook".to_string(),
+        ));
     }
 
     let playbook = sqlx::query_as::<_, Playbook>(
@@ -186,7 +190,7 @@ async fn update_playbook(
             updated_at = NOW()
         WHERE id = $1
         RETURNING *
-        "#
+        "#,
     )
     .bind(id)
     .bind(&payload.name)
@@ -212,9 +216,11 @@ async fn delete_playbook(
         .fetch_optional(&state.db)
         .await?
         .ok_or_else(|| AppError::NotFound("Playbook not found".to_string()))?;
-        
+
     if current.created_by != auth.user_id && auth.role != "system_admin" {
-        return Err(AppError::Forbidden("Only the creator can archive this playbook".to_string()));
+        return Err(AppError::Forbidden(
+            "Only the creator can archive this playbook".to_string(),
+        ));
     }
 
     sqlx::query("UPDATE playbooks SET is_archived = true WHERE id = $1")
@@ -306,7 +312,7 @@ async fn update_task(
             slash_command = $6
         WHERE id = $1
         RETURNING *
-        "#
+        "#,
     )
     .bind(id)
     .bind(&payload.title)
@@ -341,7 +347,7 @@ async fn list_runs(
     Query(query): Query<TeamQuery>,
 ) -> ApiResult<Json<Vec<PlaybookRun>>> {
     let runs = sqlx::query_as::<_, PlaybookRun>(
-        "SELECT * FROM playbook_runs WHERE team_id = $1 ORDER BY started_at DESC LIMIT 50"
+        "SELECT * FROM playbook_runs WHERE team_id = $1 ORDER BY started_at DESC LIMIT 50",
     )
     .bind(query.team_id)
     .fetch_all(&state.db)
@@ -357,28 +363,28 @@ async fn start_run(
     Json(payload): Json<StartRun>,
 ) -> ApiResult<Json<RunWithTasks>> {
     // 1. Fetch Playbook to check settings
-    let playbook = sqlx::query_as::<_, Playbook>(
-        "SELECT * FROM playbooks WHERE id = $1"
-    )
-    .bind(payload.playbook_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Playbook not found".to_string()))?;
+    let playbook = sqlx::query_as::<_, Playbook>("SELECT * FROM playbooks WHERE id = $1")
+        .bind(payload.playbook_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Playbook not found".to_string()))?;
 
     // 2. Determine Channel ID
     let mut channel_id = payload.channel_id;
 
     if channel_id.is_none() && playbook.create_channel_on_run {
         // Create a new channel
-        let template = playbook.channel_name_template.unwrap_or_else(|| "run-{{date}}".to_string());
+        let template = playbook
+            .channel_name_template
+            .unwrap_or_else(|| "run-{{date}}".to_string());
         let date_str = chrono::Utc::now().format("%Y%m%d-%H%M").to_string();
         let name = template
             .replace("{{date}}", &date_str)
             .replace("{{playbook_name}}", &playbook.name)
             .to_lowercase()
             .replace(" ", "-"); // Sanitize name
-        
-        let channel_name = format!("{}-{}", name, Uuid::new_v4().simple().to_string()[0..6].to_string()); // Ensure uniqueness
+
+        let channel_name = format!("{}-{}", name, &Uuid::new_v4().simple().to_string()[0..6]); // Ensure uniqueness
 
         // Create channel
         let channel = sqlx::query_as::<_, crate::models::Channel>(
@@ -386,20 +392,24 @@ async fn start_run(
             INSERT INTO channels (team_id, name, display_name, purpose, type, creator_id)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#
+            "#,
         )
         .bind(query.team_id)
         .bind(&channel_name)
         .bind(format!("Run: {}", payload.name))
         .bind(format!("Channel for playbook run: {}", payload.name))
-        .bind(if playbook.is_public { "public" } else { "private" })
+        .bind(if playbook.is_public {
+            "public"
+        } else {
+            "private"
+        })
         .bind(auth.user_id)
         .fetch_one(&state.db)
         .await?;
 
         // Add creator/owner to channel
         sqlx::query(
-            "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'admin')"
+            "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'admin')",
         )
         .bind(channel.id)
         .bind(auth.user_id)
@@ -415,7 +425,7 @@ async fn start_run(
         INSERT INTO playbook_runs (playbook_id, team_id, name, owner_id, channel_id, attributes)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
-        "#
+        "#,
     )
     .bind(payload.playbook_id)
     .bind(query.team_id)
@@ -434,7 +444,7 @@ async fn start_run(
         FROM playbook_tasks pt
         JOIN playbook_checklists pc ON pt.checklist_id = pc.id
         WHERE pc.playbook_id = $2
-        "#
+        "#,
     )
     .bind(run.id)
     .bind(payload.playbook_id)
@@ -442,16 +452,18 @@ async fn start_run(
     .await?;
 
     // 5. Fetch run tasks
-    let tasks = sqlx::query_as::<_, RunTask>(
-        "SELECT * FROM run_tasks WHERE run_id = $1"
-    )
-    .bind(run.id)
-    .fetch_all(&state.db)
-    .await?;
+    let tasks = sqlx::query_as::<_, RunTask>("SELECT * FROM run_tasks WHERE run_id = $1")
+        .bind(run.id)
+        .fetch_all(&state.db)
+        .await?;
 
     let progress = calculate_progress(&tasks);
 
-    Ok(Json(RunWithTasks { run, tasks, progress }))
+    Ok(Json(RunWithTasks {
+        run,
+        tasks,
+        progress,
+    }))
 }
 
 async fn get_run(
@@ -459,24 +471,24 @@ async fn get_run(
     _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<RunWithTasks>> {
-    let run = sqlx::query_as::<_, PlaybookRun>(
-        "SELECT * FROM playbook_runs WHERE id = $1"
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Run not found".to_string()))?;
+    let run = sqlx::query_as::<_, PlaybookRun>("SELECT * FROM playbook_runs WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Run not found".to_string()))?;
 
-    let tasks = sqlx::query_as::<_, RunTask>(
-        "SELECT * FROM run_tasks WHERE run_id = $1"
-    )
-    .bind(id)
-    .fetch_all(&state.db)
-    .await?;
+    let tasks = sqlx::query_as::<_, RunTask>("SELECT * FROM run_tasks WHERE run_id = $1")
+        .bind(id)
+        .fetch_all(&state.db)
+        .await?;
 
     let progress = calculate_progress(&tasks);
 
-    Ok(Json(RunWithTasks { run, tasks, progress }))
+    Ok(Json(RunWithTasks {
+        run,
+        tasks,
+        progress,
+    }))
 }
 
 async fn update_run(
@@ -494,7 +506,7 @@ async fn update_run(
             updated_at = NOW()
         WHERE id = $1
         RETURNING *
-        "#
+        "#,
     )
     .bind(id)
     .bind(&payload.status)
@@ -516,7 +528,7 @@ async fn finish_run(
         UPDATE playbook_runs SET status = 'finished', finished_at = NOW(), updated_at = NOW()
         WHERE id = $1
         RETURNING *
-        "#
+        "#,
     )
     .bind(id)
     .fetch_one(&state.db)
@@ -556,7 +568,7 @@ async fn update_run_task(
             updated_at = NOW()
         WHERE run_id = $1 AND task_id = $2
         RETURNING *
-        "#
+        "#,
     )
     .bind(run_id)
     .bind(task_id)
@@ -579,7 +591,7 @@ async fn list_status_updates(
     Path(run_id): Path<Uuid>,
 ) -> ApiResult<Json<Vec<RunStatusUpdate>>> {
     let updates = sqlx::query_as::<_, RunStatusUpdate>(
-        "SELECT * FROM run_status_updates WHERE run_id = $1 ORDER BY created_at DESC"
+        "SELECT * FROM run_status_updates WHERE run_id = $1 ORDER BY created_at DESC",
     )
     .bind(run_id)
     .fetch_all(&state.db)
@@ -599,7 +611,7 @@ async fn create_status_update(
         INSERT INTO run_status_updates (run_id, author_id, message, is_broadcast)
         VALUES ($1, $2, $3, $4)
         RETURNING *
-        "#
+        "#,
     )
     .bind(run_id)
     .bind(auth.user_id)
@@ -619,5 +631,10 @@ fn calculate_progress(tasks: &[RunTask]) -> RunProgress {
     let in_progress = tasks.iter().filter(|t| t.status == "in_progress").count() as i32;
     let pending = tasks.iter().filter(|t| t.status == "pending").count() as i32;
 
-    RunProgress { total, completed, in_progress, pending }
+    RunProgress {
+        total,
+        completed,
+        in_progress,
+        pending,
+    }
 }

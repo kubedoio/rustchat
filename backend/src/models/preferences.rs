@@ -18,27 +18,27 @@ pub struct UserStatus {
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub struct UserPreferences {
     pub user_id: Uuid,
-    
+
     // Notification preferences
     pub notify_desktop: String,
     pub notify_push: String,
     pub notify_email: String,
     pub notify_sounds: bool,
-    
+
     // DND
     pub dnd_enabled: bool,
     pub dnd_start_time: Option<NaiveTime>,
     pub dnd_end_time: Option<NaiveTime>,
     pub dnd_days: String,
-    
+
     // Display
     pub message_display: String,
     pub sidebar_behavior: String,
     pub time_format: String,
-    
+
     // Keywords
     pub mention_keywords: Option<Vec<String>>,
-    
+
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -61,18 +61,18 @@ pub struct UpdatePreferences {
     pub notify_push: Option<String>,
     pub notify_email: Option<String>,
     pub notify_sounds: Option<bool>,
-    
+
     // DND
     pub dnd_enabled: Option<bool>,
     pub dnd_start_time: Option<String>,
     pub dnd_end_time: Option<String>,
     pub dnd_days: Option<String>,
-    
+
     // Display
     pub message_display: Option<String>,
     pub sidebar_behavior: Option<String>,
     pub time_format: Option<String>,
-    
+
     // Keywords
     pub mention_keywords: Option<Vec<String>>,
 }

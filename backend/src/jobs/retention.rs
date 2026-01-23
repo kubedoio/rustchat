@@ -5,7 +5,7 @@
 
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// Retention job configuration
 #[derive(Debug, Clone)]
@@ -24,13 +24,11 @@ pub async fn run_retention_cleanup(
     // Clean up old messages
     if config.message_retention_days > 0 {
         let cutoff = Utc::now() - Duration::days(config.message_retention_days);
-        
-        let result = sqlx::query(
-            "DELETE FROM posts WHERE created_at < $1 AND NOT is_pinned"
-        )
-        .bind(cutoff)
-        .execute(db)
-        .await?;
+
+        let result = sqlx::query("DELETE FROM posts WHERE created_at < $1 AND NOT is_pinned")
+            .bind(cutoff)
+            .execute(db)
+            .await?;
 
         stats.messages_deleted = result.rows_affected();
         info!(
@@ -44,21 +42,18 @@ pub async fn run_retention_cleanup(
         let cutoff = Utc::now() - Duration::days(config.file_retention_days);
 
         // Get files to delete (for S3 cleanup)
-        let files: Vec<(String,)> = sqlx::query_as(
-            "SELECT s3_key FROM files WHERE created_at < $1"
-        )
-        .bind(cutoff)
-        .fetch_all(db)
-        .await?;
+        let files: Vec<(String,)> =
+            sqlx::query_as("SELECT s3_key FROM files WHERE created_at < $1")
+                .bind(cutoff)
+                .fetch_all(db)
+                .await?;
 
         stats.file_keys = files.iter().map(|f| f.0.clone()).collect();
 
-        let result = sqlx::query(
-            "DELETE FROM files WHERE created_at < $1"
-        )
-        .bind(cutoff)
-        .execute(db)
-        .await?;
+        let result = sqlx::query("DELETE FROM files WHERE created_at < $1")
+            .bind(cutoff)
+            .execute(db)
+            .await?;
 
         stats.files_deleted = result.rows_affected();
         info!(
@@ -92,7 +87,7 @@ pub fn spawn_retention_job(db: PgPool) {
                 "SELECT 
                     (compliance->'message_retention_days')::int,
                     (compliance->'file_retention_days')::int
-                 FROM server_config WHERE id = 'default'"
+                 FROM server_config WHERE id = 'default'",
             )
             .fetch_optional(&db)
             .await;

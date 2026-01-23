@@ -7,16 +7,16 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WsEnvelope {
     #[serde(rename = "type")]
-    pub msg_type: String,     // "event", "command", "ack", "error"
-    pub event: String,        // e.g. "message_created"
+    pub msg_type: String, // "event", "command", "ack", "error"
+    pub event: String, // e.g. "message_created"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seq: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub channel_id: Option<Uuid>,
     pub data: serde_json::Value,
-    
+
     // Internal use for broadcast targeting (not serialized to client if possible, or filtered out before send)
-    // Actually, we can use a wrapper or just strip this field. 
+    // Actually, we can use a wrapper or just strip this field.
     // For simplicity, let's keep it but skip serializing it.
     #[serde(skip)]
     pub broadcast: Option<WsBroadcast>,
@@ -38,15 +38,15 @@ pub enum EventType {
     MessageUpdated,
     MessageDeleted,
     ThreadReplyCreated,
-    // ThreadReplyUpdated/Deleted can reuse MessageUpdated/Deleted if logic allows, 
+    // ThreadReplyUpdated/Deleted can reuse MessageUpdated/Deleted if logic allows,
     // or be explicit. Let's strictly follow spec if given, or use standard patterns.
     // Prompt mentions: thread_reply_created, thread_reply_updated, thread_reply_deleted
     ThreadReplyUpdated,
     ThreadReplyDeleted,
-    
+
     ReactionAdded,
     ReactionRemoved,
-    
+
     UserTyping,
     UserTypingStop,
 
@@ -60,10 +60,10 @@ pub enum EventType {
     UserPresence,
     CallSignal,
     ConfigUpdated,
-    
+
     ChannelSubscribed,
     ChannelUnsubscribed,
-    
+
     Error,
     Hello,
 }
@@ -159,7 +159,7 @@ impl WsEnvelope {
         self.broadcast = Some(broadcast);
         self
     }
-    
+
     pub fn error(message: &str) -> Self {
         Self {
             msg_type: "event".to_string(),

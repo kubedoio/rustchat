@@ -20,21 +20,21 @@ pub fn router() -> Router<AppState> {
 }
 
 /// List available OAuth providers
-async fn list_providers(
-    State(state): State<AppState>,
-) -> ApiResult<Json<Vec<OAuthProvider>>> {
+async fn list_providers(State(state): State<AppState>) -> ApiResult<Json<Vec<OAuthProvider>>> {
     // Query enabled SSO configs from DB
-    let configs: Vec<SsoConfigRow> = sqlx::query_as(
-        "SELECT * FROM sso_configs WHERE enabled = true"
-    )
-    .fetch_all(&state.db)
-    .await?;
+    let configs: Vec<SsoConfigRow> =
+        sqlx::query_as("SELECT * FROM sso_configs WHERE enabled = true")
+            .fetch_all(&state.db)
+            .await?;
 
-    let providers: Vec<OAuthProvider> = configs.into_iter().map(|c| OAuthProvider {
-        id: c.provider.clone(),
-        name: c.display_name.unwrap_or(c.provider),
-        icon_url: None,
-    }).collect();
+    let providers: Vec<OAuthProvider> = configs
+        .into_iter()
+        .map(|c| OAuthProvider {
+            id: c.provider.clone(),
+            name: c.display_name.unwrap_or(c.provider),
+            icon_url: None,
+        })
+        .collect();
 
     Ok(Json(providers))
 }
@@ -69,13 +69,17 @@ async fn oauth_login(
     Query(query): Query<OAuthLoginQuery>,
 ) -> Result<Redirect, AppError> {
     // Get SSO config for provider
-    let config: SsoConfigRow = sqlx::query_as(
-        "SELECT * FROM sso_configs WHERE provider = $1 AND enabled = true"
-    )
-    .bind(&provider)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound(format!("OAuth provider '{}' not found or disabled", provider)))?;
+    let config: SsoConfigRow =
+        sqlx::query_as("SELECT * FROM sso_configs WHERE provider = $1 AND enabled = true")
+            .bind(&provider)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| {
+                AppError::NotFound(format!(
+                    "OAuth provider '{}' not found or disabled",
+                    provider
+                ))
+            })?;
 
     // Generate state parameter for CSRF protection
     let oauth_state = Uuid::new_v4().to_string();
@@ -86,11 +90,12 @@ async fn oauth_login(
     // For now, we'll use a simple in-memory approach via query params
 
     // Build authorization URL
-    let issuer = config.issuer_url.unwrap_or_else(|| {
-        format!("https://{}.example.com", provider)
-    });
-    
-    let callback_url = format!("{}/api/v1/oauth2/{}/callback", 
+    let issuer = config
+        .issuer_url
+        .unwrap_or_else(|| format!("https://{}.example.com", provider));
+
+    let callback_url = format!(
+        "{}/api/v1/oauth2/{}/callback",
         std::env::var("RUSTCHAT_SITE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string()),
         provider
     );
@@ -141,27 +146,32 @@ async fn oauth_callback(
     // Check for errors from provider
     if let Some(error) = query.error {
         let desc = query.error_description.unwrap_or_else(|| error.clone());
-        return Ok(Redirect::temporary(&format!("/login?error={}", urlencoding::encode(&desc))));
+        return Ok(Redirect::temporary(&format!(
+            "/login?error={}",
+            urlencoding::encode(&desc)
+        )));
     }
 
-    let code = query.code.ok_or_else(|| {
-        AppError::BadRequest("Missing authorization code".to_string())
-    })?;
+    let code = query
+        .code
+        .ok_or_else(|| AppError::BadRequest("Missing authorization code".to_string()))?;
 
     // Get SSO config
-    let config: SsoConfigRow = sqlx::query_as(
-        "SELECT * FROM sso_configs WHERE provider = $1 AND enabled = true"
-    )
-    .bind(&provider)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound(format!("OAuth provider '{}' not found", provider)))?;
+    let config: SsoConfigRow =
+        sqlx::query_as("SELECT * FROM sso_configs WHERE provider = $1 AND enabled = true")
+            .bind(&provider)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| {
+                AppError::NotFound(format!("OAuth provider '{}' not found", provider))
+            })?;
 
-    let issuer = config.issuer_url.unwrap_or_else(|| {
-        format!("https://{}.example.com", provider)
-    });
-    
-    let callback_url = format!("{}/api/v1/oauth2/{}/callback",
+    let issuer = config
+        .issuer_url
+        .unwrap_or_else(|| format!("https://{}.example.com", provider));
+
+    let callback_url = format!(
+        "{}/api/v1/oauth2/{}/callback",
         std::env::var("RUSTCHAT_SITE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string()),
         provider
     );
@@ -169,7 +179,7 @@ async fn oauth_callback(
     // Exchange code for tokens
     let client = reqwest::Client::new();
     let token_url = format!("{}/token", issuer);
-    
+
     let token_response = client
         .post(&token_url)
         .form(&[
@@ -185,10 +195,15 @@ async fn oauth_callback(
 
     if !token_response.status().is_success() {
         let error_text = token_response.text().await.unwrap_or_default();
-        return Err(AppError::Internal(format!("Token exchange failed: {}", error_text)));
+        return Err(AppError::Internal(format!(
+            "Token exchange failed: {}",
+            error_text
+        )));
     }
 
-    let tokens: TokenResponse = token_response.json().await
+    let tokens: TokenResponse = token_response
+        .json()
+        .await
         .map_err(|e| AppError::Internal(format!("Failed to parse token response: {}", e)))?;
 
     // Get user info
@@ -200,26 +215,27 @@ async fn oauth_callback(
         .await
         .map_err(|e| AppError::Internal(format!("Userinfo request failed: {}", e)))?;
 
-    let userinfo: UserInfoResponse = userinfo_response.json::<UserInfoResponse>().await
+    let userinfo: UserInfoResponse = userinfo_response
+        .json::<UserInfoResponse>()
+        .await
         .map_err(|e| AppError::Internal(format!("Failed to parse userinfo: {}", e)))?;
 
     // Find or create user
-    let email = userinfo.email.ok_or_else(|| {
-        AppError::BadRequest("Email not provided by OAuth provider".to_string())
-    })?;
+    let email = userinfo
+        .email
+        .ok_or_else(|| AppError::BadRequest("Email not provided by OAuth provider".to_string()))?;
 
-    let user: Option<crate::models::User> = sqlx::query_as(
-        "SELECT * FROM users WHERE email = $1"
-    )
-    .bind(&email)
-    .fetch_optional(&state.db)
-    .await?;
+    let user: Option<crate::models::User> = sqlx::query_as("SELECT * FROM users WHERE email = $1")
+        .bind(&email)
+        .fetch_optional(&state.db)
+        .await?;
 
     let user = match user {
         Some(u) => u,
         None => {
             // Create new user from OAuth info
-            let username = userinfo.preferred_username
+            let username = userinfo
+                .preferred_username
                 .or(userinfo.name.clone())
                 .unwrap_or_else(|| email.split('@').next().unwrap_or("user").to_string());
 
@@ -229,7 +245,7 @@ async fn oauth_callback(
                 VALUES ($1, $2, $3, 'member', true, $4)
                 ON CONFLICT (email) DO UPDATE SET last_login_at = NOW()
                 RETURNING *
-                "#
+                "#,
             )
             .bind(&username)
             .bind(&email)
@@ -257,5 +273,8 @@ async fn oauth_callback(
     )?;
 
     // Redirect to frontend with token
-    Ok(Redirect::temporary(&format!("/oauth/callback?token={}", token)))
+    Ok(Redirect::temporary(&format!(
+        "/oauth/callback?token={}",
+        token
+    )))
 }

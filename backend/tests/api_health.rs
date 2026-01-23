@@ -6,7 +6,8 @@ mod common;
 async fn health_check_works() {
     let app = spawn_app().await;
 
-    let response = app.api_client
+    let response = app
+        .api_client
         .get(&format!("{}/api/v1/health/live", &app.address))
         .send()
         .await

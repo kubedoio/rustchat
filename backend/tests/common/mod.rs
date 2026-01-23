@@ -1,8 +1,8 @@
+use once_cell::sync::Lazy;
 use rustchat::{api, realtime::WsHub, storage::S3Client};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 // Ensure tracing is initialized only once
