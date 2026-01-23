@@ -22,8 +22,8 @@ jobs:
     name: Test & Lint
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
-      RUSTCHAT_DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+      DATABASE_URL: postgres://rustchat:password@localhost:5432/rustchat
+      RUSTCHAT_DATABASE_URL: postgres://rustchat:password@localhost:5432/rustchat
       RUSTCHAT_JWT_SECRET: "test-secret"
       # S3 Configuration (Mock values for testing)
       RUSTCHAT_S3_ENDPOINT: "http://localhost:9000"
@@ -35,9 +35,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: rustchat
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: rustchat
         ports:
           - 5432:5432
         # Set health checks to wait until postgres is ready
