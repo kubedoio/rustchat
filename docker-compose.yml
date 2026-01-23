@@ -23,7 +23,7 @@ services:
       - RUSTCHAT_S3_REGION=us-east-1
       - RUSTCHAT_JWT_SECRET=dev_secret_key_change_me_in_prod
       - RUSTCHAT_ENCRYPTION_KEY=your-super-secret-encryption-key-32chars!!
-      - RUST_LOG=info
+      - RUST_LOG=debug
     ports:
       - "3000:3000"
     restart: on-failure
