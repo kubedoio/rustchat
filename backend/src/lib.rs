@@ -9,6 +9,8 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod jobs;
+pub mod crypto;
+pub mod crypto;
 pub mod models;
 pub mod realtime;
 pub mod services;
