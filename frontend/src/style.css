@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  /* Modern Indigo-500/600 Primary */
+  --color-primary: #4F46E5;
+  --color-primary-hover: #4338ca;
+
+  /* Glassmorphism Variables */
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.dark {
+  --color-primary: #6366f1;
+  /* Indigo-500 for dark mode */
+  --color-primary-hover: #818cf8;
+
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  /* Slate-800/70 */
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  @apply bg-gray-50 text-gray-900;
+  @apply dark:bg-gray-950 dark:text-gray-100;
+}
+
+/* Glass Utilities */
+.glass {
+  @apply backdrop-blur-md bg-white/70 border-white/20 shadow-lg;
+  @apply dark:bg-slate-900/70 dark:border-white/5 dark:shadow-black/20;
+}
+
+.glass-panel {
+  @apply backdrop-blur-xl bg-white/80 border border-white/20;
+  @apply dark:bg-slate-900/80 dark:border-white/5;
+}

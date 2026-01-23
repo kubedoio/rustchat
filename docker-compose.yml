@@ -1,0 +1,115 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    container_name: rustchat-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    environment:
+      - RUSTCHAT_DATABASE_URL=postgres://rustchat:rustchat@postgres:5432/rustchat
+      - RUSTCHAT_REDIS_URL=redis://redis:6379
+      - RUSTCHAT_S3_ENDPOINT=http://minio:9000
+      - RUSTCHAT_S3_BUCKET=rustchat-uploads
+      - RUSTCHAT_S3_ACCESS_KEY=minioadmin
+      - RUSTCHAT_S3_SECRET_KEY=minioadmin
+      - RUSTCHAT_S3_REGION=us-east-1
+      - RUSTCHAT_JWT_SECRET=dev_secret_key_change_me_in_prod
+      - RUST_LOG=info
+    ports:
+      - "3000:3000"
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    container_name: rustchat-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: on-failure
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: rustchat-postgres
+    environment:
+      POSTGRES_USER: rustchat
+      POSTGRES_PASSWORD: rustchat
+      POSTGRES_DB: rustchat
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U rustchat" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: rustchat-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: rustchat-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  createbuckets:
+    image: minio/mc
+    container_name: rustchat-createbuckets
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c " /usr/bin/mc alias set rustchat http://minio:9000 minioadmin minioadmin; /usr/bin/mc mb --ignore-existing rustchat/rustchat-uploads; /usr/bin/mc anonymous set public rustchat/rustchat-uploads; exit 0; "
+
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    container_name: rustchat-meilisearch
+    environment:
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: true
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    profiles:
+      - search
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  meilisearch_data:
