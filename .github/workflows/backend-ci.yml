@@ -35,9 +35,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: rustchat
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: rustchat
         ports:
           - 5432:5432
         # Set health checks to wait until postgres is ready
