@@ -1,0 +1,95 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_VERSION: 0.8.0
+  # Postgres service credentials
+  POSTGRES_USER: rustchat
+  POSTGRES_PASSWORD: password
+  POSTGRES_DB: rustchat
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+      RUSTCHAT_DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+      RUSTCHAT_JWT_SECRET: "test-secret"
+      # S3 Configuration (Mock values for testing)
+      RUSTCHAT_S3_ENDPOINT: "http://localhost:9000"
+      RUSTCHAT_S3_BUCKET: "test-bucket"
+      RUSTCHAT_S3_ACCESS_KEY: "minioadmin"
+      RUSTCHAT_S3_SECRET_KEY: "minioadmin"
+      RUSTCHAT_S3_REGION: "us-east-1"
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres is ready
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}
+
+      - name: Cache sqlx-cli
+        id: cache-sqlx
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/sqlx
+          key: ${{ runner.os }}-sqlx-${{ env.SQLX_VERSION }}
+
+      - name: Install sqlx-cli
+        if: steps.cache-sqlx.outputs.cache-hit != 'true'
+        run: cargo install sqlx-cli --version ${{ env.SQLX_VERSION }} --features postgres,native-tls --no-default-features --locked
+
+      - name: Run migrations
+        run: sqlx migrate run
+
+      - name: Check
+        run: cargo check
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy -- -D warnings
+
+      - name: Test
+        run: cargo test
