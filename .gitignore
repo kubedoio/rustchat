@@ -1,5 +1,5 @@
 # Build artifacts
-/target/
+target/
 debug/
 release/
 
@@ -29,4 +29,3 @@ logs/
 coverage/
 
 # Cargo
-Cargo.lock
