@@ -25,6 +25,12 @@ jobs:
       DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
       RUSTCHAT_DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
       RUSTCHAT_JWT_SECRET: "test-secret"
+      # S3 Configuration (Mock values for testing)
+      RUSTCHAT_S3_ENDPOINT: "http://localhost:9000"
+      RUSTCHAT_S3_BUCKET: "test-bucket"
+      RUSTCHAT_S3_ACCESS_KEY: "minioadmin"
+      RUSTCHAT_S3_SECRET_KEY: "minioadmin"
+      RUSTCHAT_S3_REGION: "us-east-1"
     services:
       postgres:
         image: postgres:15

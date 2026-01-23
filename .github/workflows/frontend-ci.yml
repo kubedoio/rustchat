@@ -32,3 +32,14 @@ jobs:
 
       - name: Build and Type Check
         run: npm run build
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Start Frontend Dev Server
+        run: |
+          npm run dev -- --port 3000 &
+          npx wait-on tcp:3000
+
+      - name: Run Playwright tests
+        run: npx playwright test

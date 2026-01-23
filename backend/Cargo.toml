@@ -63,6 +63,8 @@ lettre = { version = "0.11", default-features = false, features = ["tokio1", "to
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json"] }
 tokio-test = "0.4"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+serde_json = "1.0"
 
 [[bin]]
 name = "rustchat"
