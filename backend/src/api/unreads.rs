@@ -1,15 +1,11 @@
 //! Unreads API endpoints
 
-use axum::{
-    extract::State,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, routing::get, Json, Router};
 
 use super::AppState;
 use crate::auth::AuthUser;
 use crate::error::ApiResult;
-use crate::services::unreads::{UnreadOverview, get_unread_overview};
+use crate::services::unreads::{get_unread_overview, UnreadOverview};
 
 /// Build unreads routes
 pub fn router() -> Router<AppState> {

@@ -397,7 +397,8 @@ pub async fn create_system_message(
     state.ws_hub.broadcast(broadcast).await;
 
     // Increment unread counts in Redis for other members
-    let _ = crate::services::unreads::increment_unreads(state, channel_id, bot_user, post.seq).await;
+    let _ =
+        crate::services::unreads::increment_unreads(state, channel_id, bot_user, post.seq).await;
 
     Ok(())
 }

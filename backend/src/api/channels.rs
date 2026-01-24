@@ -29,7 +29,6 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/read", post(mark_channel_as_read))
 }
 
-
 /// Get unread counts for all channels the user is a member of
 async fn get_all_unread_counts(
     State(state): State<AppState>,
@@ -51,7 +50,8 @@ async fn mark_channel_as_read(
     Path(id): Path<Uuid>,
     Json(input): Json<MarkReadRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    crate::services::unreads::mark_channel_as_read(&state, auth.user_id, id, input.target_seq).await?;
+    crate::services::unreads::mark_channel_as_read(&state, auth.user_id, id, input.target_seq)
+        .await?;
     Ok(Json(serde_json::json!({"status": "ok"})))
 }
 

@@ -63,7 +63,11 @@ async fn list_posts(
     Path(channel_id): Path<Uuid>,
     Query(query): Query<ListPostsQuery>,
 ) -> ApiResult<Json<PostListResponse>> {
-    tracing::info!("list_posts: channel_id={}, user_id={}", channel_id, auth.user_id);
+    tracing::info!(
+        "list_posts: channel_id={}, user_id={}",
+        channel_id,
+        auth.user_id
+    );
     // Check membership
     let _: ChannelMember =
         sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
@@ -74,22 +78,30 @@ async fn list_posts(
             .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     // Get read state
-    let last_read: Option<i64> = sqlx::query_scalar("SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2")
-        .bind(auth.user_id)
-        .bind(channel_id)
-        .fetch_optional(&state.db)
-        .await?;
-    
+    let last_read: Option<i64> = sqlx::query_scalar(
+        "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
+    )
+    .bind(auth.user_id)
+    .bind(channel_id)
+    .fetch_optional(&state.db)
+    .await?;
+
     let first_unread: Option<i64> = match last_read {
-        Some(lr) => sqlx::query_scalar("SELECT MIN(seq) FROM posts WHERE channel_id = $1 AND seq > $2 AND deleted_at IS NULL")
+        Some(lr) => sqlx::query_scalar(
+            "SELECT MIN(seq) FROM posts WHERE channel_id = $1 AND seq > $2 AND deleted_at IS NULL",
+        )
+        .bind(channel_id)
+        .bind(lr)
+        .fetch_one(&state.db)
+        .await?,
+        None => {
+            sqlx::query_scalar(
+                "SELECT MIN(seq) FROM posts WHERE channel_id = $1 AND deleted_at IS NULL",
+            )
             .bind(channel_id)
-            .bind(lr)
             .fetch_one(&state.db)
-            .await?,
-        None => sqlx::query_scalar("SELECT MIN(seq) FROM posts WHERE channel_id = $1 AND deleted_at IS NULL")
-            .bind(channel_id)
-            .fetch_one(&state.db)
-            .await?,
+            .await?
+        }
     };
 
     let limit = query.limit.unwrap_or(50).min(100);

@@ -1,6 +1,6 @@
 [package]
 name = "rustchat"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 authors = ["rustchat contributors"]
 description = "Self-hosted, enterprise-ready team collaboration platform"
