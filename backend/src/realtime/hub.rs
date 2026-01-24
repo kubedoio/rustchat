@@ -70,7 +70,7 @@ impl WsHub {
 
         let mut usernames = self.usernames.write().await;
         usernames.remove(&user_id);
-        
+
         // Note: We don't eagerly remove from subscriptions here as it requires scanning all maps.
         // Lazy cleanup happens if we implement a periodic cleaner or just rely on 'connections' check.
         // For accurate tracking, we might want to maintain a reverse map user_id -> [channels/teams].
@@ -95,9 +95,7 @@ impl WsHub {
     /// Subscribe user to a team
     pub async fn subscribe_team(&self, user_id: Uuid, team_id: Uuid) {
         let mut subs = self.team_subscriptions.write().await;
-        subs.entry(team_id)
-            .or_insert_with(Vec::new)
-            .push(user_id);
+        subs.entry(team_id).or_insert_with(Vec::new).push(user_id);
     }
 
     /// Unsubscribe user from a team

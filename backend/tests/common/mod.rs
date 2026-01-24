@@ -13,6 +13,7 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 
 pub struct TestApp {
     pub address: String,
+    #[allow(dead_code)]
     pub db_pool: PgPool,
     pub api_client: reqwest::Client,
 }

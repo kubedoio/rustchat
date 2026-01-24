@@ -11,8 +11,10 @@ use super::AppState;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
+    AddTeamMember,
     AuditLog,
     AuditLogQuery,
+    CreateChannel,
     CreateRetentionPolicy,
     CreateSsoConfig,
     Permission,
@@ -21,11 +23,9 @@ use crate::models::{
     ServerConfigResponse,
     // SiteConfig, AuthConfig, IntegrationsConfig, ComplianceConfig, EmailConfig,
     SsoConfig,
-    CreateChannel,
-    UpdateChannel,
-    AddTeamMember,
     TeamMember,
     TeamMemberResponse,
+    UpdateChannel,
 };
 use sqlx::FromRow;
 
@@ -226,9 +226,9 @@ async fn create_admin_channel(
     };
 
     let event = crate::realtime::WsEnvelope::event(
-        crate::realtime::EventType::ChannelCreated, 
-        channel.clone(), 
-        Some(channel.id)
+        crate::realtime::EventType::ChannelCreated,
+        channel.clone(),
+        Some(channel.id),
     )
     .with_broadcast(broadcast);
 
@@ -268,10 +268,11 @@ async fn update_admin_channel(
             .await?;
     }
 
-    let channel: crate::models::channel::Channel = sqlx::query_as("SELECT * FROM channels WHERE id = $1")
-        .bind(id)
-        .fetch_one(&state.db)
-        .await?;
+    let channel: crate::models::channel::Channel =
+        sqlx::query_as("SELECT * FROM channels WHERE id = $1")
+            .bind(id)
+            .fetch_one(&state.db)
+            .await?;
 
     Ok(Json(channel))
 }

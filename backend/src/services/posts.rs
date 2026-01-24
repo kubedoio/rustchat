@@ -208,45 +208,43 @@ pub async fn ensure_dm_membership(state: &AppState, channel_id: Uuid) -> ApiResu
         None => return Ok(()),
     };
 
-    if chan.channel_type == crate::models::ChannelType::Direct {
-        if chan.name.starts_with("dm_") {
-            let parts: Vec<&str> = chan.name.split('_').collect();
-            if parts.len() == 3 {
-                let id1 = Uuid::parse_str(parts[1]).ok();
-                let id2 = Uuid::parse_str(parts[2]).ok();
+    if chan.channel_type == crate::models::ChannelType::Direct && chan.name.starts_with("dm_") {
+        let parts: Vec<&str> = chan.name.split('_').collect();
+        if parts.len() == 3 {
+            let id1 = Uuid::parse_str(parts[1]).ok();
+            let id2 = Uuid::parse_str(parts[2]).ok();
 
-                if let (Some(u1), Some(u2)) = (id1, id2) {
-                    for target_user_id in [u1, u2] {
-                        // Ensure member exists
-                        let added: Option<Uuid> = sqlx::query_scalar(
-                            r#"
+            if let (Some(u1), Some(u2)) = (id1, id2) {
+                for target_user_id in [u1, u2] {
+                    // Ensure member exists
+                    let added: Option<Uuid> = sqlx::query_scalar(
+                        r#"
                             INSERT INTO channel_members (channel_id, user_id, role) 
                             VALUES ($1, $2, 'member') 
                             ON CONFLICT (channel_id, user_id) DO NOTHING
                             RETURNING user_id
                             "#,
-                        )
-                        .bind(channel_id)
-                        .bind(target_user_id)
-                        .fetch_optional(&state.db)
-                        .await?;
+                    )
+                    .bind(channel_id)
+                    .bind(target_user_id)
+                    .fetch_optional(&state.db)
+                    .await?;
 
-                        if added.is_some() {
-                            // User was missing and just re-added.
-                            // Broadcast ChannelCreated to them so their UI opens it.
-                            let event = WsEnvelope::event(
-                                EventType::ChannelCreated,
-                                chan.clone(),
-                                Some(channel_id),
-                            )
-                            .with_broadcast(WsBroadcast {
-                                user_id: Some(target_user_id),
-                                channel_id: None,
-                                team_id: None,
-                                exclude_user_id: None,
-                            });
-                            state.ws_hub.broadcast(event).await;
-                        }
+                    if added.is_some() {
+                        // User was missing and just re-added.
+                        // Broadcast ChannelCreated to them so their UI opens it.
+                        let event = WsEnvelope::event(
+                            EventType::ChannelCreated,
+                            chan.clone(),
+                            Some(channel_id),
+                        )
+                        .with_broadcast(WsBroadcast {
+                            user_id: Some(target_user_id),
+                            channel_id: None,
+                            team_id: None,
+                            exclude_user_id: None,
+                        });
+                        state.ws_hub.broadcast(event).await;
                     }
                 }
             }

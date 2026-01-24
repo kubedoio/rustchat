@@ -20,7 +20,8 @@ async fn main() -> anyhow::Result<()> {
     info!("Database connected and migrations applied");
 
     // Seed admin user if configured
-    if let (Some(admin_email), Some(admin_password)) = (&config.admin_user, &config.admin_password) {
+    if let (Some(admin_email), Some(admin_password)) = (&config.admin_user, &config.admin_password)
+    {
         let user_exists = sqlx::query("SELECT 1 FROM users WHERE email = $1")
             .bind(admin_email)
             .fetch_optional(&db_pool)
