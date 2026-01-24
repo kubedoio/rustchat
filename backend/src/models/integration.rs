@@ -40,7 +40,7 @@ pub struct OutgoingWebhook {
 }
 
 /// Slash command entity
-#[derive(Debug, Clone, Serialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SlashCommand {
     pub id: Uuid,
     pub team_id: Uuid,
@@ -108,7 +108,7 @@ fn default_trigger_when() -> String {
     "first_word".to_string()
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSlashCommand {
     pub trigger: String,
     pub url: String,
@@ -154,7 +154,7 @@ pub struct OutgoingWebhookPayload {
 }
 
 /// Command execution request
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecuteCommand {
     pub command: String,
     pub channel_id: Uuid,
