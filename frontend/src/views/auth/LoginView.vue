@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import AuthLayout from '../../layouts/AuthLayout.vue'
 import BaseInput from '../../components/atomic/BaseInput.vue'
@@ -14,7 +13,6 @@ interface SsoProvider {
   icon_url?: string
 }
 
-const router = useRouter()
 const auth = useAuthStore()
 const configStore = useConfigStore()
 
@@ -38,7 +36,9 @@ async function handleLogin() {
   error.value = ''
   try {
     await auth.login({ email: email.value, password: password.value })
-    router.push('/')
+    // Use full page reload to ensure all stores (Teams, Channels, etc.) 
+    // are initialized cleanly with the new auth state.
+    window.location.href = '/'
   } catch (e: any) {
     error.value = e.response?.data?.message || 'Failed to login'
   } finally {
@@ -55,7 +55,7 @@ function loginWithSSO(providerId: string) {
   <AuthLayout>
     <template #title>Sign in to {{ configStore.siteConfig.site_name }}</template>
     <template #subtitle>
-      Or <router-link to="/register" class="font-medium text-primary hover:text-blue-500">create a new account</router-link>
+      Or <router-link to="/register" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">create a new account</router-link>
     </template>
 
     <!-- SSO Buttons -->
@@ -76,14 +76,14 @@ function loginWithSSO(providerId: string) {
         <div class="absolute inset-0 flex items-center">
           <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
         </div>
-        <div class="relative flex justify-center text-sm">
-          <span class="px-2 bg-white dark:bg-gray-900 text-gray-500">Or continue with email</span>
+        <div class="relative flex justify-center text-sm leading-5">
+          <span class="px-2 bg-white dark:bg-gray-800 text-gray-500 font-medium">Or continue with email</span>
         </div>
       </div>
     </div>
 
     <form class="space-y-6" @submit.prevent="handleLogin">
-      <div v-if="error" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
+      <div v-if="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-md text-sm">
         {{ error }}
       </div>
 
@@ -106,22 +106,27 @@ function loginWithSSO(providerId: string) {
 
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
-          <label for="remember-me" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">
+          <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer">
+          <label for="remember-me" class="ml-2 block text-sm text-gray-900 dark:text-gray-300 cursor-pointer">
             Remember me
           </label>
         </div>
 
         <div class="text-sm">
-          <a href="#" class="font-medium text-primary hover:text-blue-500">
+          <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
             Forgot your password?
           </a>
         </div>
       </div>
 
-      <div>
-        <BaseButton type="submit" block :loading="loading">
-          Sign in
+      <div class="pt-2">
+        <BaseButton 
+          type="submit" 
+          block 
+          :loading="loading"
+          class="py-3 text-base shadow-md hover:shadow-lg transition-all duration-200 ring-offset-2 hover:ring-2 hover:ring-indigo-500"
+        >
+          Sign in to your account
         </BaseButton>
       </div>
     </form>

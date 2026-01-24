@@ -2,10 +2,11 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{delete, get},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::Deserialize;
+use sqlx::FromRow;
 use uuid::Uuid;
 
 use super::AppState;
@@ -13,18 +14,45 @@ use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{Channel, ChannelMember, CreateChannel, UpdateChannel};
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
-// use crate::realtime::hub::WsHub;
 
 /// Build channels routes
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_channels).post(create_channel))
+        .route("/unreads", get(get_all_unread_counts))
         .route(
             "/{id}",
             get(get_channel).put(update_channel).delete(archive_channel),
         )
         .route("/{id}/members", get(list_members).post(add_member))
         .route("/{id}/members/{user_id}", delete(remove_member))
+        .route("/{id}/read", post(mark_channel_as_read))
+}
+
+
+/// Get unread counts for all channels the user is a member of
+async fn get_all_unread_counts(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> ApiResult<Json<Vec<crate::services::unreads::ChannelUnreadOverview>>> {
+    let overview = crate::services::unreads::get_unread_overview(&state, auth.user_id).await?;
+    Ok(Json(overview.channels))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MarkReadRequest {
+    pub target_seq: Option<i64>,
+}
+
+/// Mark a channel as read
+async fn mark_channel_as_read(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(input): Json<MarkReadRequest>,
+) -> ApiResult<Json<serde_json::Value>> {
+    crate::services::unreads::mark_channel_as_read(&state, auth.user_id, id, input.target_seq).await?;
+    Ok(Json(serde_json::json!({"status": "ok"})))
 }
 
 #[derive(Debug, Deserialize)]

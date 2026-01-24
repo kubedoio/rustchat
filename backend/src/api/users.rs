@@ -1,5 +1,3 @@
-//! Users API endpoints
-
 use axum::{
     extract::{Path, Query, State},
     routing::get,

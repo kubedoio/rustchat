@@ -133,15 +133,14 @@ export function useWebSocket() {
                 // If it's a thread reply, logic might slightly differ (handled by store)
                 messageStore.handleNewMessage(post)
 
-                // Unread handling
+                // Notifications handling (counters are handled by unread_counts_updated)
                 if (post.channel_id !== channelStore.currentChannelId && post.user_id !== authStore.user?.id) {
                     const mentionsUser = post.message?.includes(`@${authStore.user?.username}`) || false
-                    unreadStore.incrementUnread(post.channel_id, mentionsUser)
 
                     if (mentionsUser) {
                         const channel = channelStore.channels.find(c => c.id === post.channel_id)
                         const title = channel ? `#${channel.name}` : 'New Mention'
-                        
+
                         if (Notification.permission === 'granted') {
                             new Notification(title, { body: post.message })
                         } else if (Notification.permission !== 'denied') {
@@ -217,6 +216,13 @@ export function useWebSocket() {
             case 'channel_created': {
                 if (envelope.data) {
                     channelStore.addChannel(envelope.data)
+                }
+                break
+            }
+
+            case 'unread_counts_updated': {
+                if (envelope.data) {
+                    unreadStore.handleUnreadUpdate(envelope.data)
                 }
                 break
             }

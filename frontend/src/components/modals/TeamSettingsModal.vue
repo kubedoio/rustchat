@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { X, Settings, Users, Shield, Trash2, Camera, Copy, Check, Search, Plus, UserMinus } from 'lucide-vue-next'
+import { X, Settings, Users, Shield, Trash2, Camera, Copy, Check, Search, Plus, UserMinus, LogOut } from 'lucide-vue-next'
 import BaseButton from '../atomic/BaseButton.vue'
 import BaseInput from '../atomic/BaseInput.vue'
 import { teamsApi, type Team } from '../../api/teams'
@@ -26,6 +26,7 @@ const toast = useToast()
 
 const activeTab = ref('general')
 const loading = ref(false)
+const leaving = ref(false)
 const deleting = ref(false)
 const copied = ref(false)
 
@@ -109,6 +110,22 @@ async function handleDelete() {
     toast.error('Delete failed', e.response?.data?.message || 'Could not delete team')
   } finally {
     deleting.value = false
+  }
+}
+
+async function handleLeave() {
+  if (!props.team) return
+  if (!confirm(`Are you sure you want to leave "${props.team.display_name || props.team.name}"?`)) return
+  
+  leaving.value = true
+  try {
+    await teamStore.leaveTeam(props.team.id)
+    toast.success('Left team', `You have left ${props.team.display_name || props.team.name}`)
+    emit('close')
+  } catch (e: any) {
+    toast.error('Failed to leave', e.response?.data?.message || 'Could not leave team')
+  } finally {
+    leaving.value = false
   }
 }
 
@@ -312,15 +329,27 @@ async function removeMember(userId: string) {
             <!-- Danger Zone -->
             <div class="pt-6 border-t border-gray-200 dark:border-gray-700">
               <h4 class="text-sm font-semibold text-red-600 dark:text-red-400 mb-3">Danger Zone</h4>
-              <button
-                @click="handleDelete"
-                :disabled="deleting"
-                class="flex items-center px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
-              >
-                <Trash2 class="w-4 h-4 mr-2" />
-                {{ deleting ? 'Deleting...' : 'Delete Team' }}
-              </button>
-              <p class="mt-2 text-xs text-gray-500">This will permanently delete all channels, messages, and files in this team.</p>
+              <div class="space-y-3">
+                <button
+                  @click="handleLeave"
+                  :disabled="leaving || deleting"
+                  class="flex items-center px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                >
+                  <LogOut class="w-4 h-4 mr-2" />
+                  {{ leaving ? 'Leaving...' : 'Leave Team' }}
+                </button>
+
+                <button
+                  v-if="authStore.user?.role === 'system_admin' || authStore.user?.role === 'org_admin'"
+                  @click="handleDelete"
+                  :disabled="deleting || leaving"
+                  class="flex items-center px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 class="w-4 h-4 mr-2" />
+                  {{ deleting ? 'Deleting...' : 'Delete Team' }}
+                </button>
+              </div>
+              <p class="mt-2 text-xs text-gray-500">Leaving a team will remove your access to its channels. Deleting a team is permanent.</p>
             </div>
           </div>
           

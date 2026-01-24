@@ -16,6 +16,7 @@ mod preferences;
 mod search;
 mod site;
 mod teams;
+mod unreads;
 mod users;
 mod ws;
 
@@ -36,6 +37,7 @@ use crate::storage::S3Client;
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
+    pub redis: redis::Client,
     pub jwt_secret: String,
     pub jwt_expiry_hours: u64,
     pub ws_hub: Arc<WsHub>,
@@ -46,6 +48,7 @@ pub struct AppState {
 /// Build the main application router
 pub fn router(
     db: PgPool,
+    redis: redis::Client,
     jwt_secret: String,
     jwt_expiry_hours: u64,
     ws_hub: Arc<WsHub>,
@@ -53,6 +56,7 @@ pub fn router(
 ) -> Router {
     let state = AppState {
         db,
+        redis,
         jwt_secret,
         jwt_expiry_hours,
         ws_hub,
@@ -79,6 +83,7 @@ pub fn router(
         .nest("/users", users::router())
         .nest("/teams", teams::router())
         .nest("/channels", channels::router())
+        .nest("/unreads", unreads::router())
         .merge(posts::router())
         .merge(files::router())
         .merge(search::router())

@@ -2,6 +2,11 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+}
+
 :root {
   /* Modern Indigo-500/600 Primary */
   --color-primary: #4F46E5;

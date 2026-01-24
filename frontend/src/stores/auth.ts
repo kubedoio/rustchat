@@ -23,6 +23,12 @@ export const useAuthStore = defineStore('auth', () => {
         if (!token.value) return
         try {
             const { data } = await client.get('/auth/me')
+            // Map custom_status fields for easier access
+            if (data.custom_status) {
+                data.status_text = data.custom_status.text
+                data.status_emoji = data.custom_status.emoji
+                data.status_expires_at = data.custom_status.expires_at
+            }
             user.value = data
         } catch (e) {
             logout()
@@ -38,14 +44,19 @@ export const useAuthStore = defineStore('auth', () => {
     async function updateStatus(status: { presence?: string, text?: string, emoji?: string, duration_minutes?: number }) {
         if (!token.value) return
         try {
-            // @ts-ignore
             const { data } = await client.put('/users/me/status', status)
             if (user.value) {
                 if (data.presence) user.value.presence = data.presence
-                // Merge other status fields if needed, or re-fetch me
                 user.value.status_text = data.text
                 user.value.status_emoji = data.emoji
                 user.value.status_expires_at = data.expires_at
+                
+                // Also update the nested object to stay in sync
+                user.value.custom_status = {
+                    text: data.text,
+                    emoji: data.emoji,
+                    expires_at: data.expires_at
+                }
             }
         } catch (e) {
             console.error('Failed to update status', e)

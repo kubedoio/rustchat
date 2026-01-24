@@ -105,6 +105,7 @@ pub async fn create_post(
         reactions: vec![],
         is_saved: false,
         client_msg_id,
+        seq: post.seq,
     };
 
     // Populate files if any
@@ -156,6 +157,9 @@ pub async fn create_post(
 
     // Ensure DM membership for recipient if they left
     let _ = ensure_dm_membership(state, channel_id).await;
+
+    // Increment unread counts in Redis for other members
+    let _ = crate::services::unreads::increment_unreads(state, channel_id, user_id, post.seq).await;
 
     // Parse mentions (simple parsing for now)
     let mentions: Vec<String> = response
@@ -378,6 +382,7 @@ pub async fn create_system_message(
         reactions: vec![],
         is_saved: false,
         client_msg_id: None,
+        seq: post.seq,
     };
 
     // 5. Broadcast
@@ -390,6 +395,9 @@ pub async fn create_system_message(
         });
 
     state.ws_hub.broadcast(broadcast).await;
+
+    // Increment unread counts in Redis for other members
+    let _ = crate::services::unreads::increment_unreads(state, channel_id, bot_user, post.seq).await;
 
     Ok(())
 }
