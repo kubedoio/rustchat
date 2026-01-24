@@ -381,19 +381,25 @@ async fn archive_channel(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Channel>> {
-    // Check admin
-    let member: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    // Permission check
+    if auth.role != "system_admin" && auth.role != "org_admin" {
+        let member: Option<ChannelMember> =
+            sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+                .bind(id)
+                .bind(auth.user_id)
+                .fetch_optional(&state.db)
+                .await?;
 
-    if member.role != "admin" && auth.role != "system_admin" {
-        return Err(AppError::Forbidden(
-            "Not an admin of this channel".to_string(),
-        ));
+        let is_admin = match member {
+            Some(m) => m.role == "admin",
+            None => false,
+        };
+
+        if !is_admin {
+            return Err(AppError::Forbidden(
+                "Only channel admins can archive channels".to_string(),
+            ));
+        }
     }
 
     let channel: Channel =

@@ -129,9 +129,24 @@ async fn get_team(
 /// Delete a team
 async fn delete_team(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<(), AppError> {
+    // Permission check
+    if auth.role != "system_admin" && auth.role != "org_admin" {
+        let requester_role: Option<String> =
+            sqlx::query_scalar("SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2")
+                .bind(id)
+                .bind(auth.user_id)
+                .fetch_optional(&state.db)
+                .await?;
+
+        match requester_role.as_deref() {
+            Some("admin") | Some("owner") => {} // Allow
+            _ => return Err(AppError::Forbidden("Only team admins can delete teams".into())),
+        }
+    }
+
     sqlx::query("DELETE FROM teams WHERE id = $1")
         .bind(id)
         .execute(&state.db)
