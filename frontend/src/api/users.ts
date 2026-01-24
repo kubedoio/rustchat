@@ -48,7 +48,7 @@ export interface UpdateStatusRequest {
 }
 
 export const usersApi = {
-    list: (params?: { page?: number; per_page?: number }) =>
+    list: (params?: { page?: number; per_page?: number; q?: string }) =>
         api.get<User[]>('/users', { params }),
     get: (id: string) => api.get<User>(`/users/${id}`),
     update: (id: string, data: UpdateUserRequest) => api.put<User>(`/users/${id}`, data),

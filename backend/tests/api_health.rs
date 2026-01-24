@@ -8,7 +8,7 @@ async fn health_check_works() {
 
     let response = app
         .api_client
-        .get(&format!("{}/api/v1/health/live", &app.address))
+        .get(format!("{}/api/v1/health/live", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");

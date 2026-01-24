@@ -166,10 +166,25 @@ async fn get_members(
 /// Add a member to a team
 async fn add_member(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(id): Path<Uuid>,
     Json(payload): Json<AddTeamMember>,
 ) -> Result<Json<TeamMember>, AppError> {
+    // Permission check
+    if auth.role != "system_admin" && auth.role != "org_admin" {
+        let requester_role: Option<String> =
+            sqlx::query_scalar("SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2")
+                .bind(id)
+                .bind(auth.user_id)
+                .fetch_optional(&state.db)
+                .await?;
+
+        match requester_role.as_deref() {
+            Some("admin") | Some("owner") => {} // Allow
+            _ => return Err(AppError::Forbidden("Only admins can add members".into())),
+        }
+    }
+
     let member = sqlx::query_as::<_, TeamMember>(
         r#"
         INSERT INTO team_members (team_id, user_id, role)
@@ -188,7 +203,7 @@ async fn add_member(
         r#"
         INSERT INTO channel_members (channel_id, user_id)
         SELECT c.id, $1 FROM channels c
-        WHERE c.team_id = $2 AND c.channel_type = 'public'
+        WHERE c.team_id = $2 AND c.channel_type = 'public'::channel_type
         ON CONFLICT (channel_id, user_id) DO NOTHING
         "#,
     )
@@ -203,9 +218,39 @@ async fn add_member(
 /// Remove a member from a team
 async fn remove_member(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path((id, user_id)): Path<(Uuid, Uuid)>,
 ) -> Result<(), AppError> {
+    // Permission check
+    if auth.role != "system_admin" && auth.role != "org_admin" {
+        let requester_role: Option<String> =
+            sqlx::query_scalar("SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2")
+                .bind(id)
+                .bind(auth.user_id)
+                .fetch_optional(&state.db)
+                .await?;
+
+        match requester_role.as_deref() {
+            Some("admin") | Some("owner") => {
+                // Check target role
+                let target_role: Option<String> = sqlx::query_scalar(
+                    "SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2",
+                )
+                .bind(id)
+                .bind(user_id)
+                .fetch_optional(&state.db)
+                .await?;
+
+                if let Some(target) = target_role {
+                    if target == "admin" || target == "owner" {
+                        return Err(AppError::Forbidden("Cannot remove other admins".into()));
+                    }
+                }
+            }
+            _ => return Err(AppError::Forbidden("Only admins can remove members".into())),
+        }
+    }
+
     sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
         .bind(id)
         .bind(user_id)
@@ -218,16 +263,19 @@ async fn remove_member(
 /// List channels in a team
 async fn list_team_channels(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(team_id): Path<Uuid>,
 ) -> Result<Json<Vec<crate::models::channel::Channel>>, AppError> {
     let channels = sqlx::query_as::<_, crate::models::channel::Channel>(
         r#"
-        SELECT * FROM channels WHERE team_id = $1
-        ORDER BY name
+        SELECT c.* FROM channels c
+        INNER JOIN channel_members cm ON c.id = cm.channel_id
+        WHERE c.team_id = $1 AND cm.user_id = $2
+        ORDER BY c.name
         "#,
     )
     .bind(team_id)
+    .bind(auth.user_id)
     .fetch_all(&state.db)
     .await?;
 
@@ -302,7 +350,7 @@ async fn join_team(
         r#"
         INSERT INTO channel_members (channel_id, user_id)
         SELECT c.id, $1 FROM channels c
-        WHERE c.team_id = $2 AND c.channel_type = 'public'
+        WHERE c.team_id = $2 AND c.channel_type = 'public'::channel_type
         ON CONFLICT (channel_id, user_id) DO NOTHING
         "#,
     )

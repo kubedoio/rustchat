@@ -60,6 +60,7 @@ pub enum EventType {
     UserPresence,
     CallSignal,
     ConfigUpdated,
+    UnreadCountsUpdated,
 
     ChannelSubscribed,
     ChannelUnsubscribed,
@@ -92,6 +93,7 @@ impl EventType {
             Self::UserPresence => "user_presence",
             Self::CallSignal => "call_signal",
             Self::ConfigUpdated => "config_updated",
+            Self::UnreadCountsUpdated => "unread_counts_updated",
             Self::Error => "error",
             Self::Hello => "hello",
         }

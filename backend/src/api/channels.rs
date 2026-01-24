@@ -2,10 +2,11 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{delete, get},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::Deserialize;
+use sqlx::FromRow;
 use uuid::Uuid;
 
 use super::AppState;
@@ -13,18 +14,45 @@ use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{Channel, ChannelMember, CreateChannel, UpdateChannel};
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
-// use crate::realtime::hub::WsHub;
 
 /// Build channels routes
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_channels).post(create_channel))
+        .route("/unreads", get(get_all_unread_counts))
         .route(
             "/{id}",
             get(get_channel).put(update_channel).delete(archive_channel),
         )
         .route("/{id}/members", get(list_members).post(add_member))
         .route("/{id}/members/{user_id}", delete(remove_member))
+        .route("/{id}/read", post(mark_channel_as_read))
+}
+
+/// Get unread counts for all channels the user is a member of
+async fn get_all_unread_counts(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> ApiResult<Json<Vec<crate::services::unreads::ChannelUnreadOverview>>> {
+    let overview = crate::services::unreads::get_unread_overview(&state, auth.user_id).await?;
+    Ok(Json(overview.channels))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MarkReadRequest {
+    pub target_seq: Option<i64>,
+}
+
+/// Mark a channel as read
+async fn mark_channel_as_read(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(input): Json<MarkReadRequest>,
+) -> ApiResult<Json<serde_json::Value>> {
+    crate::services::unreads::mark_channel_as_read(&state, auth.user_id, id, input.target_seq)
+        .await?;
+    Ok(Json(serde_json::json!({"status": "ok"})))
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,7 +89,7 @@ async fn list_channels(
             r#"
             SELECT c.* FROM channels c
             WHERE c.team_id = $1 
-            AND c.type = 'public' 
+            AND c.type = 'public'::channel_type
             AND c.is_archived = false
             AND c.id NOT IN (
                 SELECT channel_id FROM channel_members WHERE user_id = $2
@@ -128,7 +156,7 @@ async fn create_channel(
 
         // Check if DM channel already exists in this team
         let existing = sqlx::query_as::<_, Channel>(
-            "SELECT * FROM channels WHERE team_id = $1 AND name = $2 AND type = 'direct'",
+            "SELECT * FROM channels WHERE team_id = $1 AND name = $2 AND type = 'direct'::channel_type",
         )
         .bind(input.team_id)
         .bind(&dm_name)
@@ -136,10 +164,8 @@ async fn create_channel(
         .await?;
 
         if let Some(channel) = existing {
-            // Even if it exists, the requesting user might not have it in their local list if they just switched devices
-            // But usually we just return it. The user will be redirected.
-            // If we really want to be safe, we could send the event to the requester again.
-            // But for now, just return.
+            // Re-add both users as members just in case they left (resurrect DM)
+            let _ = crate::services::posts::ensure_dm_membership(&state, channel.id).await;
             return Ok(Json(channel));
         }
 
@@ -472,6 +498,29 @@ async fn add_member(
     .bind(input.role.as_deref().unwrap_or("member"))
     .fetch_one(&state.db)
     .await?;
+
+    // Announce join in public channels
+    let channel_type = sqlx::query_scalar::<_, crate::models::ChannelType>(
+        "SELECT type FROM channels WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if channel_type == crate::models::ChannelType::Public {
+        let username = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+            .bind(input.user_id)
+            .fetch_one(&state.db)
+            .await?;
+
+        let _ = crate::services::posts::create_system_message(
+            &state,
+            id,
+            format!("@{} has joined the channel.", username),
+            None,
+        )
+        .await;
+    }
 
     Ok(Json(new_member))
 }

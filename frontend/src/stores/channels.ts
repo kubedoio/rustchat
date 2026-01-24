@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useStorage } from '@vueuse/core'
 import { channelsApi, type Channel, type CreateChannelRequest } from '../api/channels'
 import { useAuthStore } from './auth'
 
 export const useChannelStore = defineStore('channels', () => {
     const channels = ref<Channel[]>([])
     const currentChannelId = ref<string | null>(null)
+    const lastChannelByTeam = useStorage<Record<string, string>>('last_channel_by_team', {})
     const loading = ref(false)
     const error = ref<string | null>(null)
 
@@ -31,10 +33,20 @@ export const useChannelStore = defineStore('channels', () => {
         try {
             const response = await channelsApi.list(teamId)
             channels.value = response.data
-            // Auto-select general channel if none selected
-            if (!currentChannelId.value && channels.value.length > 0) {
+            
+            // Try to restore last selected channel for this team
+            const lastId = lastChannelByTeam.value[teamId]
+            if (lastId && channels.value.some(c => c.id === lastId)) {
+                currentChannelId.value = lastId
+            } else {
+                // Auto-select general channel if none selected or last not found
                 const general = channels.value.find(c => c.name === 'general')
                 currentChannelId.value = general?.id || channels.value[0]?.id || null
+                
+                // Save this default selection
+                if (currentChannelId.value) {
+                    lastChannelByTeam.value[teamId] = currentChannelId.value
+                }
             }
         } catch (e: any) {
             error.value = e.response?.data?.message || 'Failed to fetch channels'
@@ -88,6 +100,10 @@ export const useChannelStore = defineStore('channels', () => {
 
     function selectChannel(channelId: string) {
         currentChannelId.value = channelId
+        const channel = channels.value.find(c => c.id === channelId)
+        if (channel) {
+            lastChannelByTeam.value[channel.team_id] = channelId
+        }
     }
 
     function updateChannel(updated: Channel) {

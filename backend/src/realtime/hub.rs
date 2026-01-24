@@ -21,6 +21,8 @@ pub struct WsHub {
     connections: RwLock<HashMap<Uuid, broadcast::Sender<String>>>,
     /// User subscriptions to channels
     channel_subscriptions: RwLock<HashMap<Uuid, Vec<Uuid>>>, // channel_id -> user_ids
+    /// User subscriptions to teams
+    team_subscriptions: RwLock<HashMap<Uuid, Vec<Uuid>>>, // team_id -> user_ids
     /// User presence status
     presence: RwLock<HashMap<Uuid, String>>,
     /// Usernames cache
@@ -32,6 +34,7 @@ impl WsHub {
         Arc::new(Self {
             connections: RwLock::new(HashMap::new()),
             channel_subscriptions: RwLock::new(HashMap::new()),
+            team_subscriptions: RwLock::new(HashMap::new()),
             presence: RwLock::new(HashMap::new()),
             usernames: RwLock::new(HashMap::new()),
         })
@@ -67,6 +70,10 @@ impl WsHub {
 
         let mut usernames = self.usernames.write().await;
         usernames.remove(&user_id);
+
+        // Note: We don't eagerly remove from subscriptions here as it requires scanning all maps.
+        // Lazy cleanup happens if we implement a periodic cleaner or just rely on 'connections' check.
+        // For accurate tracking, we might want to maintain a reverse map user_id -> [channels/teams].
     }
 
     /// Subscribe user to a channel
@@ -81,6 +88,20 @@ impl WsHub {
     pub async fn unsubscribe_channel(&self, user_id: Uuid, channel_id: Uuid) {
         let mut subs = self.channel_subscriptions.write().await;
         if let Some(users) = subs.get_mut(&channel_id) {
+            users.retain(|&id| id != user_id);
+        }
+    }
+
+    /// Subscribe user to a team
+    pub async fn subscribe_team(&self, user_id: Uuid, team_id: Uuid) {
+        let mut subs = self.team_subscriptions.write().await;
+        subs.entry(team_id).or_insert_with(Vec::new).push(user_id);
+    }
+
+    /// Unsubscribe user from a team
+    pub async fn unsubscribe_team(&self, user_id: Uuid, team_id: Uuid) {
+        let mut subs = self.team_subscriptions.write().await;
+        if let Some(users) = subs.get_mut(&team_id) {
             users.retain(|&id| id != user_id);
         }
     }
@@ -100,6 +121,23 @@ impl WsHub {
                 // Broadcast to channel subscribers
                 let subs = self.channel_subscriptions.read().await;
                 if let Some(user_ids) = subs.get(&channel_id) {
+                    for user_id in user_ids {
+                        // Check exclusions
+                        if let Some(exclude) = broadcast.exclude_user_id {
+                            if *user_id == exclude {
+                                continue;
+                            }
+                        }
+
+                        if let Some(tx) = connections.get(user_id) {
+                            let _ = tx.send(message.clone());
+                        }
+                    }
+                }
+            } else if let Some(team_id) = broadcast.team_id {
+                // Broadcast to team subscribers
+                let subs = self.team_subscriptions.read().await;
+                if let Some(user_ids) = subs.get(&team_id) {
                     for user_id in user_ids {
                         // Check exclusions
                         if let Some(exclude) = broadcast.exclude_user_id {
@@ -161,6 +199,7 @@ impl Default for WsHub {
         Self {
             connections: RwLock::new(HashMap::new()),
             channel_subscriptions: RwLock::new(HashMap::new()),
+            team_subscriptions: RwLock::new(HashMap::new()),
             presence: RwLock::new(HashMap::new()),
             usernames: RwLock::new(HashMap::new()),
         }

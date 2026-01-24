@@ -22,7 +22,10 @@ services:
       - RUSTCHAT_S3_SECRET_KEY=minioadmin
       - RUSTCHAT_S3_REGION=us-east-1
       - RUSTCHAT_JWT_SECRET=dev_secret_key_change_me_in_prod
-      - RUST_LOG=info
+      - RUSTCHAT_ENCRYPTION_KEY=your-super-secret-encryption-key-32chars!!
+      - RUSTCHAT_ADMIN_USER=admin@rustchat.io
+      - RUSTCHAT_ADMIN_PASSWORD=Password33
+      - RUST_LOG=debug
     ports:
       - "3000:3000"
     restart: on-failure

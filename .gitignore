@@ -3,6 +3,12 @@ target/
 debug/
 release/
 
+#AI
+.agents/
+.agent.workflows/
+.agent.history/
+.agent.cache/
+
 # IDE
 .idea/
 .vscode/

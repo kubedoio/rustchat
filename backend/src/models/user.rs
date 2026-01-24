@@ -32,7 +32,15 @@ pub struct User {
     pub is_bot: bool,
     pub is_active: bool,
     pub role: String,
+    #[sqlx(default)]
     pub presence: String, // 'online', 'away', 'dnd', 'offline'
+    #[sqlx(default)]
+    pub status_text: Option<String>,
+    #[sqlx(default)]
+    pub status_emoji: Option<String>,
+    #[sqlx(default)]
+    pub status_expires_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
     pub custom_status: Option<serde_json::Value>,
     pub last_login_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
@@ -51,6 +59,9 @@ pub struct UserResponse {
     pub is_bot: bool,
     pub role: String,
     pub presence: String,
+    pub status_text: Option<String>,
+    pub status_emoji: Option<String>,
+    pub status_expires_at: Option<DateTime<Utc>>,
     pub custom_status: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
@@ -67,6 +78,9 @@ impl From<User> for UserResponse {
             is_bot: user.is_bot,
             role: user.role,
             presence: user.presence,
+            status_text: user.status_text,
+            status_emoji: user.status_emoji,
+            status_expires_at: user.status_expires_at,
             custom_status: user.custom_status,
             created_at: user.created_at,
         }

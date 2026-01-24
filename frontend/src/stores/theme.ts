@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export type Theme = 'light' | 'dark' | 'system'
+export type Theme = 'dark' | 'system'
 
 export const useThemeStore = defineStore('theme', () => {
-    const theme = ref<Theme>((localStorage.getItem('theme') as Theme) || 'system')
+    const storedTheme = localStorage.getItem('theme') as Theme
+    const theme = ref<Theme>((storedTheme === 'dark' || storedTheme === 'system') ? storedTheme : 'system')
 
     function setTheme(newTheme: Theme) {
         theme.value = newTheme
@@ -15,10 +16,9 @@ export const useThemeStore = defineStore('theme', () => {
     function applyTheme() {
         const root = window.document.documentElement
 
-        let effectiveTheme = theme.value
-        if (effectiveTheme === 'system') {
-            effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        }
+        let effectiveTheme: 'dark' | 'light' = theme.value === 'system' 
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : 'dark'
 
         if (effectiveTheme === 'dark') {
             root.classList.add('dark')

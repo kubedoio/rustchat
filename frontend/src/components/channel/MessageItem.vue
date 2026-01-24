@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { format, formatDistanceToNow } from 'date-fns'
-import { Smile, MessageSquare, MoreHorizontal, Pencil, Trash2, Pin, X, Check, Bookmark } from 'lucide-vue-next'
+import { Smile, MessageSquare, MoreHorizontal, Pencil, Trash2, Pin, X, Check, Bookmark, ArrowRight } from 'lucide-vue-next'
 import type { Message } from '../../stores/messages'
 import { useMessageStore } from '../../stores/messages'
 import { useAuthStore } from '../../stores/auth'
+import { useUnreadStore } from '../../stores/unreads'
 import { postsApi } from '../../api/posts'
 import EmojiPicker from '../atomic/EmojiPicker.vue'
 import FilePreview from '../atomic/FilePreview.vue'
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
+const unreadStore = useUnreadStore()
 
 const showActions = ref(false)
 const showMenu = ref(false)
@@ -38,6 +40,7 @@ const editInputRef = ref<HTMLTextAreaElement | null>(null)
 const saving = ref(false)
 
 const isOwnMessage = computed(() => authStore.user?.id === props.message.userId)
+const isSystemMessage = computed(() => props.message.props?.type === 'system_join_leave')
 
 async function handleSave() {
     try {
@@ -62,6 +65,17 @@ async function handlePin() {
         showMenu.value = false
     } catch (e) {
         console.error('Failed to toggle pin', e)
+    }
+}
+
+async function handleMarkAsUnread() {
+    try {
+        // Set last read to the sequence BEFORE this message
+        const targetSeq = Number(props.message.seq) - 1;
+        await unreadStore.markAsRead(props.message.channelId, targetSeq);
+        showMenu.value = false;
+    } catch (e) {
+        console.error('Failed to mark as unread', e)
     }
 }
 
@@ -138,6 +152,9 @@ const isMentioned = computed(() => {
     return username && props.message.content.includes(`@${username}`)
 })
 
+// Quick reactions
+const quickEmojis = ['👍', '❤️', '😄']
+
 // Gallery state
 const showGallery = ref(false)
 const galleryInitialIndex = ref(0)
@@ -153,18 +170,45 @@ function openGallery(file: FileUploadResponse) {
   }
 }
 
-async function addReaction(emoji: string) {
-  try {
-    await postsApi.addReaction(props.message.id, emoji)
+async function handleEmojiSelect(emoji: string) {
     showEmojiPicker.value = false
-  } catch (e) {
-    console.error('Failed to add reaction', e)
-  }
+    await toggleReaction(emoji)
+}
+
+async function toggleReaction(emoji: string) {
+    const reaction = props.message.reactions?.find(r => r.emoji === emoji)
+    const me = authStore.user?.id
+    if (!me) return
+
+    const hasReacted = reaction?.users.includes(me)
+
+    try {
+        if (hasReacted) {
+            await postsApi.removeReaction(props.message.id, emoji)
+        } else {
+            await postsApi.addReaction(props.message.id, emoji)
+        }
+    } catch (e) {
+        console.error('Failed to toggle reaction', e)
+    }
 }
 </script>
 
 <template>
+  <!-- System Message -->
+  <div v-if="isSystemMessage" class="flex items-center px-5 py-1 -mx-5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+    <div class="flex items-center text-xs text-gray-500 dark:text-gray-400 italic w-full">
+        <ArrowRight class="w-3.5 h-3.5 mr-2 text-gray-400" />
+        <span v-html="formattedContent"></span>
+        <span class="ml-2 text-[10px] text-gray-400">
+            {{ format(new Date(message.timestamp), 'h:mm a') }}
+        </span>
+    </div>
+  </div>
+
+  <!-- Regular Message -->
   <div 
+    v-else
     class="flex items-start group px-5 py-0.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 -mx-5 transition-colors relative"
     :class="{ 
         'bg-yellow-50/30 dark:bg-yellow-900/5': isMentioned,
@@ -214,7 +258,7 @@ async function addReaction(emoji: string) {
       </div>
 
       <!-- Body - Normal or Editing -->
-      <div v-if="isEditing" class="mt-1">
+      <div v-if="isEditing" class="mt-1 max-w-[70%]">
         <textarea
           ref="editInputRef"
           v-model="editContent"
@@ -243,11 +287,27 @@ async function addReaction(emoji: string) {
         </div>
       </div>
 
-      <div v-else 
-        class="text-gray-800 dark:text-gray-200 text-sm mt-0.5 whitespace-pre-wrap leading-relaxed"
-        :class="{ 'bg-yellow-50/50 dark:bg-yellow-900/10 -mx-2 px-2 py-1 rounded': isMentioned }"
-        v-html="formattedContent"
-      ></div>
+      <div v-else class="relative group/content flex items-start">
+        <div 
+          class="text-gray-800 dark:text-gray-200 text-sm mt-0.5 whitespace-pre-wrap leading-relaxed max-w-[50%] break-words"
+          :class="{ 'bg-yellow-50/50 dark:bg-yellow-900/10 -mx-2 px-2 py-1 rounded': isMentioned }"
+          v-html="formattedContent"
+        ></div>
+
+        <!-- Reactions (Middle Alignment) -->
+        <div v-if="message.reactions && message.reactions.length > 0 && !isEditing" class="flex items-center ml-4 mt-1 space-x-1 flex-wrap">
+          <div 
+            v-for="reaction in message.reactions" 
+            :key="reaction.emoji"
+            @click="toggleReaction(reaction.emoji)"
+            class="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 hover:border-blue-300 rounded-full px-1.5 py-0.5 text-[11px] cursor-pointer flex items-center space-x-1 transition-colors select-none"
+            :class="{ 'bg-blue-100 dark:bg-blue-800 border-blue-300 dark:border-blue-600': reaction.users.includes(authStore.user?.id || '') }"
+          >
+            <span>{{ reaction.emoji }}</span>
+            <span class="font-semibold text-blue-600 dark:text-blue-400">{{ reaction.count }}</span>
+          </div>
+        </div>
+      </div>
 
       <div v-if="message.files && message.files.length > 0" class="mt-2 flex flex-wrap gap-2">
         <FilePreview
@@ -256,18 +316,6 @@ async function addReaction(emoji: string) {
           :file="file"
           @preview="openGallery"
         />
-      </div>
-
-      <!-- Reactions -->
-      <div v-if="message.reactions && message.reactions.length > 0 && !isEditing" class="flex mt-1.5 space-x-1 flex-wrap">
-        <div 
-          v-for="reaction in message.reactions" 
-          :key="reaction.emoji"
-          class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 hover:border-blue-400 rounded-full px-2 py-0.5 text-xs cursor-pointer flex items-center space-x-1 transition-colors"
-        >
-          <span>{{ reaction.emoji }}</span>
-          <span class="font-semibold text-blue-600 dark:text-blue-400">{{ reaction.count }}</span>
-        </div>
       </div>
       
       <!-- Thread Reply Count -->
@@ -295,11 +343,24 @@ async function addReaction(emoji: string) {
     <!-- Hover Actions -->
     <div 
       v-show="showActions && !isEditing"
-      class="absolute right-2 top-0 -translate-y-1/2 flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden"
+      class="absolute right-4 top-0 -translate-y-1/2 flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md z-10 px-1 py-0.5 transition-all duration-200"
     >
+      <!-- Quick Reactions -->
+      <div class="flex items-center border-r border-gray-100 dark:border-gray-700 pr-1 mr-1">
+        <button 
+          v-for="emoji in quickEmojis" 
+          :key="emoji"
+          @click="toggleReaction(emoji)"
+          class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-sm leading-none"
+          :title="`React with ${emoji}`"
+        >
+          {{ emoji }}
+        </button>
+      </div>
+
       <button 
         @click="handleReply"
-        class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-md"
         title="Reply in thread"
       >
         <MessageSquare class="w-4 h-4" />
@@ -307,17 +368,18 @@ async function addReaction(emoji: string) {
       <div class="relative">
         <button 
           @click.stop="showEmojiPicker = !showEmojiPicker"
-          class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-md"
+          :class="{ 'bg-gray-100 dark:bg-gray-700 text-indigo-500': showEmojiPicker }"
           title="Add reaction"
         >
           <Smile class="w-4 h-4" />
         </button>
-        <EmojiPicker :show="showEmojiPicker" @select="addReaction" @close="showEmojiPicker = false" />
+        <EmojiPicker :show="showEmojiPicker" @select="handleEmojiSelect" @close="showEmojiPicker = false" />
       </div>
       <div class="relative">
         <button 
           @click.stop="showMenu = !showMenu"
-          class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-md"
           title="More actions"
         >
           <MoreHorizontal class="w-4 h-4" />
@@ -349,6 +411,13 @@ async function addReaction(emoji: string) {
           >
             <Pin class="w-4 h-4 mr-2" :class="{ 'fill-current': message.isPinned }" />
             {{ message.isPinned ? 'Unpin from channel' : 'Pin to channel' }}
+          </button>
+          <button 
+            @click="handleMarkAsUnread"
+            class="w-full px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+          >
+            <Check class="w-4 h-4 mr-2" />
+            Mark as unread
           </button>
           <button 
             v-if="isOwnMessage"

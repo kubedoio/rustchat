@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { postsApi, type Post } from '../api/posts'
 import { useChannelStore } from './channels'
+import { useUnreadStore } from './unreads'
 import { useAuthStore } from './auth'
 
 export interface Message {
@@ -22,6 +23,8 @@ export interface Message {
     isSaved: boolean
     status?: 'sending' | 'delivered' | 'failed'
     clientMsgId?: string
+    props?: any
+    seq: number | string
 }
 
 function postToMessage(post: Post): Message {
@@ -47,6 +50,8 @@ function postToMessage(post: Post): Message {
         isSaved: post.is_saved || false,
         status: 'delivered',
         clientMsgId: (post as any).client_msg_id,
+        props: post.props,
+        seq: post.seq,
     }
 }
 
@@ -56,6 +61,7 @@ export const useMessageStore = defineStore('messages', () => {
     const repliesByThread = ref<Record<string, Message[]>>({})
     const hasMoreOlderByChannel = ref<Record<string, boolean>>({}) // Track if we can load more history
     const loading = ref(false)
+    const isLoadingOlder = ref(false)
     const error = ref<string | null>(null)
 
     function getMessages(channelId: string) {
@@ -68,17 +74,24 @@ export const useMessageStore = defineStore('messages', () => {
         loading.value = true
         error.value = null
         try {
+            const unreadStore = useUnreadStore()
             const response = await postsApi.list(channelId, { limit: 50 })
-            const messages = response.data
+            const messages = response.data.messages
                 .filter(p => !p.root_post_id)
                 .map(postToMessage)
                 .reverse()
             messagesByChannel.value[channelId] = messages
 
+            // Update read state in unread store
+            if (response.data.read_state) {
+                unreadStore.setReadState(channelId, response.data.read_state)
+            }
+
             // If we got fewer than 50, we probably reached the end
-            hasMoreOlderByChannel.value[channelId] = response.data.length >= 50
+            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= 50
         } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to fetch messages'
+            console.error(`Failed to fetch messages for channel ${channelId}:`, e);
+            error.value = e.response?.data?.message || e.message || 'Failed to fetch messages'
         } finally {
             loading.value = false
         }
@@ -93,13 +106,14 @@ export const useMessageStore = defineStore('messages', () => {
             return
         }
 
-        // Use the timestamp of the OLDEST message as the cursor
-        const before = currentMessages[0]!.timestamp
+        // Use the ID of the OLDEST message as the cursor
+        const before = currentMessages[0]!.id
 
         loading.value = true
+        isLoadingOlder.value = true
         try {
             const response = await postsApi.list(channelId, { before, limit: 50 })
-            const olderMessages = response.data
+            const olderMessages = response.data.messages
                 .filter(p => !p.root_post_id)
                 .map(postToMessage)
                 .reverse()
@@ -108,11 +122,12 @@ export const useMessageStore = defineStore('messages', () => {
                 messagesByChannel.value[channelId] = [...olderMessages, ...currentMessages]
             }
 
-            hasMoreOlderByChannel.value[channelId] = response.data.length >= 50
+            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= 50
         } catch (e: any) {
             console.error('Failed to fetch older messages:', e)
         } finally {
             loading.value = false
+            isLoadingOlder.value = false
         }
     }
 
@@ -124,7 +139,8 @@ export const useMessageStore = defineStore('messages', () => {
             const replies = response.data.map(postToMessage)
             repliesByThread.value[rootId] = replies
         } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to fetch thread'
+            console.error(`Failed to fetch thread ${rootId}:`, e);
+            error.value = e.response?.data?.message || e.message || 'Failed to fetch thread'
         } finally {
             loading.value = false
         }
@@ -132,62 +148,70 @@ export const useMessageStore = defineStore('messages', () => {
 
     // Optimized for WebSocket usage
     function addOptimisticMessage(message: Message) {
-        if (!messagesByChannel.value[message.channelId]) {
-            messagesByChannel.value[message.channelId] = []
+        if (message.rootId) {
+            if (!repliesByThread.value[message.rootId]) {
+                repliesByThread.value[message.rootId] = []
+            }
+            repliesByThread.value[message.rootId]?.push(message)
+        } else {
+            if (!messagesByChannel.value[message.channelId]) {
+                messagesByChannel.value[message.channelId] = []
+            }
+            messagesByChannel.value[message.channelId]?.push(message)
         }
-        messagesByChannel.value[message.channelId]?.push(message)
     }
 
     function updateOptimisticMessage(clientMsgId: string, serverMsg: Message) {
-        if (!messagesByChannel.value[serverMsg.channelId]) return
+        const dest = serverMsg.rootId ? repliesByThread.value[serverMsg.rootId] : messagesByChannel.value[serverMsg.channelId]
+        if (!dest) return
 
-        const channelMessages = messagesByChannel.value[serverMsg.channelId]
-        if (!channelMessages) return;
-
-        const index = channelMessages.findIndex(m => m.clientMsgId === clientMsgId)
+        const index = dest.findIndex(m => m.clientMsgId === clientMsgId)
         if (index !== -1) {
-            // Update in place
-            channelMessages[index] = serverMsg
+            dest[index] = serverMsg
         } else {
-            // Fallback: append if not found (should be rare/race)
-            channelMessages.push(serverMsg)
+            dest.push(serverMsg)
         }
     }
 
     function handleNewMessage(post: Post) {
         const message = postToMessage(post)
 
-        if (!messagesByChannel.value[message.channelId]) {
-            messagesByChannel.value[message.channelId] = []
-        }
-
-        const channelMessages = messagesByChannel.value[message.channelId]
-        if (!channelMessages) return
-
-        // Check if message already exists (avoid duplicates) or reconcile with optimist
-        const existingIndex = channelMessages.findIndex(m => {
-            const idMatch = m.id === message.id
-            const clientMatch = m.clientMsgId && m.clientMsgId === message.clientMsgId
-            return idMatch || clientMatch
-        })
-
-        if (existingIndex !== -1) {
-            // Update existing in main feed
-            channelMessages[existingIndex] = message
-        } else if (!message.rootId) {
-            // Only add to main feed if it's a root message
-            channelMessages.push(message)
-        }
-
-        // Also add to repliesByThread if it's a reply and that thread is being viewed/cached
         if (message.rootId) {
+            // Handle reply
             if (!repliesByThread.value[message.rootId]) {
                 repliesByThread.value[message.rootId] = []
             }
-
             const threadReplies = repliesByThread.value[message.rootId]
-            if (threadReplies && !threadReplies.some(r => r.id === message.id)) {
-                threadReplies.push(message)
+            if (threadReplies) {
+                const index = threadReplies.findIndex(m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId))
+                if (index !== -1) {
+                    threadReplies[index] = message
+                } else {
+                    threadReplies.push(message)
+                }
+            }
+
+            // Important: If it was accidentally added to the main channel feed (e.g. by a bug in optimistic logic), remove it
+            const channelMessages = messagesByChannel.value[message.channelId]
+            if (channelMessages) {
+                const idx = channelMessages.findIndex(m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId))
+                if (idx !== -1) {
+                    channelMessages.splice(idx, 1)
+                }
+            }
+        } else {
+            // Handle root message
+            if (!messagesByChannel.value[message.channelId]) {
+                messagesByChannel.value[message.channelId] = []
+            }
+            const channelMessages = messagesByChannel.value[message.channelId]
+            if (channelMessages) {
+                const index = channelMessages.findIndex(m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId))
+                if (index !== -1) {
+                    channelMessages[index] = message
+                } else {
+                    channelMessages.push(message)
+                }
             }
         }
 
@@ -197,12 +221,17 @@ export const useMessageStore = defineStore('messages', () => {
 
         // Increment unread count if not current channel
         if (channelStore.currentChannelId !== message.channelId) {
-            channelStore.incrementUnread(message.channelId)
+            const unreadStore = useUnreadStore()
+            unreadStore.handleUnreadUpdate({
+                channel_id: message.channelId,
+                team_id: channelStore.channels.find(c => c.id === message.channelId)?.team_id || '',
+                unread_count: (unreadStore.channelUnreads[message.channelId] || 0) + 1
+            })
 
             // Check for mention
             const currentUser = authStore.user
             if (currentUser && message.content.includes(`@${currentUser.username}`)) {
-                channelStore.incrementMention(message.channelId)
+                unreadStore.channelMentions[message.channelId] = (unreadStore.channelMentions[message.channelId] || 0) + 1
             }
         }
     }
@@ -276,7 +305,7 @@ export const useMessageStore = defineStore('messages', () => {
         error.value = null
         try {
             const response = await postsApi.list(channelId, { q: query })
-            return response.data.map(postToMessage)
+            return response.data.messages.map(postToMessage)
         } catch (e: any) {
             error.value = 'Failed to search messages'
             throw e
@@ -290,7 +319,7 @@ export const useMessageStore = defineStore('messages', () => {
         error.value = null
         try {
             const response = await postsApi.list(channelId, { is_pinned: true })
-            return response.data.map(postToMessage)
+            return response.data.messages.map(postToMessage)
         } catch (e: any) {
             error.value = 'Failed to fetch pinned messages'
             throw e
@@ -445,6 +474,7 @@ export const useMessageStore = defineStore('messages', () => {
         messagesByChannel,
         repliesByThread,
         loading,
+        isLoadingOlder,
         error,
         getMessages,
         fetchMessages,

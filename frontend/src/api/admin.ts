@@ -181,7 +181,28 @@ export const adminApi = {
         search?: string;
     }) => api.get<{ channels: AdminChannel[]; total: number }>('/admin/channels', { params }),
 
+    createChannel: (data: {
+        team_id: string;
+        name: string;
+        display_name?: string;
+        purpose?: string;
+        channel_type: 'public' | 'private';
+    }) => api.post<AdminChannel>('/admin/channels', data),
+
+    updateChannel: (id: string, data: {
+        display_name?: string;
+        purpose?: string;
+        header?: string;
+    }) => api.patch<AdminChannel>(`/admin/channels/${id}`, data),
+
     deleteChannel: (id: string) => api.delete(`/admin/channels/${id}`),
+
+    // Team Members
+    listTeamMembers: (teamId: string) => api.get<any[]>(`/admin/teams/${teamId}/members`),
+    addTeamMember: (teamId: string, userId: string, role?: string) => 
+        api.post(`/admin/teams/${teamId}/members`, { user_id: userId, role }),
+    removeTeamMember: (teamId: string, userId: string) => 
+        api.delete(`/admin/teams/${teamId}/members/${userId}`),
 
     // Email
     testEmail: (to: string) => api.post('/admin/email/test', { to }),

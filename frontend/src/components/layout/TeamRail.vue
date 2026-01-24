@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue';
 import { Plus } from 'lucide-vue-next';
 import { useTeamStore } from '../../stores/teams';
+import { useUnreadStore } from '../../stores/unreads';
 import CreateTeamModal from '../modals/CreateTeamModal.vue';
 
 const teamStore = useTeamStore();
+const unreadStore = useUnreadStore();
 const showCreateModal = ref(false);
 
 onMounted(() => {
@@ -42,6 +44,13 @@ function getInitials(name: string): string {
       >
         {{ getInitials(team.display_name || team.name) }}
       </button>
+
+      <!-- Unread Indicator (Dot) -->
+      <div 
+        v-if="unreadStore.getTeamUnreadCount(team.id) > 0 && teamStore.currentTeamId !== team.id"
+        class="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full border-2 border-primary flex items-center justify-center shadow-lg pointer-events-none"
+      >
+      </div>
     </div>
 
     <!-- Empty state -->

@@ -34,6 +34,9 @@ pub enum AppError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
+    #[error("Redis error: {0}")]
+    Redis(#[from] redis::RedisError),
+
     #[error("Validation error: {0}")]
     Validation(String),
 }
@@ -63,6 +66,7 @@ impl AppError {
             AppError::Conflict(_) => "CONFLICT",
             AppError::Internal(_) => "INTERNAL_ERROR",
             AppError::Database(_) => "DATABASE_ERROR",
+            AppError::Redis(_) => "REDIS_ERROR",
             AppError::Validation(_) => "VALIDATION_ERROR",
         }
     }
@@ -77,6 +81,7 @@ impl AppError {
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Redis(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
