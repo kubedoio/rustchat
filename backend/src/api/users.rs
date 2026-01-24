@@ -26,6 +26,7 @@ pub struct ListUsersQuery {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
     pub _org_id: Option<Uuid>,
+    pub q: Option<String>,
 }
 
 /// List users (requires admin or same org)
@@ -37,24 +38,48 @@ async fn list_users(
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).min(100);
     let offset = ((page - 1) * per_page) as i64;
+    let search_term = query.q.map(|s| format!("%{}%", s));
 
     let users: Vec<User> = if auth.role == "system_admin" {
         // System admin can see all users
-        sqlx::query_as("SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2")
+        if let Some(term) = search_term {
+            sqlx::query_as(
+                "SELECT * FROM users WHERE username ILIKE $1 OR display_name ILIKE $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            )
+            .bind(term)
             .bind(per_page as i64)
             .bind(offset)
             .fetch_all(&state.db)
             .await?
+        } else {
+            sqlx::query_as("SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2")
+                .bind(per_page as i64)
+                .bind(offset)
+                .fetch_all(&state.db)
+                .await?
+        }
     } else if let Some(org_id) = auth.org_id {
         // Regular users see their org members
-        sqlx::query_as(
-            "SELECT * FROM users WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-        )
-        .bind(org_id)
-        .bind(per_page as i64)
-        .bind(offset)
-        .fetch_all(&state.db)
-        .await?
+        if let Some(term) = search_term {
+            sqlx::query_as(
+                "SELECT * FROM users WHERE org_id = $1 AND (username ILIKE $2 OR display_name ILIKE $2) ORDER BY created_at DESC LIMIT $3 OFFSET $4",
+            )
+            .bind(org_id)
+            .bind(term)
+            .bind(per_page as i64)
+            .bind(offset)
+            .fetch_all(&state.db)
+            .await?
+        } else {
+            sqlx::query_as(
+                "SELECT * FROM users WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            )
+            .bind(org_id)
+            .bind(per_page as i64)
+            .bind(offset)
+            .fetch_all(&state.db)
+            .await?
+        }
     } else {
         return Err(AppError::Forbidden("No organization access".to_string()));
     };

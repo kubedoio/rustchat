@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* Modern Indigo-500/600 Primary */
   --color-primary: #4F46E5;

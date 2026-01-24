@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { reactive, computed } from 'vue'
 
 export interface UnreadState {
     channelId: string
@@ -10,10 +10,10 @@ export interface UnreadState {
 
 export const useUnreadStore = defineStore('unreads', () => {
     // Unread counts per channel: channelId -> UnreadState
-    const unreads = ref<Map<string, UnreadState>>(new Map())
+    const unreads = reactive(new Map<string, UnreadState>())
 
     function setUnread(channelId: string, count: number, mentionCount = 0) {
-        unreads.value.set(channelId, {
+        unreads.set(channelId, {
             channelId,
             count,
             mentionCount,
@@ -22,9 +22,9 @@ export const useUnreadStore = defineStore('unreads', () => {
     }
 
     function markAsRead(channelId: string) {
-        const existing = unreads.value.get(channelId)
+        const existing = unreads.get(channelId)
         if (existing) {
-            unreads.value.set(channelId, {
+            unreads.set(channelId, {
                 ...existing,
                 count: 0,
                 mentionCount: 0,
@@ -34,15 +34,15 @@ export const useUnreadStore = defineStore('unreads', () => {
     }
 
     function incrementUnread(channelId: string, hasMention = false) {
-        const existing = unreads.value.get(channelId)
+        const existing = unreads.get(channelId)
         if (existing) {
-            unreads.value.set(channelId, {
+            unreads.set(channelId, {
                 ...existing,
                 count: existing.count + 1,
                 mentionCount: hasMention ? existing.mentionCount + 1 : existing.mentionCount,
             })
         } else {
-            unreads.value.set(channelId, {
+            unreads.set(channelId, {
                 channelId,
                 count: 1,
                 mentionCount: hasMention ? 1 : 0,
@@ -52,20 +52,20 @@ export const useUnreadStore = defineStore('unreads', () => {
     }
 
     function getUnreadCount(channelId: string) {
-        return computed(() => unreads.value.get(channelId)?.count || 0)
+        return computed(() => unreads.get(channelId)?.count || 0)
     }
 
     function getMentionCount(channelId: string) {
-        return computed(() => unreads.value.get(channelId)?.mentionCount || 0)
+        return computed(() => unreads.get(channelId)?.mentionCount || 0)
     }
 
     function hasUnread(channelId: string) {
-        return computed(() => (unreads.value.get(channelId)?.count || 0) > 0)
+        return computed(() => (unreads.get(channelId)?.count || 0) > 0)
     }
 
     const totalUnreadCount = computed(() => {
         let total = 0
-        for (const state of unreads.value.values()) {
+        for (const state of unreads.values()) {
             total += state.count
         }
         return total
@@ -73,14 +73,14 @@ export const useUnreadStore = defineStore('unreads', () => {
 
     const totalMentionCount = computed(() => {
         let total = 0
-        for (const state of unreads.value.values()) {
+        for (const state of unreads.values()) {
             total += state.mentionCount
         }
         return total
     })
 
     function clearUnreads() {
-        unreads.value.clear()
+        unreads.clear()
     }
 
     return {

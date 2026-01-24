@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { Bell, Search, HelpCircle, LogOut, Settings, Smile } from 'lucide-vue-next';
+import { Bell, Search, HelpCircle, LogOut, Settings, Smile, Shield } from 'lucide-vue-next';
 import { useAuthStore } from '../../stores/auth';
 import { useUIStore } from '../../stores/ui';
 import SearchModal from '../modals/SearchModal.vue';
@@ -191,6 +191,14 @@ const statusLabel = computed(() => {
 
             <!-- Links -->
             <div class="px-1 py-1">
+                <button 
+                  v-if="auth.user?.role === 'system_admin' || auth.user?.role === 'org_admin'"
+                  @click="$router.push('/admin'); showUserMenu = false"
+                  class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md flex items-center transition-colors"
+                >
+                    <Shield class="w-4 h-4 mr-2" />
+                    System Console
+                </button>
                 <button 
                   @click="ui.openSettings(); showUserMenu = false"
                   class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md flex items-center transition-colors"

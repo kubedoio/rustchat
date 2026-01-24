@@ -71,6 +71,13 @@ watch(() => messages.value.length, (newLen, oldLen) => {
   }
 })
 
+// Watch for loading state change (e.g. refresh via WebSocket)
+watch(() => messageStore.loading, (loading) => {
+    if (!loading && !messageStore.isLoadingOlder) {
+        nextTick(() => scrollToBottom('auto'))
+    }
+})
+
 // Watch for channel change to refetch and reset scroll
 watch(() => props.channelId, async (newId) => {
     if (newId) {

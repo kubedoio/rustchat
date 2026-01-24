@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import client from '../../api/client'
 import AuthLayout from '../../layouts/AuthLayout.vue'
 import BaseInput from '../../components/atomic/BaseInput.vue'
 import BaseButton from '../../components/atomic/BaseButton.vue'
 import { useConfigStore } from '../../stores/config'
+import { useAuthStore } from '../../stores/auth'
 
 const router = useRouter()
 const configStore = useConfigStore()
+const authStore = useAuthStore()
 
 const username = ref('')
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref('')
+
+onMounted(() => {
+  authStore.getAuthPolicy()
+})
 
 async function handleRegister() {
   loading.value = true
@@ -23,7 +29,8 @@ async function handleRegister() {
     await client.post('/auth/register', {
       username: username.value,
       email: email.value,
-      password: password.value
+      password: password.value,
+      display_name: username.value
     })
     // Auto login or redirect to login? Let's redirect for now.
     router.push('/login?registered=true')
@@ -71,6 +78,24 @@ async function handleRegister() {
         v-model="password"
         required
       />
+
+      <div v-if="authStore.authPolicy" class="text-xs text-gray-500 space-y-1">
+        <p>Password must contain:</p>
+        <ul class="list-disc list-inside">
+          <li :class="{ 'text-green-600': password.length >= authStore.authPolicy.password_min_length }">
+            At least {{ authStore.authPolicy.password_min_length }} characters
+          </li>
+          <li v-if="authStore.authPolicy.password_require_uppercase" :class="{ 'text-green-600': /[A-Z]/.test(password) }">
+            An uppercase letter
+          </li>
+          <li v-if="authStore.authPolicy.password_require_number" :class="{ 'text-green-600': /[0-9]/.test(password) }">
+            A number
+          </li>
+          <li v-if="authStore.authPolicy.password_require_symbol" :class="{ 'text-green-600': /[^a-zA-Z0-9]/.test(password) }">
+            A symbol
+          </li>
+        </ul>
+      </div>
 
       <div>
         <BaseButton type="submit" block :loading="loading">

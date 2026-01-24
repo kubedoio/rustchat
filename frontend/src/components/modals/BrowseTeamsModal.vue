@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { X, Users, ArrowRight, Check } from 'lucide-vue-next';
 import { useTeamStore } from '../../stores/teams';
+import { useToast } from '../../composables/useToast';
 
 const props = defineProps<{
     open: boolean
@@ -12,6 +13,7 @@ const emit = defineEmits<{
 }>();
 
 const teamStore = useTeamStore();
+const toast = useToast();
 const joining = ref<string | null>(null);
 
 onMounted(() => {
@@ -35,8 +37,10 @@ async function joinTeam(teamId: string) {
     try {
         await teamStore.joinTeam(teamId);
         emit('close');
+        toast.success('Joined team', 'You have successfully joined the team');
     } catch (e) {
         console.error('Failed to join team:', e);
+        toast.error('Failed to join', 'Could not join the team');
     } finally {
         joining.value = null;
     }

@@ -61,7 +61,7 @@ async fn list_channels(
             r#"
             SELECT c.* FROM channels c
             WHERE c.team_id = $1 
-            AND c.type = 'public' 
+            AND c.type = 'public'::channel_type
             AND c.is_archived = false
             AND c.id NOT IN (
                 SELECT channel_id FROM channel_members WHERE user_id = $2
@@ -128,7 +128,7 @@ async fn create_channel(
 
         // Check if DM channel already exists in this team
         let existing = sqlx::query_as::<_, Channel>(
-            "SELECT * FROM channels WHERE team_id = $1 AND name = $2 AND type = 'direct'",
+            "SELECT * FROM channels WHERE team_id = $1 AND name = $2 AND type = 'direct'::channel_type",
         )
         .bind(input.team_id)
         .bind(&dm_name)
@@ -136,10 +136,8 @@ async fn create_channel(
         .await?;
 
         if let Some(channel) = existing {
-            // Even if it exists, the requesting user might not have it in their local list if they just switched devices
-            // But usually we just return it. The user will be redirected.
-            // If we really want to be safe, we could send the event to the requester again.
-            // But for now, just return.
+            // Re-add both users as members just in case they left (resurrect DM)
+            let _ = crate::services::posts::ensure_dm_membership(&state, channel.id).await;
             return Ok(Json(channel));
         }
 
@@ -472,6 +470,29 @@ async fn add_member(
     .bind(input.role.as_deref().unwrap_or("member"))
     .fetch_one(&state.db)
     .await?;
+
+    // Announce join in public channels
+    let channel_type = sqlx::query_scalar::<_, crate::models::ChannelType>(
+        "SELECT type FROM channels WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if channel_type == crate::models::ChannelType::Public {
+        let username = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+            .bind(input.user_id)
+            .fetch_one(&state.db)
+            .await?;
+
+        let _ = crate::services::posts::create_system_message(
+            &state,
+            id,
+            format!("@{} has joined the channel.", username),
+            None,
+        )
+        .await;
+    }
 
     Ok(Json(new_member))
 }

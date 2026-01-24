@@ -69,6 +69,17 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
     // Add connection to hub
     let mut rx = state.ws_hub.add_connection(user_id, username.clone()).await;
 
+    // Fetch user's teams and subscribe
+    let teams = sqlx::query_scalar::<_, uuid::Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default();
+
+    for team_id in teams {
+        state.ws_hub.subscribe_team(user_id, team_id).await;
+    }
+
     // Persist presence and broadcast
     let _ = sqlx::query("UPDATE users SET presence = 'online' WHERE id = $1")
         .bind(user_id)

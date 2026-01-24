@@ -52,5 +52,17 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    return { token, user, isAuthenticated, login, logout, fetchMe, updateStatus }
+    const authPolicy = ref<any>(null)
+
+    async function getAuthPolicy() {
+        try {
+            const { data } = await client.get('/auth/policy')
+            authPolicy.value = data
+            return data
+        } catch (e) {
+            console.error('Failed to fetch auth policy', e)
+        }
+    }
+
+    return { token, user, isAuthenticated, login, logout, fetchMe, updateStatus, authPolicy, getAuthPolicy }
 })

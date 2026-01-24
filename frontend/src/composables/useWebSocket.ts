@@ -137,6 +137,21 @@ export function useWebSocket() {
                 if (post.channel_id !== channelStore.currentChannelId && post.user_id !== authStore.user?.id) {
                     const mentionsUser = post.message?.includes(`@${authStore.user?.username}`) || false
                     unreadStore.incrementUnread(post.channel_id, mentionsUser)
+
+                    if (mentionsUser) {
+                        const channel = channelStore.channels.find(c => c.id === post.channel_id)
+                        const title = channel ? `#${channel.name}` : 'New Mention'
+                        
+                        if (Notification.permission === 'granted') {
+                            new Notification(title, { body: post.message })
+                        } else if (Notification.permission !== 'denied') {
+                            Notification.requestPermission().then(p => {
+                                if (p === 'granted') {
+                                    new Notification(title, { body: post.message })
+                                }
+                            })
+                        }
+                    }
                 }
                 break
             }

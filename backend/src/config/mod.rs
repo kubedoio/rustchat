@@ -55,6 +55,14 @@ pub struct Config {
     /// S3 region
     #[serde(default = "default_s3_region")]
     pub s3_region: String,
+
+    /// Initial admin email
+    #[serde(default)]
+    pub admin_user: Option<String>,
+
+    /// Initial admin password
+    #[serde(default)]
+    pub admin_password: Option<String>,
 }
 
 fn default_host() -> String {

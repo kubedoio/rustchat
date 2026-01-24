@@ -41,6 +41,7 @@ export const teamsApi = {
     leave: (id: string) => api.post(`/teams/${id}/leave`),
     getMembers: (id: string) => api.get(`/teams/${id}/members`),
     addMember: (teamId: string, userId: string) => api.post(`/teams/${teamId}/members`, { user_id: userId }),
+    removeMember: (teamId: string, userId: string) => api.delete(`/teams/${teamId}/members/${userId}`),
     getChannels: (teamId: string) => api.get(`/teams/${teamId}/channels`),
 }
 

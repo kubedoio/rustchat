@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { X, Hash, ArrowRight } from 'lucide-vue-next';
 import { useChannelStore } from '../../stores/channels';
 import { useTeamStore } from '../../stores/teams';
+import { useToast } from '../../composables/useToast';
 
 const props = defineProps<{
     open: boolean
@@ -14,6 +15,7 @@ const emit = defineEmits<{
 
 const channelStore = useChannelStore();
 const teamStore = useTeamStore();
+const toast = useToast();
 const joining = ref<string | null>(null);
 
 onMounted(() => {
@@ -35,8 +37,10 @@ async function joinChannel(channelId: string) {
             await channelStore.fetchJoinableChannels(teamStore.currentTeam.id);
         }
         emit('close');
+        toast.success('Joined channel', 'You have successfully joined the channel');
     } catch (e) {
         console.error('Failed to join channel:', e);
+        toast.error('Failed to join', 'Could not join the channel');
     } finally {
         joining.value = null;
     }

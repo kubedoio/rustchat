@@ -106,6 +106,7 @@ function handleChannelDeleted() {
                       :name="currentChannel.display_name || currentChannel.name" 
                       :topic="currentChannel.purpose || currentChannel.header"
                       :channelType="currentChannel.channel_type"
+                      :channelId="currentChannel.id"
                       @openSettings="showChannelSettings = true"
                   />
                   

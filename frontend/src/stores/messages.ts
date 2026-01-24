@@ -22,6 +22,7 @@ export interface Message {
     isSaved: boolean
     status?: 'sending' | 'delivered' | 'failed'
     clientMsgId?: string
+    props?: any
 }
 
 function postToMessage(post: Post): Message {
@@ -47,6 +48,7 @@ function postToMessage(post: Post): Message {
         isSaved: post.is_saved || false,
         status: 'delivered',
         clientMsgId: (post as any).client_msg_id,
+        props: post.props,
     }
 }
 
@@ -56,6 +58,7 @@ export const useMessageStore = defineStore('messages', () => {
     const repliesByThread = ref<Record<string, Message[]>>({})
     const hasMoreOlderByChannel = ref<Record<string, boolean>>({}) // Track if we can load more history
     const loading = ref(false)
+    const isLoadingOlder = ref(false)
     const error = ref<string | null>(null)
 
     function getMessages(channelId: string) {
@@ -97,6 +100,7 @@ export const useMessageStore = defineStore('messages', () => {
         const before = currentMessages[0]!.timestamp
 
         loading.value = true
+        isLoadingOlder.value = true
         try {
             const response = await postsApi.list(channelId, { before, limit: 50 })
             const olderMessages = response.data
@@ -113,6 +117,7 @@ export const useMessageStore = defineStore('messages', () => {
             console.error('Failed to fetch older messages:', e)
         } finally {
             loading.value = false
+            isLoadingOlder.value = false
         }
     }
 
@@ -445,6 +450,7 @@ export const useMessageStore = defineStore('messages', () => {
         messagesByChannel,
         repliesByThread,
         loading,
+        isLoadingOlder,
         error,
         getMessages,
         fetchMessages,

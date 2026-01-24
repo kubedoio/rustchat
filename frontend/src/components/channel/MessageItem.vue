@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { format, formatDistanceToNow } from 'date-fns'
-import { Smile, MessageSquare, MoreHorizontal, Pencil, Trash2, Pin, X, Check, Bookmark } from 'lucide-vue-next'
+import { Smile, MessageSquare, MoreHorizontal, Pencil, Trash2, Pin, X, Check, Bookmark, ArrowRight } from 'lucide-vue-next'
 import type { Message } from '../../stores/messages'
 import { useMessageStore } from '../../stores/messages'
 import { useAuthStore } from '../../stores/auth'
@@ -38,6 +38,7 @@ const editInputRef = ref<HTMLTextAreaElement | null>(null)
 const saving = ref(false)
 
 const isOwnMessage = computed(() => authStore.user?.id === props.message.userId)
+const isSystemMessage = computed(() => props.message.props?.type === 'system_join_leave')
 
 async function handleSave() {
     try {
@@ -153,18 +154,45 @@ function openGallery(file: FileUploadResponse) {
   }
 }
 
-async function addReaction(emoji: string) {
-  try {
-    await postsApi.addReaction(props.message.id, emoji)
+async function handleEmojiSelect(emoji: string) {
     showEmojiPicker.value = false
-  } catch (e) {
-    console.error('Failed to add reaction', e)
-  }
+    await toggleReaction(emoji)
+}
+
+async function toggleReaction(emoji: string) {
+    const reaction = props.message.reactions?.find(r => r.emoji === emoji)
+    const me = authStore.user?.id
+    if (!me) return
+
+    const hasReacted = reaction?.users.includes(me)
+
+    try {
+        if (hasReacted) {
+            await postsApi.removeReaction(props.message.id, emoji)
+        } else {
+            await postsApi.addReaction(props.message.id, emoji)
+        }
+    } catch (e) {
+        console.error('Failed to toggle reaction', e)
+    }
 }
 </script>
 
 <template>
+  <!-- System Message -->
+  <div v-if="isSystemMessage" class="flex items-center px-5 py-1 -mx-5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+    <div class="flex items-center text-xs text-gray-500 dark:text-gray-400 italic w-full">
+        <ArrowRight class="w-3.5 h-3.5 mr-2 text-gray-400" />
+        <span v-html="formattedContent"></span>
+        <span class="ml-2 text-[10px] text-gray-400">
+            {{ format(new Date(message.timestamp), 'h:mm a') }}
+        </span>
+    </div>
+  </div>
+
+  <!-- Regular Message -->
   <div 
+    v-else
     class="flex items-start group px-5 py-0.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 -mx-5 transition-colors relative"
     :class="{ 
         'bg-yellow-50/30 dark:bg-yellow-900/5': isMentioned,
@@ -263,7 +291,9 @@ async function addReaction(emoji: string) {
         <div 
           v-for="reaction in message.reactions" 
           :key="reaction.emoji"
-          class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 hover:border-blue-400 rounded-full px-2 py-0.5 text-xs cursor-pointer flex items-center space-x-1 transition-colors"
+          @click="toggleReaction(reaction.emoji)"
+          class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 hover:border-blue-400 rounded-full px-2 py-0.5 text-xs cursor-pointer flex items-center space-x-1 transition-colors select-none"
+          :class="{ 'bg-blue-100 dark:bg-blue-800 border-blue-300 dark:border-blue-600': reaction.users.includes(authStore.user?.id || '') }"
         >
           <span>{{ reaction.emoji }}</span>
           <span class="font-semibold text-blue-600 dark:text-blue-400">{{ reaction.count }}</span>
@@ -295,7 +325,7 @@ async function addReaction(emoji: string) {
     <!-- Hover Actions -->
     <div 
       v-show="showActions && !isEditing"
-      class="absolute right-2 top-0 -translate-y-1/2 flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden"
+      class="absolute right-2 top-0 -translate-y-1/2 flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
     >
       <button 
         @click="handleReply"
@@ -312,7 +342,7 @@ async function addReaction(emoji: string) {
         >
           <Smile class="w-4 h-4" />
         </button>
-        <EmojiPicker :show="showEmojiPicker" @select="addReaction" @close="showEmojiPicker = false" />
+        <EmojiPicker :show="showEmojiPicker" @select="handleEmojiSelect" @close="showEmojiPicker = false" />
       </div>
       <div class="relative">
         <button 

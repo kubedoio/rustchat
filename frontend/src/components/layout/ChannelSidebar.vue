@@ -7,6 +7,7 @@ import { useTeamStore } from '../../stores/teams';
 import { useChannelStore } from '../../stores/channels';
 import { useAuthStore } from '../../stores/auth';
 import { usePresenceStore } from '../../stores/presence';
+import { useUnreadStore } from '../../stores/unreads';
 import CreateChannelModal from '../modals/CreateChannelModal.vue';
 import DirectMessageModal from '../modals/DirectMessageModal.vue';
 import TeamSettingsModal from '../modals/TeamSettingsModal.vue';
@@ -17,6 +18,7 @@ const teamStore = useTeamStore();
 const channelStore = useChannelStore();
 const authStore = useAuthStore();
 const presenceStore = usePresenceStore();
+const unreadStore = useUnreadStore();
 
 const showCreateModal = ref(false);
 const showDirectMessageModal = ref(false);
@@ -58,8 +60,8 @@ const categories = computed(() => {
                 id: c.id,
                 name: c.display_name || c.name,
                 type: 'public',
-                unread: c.unreadCount || 0,
-                mention: (c.mentionCount || 0) > 0,
+                unread: unreadStore.unreads.get(c.id)?.count || 0,
+                mention: (unreadStore.unreads.get(c.id)?.mentionCount || 0) > 0,
             })),
         },
         {
@@ -70,8 +72,8 @@ const categories = computed(() => {
                 id: c.id,
                 name: c.display_name || c.name,
                 type: 'private',
-                unread: c.unreadCount || 0,
-                mention: (c.mentionCount || 0) > 0,
+                unread: unreadStore.unreads.get(c.id)?.count || 0,
+                mention: (unreadStore.unreads.get(c.id)?.mentionCount || 0) > 0,
             })),
         },
         {
@@ -102,8 +104,8 @@ const categories = computed(() => {
                     name: DisplayName,
                     type: 'dm',
                     status: status,
-                    unread: c.unreadCount || 0,
-                    mention: (c.mentionCount || 0) > 0,
+                    unread: unreadStore.unreads.get(c.id)?.count || 0,
+                    mention: (unreadStore.unreads.get(c.id)?.mentionCount || 0) > 0,
                 } as any;
             }),
         }
@@ -316,11 +318,13 @@ function handleAddCategory(catId: string) {
     />
 
     <BrowseTeamsModal 
+      v-if="showBrowseTeams"
       :open="showBrowseTeams"
       @close="showBrowseTeams = false"
     />
 
     <BrowseChannelsModal 
+      v-if="showBrowseChannels"
       :open="showBrowseChannels"
       @close="showBrowseChannels = false"
     />

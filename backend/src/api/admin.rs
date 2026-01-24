@@ -21,6 +21,11 @@ use crate::models::{
     ServerConfigResponse,
     // SiteConfig, AuthConfig, IntegrationsConfig, ComplianceConfig, EmailConfig,
     SsoConfig,
+    CreateChannel,
+    UpdateChannel,
+    AddTeamMember,
+    TeamMember,
+    TeamMemberResponse,
 };
 use sqlx::FromRow;
 
@@ -68,10 +73,21 @@ pub fn router() -> Router<AppState> {
             "/admin/teams/{id}",
             get(get_admin_team).delete(delete_admin_team),
         )
-        .route("/admin/channels", get(list_admin_channels))
+        .route(
+            "/admin/teams/{id}/members",
+            get(list_team_members).post(add_team_member),
+        )
+        .route(
+            "/admin/teams/{id}/members/{user_id}",
+            axum::routing::delete(remove_team_member),
+        )
+        .route(
+            "/admin/channels",
+            get(list_admin_channels).post(create_admin_channel),
+        )
         .route(
             "/admin/channels/{id}",
-            axum::routing::delete(delete_admin_channel),
+            patch(update_admin_channel).delete(delete_admin_channel),
         )
         // Stats & Health
         .route("/admin/stats", get(get_stats))
@@ -84,6 +100,180 @@ fn require_admin(auth: &AuthUser) -> ApiResult<()> {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
     Ok(())
+}
+
+// ... existing code ...
+
+async fn list_team_members(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<Vec<TeamMemberResponse>>> {
+    require_admin(&auth)?;
+
+    let members = sqlx::query_as::<_, TeamMemberResponse>(
+        r#"
+        SELECT tm.team_id, tm.user_id, tm.role, tm.created_at,
+               u.username, u.display_name, u.avatar_url
+        FROM team_members tm
+        JOIN users u ON tm.user_id = u.id
+        WHERE tm.team_id = $1
+        ORDER BY u.username
+        "#,
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(members))
+}
+
+async fn add_team_member(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<AddTeamMember>,
+) -> ApiResult<Json<TeamMember>> {
+    require_admin(&auth)?;
+
+    let member = sqlx::query_as::<_, TeamMember>(
+        r#"
+        INSERT INTO team_members (team_id, user_id, role)
+        VALUES ($1, $2, $3)
+        RETURNING *
+        "#,
+    )
+    .bind(id)
+    .bind(payload.user_id)
+    .bind(payload.role.unwrap_or_else(|| "member".into()))
+    .fetch_one(&state.db)
+    .await?;
+
+    // Also add user to all public channels in the team
+    sqlx::query(
+        r#"
+        INSERT INTO channel_members (channel_id, user_id)
+        SELECT c.id, $1 FROM channels c
+        WHERE c.team_id = $2 AND c.channel_type = 'public'::channel_type
+        ON CONFLICT (channel_id, user_id) DO NOTHING
+        "#,
+    )
+    .bind(payload.user_id)
+    .bind(id)
+    .execute(&state.db)
+    .await?;
+
+    Ok(Json(member))
+}
+
+async fn remove_team_member(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path((id, user_id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<Json<serde_json::Value>> {
+    require_admin(&auth)?;
+
+    sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
+        .bind(id)
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+
+    Ok(Json(serde_json::json!({"status": "removed"})))
+}
+
+async fn create_admin_channel(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(input): Json<CreateChannel>,
+) -> ApiResult<Json<crate::models::channel::Channel>> {
+    require_admin(&auth)?;
+
+    // Create channel
+    let channel: crate::models::channel::Channel = sqlx::query_as(
+        r#"
+        INSERT INTO channels (team_id, name, display_name, purpose, type, creator_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+        "#,
+    )
+    .bind(input.team_id)
+    .bind(&input.name)
+    .bind(&input.display_name)
+    .bind(&input.purpose)
+    .bind(input.channel_type)
+    .bind(auth.user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    // Broadcast event
+    let broadcast = if channel.channel_type == crate::models::ChannelType::Public {
+        // Broadcast to entire team
+        crate::realtime::WsBroadcast {
+            team_id: Some(input.team_id),
+            channel_id: None,
+            user_id: None,
+            exclude_user_id: None,
+        }
+    } else {
+        // Private channel: broadcast only to creator (admin)
+        crate::realtime::WsBroadcast {
+            user_id: Some(auth.user_id),
+            channel_id: None,
+            team_id: None,
+            exclude_user_id: None,
+        }
+    };
+
+    let event = crate::realtime::WsEnvelope::event(
+        crate::realtime::EventType::ChannelCreated, 
+        channel.clone(), 
+        Some(channel.id)
+    )
+    .with_broadcast(broadcast);
+
+    state.ws_hub.broadcast(event).await;
+
+    Ok(Json(channel))
+}
+
+async fn update_admin_channel(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(input): Json<UpdateChannel>,
+) -> ApiResult<Json<crate::models::channel::Channel>> {
+    require_admin(&auth)?;
+
+    // Update fields
+    if let Some(ref display_name) = input.display_name {
+        sqlx::query("UPDATE channels SET display_name = $1 WHERE id = $2")
+            .bind(display_name)
+            .bind(id)
+            .execute(&state.db)
+            .await?;
+    }
+    if let Some(ref purpose) = input.purpose {
+        sqlx::query("UPDATE channels SET purpose = $1 WHERE id = $2")
+            .bind(purpose)
+            .bind(id)
+            .execute(&state.db)
+            .await?;
+    }
+    if let Some(ref header) = input.header {
+        sqlx::query("UPDATE channels SET header = $1 WHERE id = $2")
+            .bind(header)
+            .bind(id)
+            .execute(&state.db)
+            .await?;
+    }
+
+    let channel: crate::models::channel::Channel = sqlx::query_as("SELECT * FROM channels WHERE id = $1")
+        .bind(id)
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok(Json(channel))
 }
 
 // ============ Audit Logs ============

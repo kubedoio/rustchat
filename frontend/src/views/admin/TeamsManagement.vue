@@ -11,9 +11,16 @@ import {
     Hash,
     Lock,
     Building2,
-    ArrowLeft
+    ArrowLeft,
+    Plus,
+    Edit2,
+    UserPlus,
+    UserMinus,
+    X
 } from 'lucide-vue-next';
-import adminApi, { type AdminTeam, type AdminChannel } from '../../api/admin';
+import adminApi, { type AdminTeam, type AdminChannel, type AdminUser } from '../../api/admin';
+import BaseInput from '../../components/atomic/BaseInput.vue';
+import BaseButton from '../../components/atomic/BaseButton.vue';
 
 // State
 const teams = ref<AdminTeam[]>([]);
@@ -24,8 +31,28 @@ const page = ref(1);
 const perPage = 10;
 
 const selectedTeam = ref<AdminTeam | null>(null);
+const activeTab = ref<'channels' | 'members'>('channels');
+
+// Channels State
 const teamChannels = ref<AdminChannel[]>([]);
 const channelsLoading = ref(false);
+const showCreateChannelModal = ref(false);
+const showEditChannelModal = ref(false);
+const editingChannel = ref<AdminChannel | null>(null);
+const channelForm = ref({
+    name: '',
+    display_name: '',
+    purpose: '',
+    type: 'public' as 'public' | 'private'
+});
+
+// Members State
+const teamMembers = ref<any[]>([]);
+const membersLoading = ref(false);
+const showAddMemberModal = ref(false);
+const memberSearch = ref('');
+const memberSearchResults = ref<AdminUser[]>([]);
+const searchingMembers = ref(false);
 
 // Actions
 async function fetchTeams() {
@@ -47,11 +74,17 @@ async function fetchTeams() {
 
 async function viewTeamDetails(team: AdminTeam) {
     selectedTeam.value = team;
+    activeTab.value = 'channels';
+    await fetchChannels();
+}
+
+async function fetchChannels() {
+    if (!selectedTeam.value) return;
     channelsLoading.value = true;
     try {
         const { data } = await adminApi.listChannels({
-            team_id: team.id,
-            per_page: 100 // Load all channels for the team
+            team_id: selectedTeam.value.id,
+            per_page: 100
         });
         teamChannels.value = data.channels;
     } catch (e) {
@@ -61,9 +94,23 @@ async function viewTeamDetails(team: AdminTeam) {
     }
 }
 
+async function fetchMembers() {
+    if (!selectedTeam.value) return;
+    membersLoading.value = true;
+    try {
+        const { data } = await adminApi.listTeamMembers(selectedTeam.value.id);
+        teamMembers.value = data;
+    } catch (e) {
+        console.error('Failed to fetch members', e);
+    } finally {
+        membersLoading.value = false;
+    }
+}
+
 function closeDetails() {
     selectedTeam.value = null;
     teamChannels.value = [];
+    teamMembers.value = [];
 }
 
 async function deleteTeam(team: AdminTeam) {
@@ -80,6 +127,56 @@ async function deleteTeam(team: AdminTeam) {
     }
 }
 
+// Channel Actions
+function openCreateChannel() {
+    channelForm.value = { name: '', display_name: '', purpose: '', type: 'public' };
+    showCreateChannelModal.value = true;
+}
+
+async function createChannel() {
+    if (!selectedTeam.value) return;
+    try {
+        await adminApi.createChannel({
+            team_id: selectedTeam.value.id,
+            name: channelForm.value.name,
+            display_name: channelForm.value.display_name,
+            purpose: channelForm.value.purpose,
+            channel_type: channelForm.value.type
+        });
+        showCreateChannelModal.value = false;
+        await fetchChannels();
+    } catch (e) {
+        console.error('Failed to create channel', e);
+        alert('Failed to create channel');
+    }
+}
+
+function openEditChannel(channel: AdminChannel) {
+    editingChannel.value = channel;
+    channelForm.value = {
+        name: channel.name,
+        display_name: channel.display_name || '',
+        purpose: channel.purpose || '',
+        type: channel.channel_type === 'public' || channel.channel_type === 'private' ? channel.channel_type : 'public'
+    };
+    showEditChannelModal.value = true;
+}
+
+async function updateChannel() {
+    if (!editingChannel.value) return;
+    try {
+        await adminApi.updateChannel(editingChannel.value.id, {
+            display_name: channelForm.value.display_name,
+            purpose: channelForm.value.purpose
+        });
+        showEditChannelModal.value = false;
+        await fetchChannels();
+    } catch (e) {
+        console.error('Failed to update channel', e);
+        alert('Failed to update channel');
+    }
+}
+
 async function deleteChannel(channel: AdminChannel) {
     if (!confirm(`Are you sure you want to delete the channel "#${channel.name}"?`)) {
         return;
@@ -87,18 +184,70 @@ async function deleteChannel(channel: AdminChannel) {
 
     try {
         await adminApi.deleteChannel(channel.id);
-        if (selectedTeam.value) {
-            await viewTeamDetails(selectedTeam.value);
-        }
+        await fetchChannels();
     } catch (e) {
         console.error('Failed to delete channel', e);
         alert('Failed to delete channel');
     }
 }
 
+// Member Actions
+async function searchUsers() {
+    if (!memberSearch.value) {
+        memberSearchResults.value = [];
+        return;
+    }
+    searchingMembers.value = true;
+    try {
+        const { data } = await adminApi.listUsers({ search: memberSearch.value, per_page: 5 });
+        // Filter out existing members
+        const currentIds = new Set(teamMembers.value.map(m => m.user_id));
+        memberSearchResults.value = data.users.filter(u => !currentIds.has(u.id));
+    } catch (e) {
+        console.error('Failed to search users', e);
+    } finally {
+        searchingMembers.value = false;
+    }
+}
+
+async function addMember(user: AdminUser) {
+    if (!selectedTeam.value) return;
+    try {
+        await adminApi.addTeamMember(selectedTeam.value.id, user.id);
+        memberSearchResults.value = memberSearchResults.value.filter(u => u.id !== user.id);
+        await fetchMembers();
+    } catch (e) {
+        console.error('Failed to add member', e);
+        alert('Failed to add member');
+    }
+}
+
+async function removeMember(member: any) {
+    if (!selectedTeam.value) return;
+    if (!confirm(`Remove ${member.username} from the team?`)) return;
+    try {
+        await adminApi.removeTeamMember(selectedTeam.value.id, member.user_id);
+        await fetchMembers();
+    } catch (e) {
+        console.error('Failed to remove member', e);
+        alert('Failed to remove member');
+    }
+}
+
 // Watchers
 watch([search, page], () => {
     fetchTeams();
+});
+
+watch(activeTab, (tab) => {
+    if (tab === 'members') fetchMembers();
+    else fetchChannels();
+});
+
+let searchTimeout: ReturnType<typeof setTimeout>;
+watch(memberSearch, () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(searchUsers, 300);
 });
 
 onMounted(fetchTeams);
@@ -250,87 +399,212 @@ onMounted(fetchTeams);
             </div>
         </div>
 
-        <!-- Team Details View (Channels) -->
+        <!-- Team Details View -->
         <div v-else class="space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Info Sidebar -->
-                <div class="space-y-6">
-                    <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 shadow-sm">
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">Team Info</h3>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Internal Name</label>
-                                <div class="text-sm font-medium dark:text-white">@{{ selectedTeam.name }}</div>
-                            </div>
-                            <div>
-                                <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Description</label>
-                                <div class="text-sm dark:text-gray-300 italic">
-                                    {{ selectedTeam.description || 'No description provided' }}
+            <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <!-- Details Header with Tabs -->
+                <div class="border-b border-gray-200 dark:border-slate-700">
+                    <div class="px-6 py-4">
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ selectedTeam.display_name || selectedTeam.name }}</h2>
+                        <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                            <span>@{{ selectedTeam.name }}</span>
+                            <span>•</span>
+                            <span>{{ selectedTeam.members_count }} members</span>
+                            <span>•</span>
+                            <span>{{ selectedTeam.channels_count }} channels</span>
+                        </div>
+                    </div>
+                    <div class="flex px-6 space-x-6">
+                        <button 
+                            @click="activeTab = 'channels'"
+                            class="pb-3 text-sm font-medium border-b-2 transition-colors"
+                            :class="activeTab === 'channels' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
+                        >
+                            Channels
+                        </button>
+                        <button 
+                            @click="activeTab = 'members'"
+                            class="pb-3 text-sm font-medium border-b-2 transition-colors"
+                            :class="activeTab === 'members' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
+                        >
+                            Members
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Channels Tab -->
+                <div v-if="activeTab === 'channels'" class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-semibold text-gray-900 dark:text-white">Team Channels</h3>
+                        <BaseButton @click="openCreateChannel">
+                            <Plus class="w-4 h-4 mr-2" />
+                            Create Channel
+                        </BaseButton>
+                    </div>
+
+                    <div v-if="channelsLoading" class="p-12 text-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    </div>
+                    
+                    <div v-else-if="teamChannels.length === 0" class="p-12 text-center text-gray-500">
+                        No channels in this team.
+                    </div>
+
+                    <div v-else class="divide-y divide-gray-200 dark:divide-slate-700 border border-gray-200 dark:border-slate-700 rounded-lg">
+                        <div v-for="channel in teamChannels" :key="channel.id" class="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                            <div class="flex items-center space-x-3">
+                                <div v-if="channel.channel_type === 'public'" class="text-gray-400">
+                                    <Hash class="w-5 h-5" />
+                                </div>
+                                <div v-else class="text-purple-400">
+                                    <Lock class="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div class="font-medium text-gray-900 dark:text-white">
+                                        {{ channel.display_name || channel.name }}
+                                        <span v-if="channel.is_archived" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">Archived</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ channel.purpose || 'No purpose set' }}</p>
                                 </div>
                             </div>
-                            <div>
-                                <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Stats</label>
-                                <div class="flex items-center space-x-4">
-                                    <div class="flex items-center space-x-1 text-sm dark:text-gray-300">
-                                        <Users class="w-4 h-4 text-gray-400" />
-                                        <span>{{ selectedTeam.members_count }} members</span>
-                                    </div>
-                                    <div class="flex items-center space-x-1 text-sm dark:text-gray-300">
-                                        <MessageSquare class="w-4 h-4 text-gray-400" />
-                                        <span>{{ selectedTeam.channels_count }} channels</span>
-                                    </div>
-                                </div>
+                            <div class="flex items-center space-x-2">
+                                <button 
+                                    @click="openEditChannel(channel)"
+                                    class="p-2 text-gray-400 hover:text-primary transition-colors"
+                                    title="Edit Channel"
+                                >
+                                    <Edit2 class="w-4 h-4" />
+                                </button>
+                                <button 
+                                    @click="deleteChannel(channel)"
+                                    class="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                                    title="Delete Channel"
+                                >
+                                    <Trash2 class="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Channels List -->
-                <div class="lg:col-span-2">
-                    <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                        <div class="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-                            <h3 class="font-semibold text-gray-900 dark:text-white">Team Channels</h3>
-                        </div>
-                        
-                        <div v-if="channelsLoading" class="p-12 text-center">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                        </div>
-                        
-                        <div v-else-if="teamChannels.length === 0" class="p-12 text-center text-gray-500">
-                            No channels in this team.
-                        </div>
+                <!-- Members Tab -->
+                <div v-if="activeTab === 'members'" class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-semibold text-gray-900 dark:text-white">Team Members</h3>
+                        <BaseButton @click="showAddMemberModal = true">
+                            <UserPlus class="w-4 h-4 mr-2" />
+                            Add Member
+                        </BaseButton>
+                    </div>
 
-                        <div v-else class="divide-y divide-gray-200 dark:divide-slate-700">
-                            <div v-for="channel in teamChannels" :key="channel.id" class="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                                <div class="flex items-center space-x-3">
-                                    <div v-if="channel.channel_type === 'public'" class="text-gray-400">
-                                        <Hash class="w-5 h-5" />
-                                    </div>
-                                    <div v-else class="text-purple-400">
-                                        <Lock class="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <div class="font-medium text-gray-900 dark:text-white">
-                                            {{ channel.display_name || channel.name }}
-                                            <span v-if="channel.is_archived" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">Archived</span>
-                                        </div>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ channel.purpose || 'No purpose set' }}</p>
-                                    </div>
+                    <div v-if="membersLoading" class="p-12 text-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    </div>
+
+                    <div v-else-if="teamMembers.length === 0" class="p-12 text-center text-gray-500">
+                        No members found.
+                    </div>
+
+                    <div v-else class="divide-y divide-gray-200 dark:divide-slate-700 border border-gray-200 dark:border-slate-700 rounded-lg">
+                        <div v-for="member in teamMembers" :key="member.user_id" class="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 font-bold">
+                                    {{ (member.display_name || member.username).charAt(0).toUpperCase() }}
                                 </div>
-                                <div class="flex items-center space-x-4">
-                                    <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-                                        <Users class="w-3 h-3 mr-1" />
-                                        {{ channel.members_count }}
-                                    </div>
-                                    <button 
-                                        @click="deleteChannel(channel)"
-                                        class="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                                    >
-                                        <Trash2 class="w-4 h-4" />
-                                    </button>
+                                <div>
+                                    <div class="font-medium text-gray-900 dark:text-white">{{ member.display_name || member.username }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">@{{ member.username }} • {{ member.role }}</div>
                                 </div>
                             </div>
+                            <button 
+                                @click="removeMember(member)"
+                                class="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Remove Member"
+                            >
+                                <UserMinus class="w-4 h-4" />
+                            </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Channel Modal -->
+        <div v-if="showCreateChannelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50" @click="showCreateChannelModal = false"></div>
+            <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Create Channel</h3>
+                    <button @click="showCreateChannelModal = false"><X class="w-5 h-5 text-gray-500" /></button>
+                </div>
+                <BaseInput v-model="channelForm.name" label="Name" placeholder="e.g. general" required />
+                <BaseInput v-model="channelForm.display_name" label="Display Name" placeholder="e.g. General" />
+                <BaseInput v-model="channelForm.purpose" label="Purpose" placeholder="Channel purpose" />
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                    <select v-model="channelForm.type" class="w-full px-3 py-2 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary dark:text-white">
+                        <option value="public">Public</option>
+                        <option value="private">Private</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <BaseButton variant="secondary" @click="showCreateChannelModal = false">Cancel</BaseButton>
+                    <BaseButton @click="createChannel">Create</BaseButton>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Channel Modal -->
+        <div v-if="showEditChannelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50" @click="showEditChannelModal = false"></div>
+            <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Edit Channel</h3>
+                    <button @click="showEditChannelModal = false"><X class="w-5 h-5 text-gray-500" /></button>
+                </div>
+                <BaseInput v-model="channelForm.name" label="Name" disabled />
+                <BaseInput v-model="channelForm.display_name" label="Display Name" />
+                <BaseInput v-model="channelForm.purpose" label="Purpose" />
+                <div class="flex justify-end space-x-2 pt-2">
+                    <BaseButton variant="secondary" @click="showEditChannelModal = false">Cancel</BaseButton>
+                    <BaseButton @click="updateChannel">Save</BaseButton>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Member Modal -->
+        <div v-if="showAddMemberModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50" @click="showAddMemberModal = false"></div>
+            <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Add Team Member</h3>
+                    <button @click="showAddMemberModal = false"><X class="w-5 h-5 text-gray-500" /></button>
+                </div>
+                <div class="relative">
+                    <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                        v-model="memberSearch"
+                        type="text"
+                        placeholder="Search users..."
+                        class="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm dark:text-white"
+                    />
+                </div>
+                <div class="max-h-60 overflow-y-auto space-y-2">
+                    <div v-if="searchingMembers" class="text-center py-4 text-sm text-gray-500">Searching...</div>
+                    <div v-else-if="memberSearchResults.length === 0" class="text-center py-4 text-sm text-gray-500">No users found</div>
+                    <div v-else v-for="user in memberSearchResults" :key="user.id" class="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 font-bold text-xs">
+                                {{ (user.display_name || user.username).charAt(0).toUpperCase() }}
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900 dark:text-white">{{ user.display_name || user.username }}</div>
+                                <div class="text-xs text-gray-500">@{{ user.username }}</div>
+                            </div>
+                        </div>
+                        <button @click="addMember(user)" class="p-1.5 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors">
+                            <Plus class="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
             </div>
