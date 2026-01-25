@@ -4,7 +4,7 @@
 +
 +## Versioning Strategy
 +
-+RustChat follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
++RustChat follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). 
 +Both backend and frontend versions are kept in sync.
 +
 +## How to Release

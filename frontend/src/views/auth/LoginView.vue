@@ -36,7 +36,7 @@ async function handleLogin() {
   error.value = ''
   try {
     await auth.login({ email: email.value, password: password.value })
-    // Use full page reload to ensure all stores (Teams, Channels, etc.)
+    // Use full page reload to ensure all stores (Teams, Channels, etc.) 
     // are initialized cleanly with the new auth state.
     window.location.href = '/'
   } catch (e: any) {
@@ -120,9 +120,9 @@ function loginWithSSO(providerId: string) {
       </div>
 
       <div class="pt-2">
-        <BaseButton
-          type="submit"
-          block
+        <BaseButton 
+          type="submit" 
+          block 
           :loading="loading"
           class="py-3 text-base shadow-md hover:shadow-lg transition-all duration-200 ring-offset-2 hover:ring-2 hover:ring-indigo-500"
         >

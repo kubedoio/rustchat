@@ -37,7 +37,7 @@ async function handleScroll() {
   
   if (atBottom) {
     showNewMessagesBtn.value = false
-
+    
     // Mark as read if there are unreads
     if (unreadStore.getChannelUnreadCount(props.channelId) > 0) {
         unreadStore.markAsRead(props.channelId)
@@ -166,8 +166,8 @@ function handleEdit(id: string) {
     <div v-else class="space-y-[1px]">
         <template v-for="msg in messages" :key="msg.id">
             <!-- New Messages Divider -->
-            <div
-                v-if="readState?.first_unread_message_id && Number(msg.seq) === Number(readState.first_unread_message_id)"
+            <div 
+                v-if="readState?.first_unread_message_id && Number(msg.seq) === Number(readState.first_unread_message_id)" 
                 class="flex items-center my-6 py-2"
             >
                 <div class="flex-1 h-px bg-rose-500/30"></div>
@@ -177,8 +177,8 @@ function handleEdit(id: string) {
                 <div class="flex-1 h-px bg-rose-500/30"></div>
             </div>
 
-            <MessageItem
-                :message="msg"
+            <MessageItem 
+                :message="msg" 
                 :data-message-id="msg.id"
                 :class="{ 'bg-yellow-100/50 dark:bg-yellow-500/10 ring-1 ring-yellow-400/50': highlightedMessageId === msg.id }"
                 class="transition-all duration-500 rounded-sm"

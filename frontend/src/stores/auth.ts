@@ -50,7 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
                 user.value.status_text = data.text
                 user.value.status_emoji = data.emoji
                 user.value.status_expires_at = data.expires_at
-
+                
                 // Also update the nested object to stay in sync
                 user.value.custom_status = {
                     text: data.text,

@@ -199,9 +199,9 @@ export const adminApi = {
 
     // Team Members
     listTeamMembers: (teamId: string) => api.get<any[]>(`/admin/teams/${teamId}/members`),
-    addTeamMember: (teamId: string, userId: string, role?: string) =>
+    addTeamMember: (teamId: string, userId: string, role?: string) => 
         api.post(`/admin/teams/${teamId}/members`, { user_id: userId, role }),
-    removeTeamMember: (teamId: string, userId: string) =>
+    removeTeamMember: (teamId: string, userId: string) => 
         api.delete(`/admin/teams/${teamId}/members/${userId}`),
 
     // Email

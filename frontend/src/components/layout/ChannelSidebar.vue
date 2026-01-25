@@ -146,7 +146,7 @@ function handleAddCategory(catId: string) {
 async function handleLeaveTeam() {
     if (!teamStore.currentTeam) return;
     if (!confirm(`Are you sure you want to leave ${teamStore.currentTeam.display_name || teamStore.currentTeam.name}?`)) return;
-
+    
     try {
         await teamStore.leaveTeam(teamStore.currentTeam.id);
         showTeamMenu.value = false;
@@ -286,7 +286,7 @@ async function handleLeaveTeam() {
             <!-- Badges & Actions -->
             <div class="flex items-center ml-2 space-x-1.5 min-w-0">
                <!-- Mark as read on hover -->
-               <button
+               <button 
                  v-if="channel.unread > 0"
                  @click.stop="unreadStore.markAsRead(channel.id)"
                  class="opacity-0 group-hover/item:opacity-100 flex items-center justify-center w-5 h-5 hover:bg-slate-700/50 rounded transition-opacity"
@@ -313,6 +313,16 @@ async function handleLeaveTeam() {
     <!-- Sidebar Footer -->
     <div class="p-2 border-t border-gray-800 space-y-1">
         <button
+          v-if="Object.values(unreadStore.channelUnreads).some(c => c > 0)"
+          @click="unreadStore.markAllAsRead()"
+          class="w-full flex items-center justify-start px-2 py-2 text-sm text-gray-400 hover:bg-gray-800 rounded transition-colors text-left"
+        >
+            <div class="w-6 h-6 rounded bg-gray-700/50 flex items-center justify-center mr-2">
+                <Check class="w-4 h-4 text-gray-300" />
+            </div>
+            <span>Mark all as read</span>
+        </button>
+        <button 
           v-if="Object.values(unreadStore.channelUnreads).some(c => c > 0)"
           @click="unreadStore.markAllAsRead()"
           class="w-full flex items-center justify-start px-2 py-2 text-sm text-gray-400 hover:bg-gray-800 rounded transition-colors text-left"

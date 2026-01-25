@@ -223,8 +223,8 @@ pub async fn ensure_dm_membership(state: &AppState, channel_id: Uuid) -> ApiResu
                     // Ensure member exists
                     let added: Option<Uuid> = sqlx::query_scalar(
                         r#"
-                            INSERT INTO channel_members (channel_id, user_id, role)
-                            VALUES ($1, $2, 'member')
+                            INSERT INTO channel_members (channel_id, user_id, role) 
+                            VALUES ($1, $2, 'member') 
                             ON CONFLICT (channel_id, user_id) DO NOTHING
                             RETURNING user_id
                             "#,

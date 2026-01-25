@@ -288,7 +288,7 @@ async function toggleReaction(emoji: string) {
       </div>
 
       <div v-else class="relative group/content flex items-start">
-        <div
+        <div 
           class="text-gray-800 dark:text-gray-200 text-sm mt-0.5 whitespace-pre-wrap leading-relaxed max-w-[50%] break-words"
           :class="{ 'bg-yellow-50/50 dark:bg-yellow-900/10 -mx-2 px-2 py-1 rounded': isMentioned }"
           v-html="formattedContent"
@@ -296,8 +296,8 @@ async function toggleReaction(emoji: string) {
 
         <!-- Reactions (Middle Alignment) -->
         <div v-if="message.reactions && message.reactions.length > 0 && !isEditing" class="flex items-center ml-4 mt-1 space-x-1 flex-wrap">
-          <div
-            v-for="reaction in message.reactions"
+          <div 
+            v-for="reaction in message.reactions" 
             :key="reaction.emoji"
             @click="toggleReaction(reaction.emoji)"
             class="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 hover:border-blue-300 rounded-full px-1.5 py-0.5 text-[11px] cursor-pointer flex items-center space-x-1 transition-colors select-none"
@@ -347,8 +347,8 @@ async function toggleReaction(emoji: string) {
     >
       <!-- Quick Reactions -->
       <div class="flex items-center border-r border-gray-100 dark:border-gray-700 pr-1 mr-1">
-        <button
-          v-for="emoji in quickEmojis"
+        <button 
+          v-for="emoji in quickEmojis" 
           :key="emoji"
           @click="toggleReaction(emoji)"
           class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-sm leading-none"
@@ -413,6 +413,13 @@ async function toggleReaction(emoji: string) {
             {{ message.isPinned ? 'Unpin from channel' : 'Pin to channel' }}
           </button>
           <button
+            @click="handleMarkAsUnread"
+            class="w-full px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+          >
+            <Check class="w-4 h-4 mr-2" />
+            Mark as unread
+          </button>
+          <button 
             @click="handleMarkAsUnread"
             class="w-full px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
           >

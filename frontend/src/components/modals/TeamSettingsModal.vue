@@ -116,7 +116,7 @@ async function handleDelete() {
 async function handleLeave() {
   if (!props.team) return
   if (!confirm(`Are you sure you want to leave "${props.team.display_name || props.team.name}"?`)) return
-
+  
   leaving.value = true
   try {
     await teamStore.leaveTeam(props.team.id)
@@ -141,7 +141,7 @@ async function handleSearch() {
     searchResults.value = []
     return
   }
-
+  
   searching.value = true
   try {
     const response = await usersApi.list({ q: searchQuery.value, per_page: 5 })
@@ -164,7 +164,7 @@ function onSearchInput() {
 
 async function addMember(user: User) {
   if (!props.team) return
-
+  
   addingMember.value = user.id
   try {
     await teamsApi.addMember(props.team.id, user.id)
@@ -182,7 +182,7 @@ async function addMember(user: User) {
 async function removeMember(userId: string) {
   if (!props.team) return
   if (!confirm('Are you sure you want to remove this member?')) return
-
+  
   removingMember.value = userId
   try {
     // Assuming delete method exists or using generic api call if strictly typed client is missing it
@@ -406,7 +406,7 @@ async function removeMember(userId: string) {
                 <h4 class="text-sm font-medium text-gray-900 dark:text-white">Team Members</h4>
                 <span class="text-xs text-gray-500">{{ teamStore.members.length }} members</span>
               </div>
-
+              
               <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
                 <div v-for="member in teamStore.members" :key="member.user_id" class="flex items-center justify-between p-3">
                   <div class="flex items-center space-x-3">
@@ -423,7 +423,7 @@ async function removeMember(userId: string) {
                       <p class="text-xs text-gray-500">@{{ member.username }}</p>
                     </div>
                   </div>
-
+                  
                   <div v-if="member.user_id !== authStore.user?.id" class="flex items-center">
                     <button
                       @click="removeMember(member.user_id)"
@@ -435,7 +435,7 @@ async function removeMember(userId: string) {
                     </button>
                   </div>
                 </div>
-
+                
                 <div v-if="teamStore.members.length === 0" class="p-8 text-center text-gray-500 text-sm">
                   No members found
                 </div>

@@ -79,25 +79,25 @@ async function fetchMembers() {
 // Search results: Users in the team who are NOT in the channel
 const searchResults = computed(() => {
   if (!searchQuery.value.trim()) return []
-
+  
   const query = searchQuery.value.toLowerCase()
   const currentMemberIds = new Set(channelMembers.value.map(m => m.user_id))
-
+  
   return teamStore.members.filter(member => {
     // Exclude existing members
     if (currentMemberIds.has(member.user_id)) return false
-
+    
     // Match name or username
     const name = (member.display_name || '').toLowerCase()
     const username = member.username.toLowerCase()
-
+    
     return name.includes(query) || username.includes(query)
   }).slice(0, 5) // Limit to 5 results
 })
 
 async function addMember(userId: string) {
   if (!props.channel) return
-
+  
   addingMember.value = userId
   try {
     await channelsApi.join(props.channel.id, userId)
@@ -114,7 +114,7 @@ async function addMember(userId: string) {
 async function removeMember(userId: string) {
   if (!props.channel) return
   if (!confirm('Are you sure you want to remove this member?')) return
-
+  
   removingMember.value = userId
   try {
     await channelsApi.removeMember(props.channel.id, userId)
@@ -308,7 +308,7 @@ async function handleDelete() {
                 <h4 class="text-sm font-medium text-gray-900 dark:text-white">Channel Members</h4>
                 <span class="text-xs text-gray-500">{{ channelMembers.length }} members</span>
               </div>
-
+              
               <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700 max-h-64 overflow-y-auto">
                 <div v-if="membersLoading" class="p-4 text-center text-gray-500 text-sm">
                   Loading members...
@@ -329,7 +329,7 @@ async function handleDelete() {
                         <p class="text-xs text-gray-500">@{{ member.username }}</p>
                       </div>
                     </div>
-
+                    
                     <div v-if="member.user_id !== authStore.user?.id" class="flex items-center">
                       <button
                         @click="removeMember(member.user_id)"
@@ -341,7 +341,7 @@ async function handleDelete() {
                       </button>
                     </div>
                   </div>
-
+                  
                   <div v-if="channelMembers.length === 0" class="p-8 text-center text-gray-500 text-sm">
                     No members found
                   </div>

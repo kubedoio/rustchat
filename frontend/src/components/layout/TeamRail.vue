@@ -46,7 +46,7 @@ function getInitials(name: string): string {
       </button>
 
       <!-- Unread Indicator (Dot) -->
-      <div
+      <div 
         v-if="unreadStore.getTeamUnreadCount(team.id) > 0 && teamStore.currentTeamId !== team.id"
         class="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full border-2 border-primary flex items-center justify-center shadow-lg pointer-events-none"
       >

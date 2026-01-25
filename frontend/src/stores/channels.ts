@@ -33,7 +33,7 @@ export const useChannelStore = defineStore('channels', () => {
         try {
             const response = await channelsApi.list(teamId)
             channels.value = response.data
-
+            
             // Try to restore last selected channel for this team
             const lastId = lastChannelByTeam.value[teamId]
             if (lastId && channels.value.some(c => c.id === lastId)) {
@@ -42,7 +42,7 @@ export const useChannelStore = defineStore('channels', () => {
                 // Auto-select general channel if none selected or last not found
                 const general = channels.value.find(c => c.name === 'general')
                 currentChannelId.value = general?.id || channels.value[0]?.id || null
-
+                
                 // Save this default selection
                 if (currentChannelId.value) {
                     lastChannelByTeam.value[teamId] = currentChannelId.value

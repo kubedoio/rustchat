@@ -117,14 +117,14 @@ const statusLabel = computed(() => {
       <button class="text-gray-400 hover:text-white transition-colors">
         <HelpCircle class="w-5 h-5" />
       </button>
-
+      
       <div class="relative">
-        <button
+        <button 
           @click="showNotifications = !showNotifications"
           class="relative text-gray-400 hover:text-white transition-colors p-1"
         >
           <Bell class="w-5 h-5" />
-          <span
+          <span 
             v-if="unreadStore.totalUnreadCount > 0"
             class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-gray-900 bg-red-500 animate-pulse"
           ></span>
@@ -207,6 +207,14 @@ const statusLabel = computed(() => {
             <!-- Links -->
             <div class="px-1 py-1">
                 <button
+                  v-if="auth.user?.role === 'system_admin' || auth.user?.role === 'org_admin'"
+                  @click="$router.push('/admin'); showUserMenu = false"
+                  class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md flex items-center transition-colors"
+                >
+                    <Shield class="w-4 h-4 mr-2" />
+                    System Console
+                </button>
+                <button 
                   v-if="auth.user?.role === 'system_admin' || auth.user?.role === 'org_admin'"
                   @click="$router.push('/admin'); showUserMenu = false"
                   class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md flex items-center transition-colors"

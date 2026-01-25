@@ -65,14 +65,14 @@ watch(() => props.isOpen, (isOpen) => {
     username.value = auth.user.username || ''
     displayName.value = auth.user.display_name || ''
     avatarUrl.value = auth.user.avatar_url || ''
-
+    
     statusText.value = auth.user.status_text || ''
     statusEmoji.value = auth.user.status_emoji || ''
     selectedPresence.value = (auth.user.presence as string) || 'online'
 
     error.value = ''
     success.value = ''
-
+    
     // Fetch policy if not loaded
     if (!passwordPolicy.value) fetchPolicy()
   }
@@ -154,7 +154,7 @@ async function handleSaveStatus() {
 
 async function handleSaveProfile() {
   if (!auth.user) return
-
+  
   loading.value = true
   error.value = ''
   success.value = ''
@@ -165,7 +165,7 @@ async function handleSaveProfile() {
       display_name: displayName.value.trim() || undefined,
       avatar_url: avatarUrl.value.trim() || undefined,
     })
-
+    
     auth.user = {
       ...auth.user,
       username: response.data.username,
@@ -253,14 +253,14 @@ function requestNotifications() {
                     <!-- Profile Section -->
                     <div class="space-y-6">
                         <h4 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider border-b border-gray-200 dark:border-gray-700 pb-2">Profile</h4>
-
+                        
                         <div class="flex items-center space-x-4">
                             <div class="relative group">
                               <div class="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-primary flex items-center justify-center text-xl sm:text-2xl text-white font-bold overflow-hidden ring-2 ring-transparent group-hover:ring-primary/50 transition-all">
                                 <img v-if="avatarUrl" :src="avatarUrl" alt="Avatar" class="w-full h-full object-cover" />
                                 <span v-else>{{ auth.user?.username?.charAt(0).toUpperCase() || 'U' }}</span>
                               </div>
-                              <button
+                              <button 
                                 type="button"
                                 @click="fileInput?.click()"
                                 class="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 bg-gray-800 dark:bg-gray-600 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 hover:bg-gray-700 dark:hover:bg-gray-500 transition-colors"
@@ -288,7 +288,7 @@ function requestNotifications() {
                               </div>
                             </div>
                         </div>
-
+                        
                         <div class="flex justify-end">
                             <BaseButton @click="handleSaveProfile" :loading="loading">Save Profile</BaseButton>
                         </div>
@@ -323,12 +323,12 @@ function requestNotifications() {
                 <!-- Status Tab -->
                 <div v-else-if="activeTab === 'status'" class="space-y-6">
                     <h4 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider border-b border-gray-200 dark:border-gray-700 pb-2">Status & Presence</h4>
-
+                    
                     <div class="space-y-4">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Set Presence</label>
                         <div class="grid grid-cols-2 gap-3">
-                            <button
-                                v-for="opt in presenceOptions"
+                            <button 
+                                v-for="opt in presenceOptions" 
                                 :key="opt.id"
                                 @click="selectedPresence = opt.id"
                                 class="flex items-center p-3 rounded-lg border transition-all"

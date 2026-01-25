@@ -16,7 +16,7 @@ export const useThemeStore = defineStore('theme', () => {
     function applyTheme() {
         const root = window.document.documentElement
 
-        let effectiveTheme: 'dark' | 'light' = theme.value === 'system'
+        let effectiveTheme: 'dark' | 'light' = theme.value === 'system' 
             ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
             : 'dark'
 
