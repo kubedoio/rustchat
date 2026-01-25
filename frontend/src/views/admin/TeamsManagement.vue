@@ -609,5 +609,86 @@ onMounted(fetchTeams);
                 </div>
             </div>
         </div>
+
+        <!-- Create Channel Modal -->
+        <div v-if="showCreateChannelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50" @click="showCreateChannelModal = false"></div>
+            <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Create Channel</h3>
+                    <button @click="showCreateChannelModal = false"><X class="w-5 h-5 text-gray-500" /></button>
+                </div>
+                <BaseInput v-model="channelForm.name" label="Name" placeholder="e.g. general" required />
+                <BaseInput v-model="channelForm.display_name" label="Display Name" placeholder="e.g. General" />
+                <BaseInput v-model="channelForm.purpose" label="Purpose" placeholder="Channel purpose" />
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                    <select v-model="channelForm.type" class="w-full px-3 py-2 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary dark:text-white">
+                        <option value="public">Public</option>
+                        <option value="private">Private</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <BaseButton variant="secondary" @click="showCreateChannelModal = false">Cancel</BaseButton>
+                    <BaseButton @click="createChannel">Create</BaseButton>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Channel Modal -->
+        <div v-if="showEditChannelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50" @click="showEditChannelModal = false"></div>
+            <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Edit Channel</h3>
+                    <button @click="showEditChannelModal = false"><X class="w-5 h-5 text-gray-500" /></button>
+                </div>
+                <BaseInput v-model="channelForm.name" label="Name" disabled />
+                <BaseInput v-model="channelForm.display_name" label="Display Name" />
+                <BaseInput v-model="channelForm.purpose" label="Purpose" />
+                <div class="flex justify-end space-x-2 pt-2">
+                    <BaseButton variant="secondary" @click="showEditChannelModal = false">Cancel</BaseButton>
+                    <BaseButton @click="updateChannel">Save</BaseButton>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Member Modal -->
+        <div v-if="showAddMemberModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50" @click="showAddMemberModal = false"></div>
+            <div class="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Add Team Member</h3>
+                    <button @click="showAddMemberModal = false"><X class="w-5 h-5 text-gray-500" /></button>
+                </div>
+                <div class="relative">
+                    <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                        v-model="memberSearch"
+                        type="text"
+                        placeholder="Search users..."
+                        class="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm dark:text-white"
+                    />
+                </div>
+                <div class="max-h-60 overflow-y-auto space-y-2">
+                    <div v-if="searchingMembers" class="text-center py-4 text-sm text-gray-500">Searching...</div>
+                    <div v-else-if="memberSearchResults.length === 0" class="text-center py-4 text-sm text-gray-500">No users found</div>
+                    <div v-else v-for="user in memberSearchResults" :key="user.id" class="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 font-bold text-xs">
+                                {{ (user.display_name || user.username).charAt(0).toUpperCase() }}
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900 dark:text-white">{{ user.display_name || user.username }}</div>
+                                <div class="text-xs text-gray-500">@{{ user.username }}</div>
+                            </div>
+                        </div>
+                        <button @click="addMember(user)" class="p-1.5 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors">
+                            <Plus class="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>

@@ -312,6 +312,16 @@ async function handleLeaveTeam() {
 
     <!-- Sidebar Footer -->
     <div class="p-2 border-t border-gray-800 space-y-1">
+        <button
+          v-if="Object.values(unreadStore.channelUnreads).some(c => c > 0)"
+          @click="unreadStore.markAllAsRead()"
+          class="w-full flex items-center justify-start px-2 py-2 text-sm text-gray-400 hover:bg-gray-800 rounded transition-colors text-left"
+        >
+            <div class="w-6 h-6 rounded bg-gray-700/50 flex items-center justify-center mr-2">
+                <Check class="w-4 h-4 text-gray-300" />
+            </div>
+            <span>Mark all as read</span>
+        </button>
         <button 
           v-if="Object.values(unreadStore.channelUnreads).some(c => c > 0)"
           @click="unreadStore.markAllAsRead()"

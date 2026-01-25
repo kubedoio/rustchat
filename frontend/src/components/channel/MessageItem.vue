@@ -412,6 +412,13 @@ async function toggleReaction(emoji: string) {
             <Pin class="w-4 h-4 mr-2" :class="{ 'fill-current': message.isPinned }" />
             {{ message.isPinned ? 'Unpin from channel' : 'Pin to channel' }}
           </button>
+          <button
+            @click="handleMarkAsUnread"
+            class="w-full px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+          >
+            <Check class="w-4 h-4 mr-2" />
+            Mark as unread
+          </button>
           <button 
             @click="handleMarkAsUnread"
             class="w-full px-3 py-1.5 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"

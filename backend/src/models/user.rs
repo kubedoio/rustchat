@@ -48,7 +48,7 @@ pub struct User {
 }
 
 /// Public user response (without sensitive fields)
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserResponse {
     pub id: Uuid,
     pub org_id: Option<Uuid>,
@@ -98,7 +98,7 @@ pub struct CreateUser {
 }
 
 /// DTO for updating a user
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateUser {
     pub username: Option<String>,
     pub display_name: Option<String>,
