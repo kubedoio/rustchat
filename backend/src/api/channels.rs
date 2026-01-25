@@ -6,7 +6,6 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
-use sqlx::FromRow;
 use uuid::Uuid;
 
 use super::AppState;

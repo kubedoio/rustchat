@@ -1,9 +1,26 @@
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend.Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    image: rustchat-backend
     container_name: rustchat-backend
+    restart: always
+    environment:
+      - RUSTCHAT_SERVER_HOST=0.0.0.0
+      - RUSTCHAT_SERVER_PORT=3000
+      - RUSTCHAT_DATABASE_URL=postgres://rustchat:rustchat@postgres:5432/rustchat
+      - RUSTCHAT_REDIS_URL=redis://redis:6379
+      - RUSTCHAT_JWT_SECRET=${RUSTCHAT_JWT_SECRET:-super-secret-key-change-me}
+      - RUSTCHAT_ENCRYPTION_KEY=${RUSTCHAT_ENCRYPTION_KEY:-another-secret-key-32chars-long!}
+      - RUSTCHAT_S3_ENDPOINT=http://minio:9000
+      - RUSTCHAT_S3_BUCKET=rustchat
+      - RUSTCHAT_S3_ACCESS_KEY=minioadmin
+      - RUSTCHAT_S3_SECRET_KEY=minioadmin
+      - RUSTCHAT_ADMIN_USER=${RUSTCHAT_ADMIN_USER:-admin@rustchat.io}
+      - RUSTCHAT_ADMIN_PASSWORD=${RUSTCHAT_ADMIN_PASSWORD:-Password123!}
+    ports:
+      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -11,35 +28,25 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      createbuckets:
-        condition: service_completed_successfully
-    environment:
-      - RUSTCHAT_DATABASE_URL=postgres://rustchat:rustchat@postgres:5432/rustchat
-      - RUSTCHAT_REDIS_URL=redis://redis:6379
-      - RUSTCHAT_S3_ENDPOINT=http://minio:9000
-      - RUSTCHAT_S3_BUCKET=rustchat-uploads
-      - RUSTCHAT_S3_ACCESS_KEY=minioadmin
-      - RUSTCHAT_S3_SECRET_KEY=minioadmin
-      - RUSTCHAT_S3_REGION=us-east-1
-      - RUSTCHAT_JWT_SECRET=dev_secret_key_change_me_in_prod
-      - RUSTCHAT_ENCRYPTION_KEY=your-super-secret-encryption-key-32chars!!
-      - RUSTCHAT_ADMIN_USER=admin@rustchat.io
-      - RUSTCHAT_ADMIN_PASSWORD=Password33
-      - RUST_LOG=debug
-    ports:
-      - "3000:3000"
-    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend.Dockerfile
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    image: rustchat-frontend
     container_name: rustchat-frontend
-    depends_on:
-      - backend
+    restart: always
     ports:
       - "8080:80"
-    restart: on-failure
+    depends_on:
+      backend:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
