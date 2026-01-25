@@ -13,7 +13,7 @@ use crate::mattermost_compat::models as mm;
 use crate::models::post::PostResponse;
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/channels/:channel_id/posts", get(get_posts))
+    Router::new().route("/channels/{channel_id}/posts", get(get_posts))
 }
 
 async fn get_posts(

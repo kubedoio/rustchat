@@ -13,7 +13,7 @@ services:
       - RUSTCHAT_REDIS_URL=redis://redis:6379
       - RUSTCHAT_JWT_SECRET=${RUSTCHAT_JWT_SECRET:-super-secret-key-change-me}
       - RUSTCHAT_ENCRYPTION_KEY=${RUSTCHAT_ENCRYPTION_KEY:-another-secret-key-32chars-long!}
-      - RUSTCHAT_S3_ENDPOINT=http://minio:9000
+      - RUSTCHAT_S3_ENDPOINT=http://rustfs:9000
       - RUSTCHAT_S3_BUCKET=rustchat
       - RUSTCHAT_S3_ACCESS_KEY=minioadmin
       - RUSTCHAT_S3_SECRET_KEY=minioadmin
@@ -26,10 +26,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      rustfs:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health/live" ]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/v1/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -78,20 +78,19 @@ services:
       timeout: 5s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
-    container_name: rustchat-minio
-    command: server /data --console-address ":9001"
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: rustchat-rustfs
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      - RUSTFS_ACCESS_KEY=minioadmin
+      - RUSTFS_SECRET_KEY=minioadmin
     ports:
       - "9000:9000" # S3 API
-      - "9001:9001" # Console
+      - "9001:9001" # Console/UI
     volumes:
-      - minio_data:/data
+      - rustfs_data:/data
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -100,10 +99,10 @@ services:
     image: minio/mc
     container_name: rustchat-createbuckets
     depends_on:
-      minio:
+      rustfs:
         condition: service_healthy
     entrypoint: >
-      /bin/sh -c " /usr/bin/mc alias set rustchat http://minio:9000 minioadmin minioadmin; /usr/bin/mc mb --ignore-existing rustchat/rustchat-uploads; /usr/bin/mc anonymous set public rustchat/rustchat-uploads; exit 0; "
+      /bin/sh -c " /usr/bin/mc alias set rustchat http://rustfs:9000 minioadmin minioadmin; /usr/bin/mc mb --ignore-existing rustchat/rustchat-uploads; /usr/bin/mc anonymous set public rustchat/rustchat-uploads; exit 0; "
 
   meilisearch:
     image: getmeili/meilisearch:latest
@@ -121,5 +120,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
+  rustfs_data:
   meilisearch_data:

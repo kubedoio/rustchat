@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { format, formatDistanceToNow } from 'date-fns'
-import { Smile, MessageSquare, MoreHorizontal, Pencil, Trash2, Pin, X, Check, Bookmark, ArrowRight } from 'lucide-vue-next'
+import { Smile, MessageSquare, MoreHorizontal, Pencil, Trash2, Pin, X, Check, Bookmark, ArrowRight, Video } from 'lucide-vue-next'
 import type { Message } from '../../stores/messages'
 import { useMessageStore } from '../../stores/messages'
 import { useAuthStore } from '../../stores/auth'
 import { useUnreadStore } from '../../stores/unreads'
+import { useUIStore } from '../../stores/ui'
 import { postsApi } from '../../api/posts'
 import EmojiPicker from '../atomic/EmojiPicker.vue'
 import FilePreview from '../atomic/FilePreview.vue'
@@ -29,6 +30,7 @@ const emit = defineEmits<{
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
 const unreadStore = useUnreadStore()
+const uiStore = useUIStore()
 
 const showActions = ref(false)
 const showMenu = ref(false)
@@ -41,6 +43,18 @@ const saving = ref(false)
 
 const isOwnMessage = computed(() => authStore.user?.id === props.message.userId)
 const isSystemMessage = computed(() => props.message.props?.type === 'system_join_leave')
+const isVideoCall = computed(() => props.message.props?.type === 'video_call')
+
+function joinCall() {
+    if (!props.message.props) return
+    const { meeting_url, mode } = props.message.props
+
+    if (mode === 'embed_iframe') {
+        uiStore.openVideoCall(meeting_url)
+    } else {
+        window.open(meeting_url, '_blank', 'noopener,noreferrer')
+    }
+}
 
 async function handleSave() {
     try {
@@ -203,6 +217,42 @@ async function toggleReaction(emoji: string) {
         <span class="ml-2 text-[10px] text-gray-400">
             {{ format(new Date(message.timestamp), 'h:mm a') }}
         </span>
+    </div>
+  </div>
+
+  <!-- Video Call Message -->
+  <div v-else-if="isVideoCall" class="flex items-start group px-5 py-2 hover:bg-gray-50 dark:hover:bg-gray-800/40 -mx-5 transition-colors relative">
+    <div class="shrink-0 select-none mr-3 mt-1">
+      <RcAvatar
+        :userId="message.userId"
+        :src="message.avatarUrl"
+        :username="message.username"
+        size="md"
+        class="w-9 h-9 rounded-md"
+      />
+    </div>
+    <div class="flex-1 min-w-0">
+        <div class="flex items-baseline mb-0.5">
+            <span class="font-bold text-[15px] text-gray-900 dark:text-gray-100 mr-2">{{ message.username }}</span>
+            <span class="text-[11px] text-gray-500">{{ format(new Date(message.timestamp), 'h:mm a') }}</span>
+        </div>
+        <div class="bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-4 inline-flex flex-col max-w-sm">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                    <Video class="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                    <div class="font-semibold text-gray-900 dark:text-gray-100">Video Call</div>
+                    <div class="text-xs text-gray-500">MiroTalk Meeting</div>
+                </div>
+            </div>
+            <button
+                @click="joinCall"
+                class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors text-sm flex items-center justify-center"
+            >
+                Join Call
+            </button>
+        </div>
     </div>
   </div>
 

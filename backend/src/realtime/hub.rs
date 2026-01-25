@@ -192,6 +192,12 @@ impl WsHub {
         let usernames = self.usernames.read().await;
         usernames.get(&user_id).cloned()
     }
+
+    /// Get number of active connections
+    pub async fn count_connections(&self) -> usize {
+        let connections = self.connections.read().await;
+        connections.len()
+    }
 }
 
 impl Default for WsHub {

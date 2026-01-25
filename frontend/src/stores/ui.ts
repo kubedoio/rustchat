@@ -9,6 +9,9 @@ export const useUIStore = defineStore('ui', () => {
     const rhsView = ref<RhsView>(null)
     const rhsContextId = ref<string | null>(null)
 
+    const videoCallUrl = ref<string | null>(null)
+    const isVideoCallOpen = ref(false)
+
     function openSettings() {
         isSettingsOpen.value = true
     }
@@ -37,5 +40,29 @@ export const useUIStore = defineStore('ui', () => {
         }
     }
 
-    return { isRhsOpen, isSettingsOpen, rhsView, rhsContextId, openRhs, closeRhs, toggleRhs, openSettings, closeSettings }
+    function openVideoCall(url: string) {
+        videoCallUrl.value = url
+        isVideoCallOpen.value = true
+    }
+
+    function closeVideoCall() {
+        isVideoCallOpen.value = false
+        videoCallUrl.value = null
+    }
+
+    return {
+        isRhsOpen,
+        isSettingsOpen,
+        rhsView,
+        rhsContextId,
+        videoCallUrl,
+        isVideoCallOpen,
+        openRhs,
+        closeRhs,
+        toggleRhs,
+        openSettings,
+        closeSettings,
+        openVideoCall,
+        closeVideoCall
+    }
 })

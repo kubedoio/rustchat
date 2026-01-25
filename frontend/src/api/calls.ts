@@ -24,7 +24,20 @@ export interface CallSession {
     participants: CallParticipant[]
 }
 
+export interface CreateMeetingResponse {
+    meeting_url: string
+    mode: 'new_tab' | 'embed_iframe'
+}
+
 export default {
+    createMeeting(scope: 'channel' | 'dm', channelId?: string, dmUserId?: string) {
+        return axios.post<CreateMeetingResponse>('/video/meetings', {
+            scope,
+            channel_id: channelId,
+            dm_user_id: dmUserId
+        })
+    },
+
     createCall(channelId: string, type: string = 'audio') {
         return axios.post<Call>('/calls', { channel_id: channelId, type })
     },

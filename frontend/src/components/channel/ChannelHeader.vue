@@ -5,6 +5,8 @@ import { useCallsStore } from '../../stores/calls';
 import { useChannelStore } from '../../stores/channels';
 import { useAuthStore } from '../../stores/auth';
 import { useUIStore } from '../../stores/ui';
+import { useConfigStore } from '../../stores/config';
+import callsApi from '../../api/calls';
 
 const props = defineProps<{
   name: string
@@ -22,19 +24,28 @@ const callsStore = useCallsStore()
 const channelStore = useChannelStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
+const configStore = useConfigStore()
 
 const showMenu = ref(false)
 
+const startCall = async () => {
+    if (configStore.siteConfig.mirotalk_enabled) {
+        try {
+             // Use 'channel' scope since we have channelId
+            const { data } = await callsApi.createMeeting('channel', props.channelId);
 
-
-const startCall = () => {
-
-    if (props.channelId) {
-
+            if (data.mode === 'embed_iframe') {
+                uiStore.openVideoCall(data.meeting_url);
+            } else {
+                window.open(data.meeting_url, '_blank', 'noopener,noreferrer');
+            }
+        } catch (e) {
+            console.error('Failed to start video call', e);
+            alert('Failed to start video call');
+        }
+    } else if (props.channelId) {
         callsStore.startCall(props.channelId)
-
     }
-
 }
 
 
@@ -118,6 +129,7 @@ const handleLeave = async () => {
         <div class="w-px h-5 bg-gray-200 dark:bg-white/10 mx-2"></div>
 
         <button 
+          v-if="configStore.siteConfig.mirotalk_enabled"
           @click="startCall"
           class="w-9 h-9 flex items-center justify-center hover:bg-green-50 dark:hover:bg-green-500/10 text-green-600 dark:text-green-400 rounded-full transition-all duration-200"
           title="Start Call"

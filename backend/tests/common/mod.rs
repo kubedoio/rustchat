@@ -49,8 +49,9 @@ pub async fn spawn_app() -> TestApp {
     let jwt_secret = Uuid::new_v4().to_string();
     let jwt_expiry_hours = 1;
 
+    // Initialize Redis
     let redis_client =
-        redis::Client::open("redis://127.0.0.1:6379/").expect("Failed to create Redis client");
+        redis::Client::open("redis://localhost:6379/").expect("Failed to create Redis client");
 
     let app = api::router(
         db_pool.clone(),

@@ -6,7 +6,8 @@ import { useWebSocket } from '../composables/useWebSocket'
 export const useConfigStore = defineStore('config', () => {
     const siteConfig = ref<PublicConfig>({
         site_name: 'RustChat',
-        logo_url: undefined
+        logo_url: undefined,
+        mirotalk_enabled: false
     })
 
     async function fetchPublicConfig() {
@@ -24,7 +25,9 @@ export const useConfigStore = defineStore('config', () => {
 
         onEvent('config_updated', (data: any) => {
             if (data.category === 'site') {
+                // Preserve other fields like mirotalk_enabled which are not in the 'site' category event yet
                 siteConfig.value = {
+                    ...siteConfig.value,
                     site_name: data.config.site_name,
                     logo_url: data.config.logo_url
                 }
