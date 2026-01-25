@@ -1,13 +1,13 @@
-use axum::Router;
 use crate::api::AppState;
+use axum::Router;
 
-pub mod users;
-pub mod teams;
 pub mod channels;
-pub mod posts;
 pub mod config;
-pub mod websocket;
 pub mod extractors;
+pub mod posts;
+pub mod teams;
+pub mod users;
+pub mod websocket;
 
 pub fn router() -> Router<AppState> {
     Router::new()

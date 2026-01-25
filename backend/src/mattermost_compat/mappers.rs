@@ -52,7 +52,11 @@ impl From<Team> for mm::Team {
             name: team.name,
             description: team.description.unwrap_or_default(),
             email: "".to_string(),
-            team_type: if team.is_public { "O".to_string() } else { "I".to_string() },
+            team_type: if team.is_public {
+                "O".to_string()
+            } else {
+                "I".to_string()
+            },
             company_name: "".to_string(),
             allowed_domains: "".to_string(),
             invite_id: "".to_string(),
@@ -67,7 +71,11 @@ impl From<Channel> for mm::Channel {
             id: channel.id.to_string(),
             create_at: channel.created_at.timestamp_millis(),
             update_at: channel.updated_at.timestamp_millis(),
-            delete_at: if channel.is_archived { channel.updated_at.timestamp_millis() } else { 0 },
+            delete_at: if channel.is_archived {
+                channel.updated_at.timestamp_millis()
+            } else {
+                0
+            },
             team_id: channel.team_id.to_string(),
             channel_type: match channel.channel_type {
                 ChannelType::Public => "O",
@@ -137,8 +145,8 @@ impl From<PostResponse> for mm::Post {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use chrono::Utc;
+    use uuid::Uuid;
 
     #[test]
     fn test_user_mapping() {

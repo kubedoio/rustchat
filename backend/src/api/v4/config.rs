@@ -1,11 +1,7 @@
-use axum::{
-    extract::State,
-    routing::get,
-    Json, Router,
-};
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::models as mm;
+use axum::{extract::State, routing::get, Json, Router};
 
 pub fn router() -> Router<AppState> {
     Router::new()

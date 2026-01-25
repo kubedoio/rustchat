@@ -18,8 +18,8 @@ mod site;
 mod teams;
 mod unreads;
 mod users;
-mod ws;
 mod v4;
+mod ws;
 
 use std::sync::Arc;
 

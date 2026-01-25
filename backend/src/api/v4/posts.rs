@@ -1,21 +1,16 @@
-use axum::{
-    extract::{State},
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, routing::post, Json, Router};
 use serde::Deserialize;
 use uuid::Uuid;
 
+use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::models as mm;
-use super::extractors::MmAuthUser;
 use crate::models::CreatePost;
 use crate::services::posts;
 
 pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/posts", post(create_post_handler))
+    Router::new().route("/posts", post(create_post_handler))
 }
 
 #[derive(Debug, Deserialize)]
@@ -41,13 +36,16 @@ async fn create_post_handler(
         .map_err(|_| AppError::Validation("Invalid channel_id".to_string()))?;
 
     let root_post_id = if !input.root_id.is_empty() {
-        Some(Uuid::parse_str(&input.root_id)
-            .map_err(|_| AppError::Validation("Invalid root_id".to_string()))?)
+        Some(
+            Uuid::parse_str(&input.root_id)
+                .map_err(|_| AppError::Validation("Invalid root_id".to_string()))?,
+        )
     } else {
         None
     };
 
-    let file_ids = input.file_ids
+    let file_ids = input
+        .file_ids
         .iter()
         .filter_map(|id| Uuid::parse_str(id).ok())
         .collect();
@@ -71,7 +69,8 @@ async fn create_post_handler(
         channel_id,
         create_payload,
         client_msg_id,
-    ).await?;
+    )
+    .await?;
 
     Ok(Json(post_resp.into()))
 }

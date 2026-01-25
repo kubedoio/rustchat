@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::api::AppState;
 use crate::auth::validate_token;
 use crate::mattermost_compat::models as mm;
-use crate::realtime::{WsEnvelope, TypingEvent};
+use crate::realtime::{TypingEvent, WsEnvelope};
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/websocket", get(ws_handler))
@@ -63,7 +63,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 }
             }
         } else {
-             break;
+            break;
         }
     }
 
@@ -111,17 +111,17 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     // Main loop: forward events from rx to sender (mapped to MM format)
 
     let mut hub_rx = rx;
-    let mut sender_task = tokio::spawn(async move {
+    let sender_task = tokio::spawn(async move {
         while let Ok(msg_str) = hub_rx.recv().await {
             // msg_str is WsEnvelope JSON string from RustChat hub
             if let Ok(envelope) = serde_json::from_str::<WsEnvelope>(&msg_str) {
                 if let Some(mm_msg) = map_envelope_to_mm(&envelope, seq) {
                     seq += 1;
-                     if let Ok(json) = serde_json::to_string(&mm_msg) {
-                         if sender.send(Message::Text(json.into())).await.is_err() {
-                             break;
-                         }
-                     }
+                    if let Ok(json) = serde_json::to_string(&mm_msg) {
+                        if sender.send(Message::Text(json.into())).await.is_err() {
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -131,7 +131,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let receive_task = tokio::spawn(async move {
         while let Some(msg) = receiver.next().await {
             if let Ok(Message::Text(_)) = msg {
-                 // Handle ping/pong if needed
+                // Handle ping/pong if needed
             } else if matches!(msg, Ok(Message::Close(_))) || msg.is_err() {
                 break;
             }
@@ -149,45 +149,47 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage> {
     match env.event.as_str() {
         "message_created" | "thread_reply_created" => {
-            if let Ok(post_resp) = serde_json::from_value::<crate::models::post::PostResponse>(env.data.clone()) {
-                 let mm_post: mm::Post = post_resp.into();
-                 let post_json = serde_json::to_string(&mm_post).unwrap_or_default();
+            if let Ok(post_resp) =
+                serde_json::from_value::<crate::models::post::PostResponse>(env.data.clone())
+            {
+                let mm_post: mm::Post = post_resp.into();
+                let post_json = serde_json::to_string(&mm_post).unwrap_or_default();
 
-                 let data = json!({
-                     "post": post_json,
-                     "channel_display_name": "",
-                     "channel_name": "",
-                     "channel_type": "O",
-                     "sender_name": mm_post.user_id,
-                     "team_id": ""
-                 });
+                let data = json!({
+                    "post": post_json,
+                    "channel_display_name": "",
+                    "channel_name": "",
+                    "channel_type": "O",
+                    "sender_name": mm_post.user_id,
+                    "team_id": ""
+                });
 
-                 Some(mm::WebSocketMessage {
-                     seq: Some(seq),
-                     event: "posted".to_string(),
-                     data,
-                     broadcast: map_broadcast(env.broadcast.as_ref()),
-                 })
+                Some(mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "posted".to_string(),
+                    data,
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                })
             } else {
                 None
             }
         }
         "user_typing" => {
-             if let Ok(typing) = serde_json::from_value::<TypingEvent>(env.data.clone()) {
-                 Some(mm::WebSocketMessage {
-                     seq: Some(seq),
-                     event: "typing".to_string(),
-                     data: json!({
-                         "parent_id": typing.thread_root_id.unwrap_or_default().to_string(),
-                         "user_id": typing.user_id.to_string(),
-                     }),
-                     broadcast: map_broadcast(env.broadcast.as_ref()),
-                 })
-             } else {
-                 None
-             }
+            if let Ok(typing) = serde_json::from_value::<TypingEvent>(env.data.clone()) {
+                Some(mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "typing".to_string(),
+                    data: json!({
+                        "parent_id": typing.thread_root_id.unwrap_or_default().to_string(),
+                        "user_id": typing.user_id.to_string(),
+                    }),
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                })
+            } else {
+                None
+            }
         }
-        _ => None
+        _ => None,
     }
 }
 
