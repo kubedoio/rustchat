@@ -37,6 +37,11 @@ pub async fn spawn_app() -> TestApp {
     // Initialize dependencies
     let ws_hub = WsHub::new();
 
+    // Initialize Redis client for tests
+    let redis_url = std::env::var("RUSTCHAT_REDIS_URL")
+        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_client = redis::Client::open(redis_url).expect("Failed to create Redis client");
+
     // Dummy S3 client
     let s3_client = S3Client::new(
         Some("http://localhost:9000".to_string()),
@@ -51,6 +56,7 @@ pub async fn spawn_app() -> TestApp {
 
     let app = api::router(
         db_pool.clone(),
+        redis_client,
         jwt_secret,
         jwt_expiry_hours,
         ws_hub,
