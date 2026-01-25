@@ -13,6 +13,7 @@ import PinnedMessagesPanel from '../../components/channel/PinnedMessagesPanel.vu
 import SearchPanel from '../../components/channel/SearchPanel.vue';
 import ChannelMembersPanel from '../../components/channel/ChannelMembersPanel.vue';
 import ChannelSettingsModal from '../../components/modals/ChannelSettingsModal.vue';
+import VideoCallModal from '../../components/modals/VideoCallModal.vue';
 import TypingIndicator from '../../components/channel/TypingIndicator.vue';
 import { useUIStore } from '../../stores/ui';
 
@@ -175,6 +176,13 @@ function handleChannelDeleted() {
         :channel="currentChannel"
         @close="showChannelSettings = false"
         @deleted="handleChannelDeleted"
+      />
+
+      <!-- Video Call Modal (Global for ChannelView context) -->
+      <VideoCallModal
+        :is-open="uiStore.isVideoCallOpen"
+        :url="uiStore.videoCallUrl"
+        @close="uiStore.closeVideoCall"
       />
   </AppShell>
 </template>

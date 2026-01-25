@@ -17,6 +17,7 @@ use crate::models::{
     CreateChannel,
     CreateRetentionPolicy,
     CreateSsoConfig,
+    MiroTalkConfig,
     Permission,
     RetentionPolicy,
     ServerConfig,
@@ -27,6 +28,7 @@ use crate::models::{
     TeamMemberResponse,
     UpdateChannel,
 };
+use crate::services::mirotalk::{MiroTalkClient, MiroTalkStats};
 use sqlx::FromRow;
 
 /// Build admin routes
@@ -92,6 +94,15 @@ pub fn router() -> Router<AppState> {
         // Stats & Health
         .route("/admin/stats", get(get_stats))
         .route("/admin/health", get(get_health))
+        // Integrations - MiroTalk
+        .route(
+            "/admin/integrations/mirotalk",
+            get(get_mirotalk_config).put(update_mirotalk_config),
+        )
+        .route(
+            "/admin/integrations/mirotalk/test",
+            axum::routing::post(test_mirotalk_connection),
+        )
 }
 
 /// Check if user is admin
@@ -485,6 +496,85 @@ async fn delete_retention_policy(
         .await?;
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
+}
+
+// ============ MiroTalk Integration ============
+
+async fn get_mirotalk_config(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> ApiResult<Json<MiroTalkConfig>> {
+    require_admin(&auth)?;
+
+    let config: MiroTalkConfig = sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
+        .fetch_optional(&state.db)
+        .await?
+        .unwrap_or_else(|| MiroTalkConfig {
+            is_active: true,
+            mode: crate::models::MiroTalkMode::Disabled,
+            base_url: "".to_string(),
+            api_key_secret: "".to_string(),
+            default_room_prefix: None,
+            join_behavior: crate::models::JoinBehavior::NewTab,
+            updated_at: chrono::Utc::now(),
+            updated_by: None,
+        });
+
+    Ok(Json(config))
+}
+
+async fn update_mirotalk_config(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(input): Json<MiroTalkConfig>,
+) -> ApiResult<Json<MiroTalkConfig>> {
+    require_admin(&auth)?;
+
+    // Upsert
+    let config: MiroTalkConfig = sqlx::query_as(
+        r#"
+        INSERT INTO mirotalk_config (is_active, mode, base_url, api_key_secret, default_room_prefix, join_behavior, updated_by, updated_at)
+        VALUES (true, $1, $2, $3, $4, $5, $6, NOW())
+        ON CONFLICT (is_active) DO UPDATE SET
+            mode = $1,
+            base_url = $2,
+            api_key_secret = $3,
+            default_room_prefix = $4,
+            join_behavior = $5,
+            updated_by = $6,
+            updated_at = NOW()
+        RETURNING *
+        "#,
+    )
+    .bind(input.mode)
+    .bind(input.base_url)
+    .bind(input.api_key_secret)
+    .bind(input.default_room_prefix)
+    .bind(input.join_behavior)
+    .bind(auth.user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(config))
+}
+
+async fn test_mirotalk_connection(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> ApiResult<Json<MiroTalkStats>> {
+    require_admin(&auth)?;
+
+    // 1. Fetch current config
+    let config: MiroTalkConfig = sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::Config("MiroTalk config not found".to_string()))?;
+
+    // 2. Init client and call stats
+    let client = MiroTalkClient::new(config, state.http_client.clone())?;
+    let stats = client.stats().await?;
+
+    Ok(Json(stats))
 }
 
 // ============ Permissions ============

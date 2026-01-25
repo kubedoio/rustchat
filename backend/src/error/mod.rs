@@ -39,6 +39,12 @@ pub enum AppError {
 
     #[error("Validation error: {0}")]
     Validation(String),
+
+    #[error("Configuration error: {0}")]
+    Config(String),
+
+    #[error("External service error: {0}")]
+    ExternalService(String),
 }
 
 /// Error response body
@@ -68,6 +74,8 @@ impl AppError {
             AppError::Database(_) => "DATABASE_ERROR",
             AppError::Redis(_) => "REDIS_ERROR",
             AppError::Validation(_) => "VALIDATION_ERROR",
+            AppError::Config(_) => "CONFIG_ERROR",
+            AppError::ExternalService(_) => "EXTERNAL_SERVICE_ERROR",
         }
     }
 
@@ -83,6 +91,8 @@ impl AppError {
             AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Redis(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            AppError::Config(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::ExternalService(_) => StatusCode::BAD_GATEWAY,
         }
     }
 }

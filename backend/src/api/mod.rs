@@ -19,6 +19,7 @@ mod teams;
 mod unreads;
 mod users;
 mod v4;
+mod video;
 mod ws;
 
 use std::sync::Arc;
@@ -43,6 +44,7 @@ pub struct AppState {
     pub jwt_expiry_hours: u64,
     pub ws_hub: Arc<WsHub>,
     pub s3_client: S3Client,
+    pub http_client: reqwest::Client,
     pub start_time: std::time::Instant,
 }
 
@@ -62,6 +64,7 @@ pub fn router(
         jwt_expiry_hours,
         ws_hub,
         s3_client,
+        http_client: reqwest::Client::new(),
         start_time: std::time::Instant::now(),
     };
 
@@ -95,6 +98,7 @@ pub fn router(
         .merge(calls::router())
         .merge(oauth::router())
         .merge(site::router())
+        .nest("/video", video::router())
         .merge(ws::router());
 
     let api_v4 = v4::router();

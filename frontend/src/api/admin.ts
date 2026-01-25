@@ -125,6 +125,22 @@ export interface HealthStatus {
     uptime_seconds: number;
 }
 
+export interface MiroTalkConfig {
+    is_active: boolean;
+    mode: 'disabled' | 'sfu' | 'p2p';
+    base_url: string;
+    api_key_secret: string;
+    default_room_prefix?: string;
+    join_behavior: 'embed_iframe' | 'new_tab';
+}
+
+export interface MiroTalkStats {
+    peers?: number;
+    rooms?: number;
+    active_rooms?: string[];
+    [key: string]: any;
+}
+
 // API functions
 export const adminApi = {
     // Config
@@ -206,6 +222,11 @@ export const adminApi = {
 
     // Email
     testEmail: (to: string) => api.post('/admin/email/test', { to }),
+
+    // Integrations - MiroTalk
+    getMiroTalkConfig: () => api.get<MiroTalkConfig>('/admin/integrations/mirotalk'),
+    updateMiroTalkConfig: (config: MiroTalkConfig) => api.put<MiroTalkConfig>('/admin/integrations/mirotalk', config),
+    testMiroTalkConnection: () => api.post<MiroTalkStats>('/admin/integrations/mirotalk/test'),
 };
 
 export default adminApi;
