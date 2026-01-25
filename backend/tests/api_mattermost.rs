@@ -156,7 +156,7 @@ async fn mm_posts_flow() {
         .unwrap();
     assert_eq!(200, teams_res.status().as_u16());
     let teams_body: serde_json::Value = teams_res.json().await.unwrap();
-    assert!(teams_body.as_array().unwrap().len() > 0);
+    assert!(!teams_body.as_array().unwrap().is_empty());
     assert_eq!(teams_body[0]["id"], team_id.to_string());
 
     // Create Post via V4
