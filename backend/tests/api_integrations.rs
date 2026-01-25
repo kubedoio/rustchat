@@ -42,7 +42,8 @@ async fn test_slash_command_lifecycle() {
         "description": "Team for testing commands"
     });
 
-    let team_res = app.api_client
+    let team_res = app
+        .api_client
         .post(format!("{}/api/v1/teams", &app.address))
         .json(&team_data)
         .send()
@@ -53,8 +54,12 @@ async fn test_slash_command_lifecycle() {
     let team: Team = team_res.json().await.expect("Failed to parse team");
 
     // 3. Get Channels to find a channel ID
-    let channels_res = app.api_client
-        .get(format!("{}/api/v1/teams/{}/channels", &app.address, team.id))
+    let channels_res = app
+        .api_client
+        .get(format!(
+            "{}/api/v1/teams/{}/channels",
+            &app.address, team.id
+        ))
         .send()
         .await
         .expect("Failed to list channels");
@@ -73,7 +78,8 @@ async fn test_slash_command_lifecycle() {
             "display_name": "General",
             "type": "public"
         });
-        let c_res = app.api_client
+        let c_res = app
+            .api_client
             .post(format!("{}/api/v1/channels", &app.address))
             .json(&channel_data)
             .send()
@@ -94,15 +100,22 @@ async fn test_slash_command_lifecycle() {
         team_id: Some(team.id),
     };
 
-    let echo_res = app.api_client
-        .post(format!("{}/api/v1/integrations/commands/execute", &app.address))
+    let echo_res = app
+        .api_client
+        .post(format!(
+            "{}/api/v1/integrations/commands/execute",
+            &app.address
+        ))
         .json(&echo_cmd)
         .send()
         .await
         .expect("Failed to execute echo");
 
     assert_eq!(200, echo_res.status().as_u16());
-    let echo_body: CommandResponse = echo_res.json().await.expect("Failed to parse echo response");
+    let echo_body: CommandResponse = echo_res
+        .json()
+        .await
+        .expect("Failed to parse echo response");
     assert_eq!(echo_body.text, "Echo: Hello World");
 
     // 5. Create Custom Slash Command
@@ -115,15 +128,22 @@ async fn test_slash_command_lifecycle() {
         hint: Some("args".to_string()),
     };
 
-    let create_res = app.api_client
-        .post(format!("{}/api/v1/integrations/commands?team_id={}", &app.address, team.id))
+    let create_res = app
+        .api_client
+        .post(format!(
+            "{}/api/v1/integrations/commands?team_id={}",
+            &app.address, team.id
+        ))
         .json(&new_cmd)
         .send()
         .await
         .expect("Failed to create command");
 
     assert_eq!(200, create_res.status().as_u16());
-    let created_cmd: SlashCommand = create_res.json().await.expect("Failed to parse created command");
+    let created_cmd: SlashCommand = create_res
+        .json()
+        .await
+        .expect("Failed to parse created command");
     assert_eq!(created_cmd.trigger, "custom");
 
     // 6. Execute Custom Command
@@ -135,8 +155,12 @@ async fn test_slash_command_lifecycle() {
         team_id: Some(team.id),
     };
 
-    let exec_res = app.api_client
-        .post(format!("{}/api/v1/integrations/commands/execute", &app.address))
+    let exec_res = app
+        .api_client
+        .post(format!(
+            "{}/api/v1/integrations/commands/execute",
+            &app.address
+        ))
         .json(&custom_exec)
         .send()
         .await
