@@ -36,7 +36,7 @@ pub struct Reaction {
 }
 
 /// Aggregated reaction for responses
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReactionResponse {
     pub emoji: String,
     pub count: i32,
@@ -76,7 +76,7 @@ pub struct PostWithAuthor {
 }
 
 /// Post response with user info (for API responses)
-#[derive(Debug, Clone, Serialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PostResponse {
     pub id: Uuid,
     pub channel_id: Uuid,

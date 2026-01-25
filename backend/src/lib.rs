@@ -15,3 +15,4 @@ pub mod realtime;
 pub mod services;
 pub mod storage;
 pub mod telemetry;
+pub mod mattermost_compat;
