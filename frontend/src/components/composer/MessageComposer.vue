@@ -34,8 +34,17 @@ let lastTypingEmit = 0
 function handleSend() {
   if (!content.value.trim() && attachedFiles.value.length === 0) return
   
+  // Only send files that have finished uploading
+  const fileIds = attachedFiles.value
+    .filter(a => !a.uploading && a.uploaded)
+    .map(a => a.uploaded!.id)
+
   const messageContent = content.value
-  emit('send', messageContent)
+  emit('send', { 
+    content: messageContent, 
+    file_ids: fileIds 
+  })
+  
   content.value = ''
   attachedFiles.value = []
   showPreview.value = false
