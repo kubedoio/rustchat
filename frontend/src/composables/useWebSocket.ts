@@ -4,6 +4,7 @@ import { useMessageStore } from '../stores/messages'
 import { usePresenceStore } from '../stores/presence'
 import { useUnreadStore } from '../stores/unreads'
 import { useChannelStore } from '../stores/channels'
+import { useToast } from './useToast'
 import type { Post } from '../api/posts'
 
 // Server -> Client
@@ -39,6 +40,7 @@ export function useWebSocket() {
     const presenceStore = usePresenceStore()
     const unreadStore = useUnreadStore()
     const channelStore = useChannelStore()
+    const toast = useToast()
 
 
     function connect() {
@@ -54,7 +56,8 @@ export function useWebSocket() {
         const url = `${protocol}//${host}/api/v1/ws?token=${authStore.token}`
 
         try {
-            const socket = new WebSocket(url)
+            // Pass token in protocols array as a fallback for browsers like Brave
+            const socket = new WebSocket(url, [authStore.token])
             ws.value = socket
 
             socket.onopen = () => {
@@ -102,7 +105,8 @@ export function useWebSocket() {
             }
 
             socket.onerror = (error) => {
-                console.error('WebSocket error:', error)
+                console.error('WebSocket connection failed:', error)
+                toast.error('Real-time connection error', 'The connection to the server was refused. Please check your network.')
             }
 
             socket.onmessage = (event) => {
