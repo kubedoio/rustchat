@@ -39,7 +39,7 @@ use crate::storage::S3Client;
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
-    pub redis: redis::Client,
+    pub redis: deadpool_redis::Pool,
     pub jwt_secret: String,
     pub jwt_expiry_hours: u64,
     pub ws_hub: Arc<WsHub>,
@@ -51,7 +51,7 @@ pub struct AppState {
 /// Build the main application router
 pub fn router(
     db: PgPool,
-    redis: redis::Client,
+    redis: deadpool_redis::Pool,
     jwt_secret: String,
     jwt_expiry_hours: u64,
     ws_hub: Arc<WsHub>,

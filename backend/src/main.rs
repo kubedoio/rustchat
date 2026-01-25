@@ -54,9 +54,10 @@ async fn main() -> anyhow::Result<()> {
     let ws_hub = WsHub::new();
     info!("WebSocket hub initialized");
 
-    // Initialize Redis
-    let redis_client = redis::Client::open(config.redis_url.clone())?;
-    info!("Redis client initialized");
+    // Initialize Redis Pool
+    let redis_cfg = deadpool_redis::Config::from_url(&config.redis_url);
+    let redis_pool = redis_cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1))?;
+    info!("Redis pool initialized");
 
     // Create S3 client
     let s3_client = S3Client::new(
@@ -74,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
     // Build application router
     let app = api::router(
         db_pool.clone(),
-        redis_client,
+        redis_pool,
         config.jwt_secret.clone(),
         config.jwt_expiry_hours,
         ws_hub,
