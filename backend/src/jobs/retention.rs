@@ -48,7 +48,7 @@ pub async fn run_retention_cleanup(
                 .fetch_all(db)
                 .await?;
 
-        stats.file_keys = files.iter().map(|f| f.0.clone()).collect();
+        stats.file_keys = files.into_iter().map(|f| f.0).collect();
 
         let result = sqlx::query("DELETE FROM files WHERE created_at < $1")
             .bind(cutoff)
