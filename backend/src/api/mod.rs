@@ -18,6 +18,7 @@ mod site;
 mod teams;
 mod unreads;
 mod users;
+mod v4;
 mod ws;
 
 use std::sync::Arc;
@@ -96,8 +97,11 @@ pub fn router(
         .merge(site::router())
         .merge(ws::router());
 
+    let api_v4 = v4::router();
+
     Router::new()
         .nest("/api/v1", api_v1)
+        .nest("/api/v4", api_v4)
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(cors)

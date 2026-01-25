@@ -10,6 +10,7 @@ pub mod crypto;
 pub mod db;
 pub mod error;
 pub mod jobs;
+pub mod mattermost_compat;
 pub mod models;
 pub mod realtime;
 pub mod services;

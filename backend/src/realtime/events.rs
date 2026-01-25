@@ -123,7 +123,7 @@ pub struct SubscribeCommandData {
 }
 
 /// Typing indicator event payload
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TypingEvent {
     pub user_id: Uuid,
     pub display_name: String,

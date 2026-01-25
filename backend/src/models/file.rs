@@ -1,7 +1,7 @@
 //! File model
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -26,7 +26,7 @@ pub struct FileInfo {
 }
 
 /// Response for file upload
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileUploadResponse {
     pub id: Uuid,
     pub name: String,
