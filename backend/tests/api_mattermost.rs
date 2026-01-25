@@ -80,7 +80,19 @@ async fn mm_login_success() {
         .expect("Failed to get config");
     assert_eq!(200, config_response.status().as_u16());
     let config_body: serde_json::Value = config_response.json().await.expect("Failed to read JSON");
-    assert_eq!(config_body["Version"], "10.0.0-rustchat");
+    assert_eq!(config_body["Version"], "5.35.0");
+
+    // Check system ping
+    let ping_response = app
+        .api_client
+        .get(format!("{}/api/v4/system/ping", &app.address))
+        .send()
+        .await
+        .expect("Failed to ping system");
+    assert_eq!(200, ping_response.status().as_u16());
+    let ping_body: serde_json::Value = ping_response.json().await.expect("Failed to read JSON");
+    assert_eq!(ping_body["status"], "OK");
+    assert_eq!(ping_body["version"], "5.35.0");
 }
 
 #[tokio::test]

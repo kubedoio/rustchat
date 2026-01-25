@@ -11,8 +11,8 @@ pub fn router() -> Router<AppState> {
 
 async fn client_config(State(_state): State<AppState>) -> ApiResult<Json<mm::Config>> {
     Ok(Json(mm::Config {
-        site_url: "".to_string(), // Mobile client usually ignores this if connected
-        version: "10.0.0-rustchat".to_string(),
+        site_url: "".to_string(),
+        version: "5.35.0".to_string(),
         enable_push_notifications: "false".to_string(),
     }))
 }
