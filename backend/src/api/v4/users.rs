@@ -21,9 +21,9 @@ pub fn router() -> Router<AppState> {
         .route("/users/me", get(me))
         .route("/users/me/teams", get(my_teams))
         .route("/users/me/teams/members", get(my_team_members))
-        .route("/users/me/teams/:team_id/channels", get(my_team_channels))
+        .route("/users/me/teams/{team_id}/channels", get(my_team_channels))
         .route(
-            "/users/me/teams/:team_id/channels/members",
+            "/users/me/teams/{team_id}/channels/members",
             get(my_team_channel_members),
         )
         .route("/users/me/teams/unread", get(my_teams_unread))

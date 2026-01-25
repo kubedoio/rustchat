@@ -879,7 +879,7 @@ async fn get_health(
             storage_type: "s3".to_string(),
         },
         websocket: WebSocketHealth {
-            active_connections: 0, // TODO: track actual connections
+            active_connections: state.ws_hub.count_connections().await as u64,
         },
         version: env!("CARGO_PKG_VERSION").to_string(),
         uptime_seconds: state.start_time.elapsed().as_secs(),
