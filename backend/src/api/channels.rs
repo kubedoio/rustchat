@@ -344,22 +344,21 @@ async fn update_channel(
     }
 
     // Update fields
-    let mut query_builder: sqlx::QueryBuilder<sqlx::Postgres> =
-        sqlx::QueryBuilder::new("UPDATE channels SET ");
+    let mut query_builder = sqlx::QueryBuilder::new("UPDATE channels SET ");
     let mut separated = query_builder.separated(", ");
     let mut has_update = false;
 
-    if let Some(ref display_name) = input.display_name {
+    if let Some(display_name) = input.display_name {
         separated.push("display_name = ");
         separated.push_bind_unseparated(display_name);
         has_update = true;
     }
-    if let Some(ref purpose) = input.purpose {
+    if let Some(purpose) = input.purpose {
         separated.push("purpose = ");
         separated.push_bind_unseparated(purpose);
         has_update = true;
     }
-    if let Some(ref header) = input.header {
+    if let Some(header) = input.header {
         separated.push("header = ");
         separated.push_bind_unseparated(header);
         has_update = true;
