@@ -103,59 +103,55 @@ async fn upload_file(
     // Generate download URL
     let url = state.s3_client.presigned_download_url(&key, 3600).await?;
 
-    // --- Image Processing ---
-    let mut width = None;
-    let mut height = None;
-    let mut has_thumbnail = false;
-    let mut thumbnail_key = None;
-    let mut thumbnail_url = None;
-
+    // --- Image Processing (Background) ---
     if content_type.starts_with("image/") {
-        if let Ok(img) = image::load_from_memory(&data) {
-            let (w, h) = img.dimensions();
-            width = Some(w as i32);
-            height = Some(h as i32);
+        let state_clone = state.clone();
+        let data_clone = data.clone();
+        let content_type_clone = content_type.clone();
+        let auth_id = auth.user_id;
+        
+        tokio::spawn(async move {
+            if let Ok(img) = image::load_from_memory(&data_clone) {
+                let (w, h) = img.dimensions();
+                let mut width = Some(w as i32);
+                let mut height = Some(h as i32);
+                let mut has_thumbnail = false;
+                let mut thumbnail_key = None;
 
-            // Generate thumbnail if image is significantly larger than thumbnail size
-            if w > 400 || h > 400 {
-                let thumb = img.thumbnail(400, 400);
-                let mut thumb_data = Vec::new();
-                // Encode as WebP for efficiency if possible, or same as original
-                if thumb
-                    .write_to(&mut Cursor::new(&mut thumb_data), ImageFormat::WebP)
-                    .is_ok()
-                {
-                    let t_key = format!("thumbnails/{}/{}.webp", auth.user_id, file_id);
-                    if state
-                        .s3_client
-                        .upload(&t_key, thumb_data, "image/webp")
-                        .await
+                // Generate thumbnail if image is significantly larger than thumbnail size
+                if w > 400 || h > 400 {
+                    let thumb = img.thumbnail(400, 400);
+                    let mut thumb_data = Vec::new();
+                    if thumb
+                        .write_to(&mut Cursor::new(&mut thumb_data), ImageFormat::WebP)
                         .is_ok()
                     {
-                        has_thumbnail = true;
-                        thumbnail_key = Some(t_key.clone());
-                        thumbnail_url = state
+                        let t_key = format!("thumbnails/{}/{}.webp", auth_id, file_id);
+                        if state_clone
                             .s3_client
-                            .presigned_download_url(&t_key, 3600)
+                            .upload(&t_key, thumb_data, "image/webp")
                             .await
-                            .ok();
+                            .is_ok()
+                        {
+                            has_thumbnail = true;
+                            thumbnail_key = Some(t_key);
+                        }
                     }
                 }
-            }
-        }
-    }
 
-    if width.is_some() || has_thumbnail {
-        sqlx::query(
-            "UPDATE files SET width = $1, height = $2, has_thumbnail = $3, thumbnail_key = $4 WHERE id = $5"
-        )
-        .bind(width)
-        .bind(height)
-        .bind(has_thumbnail)
-        .bind(thumbnail_key)
-        .bind(file_id)
-        .execute(&state.db)
-        .await.ok();
+                // Update metadata in DB
+                let _ = sqlx::query(
+                    "UPDATE files SET width = $1, height = $2, has_thumbnail = $3, thumbnail_key = $4 WHERE id = $5"
+                )
+                .bind(width)
+                .bind(height)
+                .bind(has_thumbnail)
+                .bind(thumbnail_key)
+                .bind(file_id)
+                .execute(&state_clone.db)
+                .await;
+            }
+        });
     }
 
     Ok(Json(FileUploadResponse {
@@ -164,7 +160,7 @@ async fn upload_file(
         mime_type: file_info.mime_type,
         size: file_info.size,
         url,
-        thumbnail_url,
+        thumbnail_url: None, // Will be populated when the record is fetched later
     }))
 }
 

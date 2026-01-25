@@ -49,10 +49,10 @@ watch(channelId, (newId, oldId) => {
     showChannelSettings.value = false;
 }, { immediate: true });
 
-async function onSendMessage(content: string) {
+async function onSendMessage(data: { content: string, file_ids: string[] }) {
     if (channelId.value) {
         // Optimistic send via WebSocket
-        await sendMessage(channelId.value, content);
+        await sendMessage(channelId.value, data.content, undefined, data.file_ids);
     }
 }
 

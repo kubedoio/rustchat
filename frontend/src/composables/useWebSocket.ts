@@ -300,16 +300,14 @@ export function useWebSocket() {
         })
     }
 
-    async function sendMessage(channelId: string, content: string, rootId?: string) {
+    async function sendMessage(channelId: string, content: string, rootId?: string, fileIds: string[] = []) {
         const clientMsgId = crypto.randomUUID()
         const authStore = useAuthStore()
+        const messageStore = useMessageStore()
 
         // Create temp message
         const tempMsg: any = {
-            id: clientMsgId, // uses same ID for now, server will respond with real ID which replaces it, OR we keep Client ID until confirmed
-            // Actually our store uses `id` as primary key.
-            // If we use UUIDv4 for local, server generates UUIDv4.
-            // When server update comes, we swap 'id' to server ID.
+            id: clientMsgId,
             channelId,
             userId: authStore.user?.id || '',
             username: authStore.user?.username || 'Me',
@@ -317,10 +315,10 @@ export function useWebSocket() {
             content,
             timestamp: new Date().toISOString(),
             reactions: [],
-            files: [],
+            files: [], // Optimistic files? Could be populated if we wanted
             isPinned: false,
             isSaved: false,
-            status: 'sending', // Display as grayed out or spinner
+            status: 'sending',
             clientMsgId,
             rootId
         }
@@ -334,7 +332,8 @@ export function useWebSocket() {
             client_msg_id: clientMsgId,
             data: {
                 message: content,
-                root_post_id: rootId
+                root_post_id: rootId,
+                file_ids: fileIds
             }
         })
     }
