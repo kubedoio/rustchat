@@ -38,41 +38,40 @@ async fn ws_handler(
     Query(query): Query<WsQuery>,
     headers: HeaderMap,
 ) -> Response {
-    // 1. Try to get token from query param (standard)
     let mut token = query.token.clone().unwrap_or_default();
 
-    // Remove "Bearer " prefix if present in query string (not standard but possible)
+    // Extract protocol to echo back (required by spec if sent by client)
+    let requested_protocol = headers
+        .get("Sec-WebSocket-Protocol")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string());
+
+    // Fallback: if token missing in query, try protocol header
+    if token.is_empty() || token == "undefined" {
+        if let Some(ref p) = requested_protocol {
+            if p.len() > 20 {
+                token = p.clone();
+            }
+        }
+    }
+
+    // Remove "Bearer " prefix if present
     if token.starts_with("Bearer ") {
         token = token.trim_start_matches("Bearer ").to_string();
     }
 
-    // 2. Fallback: Try to get token from Sec-WebSocket-Protocol header (workaround for some browsers/proxies)
-    let mut protocol_to_return = None;
-    if token.is_empty() || token == "undefined" {
-        if let Some(protocols) = headers.get("Sec-WebSocket-Protocol") {
-            if let Ok(protocol_str) = protocols.to_str() {
-                // Protocols can be comma separated, find the one that looks like a JWT
-                for p in protocol_str.split(',') {
-                    let p = p.trim();
-                    if p.len() > 20 {
-                        // Likely the JWT
-                        token = p.to_string();
-                        // If it starts with Bearer here too
-                        if token.starts_with("Bearer ") {
-                            token = token.trim_start_matches("Bearer ").to_string();
-                        }
-                        protocol_to_return = Some(p.to_string());
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    tracing::info!(
+        "WS Handshake - Token present: {}, Protocol: {:?}",
+        !token.is_empty(),
+        requested_protocol
+    );
 
     // Validate token
     let claims = match validate_token(&token, &state.jwt_secret) {
         Ok(data) => data.claims,
         Err(_) => {
+            tracing::warn!("WS Handshake failed: Invalid token");
             return Response::builder()
                 .status(401)
                 .body("Unauthorized".into())
@@ -81,8 +80,6 @@ async fn ws_handler(
     };
 
     let user_id = claims.sub;
-
-    // ... (omitted lines)
     let username = match sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_one(&state.db)
@@ -94,11 +91,13 @@ async fn ws_handler(
 
     let mut response = ws.on_upgrade(move |socket| handle_socket(socket, user_id, username, state));
 
-    // If we used the protocol header workaround, we MUST return the same protocol in the response
-    if let Some(p) = protocol_to_return {
-        response
-            .headers_mut()
-            .insert("Sec-WebSocket-Protocol", p.parse().unwrap());
+    // Spec compliance: if client requested a protocol, we MUST return it
+    if let Some(p) = requested_protocol {
+        if let Ok(header_val) = p.parse() {
+            response
+                .headers_mut()
+                .insert("Sec-WebSocket-Protocol", header_val);
+        }
     }
 
     response

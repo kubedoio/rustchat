@@ -50,12 +50,14 @@ pub async fn spawn_app() -> TestApp {
     let jwt_expiry_hours = 1;
 
     // Initialize Redis
-    let redis_client =
-        redis::Client::open("redis://localhost:6379/").expect("Failed to create Redis client");
+    let redis_cfg = deadpool_redis::Config::from_url("redis://localhost:6379/");
+    let redis_pool = redis_cfg
+        .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+        .expect("Failed to create Redis pool");
 
     let app = api::router(
         db_pool.clone(),
-        redis_client,
+        redis_pool,
         jwt_secret,
         jwt_expiry_hours,
         ws_hub,

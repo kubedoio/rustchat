@@ -1,6 +1,6 @@
 use crate::api::AppState;
 use crate::error::ApiResult;
-use redis::AsyncCommands;
+use deadpool_redis::redis::AsyncCommands;
 use serde::Serialize;
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -31,7 +31,11 @@ pub async fn mark_channel_as_read(
     channel_id: Uuid,
     target_seq: Option<i64>,
 ) -> ApiResult<()> {
-    let mut conn = state.redis.get_multiplexed_async_connection().await?;
+    let mut conn = state
+        .redis
+        .get()
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     let last_read_id = match target_seq {
         Some(seq) => seq,
@@ -129,7 +133,11 @@ pub async fn mark_channel_as_read(
 
 /// Get overview of unread counts for a user
 pub async fn get_unread_overview(state: &AppState, user_id: Uuid) -> ApiResult<UnreadOverview> {
-    let mut conn = state.redis.get_multiplexed_async_connection().await?;
+    let mut conn = state
+        .redis
+        .get()
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     // Get all channels user is a member of
     let channels: Vec<(Uuid, Uuid)> = sqlx::query_as("SELECT channel_id, team_id FROM channel_members JOIN channels ON channels.id = channel_members.channel_id WHERE user_id = $1")
@@ -199,7 +207,11 @@ pub async fn increment_unreads(
     author_id: Uuid,
     message_seq: i64,
 ) -> ApiResult<()> {
-    let mut conn = state.redis.get_multiplexed_async_connection().await?;
+    let mut conn = state
+        .redis
+        .get()
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     // Update channel latest msg id
     let last_msg_key = format!("rc:channel:{}:last_msg_id", channel_id);
@@ -269,7 +281,11 @@ pub async fn increment_unreads(
 
 /// Mark all channels as read for a user
 pub async fn mark_all_as_read(state: &AppState, user_id: Uuid) -> ApiResult<()> {
-    let mut conn = state.redis.get_multiplexed_async_connection().await?;
+    let mut conn = state
+        .redis
+        .get()
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     // 1. Get all channels user is a member of
     let channel_ids: Vec<Uuid> =
