@@ -22,14 +22,15 @@ async fn get_posts(
     Path(channel_id): Path<Uuid>,
 ) -> ApiResult<Json<mm::PostList>> {
     // Check channel membership first
-    let _membership: crate::models::ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(channel_id)
-    .bind(_auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(_auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| {
+                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+            })?;
 
     // Fetch posts
     // Limit to 60 by default in MM

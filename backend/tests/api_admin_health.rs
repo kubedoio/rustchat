@@ -15,7 +15,8 @@ async fn test_admin_health_check() {
         "display_name": "Admin User"
     });
 
-    let reg_res = app.api_client
+    let reg_res = app
+        .api_client
         .post(&format!("{}/api/v1/auth/register", &app.address))
         .json(&user_data)
         .send()
@@ -40,7 +41,8 @@ async fn test_admin_health_check() {
         "password": "Password123!"
     });
 
-    let login_res = app.api_client
+    let login_res = app
+        .api_client
         .post(&format!("{}/api/v1/auth/login", &app.address))
         .json(&login_data)
         .send()
@@ -48,11 +50,17 @@ async fn test_admin_health_check() {
         .expect("Failed to login");
 
     assert!(login_res.status().is_success());
-    let login_body: serde_json::Value = login_res.json().await.expect("Failed to parse login response");
-    let token = login_body["token"].as_str().expect("Token missing in response");
+    let login_body: serde_json::Value = login_res
+        .json()
+        .await
+        .expect("Failed to parse login response");
+    let token = login_body["token"]
+        .as_str()
+        .expect("Token missing in response");
 
     // 4. Check admin health endpoint
-    let health_res = app.api_client
+    let health_res = app
+        .api_client
         .get(&format!("{}/api/v1/admin/health", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -61,7 +69,10 @@ async fn test_admin_health_check() {
 
     assert_eq!(200, health_res.status().as_u16());
 
-    let body: serde_json::Value = health_res.json().await.expect("Failed to parse health response");
+    let body: serde_json::Value = health_res
+        .json()
+        .await
+        .expect("Failed to parse health response");
 
     // 5. Verify structure
     assert_eq!(body["status"], "healthy");
