@@ -344,26 +344,31 @@ async fn update_channel(
     }
 
     // Update fields
+    let mut query_builder: sqlx::QueryBuilder<sqlx::Postgres> =
+        sqlx::QueryBuilder::new("UPDATE channels SET ");
+    let mut separated = query_builder.separated(", ");
+    let mut has_update = false;
+
     if let Some(ref display_name) = input.display_name {
-        sqlx::query("UPDATE channels SET display_name = $1 WHERE id = $2")
-            .bind(display_name)
-            .bind(id)
-            .execute(&state.db)
-            .await?;
+        separated.push("display_name = ");
+        separated.push_bind_unseparated(display_name);
+        has_update = true;
     }
     if let Some(ref purpose) = input.purpose {
-        sqlx::query("UPDATE channels SET purpose = $1 WHERE id = $2")
-            .bind(purpose)
-            .bind(id)
-            .execute(&state.db)
-            .await?;
+        separated.push("purpose = ");
+        separated.push_bind_unseparated(purpose);
+        has_update = true;
     }
     if let Some(ref header) = input.header {
-        sqlx::query("UPDATE channels SET header = $1 WHERE id = $2")
-            .bind(header)
-            .bind(id)
-            .execute(&state.db)
-            .await?;
+        separated.push("header = ");
+        separated.push_bind_unseparated(header);
+        has_update = true;
+    }
+
+    if has_update {
+        query_builder.push(" WHERE id = ");
+        query_builder.push_bind(id);
+        query_builder.build().execute(&state.db).await?;
     }
 
     let channel: Channel = sqlx::query_as("SELECT * FROM channels WHERE id = $1")
