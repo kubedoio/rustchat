@@ -506,19 +506,20 @@ async fn get_mirotalk_config(
 ) -> ApiResult<Json<MiroTalkConfig>> {
     require_admin(&auth)?;
 
-    let config: MiroTalkConfig = sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
-        .fetch_optional(&state.db)
-        .await?
-        .unwrap_or_else(|| MiroTalkConfig {
-            is_active: true,
-            mode: crate::models::MiroTalkMode::Disabled,
-            base_url: "".to_string(),
-            api_key_secret: "".to_string(),
-            default_room_prefix: None,
-            join_behavior: crate::models::JoinBehavior::NewTab,
-            updated_at: chrono::Utc::now(),
-            updated_by: None,
-        });
+    let config: MiroTalkConfig =
+        sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
+            .fetch_optional(&state.db)
+            .await?
+            .unwrap_or_else(|| MiroTalkConfig {
+                is_active: true,
+                mode: crate::models::MiroTalkMode::Disabled,
+                base_url: "".to_string(),
+                api_key_secret: "".to_string(),
+                default_room_prefix: None,
+                join_behavior: crate::models::JoinBehavior::NewTab,
+                updated_at: chrono::Utc::now(),
+                updated_by: None,
+            });
 
     Ok(Json(config))
 }
@@ -565,10 +566,11 @@ async fn test_mirotalk_connection(
     require_admin(&auth)?;
 
     // 1. Fetch current config
-    let config: MiroTalkConfig = sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::Config("MiroTalk config not found".to_string()))?;
+    let config: MiroTalkConfig =
+        sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Config("MiroTalk config not found".to_string()))?;
 
     // 2. Init client and call stats
     let client = MiroTalkClient::new(config, state.http_client.clone())?;

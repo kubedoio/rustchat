@@ -28,7 +28,7 @@ pub fn router() -> Router<AppState> {
 
 #[derive(Debug, Deserialize)]
 pub struct WsQuery {
-    token: String,
+    token: Option<String>,
 }
 
 /// WebSocket upgrade handler
@@ -39,20 +39,29 @@ async fn ws_handler(
     headers: HeaderMap,
 ) -> Response {
     // 1. Try to get token from query param (standard)
-    let mut token = query.token.clone();
+    let mut token = query.token.clone().unwrap_or_default();
+
+    // Remove "Bearer " prefix if present in query string (not standard but possible)
+    if token.starts_with("Bearer ") {
+        token = token.trim_start_matches("Bearer ").to_string();
+    }
 
     // 2. Fallback: Try to get token from Sec-WebSocket-Protocol header (workaround for some browsers/proxies)
     let mut protocol_to_return = None;
     if token.is_empty() || token == "undefined" {
         if let Some(protocols) = headers.get("Sec-WebSocket-Protocol") {
             if let Ok(protocol_str) = protocols.to_str() {
-                // Protocols can be comma separated, find the one that looks like a JWT or is our custom one
+                // Protocols can be comma separated, find the one that looks like a JWT
                 for p in protocol_str.split(',') {
                     let p = p.trim();
                     if p.len() > 20 {
                         // Likely the JWT
                         token = p.to_string();
-                        protocol_to_return = Some(token.clone());
+                        // If it starts with Bearer here too
+                        if token.starts_with("Bearer ") {
+                            token = token.trim_start_matches("Bearer ").to_string();
+                        }
+                        protocol_to_return = Some(p.to_string());
                         break;
                     }
                 }
