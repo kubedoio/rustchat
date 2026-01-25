@@ -41,7 +41,7 @@ function selectEmoji(emoji: string) {
 <template>
   <div 
     v-if="show"
-    class="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-80 overflow-hidden z-50"
+    class="absolute bottom-full mb-2 right-0 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-80 overflow-hidden z-50"
   >
     <!-- Header -->
     <div class="p-2 border-b border-gray-200 dark:border-gray-700">

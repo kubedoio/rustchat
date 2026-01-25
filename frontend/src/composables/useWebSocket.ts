@@ -4,6 +4,7 @@ import { useMessageStore } from '../stores/messages'
 import { usePresenceStore } from '../stores/presence'
 import { useUnreadStore } from '../stores/unreads'
 import { useChannelStore } from '../stores/channels'
+import { useToast } from './useToast'
 import type { Post } from '../api/posts'
 
 // Server -> Client
@@ -39,6 +40,7 @@ export function useWebSocket() {
     const presenceStore = usePresenceStore()
     const unreadStore = useUnreadStore()
     const channelStore = useChannelStore()
+    const toast = useToast()
 
 
     function connect() {
@@ -54,7 +56,8 @@ export function useWebSocket() {
         const url = `${protocol}//${host}/api/v1/ws?token=${authStore.token}`
 
         try {
-            const socket = new WebSocket(url)
+            // Pass token in protocols array as a fallback for browsers like Brave
+            const socket = new WebSocket(url, [authStore.token])
             ws.value = socket
 
             socket.onopen = () => {
@@ -102,7 +105,8 @@ export function useWebSocket() {
             }
 
             socket.onerror = (error) => {
-                console.error('WebSocket error:', error)
+                console.error('WebSocket connection failed:', error)
+                toast.error('Real-time connection error', 'The connection to the server was refused. Please check your network.')
             }
 
             socket.onmessage = (event) => {
@@ -133,10 +137,24 @@ export function useWebSocket() {
                 // If it's a thread reply, logic might slightly differ (handled by store)
                 messageStore.handleNewMessage(post)
 
-                // Unread handling
+                // Notifications handling (counters are handled by unread_counts_updated)
                 if (post.channel_id !== channelStore.currentChannelId && post.user_id !== authStore.user?.id) {
                     const mentionsUser = post.message?.includes(`@${authStore.user?.username}`) || false
-                    unreadStore.incrementUnread(post.channel_id, mentionsUser)
+
+                    if (mentionsUser) {
+                        const channel = channelStore.channels.find(c => c.id === post.channel_id)
+                        const title = channel ? `#${channel.name}` : 'New Mention'
+
+                        if (Notification.permission === 'granted') {
+                            new Notification(title, { body: post.message })
+                        } else if (Notification.permission !== 'denied') {
+                            Notification.requestPermission().then(p => {
+                                if (p === 'granted') {
+                                    new Notification(title, { body: post.message })
+                                }
+                            })
+                        }
+                    }
                 }
                 break
             }
@@ -202,6 +220,13 @@ export function useWebSocket() {
             case 'channel_created': {
                 if (envelope.data) {
                     channelStore.addChannel(envelope.data)
+                }
+                break
+            }
+
+            case 'unread_counts_updated': {
+                if (envelope.data) {
+                    unreadStore.handleUnreadUpdate(envelope.data)
                 }
                 break
             }

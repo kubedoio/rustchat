@@ -139,6 +139,15 @@ async fn update_my_status(
         .ws_hub
         .set_presence(auth.user_id, user.0.clone())
         .await;
+
+    let user_status = UserStatus {
+        presence: Some(user.0.clone()),
+        text: user.1.clone(),
+        emoji: user.2.clone(),
+        expires_at: user.3,
+    };
+
+    // Broadcast presence change
     let event = WsEnvelope::event(
         EventType::UserPresence,
         PresenceEvent {
@@ -149,12 +158,20 @@ async fn update_my_status(
     );
     state.ws_hub.broadcast(event).await;
 
-    Ok(Json(UserStatus {
-        presence: Some(user.0),
-        text: user.1,
-        emoji: user.2,
-        expires_at: user.3,
-    }))
+    // Broadcast full user update (for status message/emoji)
+    let full_user: crate::models::User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    let update_event = WsEnvelope::event(
+        EventType::UserUpdated,
+        crate::models::UserResponse::from(full_user),
+        None,
+    );
+    state.ws_hub.broadcast(update_event).await;
+
+    Ok(Json(user_status))
 }
 
 /// Clear current user's status
@@ -174,6 +191,15 @@ async fn clear_my_status(
         .ws_hub
         .set_presence(auth.user_id, user.0.clone())
         .await;
+
+    let user_status = UserStatus {
+        presence: Some(user.0.clone()),
+        text: user.1.clone(),
+        emoji: user.2.clone(),
+        expires_at: user.3,
+    };
+
+    // Broadcast presence change
     let event = WsEnvelope::event(
         EventType::UserPresence,
         PresenceEvent {
@@ -184,12 +210,20 @@ async fn clear_my_status(
     );
     state.ws_hub.broadcast(event).await;
 
-    Ok(Json(UserStatus {
-        presence: Some(user.0),
-        text: user.1,
-        emoji: user.2,
-        expires_at: user.3,
-    }))
+    // Broadcast full user update (for cleared status)
+    let full_user: crate::models::User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    let update_event = WsEnvelope::event(
+        EventType::UserUpdated,
+        crate::models::UserResponse::from(full_user),
+        None,
+    );
+    state.ws_hub.broadcast(update_event).await;
+
+    Ok(Json(user_status))
 }
 
 /// Get another user's status

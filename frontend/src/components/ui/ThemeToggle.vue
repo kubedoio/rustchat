@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { Sun, Moon, Monitor } from 'lucide-vue-next';
+import { Moon, Monitor } from 'lucide-vue-next';
 import { useThemeStore } from '../../stores/theme';
 
 const themeStore = useThemeStore();
 
 const themes = [
-  { id: 'light', name: 'Light', icon: Sun },
   { id: 'dark', name: 'Dark', icon: Moon },
   { id: 'system', name: 'System', icon: Monitor },
 ] as const;

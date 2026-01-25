@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useStorage } from '@vueuse/core'
 import { teamsApi, type Team, type CreateTeamRequest, type TeamMember } from '../api/teams'
 
 export const useTeamStore = defineStore('teams', () => {
     const teams = ref<Team[]>([])
     const publicTeams = ref<Team[]>([])
     const members = ref<TeamMember[]>([])
-    const currentTeamId = ref<string | null>(null)
+    const currentTeamId = useStorage<string | null>('active_team_id', null)
     const loading = ref(false)
     const error = ref<string | null>(null)
 

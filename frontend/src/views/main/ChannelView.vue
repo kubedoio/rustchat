@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useChannelStore } from '../../stores/channels';
 import { useMessageStore } from '../../stores/messages';
+import { useUnreadStore } from '../../stores/unreads';
 import { useWebSocket } from '../../composables/useWebSocket';
 import AppShell from '../../components/layout/AppShell.vue';
 import ChannelHeader from '../../components/channel/ChannelHeader.vue';
@@ -17,6 +18,7 @@ import { useUIStore } from '../../stores/ui';
 
 const channelStore = useChannelStore();
 const messageStore = useMessageStore();
+const unreadStore = useUnreadStore();
 const uiStore = useUIStore();
 const { sendTyping, sendMessage, subscribe, unsubscribe } = useWebSocket();
 
@@ -27,6 +29,13 @@ const messageListRef = ref<any>(null);
 
 // Channel settings modal
 const showChannelSettings = ref(false);
+
+// Mark as read when channel changes
+watch(channelId, (newId) => {
+    if (newId) {
+        unreadStore.markAsRead(newId);
+    }
+});
 
 // Fetch messages when channel changes
 watch(channelId, (newId, oldId) => {
@@ -106,6 +115,7 @@ function handleChannelDeleted() {
                       :name="currentChannel.display_name || currentChannel.name" 
                       :topic="currentChannel.purpose || currentChannel.header"
                       :channelType="currentChannel.channel_type"
+                      :channelId="currentChannel.id"
                       @openSettings="showChannelSettings = true"
                   />
                   

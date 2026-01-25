@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { Users, Search, Hash, Lock, Phone, Bookmark, MoreVertical, LogOut, Info } from 'lucide-vue-next'
 import { ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
 import { useCallsStore } from '../../stores/calls';
 import { useChannelStore } from '../../stores/channels';
 import { useAuthStore } from '../../stores/auth';
 import { useUIStore } from '../../stores/ui';
 
-defineProps<{
+const props = defineProps<{
   name: string
   topic?: string
   channelType?: string
+  channelId: string
 }>()
 
 defineEmits<{
@@ -18,8 +18,6 @@ defineEmits<{
   (e: 'openSaved'): void
 }>()
 
-const route = useRoute()
-const router = useRouter()
 const callsStore = useCallsStore()
 const channelStore = useChannelStore()
 const authStore = useAuthStore()
@@ -27,38 +25,68 @@ const uiStore = useUIStore()
 
 const showMenu = ref(false)
 
+
+
 const startCall = () => {
-    const channelId = route.params.channelId as string
-    if (channelId) {
-        callsStore.startCall(channelId)
+
+    if (props.channelId) {
+
+        callsStore.startCall(props.channelId)
+
     }
+
 }
+
+
 
 const toggleView = (view: 'saved' | 'pinned' | 'search' | 'members') => {
+
     uiStore.toggleRhs(view)
+
 }
 
+
+
 const handleLeave = async () => {
+
     if (!confirm('Are you sure you want to leave this channel?')) return;
+
     
-    const channelId = route.params.channelId as string
+
     const userId = authStore.user?.id
+
     
-    if (channelId && userId) {
+
+    if (props.channelId && userId) {
+
         try {
-            await channelStore.leaveChannel(channelId, userId)
+
+            await channelStore.leaveChannel(props.channelId, userId)
+
             showMenu.value = false
+
             // Navigate to general or first available channel
+
             const firstChannel = channelStore.channels[0]
+
             if (firstChannel) {
-                router.push(`/channels/${firstChannel.id}`)
+
+                channelStore.selectChannel(firstChannel.id)
+
             } else {
-                router.push('/')
+
+                channelStore.clearChannels()
+
             }
+
         } catch (e) {
+
             console.error('Failed to leave channel', e)
+
         }
+
     }
+
 }
 </script>
 

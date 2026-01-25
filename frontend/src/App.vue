@@ -7,6 +7,7 @@ import { useToast } from './composables/useToast'
 import { useWebSocket } from './composables/useWebSocket'
 import { useUIStore } from './stores/ui'
 import { useAuthStore } from './stores/auth'
+import { useUnreadStore } from './stores/unreads'
 import ActiveCall from './components/calls/ActiveCall.vue'
 import IncomingCallModal from './components/calls/IncomingCallModal.vue'
 import { useConfigStore } from './stores/config'
@@ -15,6 +16,7 @@ const toastManagerRef = ref(null)
 const { register } = useToast()
 const ui = useUIStore()
 const authStore = useAuthStore()
+const unreadStore = useUnreadStore()
 const configStore = useConfigStore()
 const { connect, disconnect } = useWebSocket()
 
@@ -27,9 +29,10 @@ onMounted(async () => {
 })
 
 // Connect WebSocket when authenticated
-watch(() => authStore.isAuthenticated, (isAuth) => {
+watch(() => authStore.isAuthenticated, async (isAuth) => {
     if (isAuth) {
         connect()
+        await unreadStore.fetchOverview()
     } else {
         disconnect()
     }

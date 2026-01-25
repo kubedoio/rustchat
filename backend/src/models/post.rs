@@ -23,6 +23,8 @@ pub struct Post {
     #[sqlx(default)]
     pub reply_count: i32, // use i32 or i64, DB is INT (i32) usually, but BIGINT is i64
     pub last_reply_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    pub seq: i64,
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
@@ -102,4 +104,6 @@ pub struct PostResponse {
     pub is_saved: bool,
     #[sqlx(skip)]
     pub client_msg_id: Option<String>,
+    #[sqlx(default)]
+    pub seq: i64,
 }

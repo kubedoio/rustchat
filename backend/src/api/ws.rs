@@ -5,6 +5,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
     },
+    http::HeaderMap,
     response::Response,
     routing::get,
     Router,
@@ -35,9 +36,32 @@ async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
     Query(query): Query<WsQuery>,
+    headers: HeaderMap,
 ) -> Response {
+    // 1. Try to get token from query param (standard)
+    let mut token = query.token.clone();
+
+    // 2. Fallback: Try to get token from Sec-WebSocket-Protocol header (workaround for some browsers/proxies)
+    let mut protocol_to_return = None;
+    if token.is_empty() || token == "undefined" {
+        if let Some(protocols) = headers.get("Sec-WebSocket-Protocol") {
+            if let Ok(protocol_str) = protocols.to_str() {
+                // Protocols can be comma separated, find the one that looks like a JWT or is our custom one
+                for p in protocol_str.split(',') {
+                    let p = p.trim();
+                    if p.len() > 20 {
+                        // Likely the JWT
+                        token = p.to_string();
+                        protocol_to_return = Some(token.clone());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     // Validate token
-    let claims = match validate_token(&query.token, &state.jwt_secret) {
+    let claims = match validate_token(&token, &state.jwt_secret) {
         Ok(data) => data.claims,
         Err(_) => {
             return Response::builder()
@@ -49,7 +73,7 @@ async fn ws_handler(
 
     let user_id = claims.sub;
 
-    // Fetch username
+    // ... (omitted lines)
     let username = match sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_one(&state.db)
@@ -59,7 +83,16 @@ async fn ws_handler(
         Err(_) => "Unknown".to_string(),
     };
 
-    ws.on_upgrade(move |socket| handle_socket(socket, user_id, username, state))
+    let mut response = ws.on_upgrade(move |socket| handle_socket(socket, user_id, username, state));
+
+    // If we used the protocol header workaround, we MUST return the same protocol in the response
+    if let Some(p) = protocol_to_return {
+        response
+            .headers_mut()
+            .insert("Sec-WebSocket-Protocol", p.parse().unwrap());
+    }
+
+    response
 }
 
 /// Handle WebSocket connection
@@ -68,6 +101,18 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
 
     // Add connection to hub
     let mut rx = state.ws_hub.add_connection(user_id, username.clone()).await;
+
+    // Fetch user's teams and subscribe
+    let teams =
+        sqlx::query_scalar::<_, uuid::Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+
+    for team_id in teams {
+        state.ws_hub.subscribe_team(user_id, team_id).await;
+    }
 
     // Persist presence and broadcast
     let _ = sqlx::query("UPDATE users SET presence = 'online' WHERE id = $1")

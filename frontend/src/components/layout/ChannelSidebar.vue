@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { 
-  Hash, Lock, ChevronDown, ChevronRight, Plus, MessageCircle, Settings, Compass, Shield
-} from 'lucide-vue-next';
-import { useTeamStore } from '../../stores/teams';
+import {
+  Hash, Lock, ChevronDown, ChevronRight, Plus, MessageCircle, Settings, Compass, Shield, Check, LogOut
+} from 'lucide-vue-next';import { useTeamStore } from '../../stores/teams';
 import { useChannelStore } from '../../stores/channels';
 import { useAuthStore } from '../../stores/auth';
 import { usePresenceStore } from '../../stores/presence';
+import { useUnreadStore } from '../../stores/unreads';
 import CreateChannelModal from '../modals/CreateChannelModal.vue';
 import DirectMessageModal from '../modals/DirectMessageModal.vue';
 import TeamSettingsModal from '../modals/TeamSettingsModal.vue';
@@ -17,6 +17,7 @@ const teamStore = useTeamStore();
 const channelStore = useChannelStore();
 const authStore = useAuthStore();
 const presenceStore = usePresenceStore();
+const unreadStore = useUnreadStore();
 
 const showCreateModal = ref(false);
 const showDirectMessageModal = ref(false);
@@ -58,8 +59,8 @@ const categories = computed(() => {
                 id: c.id,
                 name: c.display_name || c.name,
                 type: 'public',
-                unread: c.unreadCount || 0,
-                mention: (c.mentionCount || 0) > 0,
+                unread: unreadStore.getChannelUnreadCount(c.id),
+                mention: (unreadStore.channelMentions[c.id] || 0) > 0,
             })),
         },
         {
@@ -70,8 +71,8 @@ const categories = computed(() => {
                 id: c.id,
                 name: c.display_name || c.name,
                 type: 'private',
-                unread: c.unreadCount || 0,
-                mention: (c.mentionCount || 0) > 0,
+                unread: unreadStore.getChannelUnreadCount(c.id),
+                mention: (unreadStore.channelMentions[c.id] || 0) > 0,
             })),
         },
         {
@@ -102,8 +103,8 @@ const categories = computed(() => {
                     name: DisplayName,
                     type: 'dm',
                     status: status,
-                    unread: c.unreadCount || 0,
-                    mention: (c.mentionCount || 0) > 0,
+                    unread: unreadStore.getChannelUnreadCount(c.id),
+                    mention: (unreadStore.channelMentions[c.id] || 0) > 0,
                 } as any;
             }),
         }
@@ -113,7 +114,7 @@ const categories = computed(() => {
 function selectChannel(channelId: string) {
     channelStore.selectChannel(channelId);
     // Mark as read when selecting
-    channelStore.clearCounts(channelId);
+    unreadStore.markAsRead(channelId);
 }
 
 const collapsedCategories = ref(new Set<string>());
@@ -139,6 +140,18 @@ function handleAddCategory(catId: string) {
         showDirectMessageModal.value = true;
     } else {
         showCreateModal.value = true;
+    }
+}
+
+async function handleLeaveTeam() {
+    if (!teamStore.currentTeam) return;
+    if (!confirm(`Are you sure you want to leave ${teamStore.currentTeam.display_name || teamStore.currentTeam.name}?`)) return;
+
+    try {
+        await teamStore.leaveTeam(teamStore.currentTeam.id);
+        showTeamMenu.value = false;
+    } catch (e) {
+        console.error('Failed to leave team', e);
     }
 }
 </script>
@@ -189,6 +202,14 @@ function handleAddCategory(catId: string) {
         >
           <Settings class="w-4 h-4 mr-3" />
           Team Settings
+        </button>
+        <div class="h-px bg-gray-700 my-1 font-medium"></div>
+        <button
+          @click="handleLeaveTeam"
+          class="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-900/20 transition-colors"
+        >
+          <LogOut class="w-4 h-4 mr-3" />
+          Leave Team
         </button>
       </div>
     </div>
@@ -262,10 +283,20 @@ function handleAddCategory(catId: string) {
                 ></div>
             </div>
 
-            <!-- Badges -->
-            <div v-if="channel.unread > 0 || channel.mention" class="flex items-center ml-2 space-x-1.5">
-               <div v-if="channel.mention" class="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-slate-900 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></div>
-               <div v-if="channel.unread > 0" class="px-1.5 h-5 flex items-center justify-center rounded-md bg-slate-700/80 text-[10px] font-bold text-white min-w-[20px]">
+            <!-- Badges & Actions -->
+            <div class="flex items-center ml-2 space-x-1.5 min-w-0">
+               <!-- Mark as read on hover -->
+               <button
+                 v-if="channel.unread > 0"
+                 @click.stop="unreadStore.markAsRead(channel.id)"
+                 class="opacity-0 group-hover/item:opacity-100 flex items-center justify-center w-5 h-5 hover:bg-slate-700/50 rounded transition-opacity"
+                 title="Mark as read"
+               >
+                 <Check class="w-3.5 h-3.5 text-slate-300" />
+               </button>
+
+               <div v-if="channel.mention" class="shrink-0 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-slate-900 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></div>
+               <div v-if="channel.unread > 0" class="shrink-0 px-1.5 h-5 flex items-center justify-center rounded-md bg-slate-700/80 text-[10px] font-bold text-white min-w-[20px]">
                  {{ channel.unread > 99 ? '99+' : channel.unread }}
                </div>
             </div>
@@ -281,6 +312,16 @@ function handleAddCategory(catId: string) {
 
     <!-- Sidebar Footer -->
     <div class="p-2 border-t border-gray-800 space-y-1">
+        <button
+          v-if="Object.values(unreadStore.channelUnreads).some(c => c > 0)"
+          @click="unreadStore.markAllAsRead()"
+          class="w-full flex items-center justify-start px-2 py-2 text-sm text-gray-400 hover:bg-gray-800 rounded transition-colors text-left"
+        >
+            <div class="w-6 h-6 rounded bg-gray-700/50 flex items-center justify-center mr-2">
+                <Check class="w-4 h-4 text-gray-300" />
+            </div>
+            <span>Mark all as read</span>
+        </button>
         <button 
           @click="showBrowseChannels = true"
           class="w-full flex items-center justify-start px-2 py-2 text-sm text-gray-400 hover:bg-gray-800 rounded transition-colors text-left"
@@ -316,11 +357,13 @@ function handleAddCategory(catId: string) {
     />
 
     <BrowseTeamsModal 
+      v-if="showBrowseTeams"
       :open="showBrowseTeams"
       @close="showBrowseTeams = false"
     />
 
     <BrowseChannelsModal 
+      v-if="showBrowseChannels"
       :open="showBrowseChannels"
       @close="showBrowseChannels = false"
     />

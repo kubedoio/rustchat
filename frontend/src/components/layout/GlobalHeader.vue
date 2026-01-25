@@ -1,23 +1,27 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { Bell, Search, HelpCircle, LogOut, Settings, Smile } from 'lucide-vue-next';
+import { Bell, Search, HelpCircle, LogOut, Settings, Smile, Shield } from 'lucide-vue-next';
 import { useAuthStore } from '../../stores/auth';
 import { useUIStore } from '../../stores/ui';
 import SearchModal from '../modals/SearchModal.vue';
 import SetStatusModal from '../modals/SetStatusModal.vue';
 import RcAvatar from '../ui/RcAvatar.vue';
 import PresenceSelector from '../ui/PresenceSelector.vue';
+import NotificationsDropdown from './NotificationsDropdown.vue';
 import { useConfigStore } from '../../stores/config';
 import { usePresenceStore } from '../../stores/presence';
+import { useUnreadStore } from '../../stores/unreads';
 
 const auth = useAuthStore();
 const ui = useUIStore();
 const configStore = useConfigStore();
 const presenceStore = usePresenceStore();
+const unreadStore = useUnreadStore();
 
 const showSearch = ref(false);
 const showUserMenu = ref(false);
 const showSetStatus = ref(false);
+const showNotifications = ref(false);
 
 // Initialize self presence
 if (auth.user) {
@@ -113,10 +117,21 @@ const statusLabel = computed(() => {
       <button class="text-gray-400 hover:text-white transition-colors">
         <HelpCircle class="w-5 h-5" />
       </button>
-      <button class="relative text-gray-400 hover:text-white transition-colors">
-        <Bell class="w-5 h-5" />
-        <span class="absolute top-0 right-0 block h-2 w-2 rounded-full ring-2 ring-gray-900 bg-red-500"></span>
-      </button>
+
+      <div class="relative">
+        <button
+          @click="showNotifications = !showNotifications"
+          class="relative text-gray-400 hover:text-white transition-colors p-1"
+        >
+          <Bell class="w-5 h-5" />
+          <span
+            v-if="unreadStore.totalUnreadCount > 0"
+            class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-gray-900 bg-red-500 animate-pulse"
+          ></span>
+        </button>
+        <NotificationsDropdown v-if="showNotifications" @close="showNotifications = false" />
+        <div v-if="showNotifications" class="fixed inset-0 z-40" @click="showNotifications = false"></div>
+      </div>
       
       <!-- Presence Switcher -->
       <div class="mr-2">
@@ -191,6 +206,14 @@ const statusLabel = computed(() => {
 
             <!-- Links -->
             <div class="px-1 py-1">
+                <button
+                  v-if="auth.user?.role === 'system_admin' || auth.user?.role === 'org_admin'"
+                  @click="$router.push('/admin'); showUserMenu = false"
+                  class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md flex items-center transition-colors"
+                >
+                    <Shield class="w-4 h-4 mr-2" />
+                    System Console
+                </button>
                 <button 
                   @click="ui.openSettings(); showUserMenu = false"
                   class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md flex items-center transition-colors"

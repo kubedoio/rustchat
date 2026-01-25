@@ -105,6 +105,7 @@ pub async fn create_post(
         reactions: vec![],
         is_saved: false,
         client_msg_id,
+        seq: post.seq,
     };
 
     // Populate files if any
@@ -154,6 +155,12 @@ pub async fn create_post(
         let _ = check_playbook_triggers(state, channel_id, &response.message).await;
     }
 
+    // Ensure DM membership for recipient if they left
+    let _ = ensure_dm_membership(state, channel_id).await;
+
+    // Increment unread counts in Redis for other members
+    let _ = crate::services::unreads::increment_unreads(state, channel_id, user_id, post.seq).await;
+
     // Parse mentions (simple parsing for now)
     let mentions: Vec<String> = response
         .message
@@ -191,6 +198,63 @@ pub async fn create_post(
     }
 
     Ok(response)
+}
+
+/// Helper to ensure all participants of a DM are members (resurrects DM)
+pub async fn ensure_dm_membership(state: &AppState, channel_id: Uuid) -> ApiResult<()> {
+    // 1. Get channel info
+    let chan: crate::models::Channel = match sqlx::query_as("SELECT * FROM channels WHERE id = $1")
+        .bind(channel_id)
+        .fetch_optional(&state.db)
+        .await?
+    {
+        Some(c) => c,
+        None => return Ok(()),
+    };
+
+    if chan.channel_type == crate::models::ChannelType::Direct && chan.name.starts_with("dm_") {
+        let parts: Vec<&str> = chan.name.split('_').collect();
+        if parts.len() == 3 {
+            let id1 = Uuid::parse_str(parts[1]).ok();
+            let id2 = Uuid::parse_str(parts[2]).ok();
+
+            if let (Some(u1), Some(u2)) = (id1, id2) {
+                for target_user_id in [u1, u2] {
+                    // Ensure member exists
+                    let added: Option<Uuid> = sqlx::query_scalar(
+                        r#"
+                            INSERT INTO channel_members (channel_id, user_id, role)
+                            VALUES ($1, $2, 'member')
+                            ON CONFLICT (channel_id, user_id) DO NOTHING
+                            RETURNING user_id
+                            "#,
+                    )
+                    .bind(channel_id)
+                    .bind(target_user_id)
+                    .fetch_optional(&state.db)
+                    .await?;
+
+                    if added.is_some() {
+                        // User was missing and just re-added.
+                        // Broadcast ChannelCreated to them so their UI opens it.
+                        let event = WsEnvelope::event(
+                            EventType::ChannelCreated,
+                            chan.clone(),
+                            Some(channel_id),
+                        )
+                        .with_broadcast(WsBroadcast {
+                            user_id: Some(target_user_id),
+                            channel_id: None,
+                            team_id: None,
+                            exclude_user_id: None,
+                        });
+                        state.ws_hub.broadcast(event).await;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Helper to populate files for posts
@@ -252,6 +316,89 @@ pub async fn populate_files(state: &AppState, posts: &mut [PostResponse]) -> Api
             }
         }
     }
+
+    Ok(())
+}
+
+/// Create a system message in a channel
+pub async fn create_system_message(
+    state: &AppState,
+    channel_id: Uuid,
+    message: String,
+    props: Option<serde_json::Value>,
+) -> ApiResult<()> {
+    // 1. Find bot user
+    let bot_user = sqlx::query!("SELECT id FROM users WHERE is_bot = true LIMIT 1")
+        .fetch_optional(&state.db)
+        .await?
+        .map(|r| r.id)
+        .unwrap_or_else(Uuid::nil);
+
+    // 2. Prepare props
+    let mut final_props = props.unwrap_or_else(|| serde_json::json!({}));
+    if let Some(obj) = final_props.as_object_mut() {
+        if !obj.contains_key("type") {
+            obj.insert(
+                "type".to_string(),
+                serde_json::Value::String("system_join_leave".to_string()),
+            );
+        }
+    }
+
+    // 3. Insert post
+    let post: Post = sqlx::query_as(
+        r#"
+        INSERT INTO posts (channel_id, user_id, message, props)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *
+        "#,
+    )
+    .bind(channel_id)
+    .bind(bot_user)
+    .bind(&message)
+    .bind(&final_props)
+    .fetch_one(&state.db)
+    .await?;
+
+    // 4. Construct response
+    let response = PostResponse {
+        id: post.id,
+        channel_id: post.channel_id,
+        user_id: post.user_id,
+        root_post_id: post.root_post_id,
+        message: post.message,
+        props: post.props,
+        file_ids: post.file_ids,
+        is_pinned: post.is_pinned,
+        created_at: post.created_at,
+        edited_at: post.edited_at,
+        deleted_at: post.deleted_at,
+        username: Some("System".to_string()),
+        avatar_url: None,
+        email: None,
+        reply_count: 0,
+        last_reply_at: None,
+        files: vec![],
+        reactions: vec![],
+        is_saved: false,
+        client_msg_id: None,
+        seq: post.seq,
+    };
+
+    // 5. Broadcast
+    let broadcast = WsEnvelope::event(EventType::MessageCreated, response, Some(channel_id))
+        .with_broadcast(WsBroadcast {
+            channel_id: Some(channel_id),
+            team_id: None,
+            user_id: None,
+            exclude_user_id: None,
+        });
+
+    state.ws_hub.broadcast(broadcast).await;
+
+    // Increment unread counts in Redis for other members
+    let _ =
+        crate::services::unreads::increment_unreads(state, channel_id, bot_user, post.seq).await;
 
     Ok(())
 }

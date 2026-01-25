@@ -37,4 +37,6 @@ export const channelsApi = {
     leave: (id: string) => api.delete(`/channels/${id}/members/me`),
     removeMember: (channelId: string, userId: string) => api.delete(`/channels/${channelId}/members/${userId}`),
     getMembers: (id: string) => api.get(`/channels/${id}/members`),
+    getUnreadCounts: () => api.get<{ channel_id: string, count: number }[]>('/channels/unreads'),
+    markAsRead: (id: string, targetSeq?: string | number | null) => api.post(`/channels/${id}/read`, { target_seq: targetSeq }),
 }

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { X, Hash, Lock, Settings, Users, Trash2 } from 'lucide-vue-next'
+import { ref, watch, computed } from 'vue'
+import { X, Hash, Lock, Settings, Users, Trash2, Search, Plus, UserMinus } from 'lucide-vue-next'
 import BaseButton from '../atomic/BaseButton.vue'
 import BaseInput from '../atomic/BaseInput.vue'
 import { channelsApi, type Channel } from '../../api/channels'
 import { useChannelStore } from '../../stores/channels'
+import { useTeamStore } from '../../stores/teams'
+import { useAuthStore } from '../../stores/auth'
 import { useToast } from '../../composables/useToast'
 
 const props = defineProps<{
@@ -19,6 +21,8 @@ const emit = defineEmits<{
 }>()
 
 const channelStore = useChannelStore()
+const teamStore = useTeamStore()
+const authStore = useAuthStore()
 const toast = useToast()
 
 const activeTab = ref('general')
@@ -29,6 +33,13 @@ const deleting = ref(false)
 const displayName = ref('')
 const purpose = ref('')
 const header = ref('')
+
+// Members Tab
+const channelMembers = ref<any[]>([])
+const searchQuery = ref('')
+const addingMember = ref<string | null>(null)
+const removingMember = ref<string | null>(null)
+const membersLoading = ref(false)
 
 const tabs = [
   { id: 'general', label: 'General', icon: Settings },
@@ -41,8 +52,80 @@ watch(() => props.isOpen, (isOpen) => {
     purpose.value = props.channel.purpose || ''
     header.value = props.channel.header || ''
     activeTab.value = 'general'
+    searchQuery.value = ''
+    channelMembers.value = []
   }
 })
+
+watch(activeTab, (tab) => {
+  if (tab === 'members' && props.channel) {
+    fetchMembers()
+  }
+})
+
+async function fetchMembers() {
+  if (!props.channel) return
+  membersLoading.value = true
+  try {
+    const response = await channelsApi.getMembers(props.channel.id)
+    channelMembers.value = response.data
+  } catch (e) {
+    console.error('Failed to fetch channel members', e)
+  } finally {
+    membersLoading.value = false
+  }
+}
+
+// Search results: Users in the team who are NOT in the channel
+const searchResults = computed(() => {
+  if (!searchQuery.value.trim()) return []
+
+  const query = searchQuery.value.toLowerCase()
+  const currentMemberIds = new Set(channelMembers.value.map(m => m.user_id))
+
+  return teamStore.members.filter(member => {
+    // Exclude existing members
+    if (currentMemberIds.has(member.user_id)) return false
+
+    // Match name or username
+    const name = (member.display_name || '').toLowerCase()
+    const username = member.username.toLowerCase()
+
+    return name.includes(query) || username.includes(query)
+  }).slice(0, 5) // Limit to 5 results
+})
+
+async function addMember(userId: string) {
+  if (!props.channel) return
+
+  addingMember.value = userId
+  try {
+    await channelsApi.join(props.channel.id, userId)
+    await fetchMembers()
+    toast.success('Member added', 'User added to channel')
+    searchQuery.value = '' // Clear search
+  } catch (e: any) {
+    toast.error('Failed to add member', e.response?.data?.message)
+  } finally {
+    addingMember.value = null
+  }
+}
+
+async function removeMember(userId: string) {
+  if (!props.channel) return
+  if (!confirm('Are you sure you want to remove this member?')) return
+
+  removingMember.value = userId
+  try {
+    await channelsApi.removeMember(props.channel.id, userId)
+    await fetchMembers()
+    toast.success('Member removed', 'User removed from channel')
+  } catch (e: any) {
+    toast.error('Failed to remove member', e.response?.data?.message)
+  } finally {
+    removingMember.value = null
+  }
+}
 
 async function handleSave() {
   if (!props.channel) return
@@ -177,9 +260,94 @@ async function handleDelete() {
           </div>
           
           <!-- Members Tab -->
-          <div v-else-if="activeTab === 'members'" class="text-center py-10 text-gray-500">
-            <Users class="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>Member management coming soon</p>
+          <div v-else-if="activeTab === 'members'" class="space-y-6">
+            <!-- Add Member -->
+            <div class="space-y-3">
+              <h4 class="text-sm font-medium text-gray-900 dark:text-white">Add Member</h4>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search class="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  v-model="searchQuery"
+                  placeholder="Search team members to add"
+                  class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition duration-150 ease-in-out dark:text-white"
+                />
+              </div>
+
+              <!-- Search Results -->
+              <div v-if="searchQuery && searchResults.length > 0" class="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 divide-y divide-gray-200 dark:divide-gray-600 max-h-48 overflow-y-auto">
+                <div v-for="user in searchResults" :key="user.user_id" class="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-600/50 transition-colors">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-medium text-sm">
+                      {{ (user.display_name || user.username).charAt(0).toUpperCase() }}
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900 dark:text-white">{{ user.display_name || user.username }}</p>
+                      <p class="text-xs text-gray-500">@{{ user.username }}</p>
+                    </div>
+                  </div>
+                  <button
+                    @click="addMember(user.user_id)"
+                    :disabled="addingMember === user.user_id"
+                    class="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors disabled:opacity-50"
+                  >
+                    <Plus class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div v-else-if="searchQuery && searchResults.length === 0" class="text-center py-4 text-sm text-gray-500">
+                No matching team members found
+              </div>
+            </div>
+
+            <!-- Member List -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-medium text-gray-900 dark:text-white">Channel Members</h4>
+                <span class="text-xs text-gray-500">{{ channelMembers.length }} members</span>
+              </div>
+
+              <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700 max-h-64 overflow-y-auto">
+                <div v-if="membersLoading" class="p-4 text-center text-gray-500 text-sm">
+                  Loading members...
+                </div>
+                <template v-else>
+                  <div v-for="member in channelMembers" :key="member.user_id" class="flex items-center justify-between p-3">
+                    <div class="flex items-center space-x-3">
+                      <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 font-medium text-sm">
+                        {{ (member.display_name || member.username).charAt(0).toUpperCase() }}
+                      </div>
+                      <div>
+                        <div class="flex items-center space-x-2">
+                          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ member.display_name || member.username }}</p>
+                          <span v-if="member.role === 'admin' || member.role === 'owner'" class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                            {{ member.role }}
+                          </span>
+                        </div>
+                        <p class="text-xs text-gray-500">@{{ member.username }}</p>
+                      </div>
+                    </div>
+
+                    <div v-if="member.user_id !== authStore.user?.id" class="flex items-center">
+                      <button
+                        @click="removeMember(member.user_id)"
+                        :disabled="removingMember === member.user_id"
+                        class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                        title="Remove member"
+                      >
+                        <UserMinus class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="channelMembers.length === 0" class="p-8 text-center text-gray-500 text-sm">
+                    No members found
+                  </div>
+                </template>
+              </div>
+            </div>
           </div>
         </div>
         
