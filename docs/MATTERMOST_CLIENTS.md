@@ -13,6 +13,14 @@ Rustchat currently supports the following features in Mattermost clients:
 
 *Note: This is a work in progress. Some features like advanced search, extensive settings, or specific plugins may not be fully supported.*
 
+### Native Web Frontend vs. Mattermost Clients
+
+It is important to note that the **Rustchat Web Frontend** (included in the Docker setup) is a separate application from the Mattermost clients.
+-   **Rustchat Web**: Uses the native Rustchat API (`/api/v1`). It **does not** require or use the Mattermost compatibility layer (`/api/v4`).
+-   **Mattermost Clients**: Exclusively use the `/api/v4` compatibility layer.
+
+Changes made to the Mattermost compatibility layer (e.g., API version strings, system pings) do not affect the native web frontend.
+
 ## Prerequisites
 
 Ensure your Rustchat server is running. If you are using the provided Docker Compose setup:
