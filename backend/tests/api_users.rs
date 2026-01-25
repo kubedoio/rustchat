@@ -16,7 +16,8 @@ async fn test_user_custom_status() {
         "display_name": "Status User"
     });
 
-    let reg_res = app.api_client
+    let reg_res = app
+        .api_client
         .post(&format!("{}/api/v1/auth/register", &app.address))
         .json(&user_data)
         .send()
@@ -33,7 +34,8 @@ async fn test_user_custom_status() {
         "password": "Password123!"
     });
 
-    let login_res = app.api_client
+    let login_res = app
+        .api_client
         .post(&format!("{}/api/v1/auth/login", &app.address))
         .json(&login_data)
         .send()
@@ -41,7 +43,10 @@ async fn test_user_custom_status() {
         .expect("Failed to login");
 
     assert_eq!(200, login_res.status().as_u16());
-    let body: serde_json::Value = login_res.json().await.expect("Failed to parse login response");
+    let body: serde_json::Value = login_res
+        .json()
+        .await
+        .expect("Failed to parse login response");
     let user_id = body["user"]["id"].as_str().unwrap().to_string();
 
     // 2. Update Custom Status
@@ -58,7 +63,8 @@ async fn test_user_custom_status() {
         custom_status: Some(status_payload.clone()),
     };
 
-    let update_res = app.api_client
+    let update_res = app
+        .api_client
         .put(&format!("{}/api/v1/users/{}", &app.address, user_id))
         .json(&update_data)
         .send()
@@ -66,12 +72,16 @@ async fn test_user_custom_status() {
         .expect("Failed to update user");
 
     assert_eq!(200, update_res.status().as_u16());
-    let updated_user: UserResponse = update_res.json().await.expect("Failed to parse updated user");
+    let updated_user: UserResponse = update_res
+        .json()
+        .await
+        .expect("Failed to parse updated user");
 
     assert_eq!(updated_user.custom_status, Some(status_payload.clone()));
 
     // 3. Verify Persistence (Get User)
-    let get_res = app.api_client
+    let get_res = app
+        .api_client
         .get(&format!("{}/api/v1/users/{}", &app.address, user_id))
         .send()
         .await
