@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue';
 import { useAdminStore } from '../../stores/admin';
 import { Webhook, Terminal, Bot, Save, AlertCircle, CheckCircle } from 'lucide-vue-next';
+import MiroTalkSettings from './integrations/MiroTalkSettings.vue';
 
 const adminStore = useAdminStore();
 
@@ -128,6 +129,9 @@ const saveSettings = async () => {
                     <input type="checkbox" v-model="form.enable_bots" class="w-5 h-5 text-indigo-600 rounded" />
                 </div>
             </div>
+
+            <!-- MiroTalk Integration -->
+            <MiroTalkSettings />
         </div>
     </div>
 </template>
