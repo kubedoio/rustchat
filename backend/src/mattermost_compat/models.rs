@@ -126,6 +126,8 @@ pub struct Config {
     pub version: String,
     #[serde(rename = "EnablePushNotifications")]
     pub enable_push_notifications: String,
+    #[serde(rename = "DiagnosticId")]
+    pub diagnostic_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
