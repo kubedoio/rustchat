@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::auth::validate_token;
-use crate::mattermost_compat::models as mm;
+use crate::mattermost_compat::{models as mm, MM_VERSION};
 use crate::realtime::{TypingEvent, WsEnvelope};
 
 pub fn router() -> Router<AppState> {
@@ -57,6 +57,26 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                 "seq_reply": value["seq"]
                             });
                             let _ = sender.send(Message::Text(resp.to_string().into())).await;
+
+                            // Send Hello event
+                            // This is required by some clients to finish connection setup
+                            let hello = json!({
+                                "event": "hello",
+                                "data": {
+                                    "server_version": MM_VERSION,
+                                    "connection_id": "", // We don't track connection IDs strictly yet
+                                },
+                                "broadcast": {
+                                    "user_id": claims.claims.sub.to_string(),
+                                    "omit_users": null,
+                                    "team_id": "",
+                                    "channel_id": ""
+                                },
+                                "seq": seq
+                            });
+                            seq += 1;
+                            let _ = sender.send(Message::Text(hello.to_string().into())).await;
+
                             break;
                         }
                     }
