@@ -107,14 +107,13 @@ async fn upload_file(
     if content_type.starts_with("image/") {
         let state_clone = state.clone();
         let data_clone = data.clone();
-        let content_type_clone = content_type.clone();
         let auth_id = auth.user_id;
         
         tokio::spawn(async move {
             if let Ok(img) = image::load_from_memory(&data_clone) {
                 let (w, h) = img.dimensions();
-                let mut width = Some(w as i32);
-                let mut height = Some(h as i32);
+                let width = Some(w as i32);
+                let height = Some(h as i32);
                 let mut has_thumbnail = false;
                 let mut thumbnail_key = None;
 

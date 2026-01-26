@@ -2,7 +2,7 @@
 
 **Self-hosted, enterprise-ready team collaboration platform built in Rust.**
 
-[![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.93+-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## Overview
@@ -31,7 +31,7 @@ rustchat is a high-performance team messaging platform similar to Mattermost/Sla
 
 ### Prerequisites
 
-- Rust 1.75+
+- Rust 1.93+
 - Docker & Docker Compose
 - PostgreSQL 16+
 - Redis 7+

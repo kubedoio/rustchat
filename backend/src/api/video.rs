@@ -99,7 +99,7 @@ async fn create_meeting(
     let meeting_url = client.create_meeting(&room_name).await?;
 
     // 5. Post system message
-    let message_text = format!("started a video call");
+    let message_text = "started a video call".to_string();
     let props = serde_json::json!({
         "type": "video_call",
         "meeting_url": meeting_url,

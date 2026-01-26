@@ -283,16 +283,12 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
         "channel_updated" => {
              // Check if it is a view event (hacky heuristic based on data shape)
              // or just map generic channel update
-             if let Some(cid) = env.data.get("channel_id") {
-                  Some(mm::WebSocketMessage {
-                    seq: Some(seq),
-                    event: "channel_viewed".to_string(),
-                    data: json!({ "channel_id": cid }),
-                    broadcast: map_broadcast(env.broadcast.as_ref()),
-                })
-             } else {
-                 None
-             }
+             env.data.get("channel_id").map(|cid| mm::WebSocketMessage {
+                seq: Some(seq),
+                event: "channel_viewed".to_string(),
+                data: json!({ "channel_id": cid }),
+                broadcast: map_broadcast(env.broadcast.as_ref()),
+            })
         }
         _ => None,
     }
@@ -306,32 +302,29 @@ async fn handle_upstream_message(
 ) {
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(msg) {
         if let Some(action) = value.get("action").and_then(|v| v.as_str()) {
-             match action {
-                 "user_typing" => {
-                     if let Some(data) = value.get("data") {
-                         if let Some(channel_id_str) = data.get("channel_id").and_then(|v| v.as_str()) {
-                             if let Ok(channel_id) = Uuid::parse_str(channel_id_str) {
-                                  // Broadcast typing
-                                  let broadcast = WsEnvelope::event(
-                                        crate::realtime::EventType::UserTyping,
-                                        crate::realtime::TypingEvent {
-                                            user_id,
-                                            display_name: "".to_string(),
-                                            thread_root_id: data.get("parent_id").and_then(|v| v.as_str()).and_then(|s| Uuid::parse_str(s).ok()),
-                                        },
-                                        Some(channel_id),
-                                    ).with_broadcast(crate::realtime::WsBroadcast {
-                                        channel_id: Some(channel_id),
-                                        team_id: None,
-                                        user_id: None,
-                                        exclude_user_id: Some(user_id),
-                                    });
-                                    state.ws_hub.broadcast(broadcast).await;
-                             }
+             if action == "user_typing" {
+                 if let Some(data) = value.get("data") {
+                     if let Some(channel_id_str) = data.get("channel_id").and_then(|v| v.as_str()) {
+                         if let Ok(channel_id) = Uuid::parse_str(channel_id_str) {
+                              // Broadcast typing
+                              let broadcast = WsEnvelope::event(
+                                    crate::realtime::EventType::UserTyping,
+                                    crate::realtime::TypingEvent {
+                                        user_id,
+                                        display_name: "".to_string(),
+                                        thread_root_id: data.get("parent_id").and_then(|v| v.as_str()).and_then(|s| Uuid::parse_str(s).ok()),
+                                    },
+                                    Some(channel_id),
+                                ).with_broadcast(crate::realtime::WsBroadcast {
+                                    channel_id: Some(channel_id),
+                                    team_id: None,
+                                    user_id: None,
+                                    exclude_user_id: Some(user_id),
+                                });
+                                state.ws_hub.broadcast(broadcast).await;
                          }
                      }
-                 },
-                 _ => {}
+                 }
              }
         }
     }
