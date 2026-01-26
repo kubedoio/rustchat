@@ -3,6 +3,7 @@ use axum::{http::{HeaderName, HeaderValue}, response::IntoResponse, Json, Router
 use tower_http::set_header::SetResponseHeaderLayer;
 
 pub mod channels;
+pub mod categories;
 pub mod config;
 pub mod extractors;
 pub mod files;
@@ -17,6 +18,7 @@ pub fn router() -> Router<AppState> {
         .merge(users::router())
         .merge(teams::router())
         .merge(channels::router())
+        .merge(categories::router())
         .merge(posts::router())
         .merge(files::router())
         .merge(config::router())
