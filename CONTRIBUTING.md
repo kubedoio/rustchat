@@ -4,7 +4,7 @@ Thank you for your interest in contributing to rustchat!
 
 ## Development Setup
 
-1. Install Rust 1.75+ via [rustup](https://rustup.rs/)
+1. Install Rust 1.93+ via [rustup](https://rustup.rs/)
 2. Install Docker and Docker Compose
 3. Clone the repository
 4. Run `docker compose up -d` for dependencies
