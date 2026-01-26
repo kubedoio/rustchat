@@ -89,7 +89,7 @@ pub struct PostResponse {
     pub created_at: DateTime<Utc>,
     pub edited_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
-    pub reply_count: i32,
+    pub reply_count: i64,
     pub last_reply_at: Option<DateTime<Utc>>,
     // User info from JOIN
     pub username: Option<String>,

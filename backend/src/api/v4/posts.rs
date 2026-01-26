@@ -160,7 +160,7 @@ async fn get_post_thread(
     let replies: Vec<crate::models::post::PostResponse> = sqlx::query_as(
         r#"
         SELECT p.*, u.username, u.email, u.avatar_url,
-        0 as reply_count, NULL as last_reply_at
+        0::bigint as reply_count, NULL as last_reply_at
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
