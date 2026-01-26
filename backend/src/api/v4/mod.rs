@@ -1,5 +1,5 @@
 use crate::api::AppState;
-use axum::Router;
+use axum::{response::IntoResponse, Json, Router};
 
 pub mod channels;
 pub mod config;
@@ -21,4 +21,16 @@ pub fn router() -> Router<AppState> {
         .merge(config::router())
         .merge(system::router())
         .merge(websocket::router())
+        .fallback(not_implemented)
+}
+
+async fn not_implemented() -> impl IntoResponse {
+    (
+        axum::http::StatusCode::NOT_IMPLEMENTED,
+        Json(serde_json::json!({
+            "id": "api.not_implemented",
+            "message": "Not implemented",
+            "status_code": 501
+        }))
+    )
 }

@@ -23,6 +23,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/teams", get(my_teams))
         .route("/users/me/teams/members", get(my_team_members))
         .route("/users/me/teams/{team_id}/channels", get(my_team_channels))
+        .route("/users/me/channels", get(my_channels))
         .route(
             "/users/me/teams/{team_id}/channels/members",
             get(my_team_channel_members),
@@ -160,6 +161,25 @@ async fn my_team_channels(
         "#,
     )
     .bind(team_id)
+    .bind(auth.user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
+    Ok(Json(mm_channels))
+}
+
+async fn my_channels(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+) -> ApiResult<Json<Vec<mm::Channel>>> {
+    let channels: Vec<Channel> = sqlx::query_as(
+        r#"
+        SELECT c.* FROM channels c
+        JOIN channel_members cm ON c.id = cm.channel_id
+        WHERE cm.user_id = $1
+        "#,
+    )
     .bind(auth.user_id)
     .fetch_all(&state.db)
     .await?;
