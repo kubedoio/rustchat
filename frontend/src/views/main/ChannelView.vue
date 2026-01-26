@@ -16,11 +16,14 @@ import ChannelSettingsModal from '../../components/modals/ChannelSettingsModal.v
 import VideoCallModal from '../../components/modals/VideoCallModal.vue';
 import TypingIndicator from '../../components/channel/TypingIndicator.vue';
 import { useUIStore } from '../../stores/ui';
+import callsApi from '../../api/calls';
+import { useConfigStore } from '../../stores/config';
 
 const channelStore = useChannelStore();
 const messageStore = useMessageStore();
 const unreadStore = useUnreadStore();
 const uiStore = useUIStore();
+const configStore = useConfigStore();
 const { sendTyping, sendMessage, subscribe, unsubscribe } = useWebSocket();
 
 const currentChannel = computed(() => channelStore.currentChannel);
@@ -89,6 +92,21 @@ function handleMessageJump(messageId: string) {
 function handleChannelDeleted() {
     channelStore.removeChannel(currentChannel.value?.id || '');
 }
+
+async function onStartCall() {
+    if (!channelId.value || !configStore.siteConfig.mirotalk_enabled) return;
+    try {
+        const { data } = await callsApi.createMeeting('channel', channelId.value);
+        if (data.mode === 'embed_iframe') {
+            uiStore.openVideoCall(data.meeting_url);
+        } else {
+            window.open(data.meeting_url, '_blank', 'noopener,noreferrer');
+        }
+    } catch (e) {
+        console.error('Failed to start call', e);
+        alert('Failed to start call');
+    }
+}
 </script>
 
 <template>
@@ -132,7 +150,7 @@ function handleChannelDeleted() {
                   <TypingIndicator :channelId="currentChannel.id" />
 
                   <!-- Composer -->
-                  <MessageComposer @send="onSendMessage" @typing="onTyping" />
+                  <MessageComposer @send="onSendMessage" @typing="onTyping" @startCall="onStartCall" />
               </template>
           </div>
 

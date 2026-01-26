@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Users, Search, Hash, Lock, Phone, Bookmark, MoreVertical, LogOut, Info } from 'lucide-vue-next'
+import { Users, Search, Hash, Lock, Phone, Bookmark, MoreVertical, LogOut, Info, Pin } from 'lucide-vue-next'
 import { ref } from 'vue';
 import { useCallsStore } from '../../stores/calls';
 import { useChannelStore } from '../../stores/channels';

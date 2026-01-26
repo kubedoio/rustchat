@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Smile, Paperclip, Send, X, File as FileIcon } from 'lucide-vue-next';
+import { Smile, Paperclip, Send, X, File as FileIcon, Video } from 'lucide-vue-next';
 import { useToast } from '../../composables/useToast';
 import { filesApi, type FileUploadResponse } from '../../api/files';
 import FileUploader from '../atomic/FileUploader.vue';
@@ -9,14 +9,16 @@ import FormattingToolbar from './FormattingToolbar.vue';
 import MarkdownPreview from './MarkdownPreview.vue';
 import MentionAutocomplete from './MentionAutocomplete.vue';
 import { useTeamStore } from '../../stores/teams';
+import { useConfigStore } from '../../stores/config';
 
-const emit = defineEmits(['send', 'typing'])
+const emit = defineEmits(['send', 'typing', 'startCall'])
 const content = ref('')
 const showEmojiPicker = ref(false)
 const showPreview = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const toast = useToast()
 const teamStore = useTeamStore()
+const configStore = useConfigStore()
 
 const showMentionMenu = ref(false)
 const attachedFiles = ref<{ 
@@ -328,6 +330,15 @@ function formatFileSize(bytes: number): string {
                     @close="showEmojiPicker = false" 
                   />
                 </div>
+
+                <button
+                  v-if="configStore.siteConfig.mirotalk_enabled"
+                  @click="$emit('startCall')"
+                  class="p-2 hover:bg-green-500/10 hover:text-green-500 rounded-lg transition-colors"
+                  title="Start video call"
+                >
+                    <Video class="w-4.5 h-4.5" />
+                </button>
             </div>
             
             <div class="flex items-center space-x-4">
