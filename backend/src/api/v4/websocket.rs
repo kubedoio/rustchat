@@ -128,12 +128,15 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     });
 
     // Handle incoming pings/typing
+    let state_clone = state.clone();
     let receive_task = tokio::spawn(async move {
         while let Some(msg) = receiver.next().await {
-            if let Ok(Message::Text(_)) = msg {
-                // Handle ping/pong if needed
-            } else if matches!(msg, Ok(Message::Close(_))) || msg.is_err() {
-                break;
+            match msg {
+                Ok(Message::Text(text)) => {
+                    handle_upstream_message(&state_clone, user_id, &text).await;
+                }
+                Ok(Message::Close(_)) | Err(_) => break,
+                _ => {}
             }
         }
     });
@@ -189,7 +192,148 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
                 None
             }
         }
+        "message_updated" | "thread_reply_updated" => {
+            if let Ok(post_resp) =
+                serde_json::from_value::<crate::models::post::PostResponse>(env.data.clone())
+            {
+                let mm_post: mm::Post = post_resp.into();
+                let post_json = serde_json::to_string(&mm_post).unwrap_or_default();
+                Some(mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "post_edited".to_string(),
+                    data: json!({ "post": post_json }),
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                })
+            } else {
+                None
+            }
+        }
+        "message_deleted" | "thread_reply_deleted" => {
+            if let Ok(post_resp) =
+                serde_json::from_value::<crate::models::post::PostResponse>(env.data.clone())
+            {
+                let mm_post: mm::Post = post_resp.into();
+                let post_json = serde_json::to_string(&mm_post).unwrap_or_default();
+                Some(mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "post_deleted".to_string(),
+                    data: json!({ "post": post_json }),
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                })
+            } else {
+                None
+            }
+        }
+        "reaction_added" => {
+            if let Ok(reaction) =
+                serde_json::from_value::<crate::models::post::Reaction>(env.data.clone())
+            {
+                let mm_reaction = mm::Reaction {
+                    user_id: reaction.user_id.to_string(),
+                    post_id: reaction.post_id.to_string(),
+                    emoji_name: reaction.emoji_name,
+                    create_at: reaction.created_at.timestamp_millis(),
+                };
+                let reaction_json = serde_json::to_string(&mm_reaction).unwrap_or_default();
+                Some(mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "reaction_added".to_string(),
+                    data: json!({ "reaction": reaction_json }),
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                })
+            } else {
+                None
+            }
+        }
+        "reaction_removed" => {
+            if let Ok(reaction) =
+                serde_json::from_value::<crate::models::post::Reaction>(env.data.clone())
+            {
+                let mm_reaction = mm::Reaction {
+                    user_id: reaction.user_id.to_string(),
+                    post_id: reaction.post_id.to_string(),
+                    emoji_name: reaction.emoji_name,
+                    create_at: reaction.created_at.timestamp_millis(),
+                };
+                let reaction_json = serde_json::to_string(&mm_reaction).unwrap_or_default();
+                Some(mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "reaction_removed".to_string(),
+                    data: json!({ "reaction": reaction_json }),
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                })
+            } else {
+                None
+            }
+        }
+        "user_updated" => {
+            // Check if this is a status update
+             if let Some(status_str) = env.data.get("status").and_then(|v| v.as_str()) {
+                 let user_id = env.data.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
+                 Some(mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "status_change".to_string(),
+                    data: json!({ "user_id": user_id, "status": status_str }),
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                })
+             } else {
+                 None
+             }
+        }
+        "channel_updated" => {
+             // Check if it is a view event (hacky heuristic based on data shape)
+             // or just map generic channel update
+             if let Some(cid) = env.data.get("channel_id") {
+                  Some(mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "channel_viewed".to_string(),
+                    data: json!({ "channel_id": cid }),
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                })
+             } else {
+                 None
+             }
+        }
         _ => None,
+    }
+}
+
+// Handle client upstream messages (commands)
+async fn handle_upstream_message(
+    state: &AppState,
+    user_id: Uuid,
+    msg: &str
+) {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(msg) {
+        if let Some(action) = value.get("action").and_then(|v| v.as_str()) {
+             match action {
+                 "user_typing" => {
+                     if let Some(data) = value.get("data") {
+                         if let Some(channel_id_str) = data.get("channel_id").and_then(|v| v.as_str()) {
+                             if let Ok(channel_id) = Uuid::parse_str(channel_id_str) {
+                                  // Broadcast typing
+                                  let broadcast = WsEnvelope::event(
+                                        crate::realtime::EventType::UserTyping,
+                                        crate::realtime::TypingEvent {
+                                            user_id,
+                                            display_name: "".to_string(),
+                                            thread_root_id: data.get("parent_id").and_then(|v| v.as_str()).and_then(|s| Uuid::parse_str(s).ok()),
+                                        },
+                                        Some(channel_id),
+                                    ).with_broadcast(crate::realtime::WsBroadcast {
+                                        channel_id: Some(channel_id),
+                                        team_id: None,
+                                        user_id: None,
+                                        exclude_user_id: Some(user_id),
+                                    });
+                                    state.ws_hub.broadcast(broadcast).await;
+                             }
+                         }
+                     }
+                 },
+                 _ => {}
+             }
+        }
     }
 }
 

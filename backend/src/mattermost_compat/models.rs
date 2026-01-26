@@ -146,6 +146,46 @@ pub struct WebSocketMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Preference {
+    pub user_id: String,
+    pub category: String,
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Status {
+    pub user_id: String,
+    pub status: String,
+    pub manual: bool,
+    pub last_activity_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Reaction {
+    pub user_id: String,
+    pub post_id: String,
+    pub emoji_name: String,
+    pub create_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileInfo {
+    pub id: String,
+    pub user_id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub name: String,
+    pub extension: String,
+    pub size: i64,
+    pub mime_type: String,
+    pub width: i32,
+    pub height: i32,
+    pub has_preview_image: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Broadcast {
     pub omit_users: Option<Value>,
     pub user_id: String,

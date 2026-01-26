@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 /// Post entity (message)
 /// Post entity (message)
-#[derive(Debug, Clone, Serialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Post {
     pub id: Uuid,
     pub channel_id: Uuid,
@@ -27,7 +27,7 @@ pub struct Post {
     pub seq: i64,
 }
 
-#[derive(Debug, Clone, Serialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Reaction {
     pub post_id: Uuid,
     pub user_id: Uuid,
