@@ -4,6 +4,7 @@ use axum::Router;
 pub mod channels;
 pub mod config;
 pub mod extractors;
+pub mod files;
 pub mod posts;
 pub mod system;
 pub mod teams;
@@ -16,6 +17,7 @@ pub fn router() -> Router<AppState> {
         .merge(teams::router())
         .merge(channels::router())
         .merge(posts::router())
+        .merge(files::router())
         .merge(config::router())
         .merge(system::router())
         .merge(websocket::router())
