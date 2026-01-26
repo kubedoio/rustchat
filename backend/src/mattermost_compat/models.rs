@@ -134,6 +134,12 @@ pub struct Config {
 pub struct License {
     #[serde(rename = "IsLicensed")]
     pub is_licensed: String,
+    #[serde(rename = "IssuedAt")]
+    pub issued_at: i64,
+    #[serde(rename = "StartsAt")]
+    pub starts_at: i64,
+    #[serde(rename = "ExpiresAt")]
+    pub expires_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

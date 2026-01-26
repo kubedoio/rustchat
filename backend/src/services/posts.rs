@@ -31,19 +31,12 @@ pub async fn create_post(
     // Validate root_post_id if provided
     let root_post_id = input.root_post_id;
     if let Some(r_id) = root_post_id {
-        let root_post: Option<Post> = sqlx::query_as(
-            r#"
-            SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-                   is_pinned, created_at, edited_at, deleted_at,
-                   reply_count::int8 as reply_count,
-                   last_reply_at, seq
-            FROM posts WHERE id = $1 AND channel_id = $2
-            "#,
-        )
-        .bind(r_id)
-        .bind(channel_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let root_post: Option<Post> =
+            sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND channel_id = $2")
+                .bind(r_id)
+                .bind(channel_id)
+                .fetch_optional(&state.db)
+                .await?;
 
         if root_post.is_none() {
             return Err(AppError::BadRequest("Invalid root post".to_string()));
@@ -55,10 +48,7 @@ pub async fn create_post(
         r#"
         INSERT INTO posts (channel_id, user_id, root_post_id, message, props, file_ids)
         VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                  is_pinned, created_at, edited_at, deleted_at,
-                  reply_count::int8 as reply_count,
-                  last_reply_at, seq
+        RETURNING *
         "#,
     )
     .bind(channel_id)
@@ -360,10 +350,7 @@ pub async fn create_system_message(
         r#"
         INSERT INTO posts (channel_id, user_id, message, props)
         VALUES ($1, $2, $3, $4)
-        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                  is_pinned, created_at, edited_at, deleted_at,
-                  reply_count::int8 as reply_count,
-                  last_reply_at, seq
+        RETURNING *
         "#,
     )
     .bind(channel_id)

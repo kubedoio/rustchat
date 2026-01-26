@@ -1,55 +1,51 @@
-# Mattermost Compatibility Layer
+# Mattermost Compatibility
 
-RustChat includes a compatibility layer for the Mattermost API v4, allowing Mattermost clients (Mobile/Desktop) to connect to a RustChat server.
+RustChat implements a subset of the Mattermost API v4 to support mobile clients (Mattermost Mobile for Android/iOS).
 
-## Supported Features
+## Compatibility Version
+The server reports version `10.11.0` to clients.
 
-- **Authentication**: Login using RustChat credentials.
-- **Teams**: Listing teams (workspaces).
-- **Channels**: Listing channels, joining channels.
-- **Messaging**: Viewing history, posting messages.
-- **WebSocket**: Real-time events for new posts, reactions, and typing.
+## Supported Endpoints
 
-## Configuration
+### System & Handshake
+- `GET /api/v4/system/ping`: Returns system status and version.
+- `GET /api/v4/system/version`: Returns the server version string.
+- `GET /api/v4/config/client`: Returns client configuration.
+- `GET /api/v4/license/client`: Returns license information.
 
-The compatibility layer uses a hardcoded version `10.11.0` to ensure compatibility with modern Mattermost clients.
-
-## Endpoints
-
-### System
-- `GET /api/v4/system/ping`: Server status.
-- `GET /api/v4/system/version`: Server version (compat).
-- `GET /api/v4/config/client`: Client configuration.
-
-### Authentication
+### Authentication & Users
 - `POST /api/v4/users/login`: Login with username/email and password.
-- `GET /api/v4/users/me`: Get current user.
+- `GET /api/v4/users/me`: Get current user info.
+- `GET /api/v4/users/me/teams`: Get user's teams.
+- `GET /api/v4/users/me/channels`: Get user's channels.
+- `GET /api/v4/users/status/ids`: Get status for list of users.
+- `GET /api/v4/users/{user_id}/status`: Get status for a user.
+- `PUT /api/v4/users/me/status`: Update current user status.
 
 ### Teams & Channels
-- `GET /api/v4/teams`: List teams.
-- `GET /api/v4/users/me/teams`: List user's teams.
-- `GET /api/v4/teams/{team_id}/channels`: List channels in a team.
-- `GET /api/v4/users/me/teams/{team_id}/channels`: List user's channels in a team.
-- `GET /api/v4/users/me/channels`: List user's channels across teams.
+- `GET /api/v4/teams/{team_id}/channels`: Get channels for a team.
 - `GET /api/v4/channels/{channel_id}`: Get channel details.
-- `GET /api/v4/channels/{channel_id}/posts`: Get posts (supports pagination).
+- `GET /api/v4/channels/{channel_id}/members`: Get channel members.
+- `GET /api/v4/channels/{channel_id}/posts`: Get posts in a channel (with pagination).
 
 ### Posts
-- `POST /api/v4/posts`: Create a post.
-- `GET /api/v4/posts/{post_id}`: Get a post.
-- `PUT /api/v4/posts/{post_id}`: Edit a post.
+- `POST /api/v4/posts`: Create a new post.
+- `GET /api/v4/posts/{post_id}`: Get a specific post.
+- `PUT /api/v4/posts/{post_id}/patch`: Edit a post.
 - `DELETE /api/v4/posts/{post_id}`: Delete a post.
+- `GET /api/v4/posts/{post_id}/thread`: Get post thread.
+
+### Reactions
+- `POST /api/v4/reactions`: Add a reaction.
+- `DELETE /api/v4/users/me/posts/{post_id}/reactions/{emoji_name}`: Remove a reaction.
+- `GET /api/v4/posts/{post_id}/reactions`: Get reactions for a post.
 
 ### WebSocket
-- `GET /api/v4/websocket`: WebSocket connection.
+- `/api/v4/websocket`: WebSocket connection for real-time events.
 
-## Implementation Details
+## Architecture
+All `/api/v4/*` requests are routed to the Rust backend. The frontend (Nginx) acts as a reverse proxy but does not serve these requests directly (no SPA fallback).
+Responses from `/api/v4/` include the `X-MM-COMPAT: 1` header.
 
-- **Auth Token**: Uses RustChat's JWT token. Accepted via `Authorization: Bearer <token>` or `Token: <token>` header.
-- **IDs**: Uses UUIDs (RustChat standard) which are compatible with Mattermost's 26-char ID requirement (as strings).
-- **Versioning**: Reports version `10.11.0` to satisfy mobile client checks.
-
-## Limitations
-
-- Not all Mattermost features are supported (e.g., extensive search, plugins, deeply nested threads usage in some clients).
-- Push notifications are currently disabled in config.
+## Unimplemented Endpoints
+Unimplemented endpoints return HTTP 501 Not Implemented with a JSON error body.

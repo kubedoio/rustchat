@@ -168,11 +168,9 @@ async fn get_posts(
     // Fetch posts
     let posts: Vec<PostResponse> = sqlx::query_as(
         r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-               p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
+        SELECT p.*, u.username, u.email, u.avatar_url,
+        (SELECT COUNT(*) FROM posts r WHERE r.root_post_id = p.id) as reply_count,
+        (SELECT MAX(created_at) FROM posts r WHERE r.root_post_id = p.id) as last_reply_at
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.channel_id = $1 AND p.deleted_at IS NULL

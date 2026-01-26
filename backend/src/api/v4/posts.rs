@@ -98,11 +98,9 @@ async fn get_post(
 ) -> ApiResult<Json<mm::Post>> {
     let post: crate::models::post::PostResponse = sqlx::query_as(
         r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-               p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
+        SELECT p.*, u.username, u.email, u.avatar_url,
+        (SELECT COUNT(*) FROM posts r WHERE r.root_post_id = p.id) as reply_count,
+        (SELECT MAX(created_at) FROM posts r WHERE r.root_post_id = p.id) as last_reply_at
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.id = $1 AND p.deleted_at IS NULL
@@ -135,11 +133,9 @@ async fn get_post_thread(
     // 1. Get the requested post
     let root_post: crate::models::post::PostResponse = sqlx::query_as(
         r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-               p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
+        SELECT p.*, u.username, u.email, u.avatar_url,
+        (SELECT COUNT(*) FROM posts r WHERE r.root_post_id = p.id) as reply_count,
+        (SELECT MAX(created_at) FROM posts r WHERE r.root_post_id = p.id) as last_reply_at
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.id = $1 AND p.deleted_at IS NULL
@@ -163,11 +159,8 @@ async fn get_post_thread(
     // 3. Get replies
     let replies: Vec<crate::models::post::PostResponse> = sqlx::query_as(
         r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-               p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
+        SELECT p.*, u.username, u.email, u.avatar_url,
+        0 as reply_count, NULL as last_reply_at
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
@@ -218,17 +211,13 @@ async fn delete_post(
 
     let deleted_post: crate::models::post::PostResponse = sqlx::query_as(
         r#"
-        WITH updated_post AS (
-            UPDATE posts SET deleted_at = NOW() WHERE id = $1
-            RETURNING *
-        )
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-               p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
-        FROM updated_post p
-        LEFT JOIN users u ON p.user_id = u.id
+        UPDATE posts SET deleted_at = NOW() WHERE id = $1
+        RETURNING *,
+        (SELECT username FROM users WHERE id = user_id) as username,
+        (SELECT email FROM users WHERE id = user_id) as email,
+        (SELECT avatar_url FROM users WHERE id = user_id) as avatar_url,
+        (SELECT COUNT(*) FROM posts r WHERE r.root_post_id = posts.id) as reply_count,
+        (SELECT MAX(created_at) FROM posts r WHERE r.root_post_id = posts.id) as last_reply_at
         "#,
     )
     .bind(post_id)
@@ -273,18 +262,14 @@ async fn patch_post(
 
     let updated: crate::models::post::PostResponse = sqlx::query_as(
         r#"
-        WITH updated_post AS (
-            UPDATE posts SET message = $1, edited_at = NOW()
-            WHERE id = $2
-            RETURNING *
-        )
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-               p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
-        FROM updated_post p
-        LEFT JOIN users u ON p.user_id = u.id
+        UPDATE posts SET message = $1, edited_at = NOW()
+        WHERE id = $2
+        RETURNING *,
+        (SELECT username FROM users WHERE id = user_id) as username,
+        (SELECT email FROM users WHERE id = user_id) as email,
+        (SELECT avatar_url FROM users WHERE id = user_id) as avatar_url,
+        (SELECT COUNT(*) FROM posts r WHERE r.root_post_id = posts.id) as reply_count,
+        (SELECT MAX(created_at) FROM posts r WHERE r.root_post_id = posts.id) as last_reply_at
         "#,
     )
     .bind(input.message)

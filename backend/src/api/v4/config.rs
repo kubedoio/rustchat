@@ -23,5 +23,8 @@ async fn client_config(State(_state): State<AppState>) -> ApiResult<Json<mm::Con
 async fn client_license(State(_state): State<AppState>) -> ApiResult<Json<mm::License>> {
     Ok(Json(mm::License {
         is_licensed: "false".to_string(),
+        issued_at: 0,
+        starts_at: 0,
+        expires_at: 0,
     }))
 }
