@@ -3,6 +3,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
     },
+    http::HeaderMap,
     response::Response,
     routing::get,
     Router,
@@ -11,6 +12,9 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
+use std::time::Duration;
+use tokio::time::interval;
+use chrono;
 
 use crate::api::AppState;
 use crate::auth::validate_token;
@@ -23,6 +27,7 @@ pub fn router() -> Router<AppState> {
 
 #[derive(Debug, Deserialize)]
 struct WsQuery {
+    token: Option<String>,
     #[allow(dead_code)]
     connection_id: Option<String>,
     #[allow(dead_code)]
@@ -31,59 +36,62 @@ struct WsQuery {
 
 async fn ws_handler(
     ws: WebSocketUpgrade,
+    headers: HeaderMap,
     State(state): State<AppState>,
-    Query(_query): Query<WsQuery>,
+    Query(query): Query<WsQuery>,
 ) -> Response {
-    ws.on_upgrade(move |socket| handle_socket(socket, state))
+    let mut token = query.token.clone();
+
+    // Check Authorization header if token not in query
+    if token.is_none() {
+        if let Some(auth_header) = headers.get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                if auth_str.starts_with("Bearer ") {
+                    token = Some(auth_str[7..].to_string());
+                } else {
+                    token = Some(auth_str.to_string());
+                }
+            }
+        }
+    }
+
+    let user_id = if let Some(ref t) = token {
+        validate_token(t, &state.jwt_secret).ok().map(|c| c.claims.sub)
+    } else {
+        None
+    };
+
+    ws.on_upgrade(move |socket| handle_socket(socket, state, user_id))
 }
 
-async fn handle_socket(socket: WebSocket, state: AppState) {
+async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<Uuid>) {
     let (mut sender, mut receiver) = socket.split();
-    let mut user_id: Option<Uuid> = None;
     let mut seq = 0;
 
-    // Wait for authentication
-    while let Some(msg) = receiver.next().await {
-        if let Ok(Message::Text(text)) = msg {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
-                if value["action"] == "authentication_challenge" {
-                    if let Some(token) = value["data"]["token"].as_str() {
-                        if let Ok(claims) = validate_token(token, &state.jwt_secret) {
-                            user_id = Some(claims.claims.sub);
+    // 1. Wait for authentication if not already authenticated via handshake
+    if user_id.is_none() {
+        while let Some(msg) = receiver.next().await {
+            if let Ok(Message::Text(text)) = msg {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if value["action"] == "authentication_challenge" {
+                        if let Some(token) = value["data"]["token"].as_str() {
+                            if let Ok(claims) = validate_token(token, &state.jwt_secret) {
+                                user_id = Some(claims.claims.sub);
 
-                            // Send OK response
-                            let resp = json!({
-                                "status": "OK",
-                                "seq_reply": value["seq"]
-                            });
-                            let _ = sender.send(Message::Text(resp.to_string().into())).await;
-
-                            // Send Hello event
-                            // This is required by some clients to finish connection setup
-                            let hello = json!({
-                                "event": "hello",
-                                "data": {
-                                    "server_version": MM_VERSION,
-                                    "connection_id": "", // We don't track connection IDs strictly yet
-                                },
-                                "broadcast": {
-                                    "user_id": claims.claims.sub.to_string(),
-                                    "omit_users": null,
-                                    "team_id": "",
-                                    "channel_id": ""
-                                },
-                                "seq": seq
-                            });
-                            seq += 1;
-                            let _ = sender.send(Message::Text(hello.to_string().into())).await;
-
-                            break;
+                                // Send OK response
+                                let resp = json!({
+                                    "status": "OK",
+                                    "seq_reply": value["seq"]
+                                });
+                                let _ = sender.send(Message::Text(resp.to_string().into())).await;
+                                break;
+                            }
                         }
                     }
                 }
+            } else if let Ok(Message::Close(_)) | Err(_) = msg {
+                return;
             }
-        } else {
-            break;
         }
     }
 
@@ -92,7 +100,27 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         None => return, // Failed to auth
     };
 
-    // Authenticated. Connect to Hub.
+    // 2. Send Hello event immediately after successful auth
+    let hello = json!({
+        "type": "event",
+        "event": "hello",
+        "data": {
+            "server_version": MM_VERSION,
+            "connection_id": "", 
+            "user_id": user_id.to_string(),
+        },
+        "broadcast": {
+            "user_id": user_id.to_string(),
+            "omit_users": null,
+            "team_id": "",
+            "channel_id": ""
+        },
+        "seq": seq
+    });
+    seq += 1;
+    let _ = sender.send(Message::Text(hello.to_string().into())).await;
+
+    // 3. Authenticated. Setup Hub connection.
     let username = match sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_one(&state.db)
@@ -104,56 +132,80 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
     let rx = state.ws_hub.add_connection(user_id, username.clone()).await;
 
-    // Subscribe to teams
-    let teams =
-        sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
+    // Subscribe to teams and channels
+    let teams = sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
             .bind(user_id)
             .fetch_all(&state.db)
             .await
             .unwrap_or_default();
-
     for team_id in teams {
         state.ws_hub.subscribe_team(user_id, team_id).await;
     }
 
-    // Subscribe to channels
-    let channels =
-        sqlx::query_scalar::<_, Uuid>("SELECT channel_id FROM channel_members WHERE user_id = $1")
+    let channels = sqlx::query_scalar::<_, Uuid>("SELECT channel_id FROM channel_members WHERE user_id = $1")
             .bind(user_id)
             .fetch_all(&state.db)
             .await
             .unwrap_or_default();
-
     for channel_id in channels {
         state.ws_hub.subscribe_channel(user_id, channel_id).await;
     }
 
-    // Main loop: forward events from rx to sender (mapped to MM format)
-
+    // 4. Main loops
     let mut hub_rx = rx;
+    let (mut sender_sink, mut receiver_stream) = (sender, receiver);
+
+    let state_clone = state.clone();
+    
+    // Task for forwarding events from hub to client + Heartbeat
     let sender_task = tokio::spawn(async move {
-        while let Ok(msg_str) = hub_rx.recv().await {
-            // msg_str is WsEnvelope JSON string from RustChat hub
-            if let Ok(envelope) = serde_json::from_str::<WsEnvelope>(&msg_str) {
-                if let Some(mm_msg) = map_envelope_to_mm(&envelope, seq) {
-                    seq += 1;
-                    if let Ok(json) = serde_json::to_string(&mm_msg) {
-                        if sender.send(Message::Text(json.into())).await.is_err() {
-                            break;
+        let mut heartbeat = interval(Duration::from_secs(25));
+        loop {
+            tokio::select! {
+                // Heartbeat
+                _ = heartbeat.tick() => {
+                    // Send a ping event or frame. MM uses a "ping" event or WS Ping.
+                    // We'll send a JSON ping event for visibility.
+                    let ping = json!({
+                        "type": "event",
+                        "event": "ping",
+                        "data": {
+                            "server_time": chrono::Utc::now().timestamp_millis()
+                        },
+                        "seq": seq
+                    });
+                    if sender_sink.send(Message::Text(ping.to_string().into())).await.is_err() {
+                        break;
+                    }
+                }
+                // Hub events
+                msg_res = hub_rx.recv() => {
+                    if let Ok(msg_str) = msg_res {
+                        if let Ok(envelope) = serde_json::from_str::<WsEnvelope>(&msg_str) {
+                            if let Some(mm_msg) = map_envelope_to_mm(&envelope, 0) {
+                                if let Ok(json) = serde_json::to_string(&mm_msg) {
+                                    if sender_sink.send(Message::Text(json.into())).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
                         }
+                    } else {
+                        break;
                     }
                 }
             }
         }
     });
 
-    // Handle incoming pings/typing
-    let state_clone = state.clone();
+    // Task for handling incoming messages (typing, etc.)
     let receive_task = tokio::spawn(async move {
-        while let Some(msg) = receiver.next().await {
+        while let Some(msg) = receiver_stream.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
                     handle_upstream_message(&state_clone, user_id, &text).await;
+                }
+                Ok(Message::Ping(_)) => {
                 }
                 Ok(Message::Close(_)) | Err(_) => break,
                 _ => {}
@@ -287,7 +339,6 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
             }
         }
         "user_updated" => {
-            // Check if this is a status update
              if let Some(status_str) = env.data.get("status").and_then(|v| v.as_str()) {
                  let user_id = env.data.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
                  Some(mm::WebSocketMessage {
@@ -301,8 +352,6 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
              }
         }
         "channel_updated" => {
-             // Check if it is a view event (hacky heuristic based on data shape)
-             // or just map generic channel update
              env.data.get("channel_id").map(|cid| mm::WebSocketMessage {
                 seq: Some(seq),
                 event: "channel_viewed".to_string(),
@@ -314,7 +363,6 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
     }
 }
 
-// Handle client upstream messages (commands)
 async fn handle_upstream_message(
     state: &AppState,
     user_id: Uuid,
@@ -326,7 +374,6 @@ async fn handle_upstream_message(
                  if let Some(data) = value.get("data") {
                      if let Some(channel_id_str) = data.get("channel_id").and_then(|v| v.as_str()) {
                          if let Ok(channel_id) = Uuid::parse_str(channel_id_str) {
-                              // Broadcast typing
                               let broadcast = WsEnvelope::event(
                                     crate::realtime::EventType::UserTyping,
                                     crate::realtime::TypingEvent {

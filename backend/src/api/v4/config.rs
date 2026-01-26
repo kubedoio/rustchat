@@ -2,7 +2,8 @@ use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::models as mm;
 use crate::mattermost_compat::MM_VERSION;
-use axum::{extract::State, routing::get, Json, Router};
+use axum::{extract::{Query, State}, routing::get, Json, Router};
+use serde::Deserialize;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -20,7 +21,16 @@ async fn client_config(State(_state): State<AppState>) -> ApiResult<Json<mm::Con
     }))
 }
 
-async fn client_license(State(_state): State<AppState>) -> ApiResult<Json<mm::License>> {
+#[derive(Deserialize)]
+pub struct LicenseQuery {
+    #[allow(dead_code)]
+    pub format: Option<String>,
+}
+
+async fn client_license(
+    State(_state): State<AppState>,
+    Query(_query): Query<LicenseQuery>,
+) -> ApiResult<Json<mm::License>> {
     Ok(Json(mm::License {
         is_licensed: false,
         issued_at: 0,
