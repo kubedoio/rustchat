@@ -108,7 +108,11 @@ async fn list_posts(
 
     let mut sql = String::from(
         r#"
-        SELECT p.*, u.username, u.avatar_url, u.email
+        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+               p.reply_count::int8 as reply_count,
+               p.last_reply_at, p.seq,
+               u.username, u.avatar_url, u.email
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.channel_id = $1 AND p.deleted_at IS NULL AND p.root_post_id IS NULL
@@ -197,11 +201,19 @@ async fn get_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Post>> {
-    let post: Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let post: Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check membership
     let _: ChannelMember =
@@ -234,7 +246,13 @@ async fn update_post(
     }
 
     let updated: Post = sqlx::query_as(
-        "UPDATE posts SET message = $1, edited_at = NOW() WHERE id = $2 RETURNING *",
+        r#"
+        UPDATE posts SET message = $1, edited_at = NOW() WHERE id = $2
+        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
+                  is_pinned, created_at, edited_at, deleted_at,
+                  reply_count::int8 as reply_count,
+                  last_reply_at, seq
+        "#,
     )
     .bind(&input.message)
     .bind(id)
@@ -269,11 +287,19 @@ async fn delete_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post: Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let post: Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Only author or admin can delete
     if post.user_id != auth.user_id && auth.role != "system_admin" {
@@ -311,12 +337,19 @@ async fn get_thread(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Vec<PostResponse>>> {
-    let root_post: Post =
-        sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let root_post: Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check membership
     let _: ChannelMember =
@@ -329,7 +362,11 @@ async fn get_thread(
 
     let replies: Vec<PostResponse> = sqlx::query_as(
         r#"
-        SELECT p.*, u.username, u.avatar_url, u.email
+        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+               p.reply_count::int8 as reply_count,
+               p.last_reply_at, p.seq,
+               u.username, u.avatar_url, u.email
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
@@ -355,11 +392,19 @@ async fn add_reaction(
     Path(id): Path<Uuid>,
     Json(input): Json<CreateReaction>,
 ) -> ApiResult<Json<Reaction>> {
-    let post: Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let post: Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check membership
     let _: ChannelMember =
@@ -408,10 +453,18 @@ async fn remove_reaction(
     Path((id, emoji)): Path<(Uuid, String)>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Get post to find channel_id for broadcast
-    let post: Option<Post> = sqlx::query_as("SELECT * FROM posts WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?;
+    let post: Option<Post> = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?;
 
     sqlx::query("DELETE FROM reactions WHERE post_id = $1 AND user_id = $2 AND emoji_name = $3")
         .bind(id)
@@ -448,11 +501,19 @@ async fn pin_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Post>> {
-    let post: Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let post: Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check admin membership
     let member: ChannelMember =
@@ -467,11 +528,18 @@ async fn pin_post(
         return Err(AppError::Forbidden("Only admins can pin posts".to_string()));
     }
 
-    let pinned: Post =
-        sqlx::query_as("UPDATE posts SET is_pinned = true WHERE id = $1 RETURNING *")
-            .bind(id)
-            .fetch_one(&state.db)
-            .await?;
+    let pinned: Post = sqlx::query_as(
+        r#"
+        UPDATE posts SET is_pinned = true WHERE id = $1
+        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
+                  is_pinned, created_at, edited_at, deleted_at,
+                  reply_count::int8 as reply_count,
+                  last_reply_at, seq
+        "#,
+    )
+    .bind(id)
+    .fetch_one(&state.db)
+    .await?;
 
     // Broadcast pin change
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -500,11 +568,19 @@ async fn unpin_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Post>> {
-    let post: Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let post: Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check admin membership
     let member: ChannelMember =
@@ -521,11 +597,18 @@ async fn unpin_post(
         ));
     }
 
-    let unpinned: Post =
-        sqlx::query_as("UPDATE posts SET is_pinned = false WHERE id = $1 RETURNING *")
-            .bind(id)
-            .fetch_one(&state.db)
-            .await?;
+    let unpinned: Post = sqlx::query_as(
+        r#"
+        UPDATE posts SET is_pinned = false WHERE id = $1
+        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
+                  is_pinned, created_at, edited_at, deleted_at,
+                  reply_count::int8 as reply_count,
+                  last_reply_at, seq
+        "#,
+    )
+    .bind(id)
+    .fetch_one(&state.db)
+    .await?;
 
     // Broadcast pin change
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -560,11 +643,19 @@ async fn save_post(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Verify post exists
-    let _post: Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1 AND deleted_at IS NULL")
-        .bind(id)
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let _post: Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check if membership is needed? Usually saving implies you can see it.
     // If list_posts filters by membership, saving implies you have access.
@@ -616,7 +707,11 @@ async fn get_saved_posts(
 ) -> ApiResult<Json<Vec<PostResponse>>> {
     let posts: Vec<PostResponse> = sqlx::query_as(
         r#"
-        SELECT p.*, u.username, u.avatar_url, u.email
+        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+               p.reply_count::int8 as reply_count,
+               p.last_reply_at, p.seq,
+               u.username, u.avatar_url, u.email
         FROM saved_posts s
         JOIN posts p ON s.post_id = p.id
         LEFT JOIN users u ON p.user_id = u.id
