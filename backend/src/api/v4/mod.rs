@@ -1,5 +1,6 @@
 use crate::api::AppState;
-use axum::{response::IntoResponse, Json, Router};
+use axum::{http::{HeaderName, HeaderValue}, response::IntoResponse, Json, Router};
+use tower_http::set_header::SetResponseHeaderLayer;
 
 pub mod channels;
 pub mod config;
@@ -22,6 +23,10 @@ pub fn router() -> Router<AppState> {
         .merge(system::router())
         .merge(websocket::router())
         .fallback(not_implemented)
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("x-mm-compat"),
+            HeaderValue::from_static("1"),
+        ))
 }
 
 async fn not_implemented() -> impl IntoResponse {

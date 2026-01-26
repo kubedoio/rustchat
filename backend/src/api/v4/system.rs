@@ -30,12 +30,12 @@ struct SystemStatus {
 
 async fn ping() -> ApiResult<Json<SystemStatus>> {
     Ok(Json(SystemStatus {
-        android_latest_version: "2.0.0".to_string(),
-        android_min_version: "1.0.0".to_string(),
-        desktop_latest_version: "5.0.0".to_string(),
-        desktop_min_version: "4.0.0".to_string(),
-        ios_latest_version: "2.0.0".to_string(),
-        ios_min_version: "1.0.0".to_string(),
+        android_latest_version: "".to_string(),
+        android_min_version: "".to_string(),
+        desktop_latest_version: "".to_string(),
+        desktop_min_version: "".to_string(),
+        ios_latest_version: "".to_string(),
+        ios_min_version: "".to_string(),
         status: "OK".to_string(),
         version: MM_VERSION.to_string(),
     }))
