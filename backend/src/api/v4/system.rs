@@ -1,10 +1,13 @@
 use crate::api::AppState;
 use crate::error::ApiResult;
-use axum::{routing::get, Json, Router};
+use crate::mattermost_compat::MM_VERSION;
+use axum::{routing::get, Json, Router, response::IntoResponse};
 use serde::Serialize;
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/system/ping", get(ping))
+    Router::new()
+        .route("/system/ping", get(ping))
+        .route("/system/version", get(version))
 }
 
 #[derive(Serialize)]
@@ -34,6 +37,13 @@ async fn ping() -> ApiResult<Json<SystemStatus>> {
         ios_latest_version: "2.0.0".to_string(),
         ios_min_version: "1.0.0".to_string(),
         status: "OK".to_string(),
-        version: "5.35.0".to_string(),
+        version: MM_VERSION.to_string(),
     }))
+}
+
+async fn version() -> ApiResult<impl IntoResponse> {
+     Ok((
+        [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        MM_VERSION.to_string()
+    ))
 }

@@ -1,9 +1,10 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -19,6 +20,12 @@ pub fn router() -> Router<AppState> {
         .route("/channels/{channel_id}", get(get_channel))
         .route("/channels/{channel_id}/members", get(get_channel_members))
         .route("/channels/members/me/view", post(view_channel))
+}
+
+#[derive(Deserialize)]
+struct Pagination {
+    page: Option<u64>,
+    per_page: Option<u64>,
 }
 
 #[derive(serde::Deserialize)]
@@ -141,6 +148,7 @@ async fn get_posts(
     State(state): State<AppState>,
     _auth: MmAuthUser,
     Path(channel_id): Path<Uuid>,
+    Query(pagination): Query<Pagination>,
 ) -> ApiResult<Json<mm::PostList>> {
     // Check channel membership first
     let _membership: crate::models::ChannelMember =
@@ -153,8 +161,11 @@ async fn get_posts(
                 crate::error::AppError::Forbidden("Not a member of this channel".to_string())
             })?;
 
+    let page = pagination.page.unwrap_or(0);
+    let per_page = pagination.per_page.unwrap_or(60).min(200);
+    let offset = page * per_page;
+
     // Fetch posts
-    // Limit to 60 by default in MM
     let posts: Vec<PostResponse> = sqlx::query_as(
         r#"
         SELECT p.*, u.username, u.email, u.avatar_url,
@@ -164,10 +175,12 @@ async fn get_posts(
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.channel_id = $1 AND p.deleted_at IS NULL
         ORDER BY p.created_at DESC
-        LIMIT 60
+        LIMIT $2 OFFSET $3
         "#,
     )
     .bind(channel_id)
+    .bind(per_page as i64)
+    .bind(offset as i64)
     .fetch_all(&state.db)
     .await?;
 
