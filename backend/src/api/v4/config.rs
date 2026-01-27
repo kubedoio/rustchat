@@ -1,33 +1,16 @@
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::models as mm;
-use crate::mattermost_compat::MM_VERSION;
+use crate::mattermost_compat::{id::encode_mm_id, MM_VERSION};
 use crate::models::server_config::SiteConfig;
 use axum::{extract::{Query, State}, response::IntoResponse, routing::get, Json, Router};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use uuid::Uuid;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/config/client", get(client_config))
         .route("/license/client", get(client_license))
-}
-
-#[derive(Serialize)]
-struct LegacyConfig {
-    #[serde(rename = "Version")]
-    version: String,
-    #[serde(rename = "BuildNumber")]
-    build_number: String,
-    #[serde(rename = "SiteName")]
-    site_name: String,
-}
-
-#[derive(Serialize)]
-struct LegacyLicense {
-    #[serde(rename = "IsLicensed")]
-    is_licensed: String,
-    #[serde(rename = "TelemetryId")]
-    telemetry_id: String,
 }
 
 async fn client_config(
@@ -45,12 +28,19 @@ async fn client_config(
     .unwrap_or_default();
 
     let body = if matches!(query.format.as_deref(), Some("old")) {
-        serde_json::to_value(LegacyConfig {
-            version: "9.5.0".to_string(),
-            build_number: "dev".to_string(),
-            site_name: site.site_name.clone(),
+        let diagnostic_id = encode_mm_id(Uuid::nil());
+        serde_json::json!({
+            "Version": "9.5.0",
+            "DiagnosticId": diagnostic_id,
+            "TelemetryId": diagnostic_id,
+            "EnableDiagnostics": "false",
+            "BuildNumber": "dev",
+            "SiteName": site.site_name,
+            "EnableFilePost": "true",
+            "EnableCommands": "false",
+            "EnableCustomEmoji": "false",
+            "ExperimentalEnableDefaultChannelLeaveJoinMessages": "true"
         })
-        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
     } else {
         serde_json::to_value(mm::Config {
             site_url: site.site_url.clone(),
@@ -76,11 +66,10 @@ async fn client_license(
     Query(query): Query<LicenseQuery>,
 ) -> ApiResult<impl IntoResponse> {
     let body = if matches!(query.format.as_deref(), Some("old")) {
-        serde_json::to_value(LegacyLicense {
-            is_licensed: "true".to_string(),
-            telemetry_id: "12345".to_string(),
+        serde_json::json!({
+            "IsLicensed": "false",
+            "Cloud": "false"
         })
-        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
     } else {
         serde_json::to_value(mm::License {
             is_licensed: false,
