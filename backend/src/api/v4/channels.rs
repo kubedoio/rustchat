@@ -6,12 +6,11 @@ use axum::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
-use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::ApiResult;
-use crate::mattermost_compat::models as mm;
+use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::post::PostResponse;
 
 pub fn router() -> Router<AppState> {
@@ -42,7 +41,7 @@ async fn view_channel(
     auth: MmAuthUser,
     Json(input): Json<ViewChannelRequest>,
 ) -> ApiResult<impl IntoResponse> {
-    if let Ok(channel_id) = Uuid::parse_str(&input.channel_id) {
+    if let Some(channel_id) = parse_mm_or_uuid(&input.channel_id) {
         // Update last_viewed_at
         sqlx::query(
             "UPDATE channel_members SET last_viewed_at = NOW() WHERE channel_id = $1 AND user_id = $2"
@@ -83,8 +82,10 @@ async fn view_channel(
 async fn get_channel(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path(channel_id): Path<Uuid>,
+    Path(channel_id): Path<String>,
 ) -> ApiResult<Json<mm::Channel>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
     // Verify membership
     let _membership: crate::models::ChannelMember =
         sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
@@ -107,8 +108,10 @@ async fn get_channel(
 async fn get_channel_members(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path(channel_id): Path<Uuid>,
+    Path(channel_id): Path<String>,
 ) -> ApiResult<Json<Vec<mm::ChannelMember>>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
     // Verify membership
     let _membership: crate::models::ChannelMember =
         sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
@@ -129,8 +132,8 @@ async fn get_channel_members(
     let mm_members = members
         .into_iter()
         .map(|m| mm::ChannelMember {
-            channel_id: m.channel_id.to_string(),
-            user_id: m.user_id.to_string(),
+            channel_id: encode_mm_id(m.channel_id),
+            user_id: encode_mm_id(m.user_id),
             roles: "channel_user".to_string(),
             last_viewed_at: m.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
             msg_count: 0,
@@ -149,8 +152,10 @@ async fn get_channel_members(
 async fn get_channel_member_me(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path(channel_id): Path<Uuid>,
+    Path(channel_id): Path<String>,
 ) -> ApiResult<Json<mm::ChannelMember>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
     let member: crate::models::ChannelMember = sqlx::query_as(
         "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2",
     )
@@ -161,8 +166,8 @@ async fn get_channel_member_me(
     .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     Ok(Json(mm::ChannelMember {
-        channel_id: member.channel_id.to_string(),
-        user_id: member.user_id.to_string(),
+        channel_id: encode_mm_id(member.channel_id),
+        user_id: encode_mm_id(member.user_id),
         roles: "channel_user".to_string(),
         last_viewed_at: member.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
         msg_count: 0,
@@ -178,8 +183,10 @@ async fn get_channel_member_me(
 async fn get_channel_stats(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path(channel_id): Path<Uuid>,
+    Path(channel_id): Path<String>,
 ) -> ApiResult<Json<mm::ChannelStats>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
     let is_member: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
     )
@@ -200,7 +207,7 @@ async fn get_channel_stats(
     .await?;
 
     Ok(Json(mm::ChannelStats {
-        channel_id: channel_id.to_string(),
+        channel_id: encode_mm_id(channel_id),
         member_count,
     }))
 }
@@ -208,9 +215,11 @@ async fn get_channel_stats(
 async fn get_posts(
     State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(channel_id): Path<Uuid>,
+    Path(channel_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> ApiResult<Json<mm::PostList>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
     // Check channel membership first
     let _membership: crate::models::ChannelMember =
         sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
@@ -251,7 +260,7 @@ async fn get_posts(
     let mut posts_map = HashMap::new();
 
     for p in posts {
-        let id = p.id.to_string();
+        let id = encode_mm_id(p.id);
         order.push(id.clone());
         posts_map.insert(id, p.into());
     }

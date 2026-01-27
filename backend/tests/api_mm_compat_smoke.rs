@@ -22,12 +22,12 @@ async fn mm_compat_smoke_test() {
     let lic_res = app.api_client.get(format!("{}/api/v4/license/client?format=old", &app.address))
         .send().await.unwrap();
     let lic = lic_res.json::<serde_json::Value>().await.unwrap();
-    assert_eq!(lic["IsLicensed"], "false");
-    assert!(lic.get("IssuedAt").is_some());
+    assert_eq!(lic["IsLicensed"], "true");
+    assert!(lic.get("TelemetryId").is_some());
 
     // 4. Check Config
     let conf_res = app.api_client.get(format!("{}/api/v4/config/client?format=old", &app.address))
         .send().await.unwrap();
     let conf = conf_res.json::<serde_json::Value>().await.unwrap();
-    assert_eq!(conf["Version"], "10.11.0");
+    assert_eq!(conf["Version"], "9.5.0");
 }

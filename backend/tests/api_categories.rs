@@ -1,5 +1,7 @@
 use crate::common::spawn_app;
 use serde_json::json;
+use rustchat::mattermost_compat::id::encode_mm_id;
+use uuid::Uuid;
 
 mod common;
 
@@ -122,7 +124,8 @@ async fn test_sidebar_categories() {
 
     assert_eq!(200, update_res.status().as_u16());
     let update_body: serde_json::Value = update_res.json().await.unwrap();
-    assert_eq!(update_body[0]["channel_ids"][0], channel_id);
+    let expected_channel_id = encode_mm_id(Uuid::parse_str(channel_id).unwrap());
+    assert_eq!(update_body[0]["channel_ids"][0], expected_channel_id);
 
     // 6. Update category order
     let order_data = json!([cat_id]);

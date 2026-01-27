@@ -4,7 +4,6 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
 use super::users::{
@@ -13,7 +12,7 @@ use super::users::{
 };
 use crate::api::AppState;
 use crate::error::ApiResult;
-use crate::mattermost_compat::models as mm;
+use crate::mattermost_compat::{id::parse_mm_or_uuid, models as mm};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -32,7 +31,7 @@ pub fn router() -> Router<AppState> {
 #[derive(Deserialize)]
 struct CategoriesPath {
     user_id: String,
-    team_id: Uuid,
+    team_id: String,
 }
 
 async fn get_categories(
@@ -41,7 +40,9 @@ async fn get_categories(
     Path(params): Path<CategoriesPath>,
 ) -> ApiResult<Json<mm::SidebarCategories>> {
     let user_id = resolve_user_id(&params.user_id, &auth)?;
-    get_categories_internal(state, user_id, params.team_id).await
+    let team_id = parse_mm_or_uuid(&params.team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+    get_categories_internal(state, user_id, team_id).await
 }
 
 async fn create_category(
@@ -51,7 +52,9 @@ async fn create_category(
     Json(input): Json<CreateCategoryRequest>,
 ) -> ApiResult<Json<mm::SidebarCategory>> {
     let user_id = resolve_user_id(&params.user_id, &auth)?;
-    create_category_internal(state, user_id, params.team_id, input).await
+    let team_id = parse_mm_or_uuid(&params.team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+    create_category_internal(state, user_id, team_id, input).await
 }
 
 async fn update_categories(
@@ -61,7 +64,9 @@ async fn update_categories(
     Json(input): Json<UpdateCategoriesRequest>,
 ) -> ApiResult<Json<Vec<mm::SidebarCategory>>> {
     let user_id = resolve_user_id(&params.user_id, &auth)?;
-    update_categories_internal(state, user_id, params.team_id, input).await
+    let team_id = parse_mm_or_uuid(&params.team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+    update_categories_internal(state, user_id, team_id, input).await
 }
 
 async fn update_category_order(
@@ -71,5 +76,7 @@ async fn update_category_order(
     Json(order): Json<Vec<String>>,
 ) -> ApiResult<Json<Vec<String>>> {
     let user_id = resolve_user_id(&params.user_id, &auth)?;
-    update_category_order_internal(state, user_id, params.team_id, order).await
+    let team_id = parse_mm_or_uuid(&params.team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+    update_category_order_internal(state, user_id, team_id, order).await
 }

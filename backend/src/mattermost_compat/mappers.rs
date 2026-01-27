@@ -1,4 +1,4 @@
-use super::models as mm;
+use super::{id::encode_mm_id, models as mm};
 use crate::models::{
     channel::{Channel, ChannelType},
     post::{Post, PostResponse},
@@ -10,7 +10,7 @@ use serde_json::json;
 impl From<User> for mm::User {
     fn from(user: User) -> Self {
         mm::User {
-            id: user.id.to_string(),
+            id: encode_mm_id(user.id),
             create_at: user.created_at.timestamp_millis(),
             update_at: user.updated_at.timestamp_millis(),
             delete_at: 0,
@@ -44,7 +44,7 @@ fn map_role(role: &str) -> String {
 impl From<Team> for mm::Team {
     fn from(team: Team) -> Self {
         mm::Team {
-            id: team.id.to_string(),
+            id: encode_mm_id(team.id),
             create_at: team.created_at.timestamp_millis(),
             update_at: team.updated_at.timestamp_millis(),
             delete_at: 0,
@@ -68,7 +68,7 @@ impl From<Team> for mm::Team {
 impl From<Channel> for mm::Channel {
     fn from(channel: Channel) -> Self {
         mm::Channel {
-            id: channel.id.to_string(),
+            id: encode_mm_id(channel.id),
             create_at: channel.created_at.timestamp_millis(),
             update_at: channel.updated_at.timestamp_millis(),
             delete_at: if channel.is_archived {
@@ -76,7 +76,7 @@ impl From<Channel> for mm::Channel {
             } else {
                 0
             },
-            team_id: channel.team_id.to_string(),
+            team_id: encode_mm_id(channel.team_id),
             channel_type: match channel.channel_type {
                 ChannelType::Public => "O",
                 ChannelType::Private => "P",
@@ -91,7 +91,7 @@ impl From<Channel> for mm::Channel {
             last_post_at: 0,
             total_msg_count: 0,
             extra_update_at: 0,
-            creator_id: channel.creator_id.unwrap_or_default().to_string(),
+            creator_id: channel.creator_id.map(encode_mm_id).unwrap_or_default(),
         }
     }
 }
@@ -99,20 +99,20 @@ impl From<Channel> for mm::Channel {
 impl From<Post> for mm::Post {
     fn from(post: Post) -> Self {
         mm::Post {
-            id: post.id.to_string(),
+            id: encode_mm_id(post.id),
             create_at: post.created_at.timestamp_millis(),
             update_at: post.edited_at.unwrap_or(post.created_at).timestamp_millis(),
             delete_at: post.deleted_at.map(|t| t.timestamp_millis()).unwrap_or(0),
             edit_at: post.edited_at.map(|t| t.timestamp_millis()).unwrap_or(0),
-            user_id: post.user_id.to_string(),
-            channel_id: post.channel_id.to_string(),
-            root_id: post.root_post_id.unwrap_or_default().to_string(),
+            user_id: encode_mm_id(post.user_id),
+            channel_id: encode_mm_id(post.channel_id),
+            root_id: post.root_post_id.map(encode_mm_id).unwrap_or_default(),
             original_id: "".to_string(),
             message: post.message,
             post_type: "".to_string(),
             props: post.props,
             hashtags: "".to_string(),
-            file_ids: post.file_ids.iter().map(|id| id.to_string()).collect(),
+            file_ids: post.file_ids.iter().map(|id| encode_mm_id(*id)).collect(),
             pending_post_id: "".to_string(),
             metadata: None,
         }
@@ -122,20 +122,20 @@ impl From<Post> for mm::Post {
 impl From<PostResponse> for mm::Post {
     fn from(post: PostResponse) -> Self {
         mm::Post {
-            id: post.id.to_string(),
+            id: encode_mm_id(post.id),
             create_at: post.created_at.timestamp_millis(),
             update_at: post.edited_at.unwrap_or(post.created_at).timestamp_millis(),
             delete_at: post.deleted_at.map(|t| t.timestamp_millis()).unwrap_or(0),
             edit_at: post.edited_at.map(|t| t.timestamp_millis()).unwrap_or(0),
-            user_id: post.user_id.to_string(),
-            channel_id: post.channel_id.to_string(),
-            root_id: post.root_post_id.unwrap_or_default().to_string(),
+            user_id: encode_mm_id(post.user_id),
+            channel_id: encode_mm_id(post.channel_id),
+            root_id: post.root_post_id.map(encode_mm_id).unwrap_or_default(),
             original_id: "".to_string(),
             message: post.message,
             post_type: "".to_string(),
             props: post.props,
             hashtags: "".to_string(),
-            file_ids: post.file_ids.iter().map(|id| id.to_string()).collect(),
+            file_ids: post.file_ids.iter().map(|id| encode_mm_id(*id)).collect(),
             pending_post_id: post.client_msg_id.unwrap_or_default(),
             metadata: None,
         }
@@ -174,7 +174,7 @@ mod tests {
         };
 
         let mm_u: mm::User = u.into();
-        assert_eq!(mm_u.id, user_id.to_string());
+        assert_eq!(mm_u.id, encode_mm_id(user_id));
         assert_eq!(mm_u.username, "testuser");
         assert_eq!(mm_u.email, "test@example.com");
         assert_eq!(mm_u.roles, "system_user");
@@ -200,8 +200,8 @@ mod tests {
         };
 
         let mm_c: mm::Channel = c.into();
-        assert_eq!(mm_c.id, channel_id.to_string());
-        assert_eq!(mm_c.team_id, team_id.to_string());
+        assert_eq!(mm_c.id, encode_mm_id(channel_id));
+        assert_eq!(mm_c.team_id, encode_mm_id(team_id));
         assert_eq!(mm_c.channel_type, "O");
         assert_eq!(mm_c.name, "general");
     }

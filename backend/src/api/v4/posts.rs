@@ -10,7 +10,7 @@ use uuid::Uuid;
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::models as mm;
+use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::CreatePost;
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 use crate::services::posts;
@@ -48,13 +48,13 @@ async fn create_post_handler(
     auth: MmAuthUser,
     Json(input): Json<CreatePostRequest>,
 ) -> ApiResult<Json<mm::Post>> {
-    let channel_id = Uuid::parse_str(&input.channel_id)
-        .map_err(|_| AppError::Validation("Invalid channel_id".to_string()))?;
+    let channel_id = parse_mm_or_uuid(&input.channel_id)
+        .ok_or_else(|| AppError::Validation("Invalid channel_id".to_string()))?;
 
     let root_post_id = if !input.root_id.is_empty() {
         Some(
-            Uuid::parse_str(&input.root_id)
-                .map_err(|_| AppError::Validation("Invalid root_id".to_string()))?,
+            parse_mm_or_uuid(&input.root_id)
+                .ok_or_else(|| AppError::Validation("Invalid root_id".to_string()))?,
         )
     } else {
         None
@@ -63,7 +63,7 @@ async fn create_post_handler(
     let file_ids = input
         .file_ids
         .iter()
-        .filter_map(|id| Uuid::parse_str(id).ok())
+        .filter_map(|id| parse_mm_or_uuid(id))
         .collect();
 
     let create_payload = CreatePost {
@@ -94,8 +94,10 @@ async fn create_post_handler(
 async fn get_post(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path(post_id): Path<Uuid>,
+    Path(post_id): Path<String>,
 ) -> ApiResult<Json<mm::Post>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     let post: crate::models::post::PostResponse = sqlx::query_as(
         r#"
         SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
@@ -128,8 +130,10 @@ async fn get_post(
 async fn get_post_thread(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path(post_id): Path<Uuid>,
+    Path(post_id): Path<String>,
 ) -> ApiResult<Json<mm::PostList>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     use std::collections::HashMap;
 
     // 1. Get the requested post
@@ -183,13 +187,13 @@ async fn get_post_thread(
     let mut posts_map = HashMap::new();
 
     // Add root post
-    let root_id = root_post.id.to_string();
+    let root_id = encode_mm_id(root_post.id);
     order.push(root_id.clone());
     posts_map.insert(root_id, root_post.into());
 
     // Add replies
     for r in replies {
-        let id = r.id.to_string();
+        let id = encode_mm_id(r.id);
         order.push(id.clone());
         posts_map.insert(id, r.into());
     }
@@ -205,8 +209,10 @@ async fn get_post_thread(
 async fn delete_post(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path(post_id): Path<Uuid>,
+    Path(post_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     let post: crate::models::post::Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1")
         .bind(post_id)
         .fetch_one(&state.db)
@@ -248,7 +254,7 @@ async fn delete_post(
     });
     state.ws_hub.broadcast(broadcast).await;
 
-    Ok(Json(serde_json::json!({"status": "OK", "id": post_id.to_string()})))
+    Ok(Json(serde_json::json!({"status": "OK", "id": encode_mm_id(post_id)})))
 }
 
 #[derive(Deserialize)]
@@ -259,9 +265,11 @@ struct PatchPostRequest {
 async fn patch_post(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path(post_id): Path<Uuid>,
+    Path(post_id): Path<String>,
     Json(input): Json<PatchPostRequest>,
 ) -> ApiResult<Json<mm::Post>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     let post: crate::models::post::Post = sqlx::query_as("SELECT * FROM posts WHERE id = $1")
         .bind(post_id)
         .fetch_one(&state.db)
@@ -320,11 +328,14 @@ async fn add_reaction(
     auth: MmAuthUser,
     Json(input): Json<ReactionRequest>,
 ) -> ApiResult<Json<mm::Reaction>> {
-    if input.user_id != auth.user_id.to_string() {
+    let input_user_id = parse_mm_or_uuid(&input.user_id)
+        .ok_or_else(|| AppError::Validation("Invalid user_id".to_string()))?;
+    if input_user_id != auth.user_id {
         return Err(AppError::Forbidden("Cannot react for other user".to_string()));
     }
 
-    let post_id = Uuid::parse_str(&input.post_id).map_err(|_| AppError::Validation("Invalid post_id".to_string()))?;
+    let post_id = parse_mm_or_uuid(&input.post_id)
+        .ok_or_else(|| AppError::Validation("Invalid post_id".to_string()))?;
 
     let reaction: crate::models::post::Reaction = sqlx::query_as(
         r#"
@@ -359,8 +370,8 @@ async fn add_reaction(
     state.ws_hub.broadcast(broadcast).await;
 
     Ok(Json(mm::Reaction {
-        user_id: reaction.user_id.to_string(),
-        post_id: reaction.post_id.to_string(),
+        user_id: encode_mm_id(reaction.user_id),
+        post_id: encode_mm_id(reaction.post_id),
         emoji_name: reaction.emoji_name,
         create_at: reaction.created_at.timestamp_millis(),
     }))
@@ -369,8 +380,10 @@ async fn add_reaction(
 async fn remove_reaction(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Path((post_id, emoji_name)): Path<(Uuid, String)>,
+    Path((post_id, emoji_name)): Path<(String, String)>,
 ) -> ApiResult<impl IntoResponse> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     let reaction: Option<crate::models::post::Reaction> = sqlx::query_as(
         "SELECT * FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
     )
@@ -408,16 +421,18 @@ async fn remove_reaction(
 
 async fn get_reactions(
     State(state): State<AppState>,
-    Path(post_id): Path<Uuid>,
+    Path(post_id): Path<String>,
 ) -> ApiResult<Json<Vec<mm::Reaction>>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     let reactions: Vec<crate::models::post::Reaction> = sqlx::query_as("SELECT * FROM reactions WHERE post_id = $1")
         .bind(post_id)
         .fetch_all(&state.db)
         .await?;
 
     let mm_reactions = reactions.into_iter().map(|r| mm::Reaction {
-        user_id: r.user_id.to_string(),
-        post_id: r.post_id.to_string(),
+        user_id: encode_mm_id(r.user_id),
+        post_id: encode_mm_id(r.post_id),
         emoji_name: r.emoji_name,
         create_at: r.created_at.timestamp_millis(),
     }).collect();

@@ -18,7 +18,7 @@ use chrono;
 
 use crate::api::AppState;
 use crate::auth::validate_token;
-use crate::mattermost_compat::{models as mm, MM_VERSION};
+use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm, MM_VERSION};
 use crate::realtime::{TypingEvent, WsEnvelope};
 
 pub fn router() -> Router<AppState> {
@@ -107,10 +107,10 @@ async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<U
         "data": {
             "server_version": MM_VERSION,
             "connection_id": "", 
-            "user_id": user_id.to_string(),
+            "user_id": encode_mm_id(user_id),
         },
         "broadcast": {
-            "user_id": user_id.to_string(),
+            "user_id": encode_mm_id(user_id),
             "omit_users": null,
             "team_id": "",
             "channel_id": ""
@@ -251,12 +251,16 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
         }
         "user_typing" => {
             if let Ok(typing) = serde_json::from_value::<TypingEvent>(env.data.clone()) {
+                let parent_id = typing
+                    .thread_root_id
+                    .map(encode_mm_id)
+                    .unwrap_or_default();
                 Some(mm::WebSocketMessage {
                     seq: Some(seq),
                     event: "typing".to_string(),
                     data: json!({
-                        "parent_id": typing.thread_root_id.unwrap_or_default().to_string(),
-                        "user_id": typing.user_id.to_string(),
+                        "parent_id": parent_id,
+                        "user_id": encode_mm_id(typing.user_id),
                     }),
                     broadcast: map_broadcast(env.broadcast.as_ref()),
                 })
@@ -301,8 +305,8 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
                 serde_json::from_value::<crate::models::post::Reaction>(env.data.clone())
             {
                 let mm_reaction = mm::Reaction {
-                    user_id: reaction.user_id.to_string(),
-                    post_id: reaction.post_id.to_string(),
+                    user_id: encode_mm_id(reaction.user_id),
+                    post_id: encode_mm_id(reaction.post_id),
                     emoji_name: reaction.emoji_name,
                     create_at: reaction.created_at.timestamp_millis(),
                 };
@@ -322,8 +326,8 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
                 serde_json::from_value::<crate::models::post::Reaction>(env.data.clone())
             {
                 let mm_reaction = mm::Reaction {
-                    user_id: reaction.user_id.to_string(),
-                    post_id: reaction.post_id.to_string(),
+                    user_id: encode_mm_id(reaction.user_id),
+                    post_id: encode_mm_id(reaction.post_id),
                     emoji_name: reaction.emoji_name,
                     create_at: reaction.created_at.timestamp_millis(),
                 };
@@ -340,7 +344,13 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
         }
         "user_updated" => {
              if let Some(status_str) = env.data.get("status").and_then(|v| v.as_str()) {
-                 let user_id = env.data.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
+                 let user_id = env
+                     .data
+                     .get("user_id")
+                     .and_then(|v| v.as_str())
+                     .and_then(parse_mm_or_uuid)
+                     .map(encode_mm_id)
+                     .unwrap_or_default();
                  Some(mm::WebSocketMessage {
                     seq: Some(seq),
                     event: "status_change".to_string(),
@@ -352,12 +362,15 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
              }
         }
         "channel_updated" => {
-             env.data.get("channel_id").map(|cid| mm::WebSocketMessage {
-                seq: Some(seq),
-                event: "channel_viewed".to_string(),
-                data: json!({ "channel_id": cid }),
-                broadcast: map_broadcast(env.broadcast.as_ref()),
-            })
+             env.data.get("channel_id").and_then(|cid| cid.as_str()).map(|cid| {
+                let channel_id = parse_mm_or_uuid(cid).map(encode_mm_id).unwrap_or_default();
+                mm::WebSocketMessage {
+                    seq: Some(seq),
+                    event: "channel_viewed".to_string(),
+                    data: json!({ "channel_id": channel_id }),
+                    broadcast: map_broadcast(env.broadcast.as_ref()),
+                }
+             })
         }
         _ => None,
     }
@@ -373,13 +386,16 @@ async fn handle_upstream_message(
              if action == "user_typing" {
                  if let Some(data) = value.get("data") {
                      if let Some(channel_id_str) = data.get("channel_id").and_then(|v| v.as_str()) {
-                         if let Ok(channel_id) = Uuid::parse_str(channel_id_str) {
+                         if let Some(channel_id) = parse_mm_or_uuid(channel_id_str) {
                               let broadcast = WsEnvelope::event(
                                     crate::realtime::EventType::UserTyping,
                                     crate::realtime::TypingEvent {
                                         user_id,
                                         display_name: "".to_string(),
-                                        thread_root_id: data.get("parent_id").and_then(|v| v.as_str()).and_then(|s| Uuid::parse_str(s).ok()),
+                                        thread_root_id: data
+                                            .get("parent_id")
+                                            .and_then(|v| v.as_str())
+                                            .and_then(parse_mm_or_uuid),
                                     },
                                     Some(channel_id),
                                 ).with_broadcast(crate::realtime::WsBroadcast {
@@ -401,9 +417,9 @@ fn map_broadcast(b_opt: Option<&crate::realtime::WsBroadcast>) -> mm::Broadcast 
     if let Some(b) = b_opt {
         mm::Broadcast {
             omit_users: None,
-            user_id: b.user_id.map(|u| u.to_string()).unwrap_or_default(),
-            channel_id: b.channel_id.map(|c| c.to_string()).unwrap_or_default(),
-            team_id: b.team_id.map(|t| t.to_string()).unwrap_or_default(),
+            user_id: b.user_id.map(encode_mm_id).unwrap_or_default(),
+            channel_id: b.channel_id.map(encode_mm_id).unwrap_or_default(),
+            team_id: b.team_id.map(encode_mm_id).unwrap_or_default(),
         }
     } else {
         mm::Broadcast {
