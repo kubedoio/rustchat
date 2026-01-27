@@ -13,7 +13,7 @@ pub fn decode_mm_id(id: &str) -> Option<Uuid> {
     }
 
     let bytes = decode_base32(id)?;
-    Some(Uuid::from_bytes(bytes))
+    Uuid::from_slice(&bytes).ok()
 }
 
 pub fn parse_mm_or_uuid(id: &str) -> Option<Uuid> {
