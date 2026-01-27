@@ -41,8 +41,10 @@ pub fn router() -> Router<AppState> {
         .route("/users/status/ids", post(get_statuses_by_ids))
         .route("/users/ids", post(get_users_by_ids))
         .route("/users/{user_id}/status", get(get_status))
-        .route("/users/me/status", put(update_status))
+        .route("/users/me/status", get(get_my_status).put(update_status))
         .route("/users/{user_id}/channels/{channel_id}/typing", post(user_typing))
+        .route("/users/me/patch", put(patch_me))
+        .route("/roles/names", post(get_roles_by_names))
         .route(
             "/users/{user_id}/sidebar/categories",
             get(get_categories).post(create_category).put(update_categories),
@@ -960,12 +962,11 @@ enum UsersByIdsRequest {
 
 async fn get_users_by_ids(
     State(state): State<AppState>,
-    Json(input): Json<UsersByIdsRequest>,
+    headers: HeaderMap,
+    body: Bytes,
+    Query(_query): Query<std::collections::HashMap<String, String>>,
 ) -> ApiResult<Json<Vec<mm::User>>> {
-    let ids = match input {
-        UsersByIdsRequest::Ids(ids) => ids,
-        UsersByIdsRequest::Wrapped { user_ids } => user_ids,
-    };
+    let ids = parse_users_by_ids(&headers, &body)?;
 
     let uuids: Vec<Uuid> = ids.iter().filter_map(|id| parse_mm_or_uuid(id)).collect();
 
@@ -980,6 +981,34 @@ async fn get_users_by_ids(
 
     let mm_users: Vec<mm::User> = users.into_iter().map(|u| u.into()).collect();
     Ok(Json(mm_users))
+}
+
+fn parse_users_by_ids(headers: &HeaderMap, body: &Bytes) -> ApiResult<Vec<String>> {
+    if body.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let content_type = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    let parsed: UsersByIdsRequest = if content_type.starts_with("application/json") {
+        serde_json::from_slice(body)
+            .map_err(|_| AppError::BadRequest("Invalid JSON body".to_string()))?
+    } else if content_type.starts_with("application/x-www-form-urlencoded") {
+        serde_urlencoded::from_bytes(body)
+            .map_err(|_| AppError::BadRequest("Invalid form body".to_string()))?
+    } else {
+        serde_json::from_slice(body)
+            .or_else(|_| serde_urlencoded::from_bytes(body))
+            .map_err(|_| AppError::BadRequest("Unsupported users/ids body".to_string()))?
+    };
+
+    Ok(match parsed {
+        UsersByIdsRequest::Ids(ids) => ids,
+        UsersByIdsRequest::Wrapped { user_ids } => user_ids,
+    })
 }
 
 async fn get_status(
@@ -1003,10 +1032,41 @@ async fn get_status(
     }))
 }
 
+async fn get_my_status(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+) -> ApiResult<Json<mm::Status>> {
+    let (presence, last_login): (String, Option<DateTime<Utc>>) = sqlx::query_as(
+        "SELECT presence, last_login_at FROM users WHERE id = $1",
+    )
+    .bind(auth.user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(mm::Status {
+        user_id: encode_mm_id(auth.user_id),
+        status: if presence.is_empty() { "offline".to_string() } else { presence },
+        manual: false,
+        last_activity_at: last_login.map(|t| t.timestamp_millis()).unwrap_or(0),
+    }))
+}
+
 #[derive(Deserialize)]
 struct UpdateStatusRequest {
     user_id: String,
     status: String,
+}
+
+#[derive(Deserialize)]
+struct PatchMeRequest {
+    #[allow(dead_code)]
+    nickname: Option<String>,
+    #[allow(dead_code)]
+    first_name: Option<String>,
+    #[allow(dead_code)]
+    last_name: Option<String>,
+    #[allow(dead_code)]
+    position: Option<String>,
 }
 
 async fn update_status(
@@ -1047,6 +1107,37 @@ async fn update_status(
     state.ws_hub.broadcast(broadcast).await;
 
     Ok(Json(status))
+}
+
+async fn patch_me(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Json(_input): Json<PatchMeRequest>,
+) -> ApiResult<Json<mm::User>> {
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok(Json(user.into()))
+}
+
+async fn get_roles_by_names(
+    Json(names): Json<Vec<String>>,
+) -> ApiResult<Json<Vec<mm::Role>>> {
+    let roles = names
+        .into_iter()
+        .map(|name| mm::Role {
+            id: encode_mm_id(Uuid::new_v4()),
+            display_name: name.clone(),
+            description: "".to_string(),
+            permissions: vec![],
+            scheme_managed: false,
+            name,
+        })
+        .collect();
+
+    Ok(Json(roles))
 }
 
 async fn user_typing(

@@ -192,6 +192,16 @@ pub struct FileInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Role {
+    pub id: String,
+    pub name: String,
+    pub display_name: String,
+    pub description: String,
+    pub permissions: Vec<String>,
+    pub scheme_managed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelStats {
     pub channel_id: String,
     pub member_count: i64,
