@@ -19,7 +19,7 @@ async fn client_config(State(state): State<AppState>) -> ApiResult<Json<mm::Conf
             .await?;
 
     Ok(Json(mm::Config {
-        site_url: site.0.site_url,
+        site_url: site.0.site_url.clone(),
         version: MM_VERSION.to_string(),
         enable_push_notifications: "false".to_string(),
         // Hardcoded diagnostic ID to satisfy client requirements
