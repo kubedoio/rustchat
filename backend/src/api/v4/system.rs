@@ -1,7 +1,7 @@
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::MM_VERSION;
-use axum::{routing::get, Json, Router, response::IntoResponse};
+use axum::{extract::Query, routing::get, Json, Router, response::IntoResponse};
 use serde::Serialize;
 
 pub fn router() -> Router<AppState> {
@@ -28,8 +28,24 @@ struct SystemStatus {
     version: String,
 }
 
-async fn ping() -> ApiResult<Json<SystemStatus>> {
-    Ok(Json(SystemStatus {
+#[derive(serde::Deserialize)]
+struct PingQuery {
+    format: Option<String>,
+}
+
+async fn ping(Query(query): Query<PingQuery>) -> ApiResult<Json<serde_json::Value>> {
+    if matches!(query.format.as_deref(), Some("old")) {
+        return Ok(Json(serde_json::json!({
+            "ActiveSearchBackend": "database",
+            "AndroidLatestVersion": "",
+            "AndroidMinVersion": "",
+            "IosLatestVersion": "",
+            "IosMinVersion": "",
+            "status": "OK"
+        })));
+    }
+
+    let body = serde_json::to_value(SystemStatus {
         android_latest_version: "".to_string(),
         android_min_version: "".to_string(),
         desktop_latest_version: "".to_string(),
@@ -38,7 +54,10 @@ async fn ping() -> ApiResult<Json<SystemStatus>> {
         ios_min_version: "".to_string(),
         status: "OK".to_string(),
         version: MM_VERSION.to_string(),
-    }))
+    })
+    .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+
+    Ok(Json(body))
 }
 
 async fn version() -> ApiResult<impl IntoResponse> {

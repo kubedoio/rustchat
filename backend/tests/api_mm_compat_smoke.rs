@@ -23,7 +23,6 @@ async fn mm_compat_smoke_test() {
         .send().await.unwrap();
     let lic = lic_res.json::<serde_json::Value>().await.unwrap();
     assert_eq!(lic["IsLicensed"], "false");
-    assert_eq!(lic["Cloud"], "false");
 
     // 4. Check Config
     let conf_res = app.api_client.get(format!("{}/api/v4/config/client?format=old", &app.address))

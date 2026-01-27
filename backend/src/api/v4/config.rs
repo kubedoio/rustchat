@@ -30,18 +30,7 @@ async fn client_config(
 
     let body = if matches!(query.format.as_deref(), Some("old")) {
         let diagnostic_id = diagnostic_id(&site);
-        serde_json::json!({
-            "Version": "9.5.0",
-            "DiagnosticId": diagnostic_id,
-            "TelemetryId": diagnostic_id,
-            "EnableDiagnostics": "false",
-            "BuildNumber": "dev",
-            "SiteName": site.site_name,
-            "EnableFilePost": "true",
-            "EnableCommands": "false",
-            "EnableCustomEmoji": "false",
-            "ExperimentalEnableDefaultChannelLeaveJoinMessages": "true"
-        })
+        legacy_config(&site, &diagnostic_id)
     } else {
         serde_json::to_value(mm::Config {
             site_url: site.site_url.clone(),
@@ -68,8 +57,7 @@ async fn client_license(
 ) -> ApiResult<impl IntoResponse> {
     let body = if matches!(query.format.as_deref(), Some("old")) {
         serde_json::json!({
-            "IsLicensed": "false",
-            "Cloud": "false"
+            "IsLicensed": "false"
         })
     } else {
         serde_json::to_value(mm::License {
@@ -84,6 +72,127 @@ async fn client_license(
     Ok(Json(body))
 }
 
+fn legacy_config(site: &SiteConfig, diagnostic_id: &str) -> serde_json::Value {
+    serde_json::json!({
+        "AboutLink": "https://docs.mattermost.com/about/product.html/",
+        "AllowDownloadLogs": "true",
+        "AndroidAppDownloadLink": "https://mattermost.com/mattermost-android-app/",
+        "AndroidLatestVersion": "",
+        "AndroidMinVersion": "",
+        "AppDownloadLink": "https://mattermost.com/download/#mattermostApps",
+        "AppsPluginEnabled": "true",
+        "AsymmetricSigningPublicKey": "",
+        "BuildDate": "",
+        "BuildEnterpriseReady": "false",
+        "BuildHash": "",
+        "BuildHashEnterprise": "none",
+        "BuildNumber": "dev",
+        "CWSURL": "",
+        "CustomBrandText": "",
+        "CustomDescriptionText": "",
+        "DefaultClientLocale": "en",
+        "DiagnosticId": diagnostic_id,
+        "DiagnosticsEnabled": "true",
+        "EmailLoginButtonBorderColor": "#2389D7",
+        "EmailLoginButtonColor": "#0000",
+        "EmailLoginButtonTextColor": "#2389D7",
+        "EnableAskCommunityLink": "true",
+        "EnableBotAccountCreation": "false",
+        "EnableClientMetrics": "true",
+        "EnableComplianceExport": "false",
+        "EnableCustomBrand": "false",
+        "EnableCustomEmoji": "true",
+        "EnableDesktopLandingPage": "true",
+        "EnableDiagnostics": "true",
+        "EnableFile": "true",
+        "EnableGuestAccounts": "false",
+        "EnableJoinLeaveMessageByDefault": "true",
+        "EnableLdap": "false",
+        "EnableMultifactorAuthentication": "true",
+        "EnableOpenServer": "false",
+        "EnableSaml": "false",
+        "EnableSignInWithEmail": "true",
+        "EnableSignInWithUsername": "true",
+        "EnableSignUpWithEmail": "true",
+        "EnableSignUpWithGitLab": "true",
+        "EnableSignUpWithGoogle": "false",
+        "EnableSignUpWithOffice365": "false",
+        "EnableSignUpWithOpenId": "false",
+        "EnableUserCreation": "true",
+        "EnableUserStatuses": "true",
+        "EnforceMultifactorAuthentication": "false",
+        "FeatureFlagAppsEnabled": "false",
+        "FeatureFlagAttributeBasedAccessControl": "true",
+        "FeatureFlagChannelBookmarks": "true",
+        "FeatureFlagCloudAnnualRenewals": "false",
+        "FeatureFlagCloudDedicatedExportUI": "false",
+        "FeatureFlagCloudIPFiltering": "false",
+        "FeatureFlagConsumePostHook": "false",
+        "FeatureFlagCustomProfileAttributes": "true",
+        "FeatureFlagDeprecateCloudFree": "false",
+        "FeatureFlagEnableExportDirectDownload": "false",
+        "FeatureFlagEnableRemoteClusterService": "false",
+        "FeatureFlagEnableSharedChannelsDMs": "false",
+        "FeatureFlagEnableSharedChannelsMemberSync": "false",
+        "FeatureFlagEnableSharedChannelsPlugins": "true",
+        "FeatureFlagEnableSyncAllUsersForRemoteCluster": "false",
+        "FeatureFlagExperimentalAuditSettingsSystemConsoleUI": "false",
+        "FeatureFlagMoveThreadsEnabled": "false",
+        "FeatureFlagNormalizeLdapDNs": "false",
+        "FeatureFlagNotificationMonitoring": "true",
+        "FeatureFlagOnboardingTourTips": "true",
+        "FeatureFlagPermalinkPreviews": "false",
+        "FeatureFlagStreamlinedMarketplace": "true",
+        "FeatureFlagTestBoolFeature": "false",
+        "FeatureFlagTestFeature": "off",
+        "FeatureFlagWebSocketEventScope": "true",
+        "FeatureFlagWysiwygEditor": "false",
+        "FileLevel": "INFO",
+        "ForgotPasswordLink": "",
+        "GitLabButtonColor": "",
+        "GitLabButtonText": "",
+        "GuestAccountsEnforceMultifactorAuthentication": "false",
+        "HasImageProxy": "false",
+        "HelpLink": "https://mattermost.com/default-help/",
+        "HideGuestTags": "false",
+        "IosAppDownloadLink": "https://mattermost.com/mattermost-ios-app/",
+        "IosLatestVersion": "",
+        "IosMinVersion": "",
+        "LdapLoginButtonBorderColor": "",
+        "LdapLoginButtonColor": "",
+        "LdapLoginButtonTextColor": "",
+        "LdapLoginFieldName": "",
+        "MobileExternalBrowser": "false",
+        "NoAccounts": "false",
+        "OpenIdButtonColor": "",
+        "OpenIdButtonText": "",
+        "PasswordEnableForgotLink": "true",
+        "PasswordMinimumLength": "10",
+        "PasswordRequireLowercase": "true",
+        "PasswordRequireNumber": "true",
+        "PasswordRequireSymbol": "true",
+        "PasswordRequireUppercase": "true",
+        "PluginsEnabled": "true",
+        "PrivacyPolicyLink": "",
+        "ReportAProblemLink": "",
+        "ReportAProblemMail": "",
+        "ReportAProblemType": "default",
+        "SamlLoginButtonBorderColor": "",
+        "SamlLoginButtonColor": "",
+        "SamlLoginButtonText": "",
+        "SamlLoginButtonTextColor": "",
+        "ServiceEnvironment": "production",
+        "SiteName": site.site_name,
+        "SiteURL": site.site_url,
+        "SupportEmail": "",
+        "TelemetryId": diagnostic_id,
+        "TermsOfServiceLink": "",
+        "Version": MM_VERSION,
+        "WebsocketPort": "80",
+        "WebsocketSecurePort": "443",
+        "WebsocketURL": ""
+    })
+}
 fn diagnostic_id(site: &SiteConfig) -> String {
     let seed = if !site.site_url.is_empty() {
         site.site_url.as_bytes()
