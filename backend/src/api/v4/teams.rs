@@ -15,6 +15,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/teams", get(get_teams))
         .route("/teams/{team_id}", get(get_team))
+        .route("/teams/{team_id}/members/me", get(get_team_member_me))
         .route("/teams/{team_id}/channels", get(get_team_channels))
 }
 
@@ -70,4 +71,29 @@ async fn get_team_channels(
 
     let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
     Ok(Json(mm_channels))
+}
+
+async fn get_team_member_me(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(team_id): Path<Uuid>,
+) -> ApiResult<Json<mm::TeamMember>> {
+    let member: crate::models::TeamMember = sqlx::query_as(
+        "SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2",
+    )
+    .bind(team_id)
+    .bind(auth.user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this team".to_string()))?;
+
+    Ok(Json(mm::TeamMember {
+        team_id: member.team_id.to_string(),
+        user_id: member.user_id.to_string(),
+        roles: "team_user".to_string(),
+        delete_at: 0,
+        scheme_guest: false,
+        scheme_user: true,
+        scheme_admin: false,
+    }))
 }

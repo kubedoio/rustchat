@@ -2,6 +2,7 @@ use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::models as mm;
 use crate::mattermost_compat::MM_VERSION;
+use crate::models::server_config::SiteConfig;
 use axum::{extract::{Query, State}, routing::get, Json, Router};
 use serde::Deserialize;
 
@@ -11,9 +12,14 @@ pub fn router() -> Router<AppState> {
         .route("/license/client", get(client_license))
 }
 
-async fn client_config(State(_state): State<AppState>) -> ApiResult<Json<mm::Config>> {
+async fn client_config(State(state): State<AppState>) -> ApiResult<Json<mm::Config>> {
+    let site: (sqlx::types::Json<SiteConfig>,) =
+        sqlx::query_as("SELECT site FROM server_config WHERE id = 'default'")
+            .fetch_one(&state.db)
+            .await?;
+
     Ok(Json(mm::Config {
-        site_url: "".to_string(),
+        site_url: site.0.site_url,
         version: MM_VERSION.to_string(),
         enable_push_notifications: "false".to_string(),
         // Hardcoded diagnostic ID to satisfy client requirements

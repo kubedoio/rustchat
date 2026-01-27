@@ -192,6 +192,12 @@ pub struct FileInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelStats {
+    pub channel_id: String,
+    pub member_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Broadcast {
     pub omit_users: Option<Value>,
     pub user_id: String,

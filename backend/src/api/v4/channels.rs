@@ -19,6 +19,8 @@ pub fn router() -> Router<AppState> {
         .route("/channels/{channel_id}/posts", get(get_posts))
         .route("/channels/{channel_id}", get(get_channel))
         .route("/channels/{channel_id}/members", get(get_channel_members))
+        .route("/channels/{channel_id}/members/me", get(get_channel_member_me))
+        .route("/channels/{channel_id}/stats", get(get_channel_stats))
         .route("/channels/members/me/view", post(view_channel))
 }
 
@@ -142,6 +144,65 @@ async fn get_channel_members(
         .collect();
 
     Ok(Json(mm_members))
+}
+
+async fn get_channel_member_me(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(channel_id): Path<Uuid>,
+) -> ApiResult<Json<mm::ChannelMember>> {
+    let member: crate::models::ChannelMember = sqlx::query_as(
+        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2",
+    )
+    .bind(channel_id)
+    .bind(auth.user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    Ok(Json(mm::ChannelMember {
+        channel_id: member.channel_id.to_string(),
+        user_id: member.user_id.to_string(),
+        roles: "channel_user".to_string(),
+        last_viewed_at: member.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
+        msg_count: 0,
+        mention_count: 0,
+        notify_props: member.notify_props,
+        last_update_at: 0,
+        scheme_guest: false,
+        scheme_user: true,
+        scheme_admin: false,
+    }))
+}
+
+async fn get_channel_stats(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(channel_id): Path<Uuid>,
+) -> ApiResult<Json<mm::ChannelStats>> {
+    let is_member: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
+    )
+    .bind(channel_id)
+    .bind(auth.user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if !is_member {
+        return Err(crate::error::AppError::Forbidden("Not a member of this channel".to_string()));
+    }
+
+    let member_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM channel_members WHERE channel_id = $1",
+    )
+    .bind(channel_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(mm::ChannelStats {
+        channel_id: channel_id.to_string(),
+        member_count,
+    }))
 }
 
 async fn get_posts(

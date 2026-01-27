@@ -38,6 +38,7 @@ pub fn router() -> Router<AppState> {
             get(get_preferences).put(update_preferences),
         )
         .route("/users/status/ids", post(get_statuses_by_ids))
+        .route("/users/ids", post(get_users_by_ids))
         .route("/users/{user_id}/status", get(get_status))
         .route("/users/me/status", put(update_status))
         .route("/users/{user_id}/channels/{channel_id}/typing", post(user_typing))
@@ -852,6 +853,37 @@ async fn get_statuses_by_ids(
     }).collect();
 
     Ok(Json(statuses))
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum UsersByIdsRequest {
+    Ids(Vec<String>),
+    Wrapped { user_ids: Vec<String> },
+}
+
+async fn get_users_by_ids(
+    State(state): State<AppState>,
+    Json(input): Json<UsersByIdsRequest>,
+) -> ApiResult<Json<Vec<mm::User>>> {
+    let ids = match input {
+        UsersByIdsRequest::Ids(ids) => ids,
+        UsersByIdsRequest::Wrapped { user_ids } => user_ids,
+    };
+
+    let uuids: Vec<Uuid> = ids.iter().filter_map(|id| Uuid::parse_str(id).ok()).collect();
+
+    if uuids.is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    let users: Vec<User> = sqlx::query_as("SELECT * FROM users WHERE id = ANY($1) AND is_active = true")
+        .bind(&uuids)
+        .fetch_all(&state.db)
+        .await?;
+
+    let mm_users: Vec<mm::User> = users.into_iter().map(|u| u.into()).collect();
+    Ok(Json(mm_users))
 }
 
 async fn get_status(
