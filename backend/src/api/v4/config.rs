@@ -73,125 +73,132 @@ async fn client_license(
 }
 
 fn legacy_config(site: &SiteConfig, diagnostic_id: &str) -> serde_json::Value {
-    serde_json::json!({
-        "AboutLink": "https://docs.mattermost.com/about/product.html/",
-        "AllowDownloadLogs": "true",
-        "AndroidAppDownloadLink": "https://mattermost.com/mattermost-android-app/",
-        "AndroidLatestVersion": "",
-        "AndroidMinVersion": "",
-        "AppDownloadLink": "https://mattermost.com/download/#mattermostApps",
-        "AppsPluginEnabled": "true",
-        "AsymmetricSigningPublicKey": "",
-        "BuildDate": "",
-        "BuildEnterpriseReady": "false",
-        "BuildHash": "",
-        "BuildHashEnterprise": "none",
-        "BuildNumber": "dev",
-        "CWSURL": "",
-        "CustomBrandText": "",
-        "CustomDescriptionText": "",
-        "DefaultClientLocale": "en",
-        "DiagnosticId": diagnostic_id,
-        "DiagnosticsEnabled": "true",
-        "EmailLoginButtonBorderColor": "#2389D7",
-        "EmailLoginButtonColor": "#0000",
-        "EmailLoginButtonTextColor": "#2389D7",
-        "EnableAskCommunityLink": "true",
-        "EnableBotAccountCreation": "false",
-        "EnableClientMetrics": "true",
-        "EnableComplianceExport": "false",
-        "EnableCustomBrand": "false",
-        "EnableCustomEmoji": "true",
-        "EnableDesktopLandingPage": "true",
-        "EnableDiagnostics": "true",
-        "EnableFile": "true",
-        "EnableGuestAccounts": "false",
-        "EnableJoinLeaveMessageByDefault": "true",
-        "EnableLdap": "false",
-        "EnableMultifactorAuthentication": "true",
-        "EnableOpenServer": "false",
-        "EnableSaml": "false",
-        "EnableSignInWithEmail": "true",
-        "EnableSignInWithUsername": "true",
-        "EnableSignUpWithEmail": "true",
-        "EnableSignUpWithGitLab": "true",
-        "EnableSignUpWithGoogle": "false",
-        "EnableSignUpWithOffice365": "false",
-        "EnableSignUpWithOpenId": "false",
-        "EnableUserCreation": "true",
-        "EnableUserStatuses": "true",
-        "EnforceMultifactorAuthentication": "false",
-        "FeatureFlagAppsEnabled": "false",
-        "FeatureFlagAttributeBasedAccessControl": "true",
-        "FeatureFlagChannelBookmarks": "true",
-        "FeatureFlagCloudAnnualRenewals": "false",
-        "FeatureFlagCloudDedicatedExportUI": "false",
-        "FeatureFlagCloudIPFiltering": "false",
-        "FeatureFlagConsumePostHook": "false",
-        "FeatureFlagCustomProfileAttributes": "true",
-        "FeatureFlagDeprecateCloudFree": "false",
-        "FeatureFlagEnableExportDirectDownload": "false",
-        "FeatureFlagEnableRemoteClusterService": "false",
-        "FeatureFlagEnableSharedChannelsDMs": "false",
-        "FeatureFlagEnableSharedChannelsMemberSync": "false",
-        "FeatureFlagEnableSharedChannelsPlugins": "true",
-        "FeatureFlagEnableSyncAllUsersForRemoteCluster": "false",
-        "FeatureFlagExperimentalAuditSettingsSystemConsoleUI": "false",
-        "FeatureFlagMoveThreadsEnabled": "false",
-        "FeatureFlagNormalizeLdapDNs": "false",
-        "FeatureFlagNotificationMonitoring": "true",
-        "FeatureFlagOnboardingTourTips": "true",
-        "FeatureFlagPermalinkPreviews": "false",
-        "FeatureFlagStreamlinedMarketplace": "true",
-        "FeatureFlagTestBoolFeature": "false",
-        "FeatureFlagTestFeature": "off",
-        "FeatureFlagWebSocketEventScope": "true",
-        "FeatureFlagWysiwygEditor": "false",
-        "FileLevel": "INFO",
-        "ForgotPasswordLink": "",
-        "GitLabButtonColor": "",
-        "GitLabButtonText": "",
-        "GuestAccountsEnforceMultifactorAuthentication": "false",
-        "HasImageProxy": "false",
-        "HelpLink": "https://mattermost.com/default-help/",
-        "HideGuestTags": "false",
-        "IosAppDownloadLink": "https://mattermost.com/mattermost-ios-app/",
-        "IosLatestVersion": "",
-        "IosMinVersion": "",
-        "LdapLoginButtonBorderColor": "",
-        "LdapLoginButtonColor": "",
-        "LdapLoginButtonTextColor": "",
-        "LdapLoginFieldName": "",
-        "MobileExternalBrowser": "false",
-        "NoAccounts": "false",
-        "OpenIdButtonColor": "",
-        "OpenIdButtonText": "",
-        "PasswordEnableForgotLink": "true",
-        "PasswordMinimumLength": "10",
-        "PasswordRequireLowercase": "true",
-        "PasswordRequireNumber": "true",
-        "PasswordRequireSymbol": "true",
-        "PasswordRequireUppercase": "true",
-        "PluginsEnabled": "true",
-        "PrivacyPolicyLink": "",
-        "ReportAProblemLink": "",
-        "ReportAProblemMail": "",
-        "ReportAProblemType": "default",
-        "SamlLoginButtonBorderColor": "",
-        "SamlLoginButtonColor": "",
-        "SamlLoginButtonText": "",
-        "SamlLoginButtonTextColor": "",
-        "ServiceEnvironment": "production",
-        "SiteName": site.site_name,
-        "SiteURL": site.site_url,
-        "SupportEmail": "",
-        "TelemetryId": diagnostic_id,
-        "TermsOfServiceLink": "",
-        "Version": MM_VERSION,
-        "WebsocketPort": "80",
-        "WebsocketSecurePort": "443",
-        "WebsocketURL": ""
-    })
+    use serde_json::{Map, Value};
+
+    let mut map = Map::new();
+    let insert = |map: &mut Map<String, Value>, key: &str, value: &str| {
+        map.insert(key.to_string(), Value::String(value.to_string()));
+    };
+
+    insert(&mut map, "AboutLink", "https://docs.mattermost.com/about/product.html/");
+    insert(&mut map, "AllowDownloadLogs", "true");
+    insert(&mut map, "AndroidAppDownloadLink", "https://mattermost.com/mattermost-android-app/");
+    insert(&mut map, "AndroidLatestVersion", "");
+    insert(&mut map, "AndroidMinVersion", "");
+    insert(&mut map, "AppDownloadLink", "https://mattermost.com/download/#mattermostApps");
+    insert(&mut map, "AppsPluginEnabled", "true");
+    insert(&mut map, "AsymmetricSigningPublicKey", "");
+    insert(&mut map, "BuildDate", "");
+    insert(&mut map, "BuildEnterpriseReady", "false");
+    insert(&mut map, "BuildHash", "");
+    insert(&mut map, "BuildHashEnterprise", "none");
+    insert(&mut map, "BuildNumber", "dev");
+    insert(&mut map, "CWSURL", "");
+    insert(&mut map, "CustomBrandText", "");
+    insert(&mut map, "CustomDescriptionText", "");
+    insert(&mut map, "DefaultClientLocale", "en");
+    insert(&mut map, "DiagnosticId", diagnostic_id);
+    insert(&mut map, "DiagnosticsEnabled", "true");
+    insert(&mut map, "EmailLoginButtonBorderColor", "#2389D7");
+    insert(&mut map, "EmailLoginButtonColor", "#0000");
+    insert(&mut map, "EmailLoginButtonTextColor", "#2389D7");
+    insert(&mut map, "EnableAskCommunityLink", "true");
+    insert(&mut map, "EnableBotAccountCreation", "false");
+    insert(&mut map, "EnableClientMetrics", "true");
+    insert(&mut map, "EnableComplianceExport", "false");
+    insert(&mut map, "EnableCustomBrand", "false");
+    insert(&mut map, "EnableCustomEmoji", "true");
+    insert(&mut map, "EnableDesktopLandingPage", "true");
+    insert(&mut map, "EnableDiagnostics", "true");
+    insert(&mut map, "EnableFile", "true");
+    insert(&mut map, "EnableGuestAccounts", "false");
+    insert(&mut map, "EnableJoinLeaveMessageByDefault", "true");
+    insert(&mut map, "EnableLdap", "false");
+    insert(&mut map, "EnableMultifactorAuthentication", "true");
+    insert(&mut map, "EnableOpenServer", "false");
+    insert(&mut map, "EnableSaml", "false");
+    insert(&mut map, "EnableSignInWithEmail", "true");
+    insert(&mut map, "EnableSignInWithUsername", "true");
+    insert(&mut map, "EnableSignUpWithEmail", "true");
+    insert(&mut map, "EnableSignUpWithGitLab", "true");
+    insert(&mut map, "EnableSignUpWithGoogle", "false");
+    insert(&mut map, "EnableSignUpWithOffice365", "false");
+    insert(&mut map, "EnableSignUpWithOpenId", "false");
+    insert(&mut map, "EnableUserCreation", "true");
+    insert(&mut map, "EnableUserStatuses", "true");
+    insert(&mut map, "EnforceMultifactorAuthentication", "false");
+    insert(&mut map, "FeatureFlagAppsEnabled", "false");
+    insert(&mut map, "FeatureFlagAttributeBasedAccessControl", "true");
+    insert(&mut map, "FeatureFlagChannelBookmarks", "true");
+    insert(&mut map, "FeatureFlagCloudAnnualRenewals", "false");
+    insert(&mut map, "FeatureFlagCloudDedicatedExportUI", "false");
+    insert(&mut map, "FeatureFlagCloudIPFiltering", "false");
+    insert(&mut map, "FeatureFlagConsumePostHook", "false");
+    insert(&mut map, "FeatureFlagCustomProfileAttributes", "true");
+    insert(&mut map, "FeatureFlagDeprecateCloudFree", "false");
+    insert(&mut map, "FeatureFlagEnableExportDirectDownload", "false");
+    insert(&mut map, "FeatureFlagEnableRemoteClusterService", "false");
+    insert(&mut map, "FeatureFlagEnableSharedChannelsDMs", "false");
+    insert(&mut map, "FeatureFlagEnableSharedChannelsMemberSync", "false");
+    insert(&mut map, "FeatureFlagEnableSharedChannelsPlugins", "true");
+    insert(&mut map, "FeatureFlagEnableSyncAllUsersForRemoteCluster", "false");
+    insert(&mut map, "FeatureFlagExperimentalAuditSettingsSystemConsoleUI", "false");
+    insert(&mut map, "FeatureFlagMoveThreadsEnabled", "false");
+    insert(&mut map, "FeatureFlagNormalizeLdapDNs", "false");
+    insert(&mut map, "FeatureFlagNotificationMonitoring", "true");
+    insert(&mut map, "FeatureFlagOnboardingTourTips", "true");
+    insert(&mut map, "FeatureFlagPermalinkPreviews", "false");
+    insert(&mut map, "FeatureFlagStreamlinedMarketplace", "true");
+    insert(&mut map, "FeatureFlagTestBoolFeature", "false");
+    insert(&mut map, "FeatureFlagTestFeature", "off");
+    insert(&mut map, "FeatureFlagWebSocketEventScope", "true");
+    insert(&mut map, "FeatureFlagWysiwygEditor", "false");
+    insert(&mut map, "FileLevel", "INFO");
+    insert(&mut map, "ForgotPasswordLink", "");
+    insert(&mut map, "GitLabButtonColor", "");
+    insert(&mut map, "GitLabButtonText", "");
+    insert(&mut map, "GuestAccountsEnforceMultifactorAuthentication", "false");
+    insert(&mut map, "HasImageProxy", "false");
+    insert(&mut map, "HelpLink", "https://mattermost.com/default-help/");
+    insert(&mut map, "HideGuestTags", "false");
+    insert(&mut map, "IosAppDownloadLink", "https://mattermost.com/mattermost-ios-app/");
+    insert(&mut map, "IosLatestVersion", "");
+    insert(&mut map, "IosMinVersion", "");
+    insert(&mut map, "LdapLoginButtonBorderColor", "");
+    insert(&mut map, "LdapLoginButtonColor", "");
+    insert(&mut map, "LdapLoginButtonTextColor", "");
+    insert(&mut map, "LdapLoginFieldName", "");
+    insert(&mut map, "MobileExternalBrowser", "false");
+    insert(&mut map, "NoAccounts", "false");
+    insert(&mut map, "OpenIdButtonColor", "");
+    insert(&mut map, "OpenIdButtonText", "");
+    insert(&mut map, "PasswordEnableForgotLink", "true");
+    insert(&mut map, "PasswordMinimumLength", "10");
+    insert(&mut map, "PasswordRequireLowercase", "true");
+    insert(&mut map, "PasswordRequireNumber", "true");
+    insert(&mut map, "PasswordRequireSymbol", "true");
+    insert(&mut map, "PasswordRequireUppercase", "true");
+    insert(&mut map, "PluginsEnabled", "true");
+    insert(&mut map, "PrivacyPolicyLink", "");
+    insert(&mut map, "ReportAProblemLink", "");
+    insert(&mut map, "ReportAProblemMail", "");
+    insert(&mut map, "ReportAProblemType", "default");
+    insert(&mut map, "SamlLoginButtonBorderColor", "");
+    insert(&mut map, "SamlLoginButtonColor", "");
+    insert(&mut map, "SamlLoginButtonText", "");
+    insert(&mut map, "SamlLoginButtonTextColor", "");
+    insert(&mut map, "ServiceEnvironment", "production");
+    insert(&mut map, "SiteName", &site.site_name);
+    insert(&mut map, "SiteURL", &site.site_url);
+    insert(&mut map, "SupportEmail", "");
+    insert(&mut map, "TelemetryId", diagnostic_id);
+    insert(&mut map, "TermsOfServiceLink", "");
+    insert(&mut map, "Version", MM_VERSION);
+    insert(&mut map, "WebsocketPort", "80");
+    insert(&mut map, "WebsocketSecurePort", "443");
+    insert(&mut map, "WebsocketURL", "");
+
+    Value::Object(map)
 }
 fn diagnostic_id(site: &SiteConfig) -> String {
     let seed = if !site.site_url.is_empty() {
