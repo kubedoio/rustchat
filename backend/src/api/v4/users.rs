@@ -1,5 +1,6 @@
 use axum::{
-    extract::{Path, State, Query},
+    body::Bytes,
+    extract::{Path, Query, State},
     http::{HeaderMap, HeaderValue},
     response::IntoResponse,
     routing::{get, post, put},
@@ -559,7 +560,9 @@ mod tests {
 
 #[derive(Deserialize)]
 struct LoginRequest {
-    login_id: String,
+    login_id: Option<String>,
+    #[serde(default)]
+    email: Option<String>,
     password: String,
     #[allow(dead_code)]
     device_id: Option<String>,
@@ -567,12 +570,19 @@ struct LoginRequest {
 
 async fn login(
     State(state): State<AppState>,
-    Json(input): Json<LoginRequest>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
+    let input = parse_login_request(&headers, &body)?;
+    let login_id = input
+        .login_id
+        .or(input.email)
+        .ok_or_else(|| AppError::BadRequest("Missing login_id".to_string()))?;
+
     let user: Option<User> = sqlx::query_as(
         "SELECT * FROM users WHERE (email = $1 OR username = $1) AND is_active = true",
     )
-    .bind(&input.login_id)
+    .bind(&login_id)
     .fetch_optional(&state.db)
     .await?;
 
@@ -607,6 +617,25 @@ async fn login(
     headers.insert("Token", HeaderValue::from_str(&token).unwrap());
 
     Ok((headers, Json(mm_user)))
+}
+
+fn parse_login_request(headers: &HeaderMap, body: &Bytes) -> ApiResult<LoginRequest> {
+    let content_type = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if content_type.starts_with("application/json") {
+        serde_json::from_slice(body)
+            .map_err(|_| AppError::BadRequest("Invalid JSON body".to_string()))
+    } else if content_type.starts_with("application/x-www-form-urlencoded") {
+        serde_urlencoded::from_bytes(body)
+            .map_err(|_| AppError::BadRequest("Invalid form body".to_string()))
+    } else {
+        serde_json::from_slice(body)
+            .or_else(|_| serde_urlencoded::from_bytes(body))
+            .map_err(|_| AppError::BadRequest("Unsupported login body".to_string()))
+    }
 }
 
 async fn me(State(state): State<AppState>, auth: MmAuthUser) -> ApiResult<Json<mm::User>> {
