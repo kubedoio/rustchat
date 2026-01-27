@@ -153,6 +153,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<U
     // Task for forwarding events from hub to client + Heartbeat
     let sender_task = tokio::spawn(async move {
         let mut heartbeat = interval(Duration::from_secs(25));
+        let mut seq = seq;
         loop {
             tokio::select! {
                 // Heartbeat
@@ -167,6 +168,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<U
                         },
                         "seq": seq
                     });
+                    seq += 1;
                     if sender_sink.send(Message::Text(ping.to_string().into())).await.is_err() {
                         break;
                     }
@@ -175,8 +177,9 @@ async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<U
                 msg_res = hub_rx.recv() => {
                     if let Ok(msg_str) = msg_res {
                         if let Ok(envelope) = serde_json::from_str::<WsEnvelope>(&msg_str) {
-                            if let Some(mm_msg) = map_envelope_to_mm(&envelope, 0) {
+                            if let Some(mm_msg) = map_envelope_to_mm(&envelope, seq) {
                                 if let Ok(json) = serde_json::to_string(&mm_msg) {
+                                    seq += 1;
                                     if sender_sink.send(Message::Text(json.into())).await.is_err() {
                                         break;
                                     }

@@ -7,6 +7,7 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -25,6 +26,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/teams/members", get(my_team_members))
         .route("/users/me/teams/{team_id}/channels", get(my_team_channels))
         .route("/users/me/channels", get(my_channels))
+        .route("/users", get(list_users))
         .route(
             "/users/me/teams/{team_id}/channels/members",
             get(my_team_channel_members),
@@ -44,6 +46,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/status", get(get_my_status).put(update_status))
         .route("/users/{user_id}/channels/{channel_id}/typing", post(user_typing))
         .route("/users/me/patch", put(patch_me))
+        .route("/users/{user_id}/image", get(get_user_image))
         .route("/roles/names", post(get_roles_by_names))
         .route(
             "/users/{user_id}/sidebar/categories",
@@ -926,8 +929,10 @@ async fn update_preferences(
 
 async fn get_statuses_by_ids(
     State(state): State<AppState>,
-    Json(ids): Json<Vec<String>>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Json<Vec<mm::Status>>> {
+    let ids: Vec<String> = parse_body(&headers, &body, "Invalid status ids body")?;
     let uuids: Vec<Uuid> = ids.iter().filter_map(|id| parse_mm_or_uuid(id)).collect();
 
     if uuids.is_empty() {
@@ -966,7 +971,11 @@ async fn get_users_by_ids(
     Query(_query): Query<std::collections::HashMap<String, String>>,
     body: Bytes,
 ) -> ApiResult<Json<Vec<mm::User>>> {
-    let ids = parse_users_by_ids(&headers, &body)?;
+    let ids = parse_body::<UsersByIdsRequest>(&headers, &body, "Invalid users/ids body")
+        .map(|parsed| match parsed {
+            UsersByIdsRequest::Ids(ids) => ids,
+            UsersByIdsRequest::Wrapped { user_ids } => user_ids,
+        })?;
 
     let uuids: Vec<Uuid> = ids.iter().filter_map(|id| parse_mm_or_uuid(id)).collect();
 
@@ -983,32 +992,26 @@ async fn get_users_by_ids(
     Ok(Json(mm_users))
 }
 
-fn parse_users_by_ids(headers: &HeaderMap, body: &Bytes) -> ApiResult<Vec<String>> {
-    if body.is_empty() {
-        return Ok(vec![]);
-    }
-
+fn parse_body<T: DeserializeOwned>(
+    headers: &HeaderMap,
+    body: &Bytes,
+    message: &str,
+) -> ApiResult<T> {
     let content_type = headers
         .get(axum::http::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
-    let parsed: UsersByIdsRequest = if content_type.starts_with("application/json") {
-        serde_json::from_slice(body)
-            .map_err(|_| AppError::BadRequest("Invalid JSON body".to_string()))?
+    if content_type.starts_with("application/json") {
+        serde_json::from_slice(body).map_err(|_| AppError::BadRequest(message.to_string()))
     } else if content_type.starts_with("application/x-www-form-urlencoded") {
         serde_urlencoded::from_bytes(body)
-            .map_err(|_| AppError::BadRequest("Invalid form body".to_string()))?
+            .map_err(|_| AppError::BadRequest(message.to_string()))
     } else {
         serde_json::from_slice(body)
             .or_else(|_| serde_urlencoded::from_bytes(body))
-            .map_err(|_| AppError::BadRequest("Unsupported users/ids body".to_string()))?
-    };
-
-    Ok(match parsed {
-        UsersByIdsRequest::Ids(ids) => ids,
-        UsersByIdsRequest::Wrapped { user_ids } => user_ids,
-    })
+            .map_err(|_| AppError::BadRequest(message.to_string()))
+    }
 }
 
 async fn get_status(
@@ -1112,8 +1115,10 @@ async fn update_status(
 async fn patch_me(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(_input): Json<PatchMeRequest>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Json<mm::User>> {
+    let _input: PatchMeRequest = parse_body(&headers, &body, "Invalid patch body")?;
     let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
         .bind(auth.user_id)
         .fetch_one(&state.db)
@@ -1123,8 +1128,10 @@ async fn patch_me(
 }
 
 async fn get_roles_by_names(
-    Json(names): Json<Vec<String>>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Json<Vec<mm::Role>>> {
+    let names: Vec<String> = parse_body(&headers, &body, "Invalid roles body")?;
     let roles = names
         .into_iter()
         .map(|name| mm::Role {
@@ -1138,6 +1145,80 @@ async fn get_roles_by_names(
         .collect();
 
     Ok(Json(roles))
+}
+
+#[derive(Deserialize)]
+struct UsersQuery {
+    in_channel: Option<String>,
+    page: Option<i64>,
+    per_page: Option<i64>,
+}
+
+async fn list_users(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Query(query): Query<UsersQuery>,
+) -> ApiResult<Json<Vec<mm::User>>> {
+    let channel_id = match query.in_channel.as_deref() {
+        Some(id) => parse_mm_or_uuid(id)
+            .ok_or_else(|| AppError::BadRequest("Invalid in_channel".to_string()))?,
+        None => return Ok(Json(vec![])),
+    };
+
+    let page = query.page.unwrap_or(0).max(0);
+    let per_page = query.per_page.unwrap_or(60).clamp(1, 200);
+    let offset = page * per_page;
+
+    let is_member: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
+    )
+    .bind(channel_id)
+    .bind(auth.user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if !is_member {
+        return Err(AppError::Forbidden("Not a member of this channel".to_string()));
+    }
+
+    let users: Vec<User> = sqlx::query_as(
+        r#"
+        SELECT u.*
+        FROM users u
+        JOIN channel_members cm ON u.id = cm.user_id
+        WHERE cm.channel_id = $1 AND u.is_active = true
+        ORDER BY u.username ASC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(channel_id)
+    .bind(per_page)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mm_users: Vec<mm::User> = users.into_iter().map(|u| u.into()).collect();
+    Ok(Json(mm_users))
+}
+
+async fn get_user_image(
+    State(_state): State<AppState>,
+    Path(user_id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    let _user_id = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
+
+    const PNG_1X1: &[u8] = &[
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0,
+        0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120,
+        156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68,
+        174, 66, 96, 130,
+    ];
+
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, "image/png")],
+        PNG_1X1,
+    ))
 }
 
 async fn user_typing(

@@ -1,5 +1,6 @@
 use axum::{
     extract::{Path, State},
+    response::IntoResponse,
     routing::get,
     Json, Router,
 };
@@ -14,6 +15,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/teams", get(get_teams))
         .route("/teams/{team_id}", get(get_team))
+        .route("/teams/{team_id}/image", get(get_team_image))
         .route("/teams/{team_id}/members/me", get(get_team_member_me))
         .route("/teams/{team_id}/channels", get(get_team_channels))
 }
@@ -101,4 +103,24 @@ async fn get_team_member_me(
         scheme_user: true,
         scheme_admin: false,
     }))
+}
+
+async fn get_team_image(
+    State(_state): State<AppState>,
+    Path(team_id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    let _team_id = parse_mm_or_uuid(&team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+
+    const PNG_1X1: &[u8] = &[
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0,
+        0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120,
+        156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68,
+        174, 66, 96, 130,
+    ];
+
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, "image/png")],
+        PNG_1X1,
+    ))
 }
