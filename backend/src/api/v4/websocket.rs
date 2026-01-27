@@ -41,6 +41,7 @@ async fn ws_handler(
     Query(query): Query<WsQuery>,
 ) -> Response {
     let mut token = query.token.clone();
+    let seq_start = query.sequence_number.unwrap_or(0);
 
     // Check Authorization header if token not in query
     if token.is_none() {
@@ -61,12 +62,17 @@ async fn ws_handler(
         None
     };
 
-    ws.on_upgrade(move |socket| handle_socket(socket, state, user_id))
+    ws.on_upgrade(move |socket| handle_socket(socket, state, user_id, seq_start))
 }
 
-async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<Uuid>) {
+async fn handle_socket(
+    socket: WebSocket,
+    state: AppState,
+    mut user_id: Option<Uuid>,
+    seq_start: i64,
+) {
     let (mut sender, mut receiver) = socket.split();
-    let mut seq: i64 = 0;
+    let mut seq: i64 = seq_start;
     let connection_id = encode_mm_id(Uuid::new_v4());
 
     // 1. Wait for authentication if not already authenticated via handshake
@@ -102,16 +108,24 @@ async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<U
     };
 
     // 2. Send Hello event immediately after successful auth
-    let hello = json!({
-        "event": "hello",
-        "data": {
+    let hello = mm::WebSocketMessage {
+        seq: Some(seq),
+        event: "hello".to_string(),
+        data: json!({
             "server_version": "9.5.0",
             "connection_id": connection_id
+        }),
+        broadcast: mm::Broadcast {
+            omit_users: None,
+            user_id: "".to_string(),
+            channel_id: "".to_string(),
+            team_id: "".to_string(),
         },
-        "seq": seq
-    });
+    };
     seq += 1;
-    let _ = sender.send(Message::Text(hello.to_string().into())).await;
+    let _ = sender
+        .send(Message::Text(serde_json::to_string(&hello).unwrap_or_default().into()))
+        .await;
 
     // 3. Authenticated. Setup Hub connection.
     let username = match sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
