@@ -3,7 +3,7 @@
 RustChat implements a subset of the Mattermost API v4 to support mobile clients (Mattermost Mobile for Android/iOS).
 
 ## Compatibility Version
-The server reports version `10.11.0` to clients.
+The server reports version `9.5.0` to clients.
 
 ## Supported Endpoints
 
