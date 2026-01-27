@@ -756,7 +756,7 @@ async fn my_team_channel_members(
             last_viewed_at: m.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
             msg_count: 0,
             mention_count: 0,
-            notify_props: m.notify_props,
+            notify_props: normalize_notify_props(m.notify_props),
             last_update_at: 0,
             scheme_guest: false,
             scheme_user: true,
@@ -772,6 +772,20 @@ async fn my_teams_unread(
     _auth: MmAuthUser,
 ) -> ApiResult<Json<Vec<serde_json::Value>>> {
     Ok(Json(vec![]))
+}
+
+fn normalize_notify_props(value: serde_json::Value) -> serde_json::Value {
+    if value.is_null() {
+        return serde_json::json!({"desktop": "default", "mark_unread": "all"});
+    }
+
+    if let Some(obj) = value.as_object() {
+        if obj.is_empty() {
+            return serde_json::json!({"desktop": "default", "mark_unread": "all"});
+        }
+    }
+
+    value
 }
 
 #[derive(Deserialize)]

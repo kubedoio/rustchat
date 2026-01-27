@@ -138,7 +138,7 @@ async fn get_channel_members(
             last_viewed_at: m.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
             msg_count: 0,
             mention_count: 0,
-            notify_props: m.notify_props,
+            notify_props: normalize_notify_props(m.notify_props),
             last_update_at: 0,
             scheme_guest: false,
             scheme_user: true,
@@ -172,12 +172,26 @@ async fn get_channel_member_me(
         last_viewed_at: member.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
         msg_count: 0,
         mention_count: 0,
-        notify_props: member.notify_props,
+        notify_props: normalize_notify_props(member.notify_props),
         last_update_at: 0,
         scheme_guest: false,
         scheme_user: true,
         scheme_admin: false,
     }))
+}
+
+fn normalize_notify_props(value: serde_json::Value) -> serde_json::Value {
+    if value.is_null() {
+        return serde_json::json!({"desktop": "default", "mark_unread": "all"});
+    }
+
+    if let Some(obj) = value.as_object() {
+        if obj.is_empty() {
+            return serde_json::json!({"desktop": "default", "mark_unread": "all"});
+        }
+    }
+
+    value
 }
 
 async fn get_channel_stats(
