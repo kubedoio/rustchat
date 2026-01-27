@@ -1,4 +1,5 @@
 use axum::{
+    body::Bytes,
     extract::{Path, Query, State},
     response::IntoResponse,
     routing::{get, post},
@@ -39,8 +40,10 @@ struct ViewChannelRequest {
 async fn view_channel(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(input): Json<ViewChannelRequest>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
+    let input = parse_view_channel_request(&headers, &body)?;
     if let Some(channel_id) = parse_mm_or_uuid(&input.channel_id) {
         // Update last_viewed_at
         sqlx::query(
@@ -76,6 +79,28 @@ async fn view_channel(
         Ok(Json(serde_json::json!({"status": "OK"})))
     } else {
         Err(crate::error::AppError::BadRequest("Invalid channel_id".to_string()))
+    }
+}
+
+fn parse_view_channel_request(
+    headers: &axum::http::HeaderMap,
+    body: &Bytes,
+) -> ApiResult<ViewChannelRequest> {
+    let content_type = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if content_type.starts_with("application/json") {
+        serde_json::from_slice(body)
+            .map_err(|_| crate::error::AppError::BadRequest("Invalid JSON body".to_string()))
+    } else if content_type.starts_with("application/x-www-form-urlencoded") {
+        serde_urlencoded::from_bytes(body)
+            .map_err(|_| crate::error::AppError::BadRequest("Invalid form body".to_string()))
+    } else {
+        serde_json::from_slice(body)
+            .or_else(|_| serde_urlencoded::from_bytes(body))
+            .map_err(|_| crate::error::AppError::BadRequest("Unsupported view body".to_string()))
     }
 }
 

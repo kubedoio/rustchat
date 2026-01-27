@@ -963,8 +963,8 @@ enum UsersByIdsRequest {
 async fn get_users_by_ids(
     State(state): State<AppState>,
     headers: HeaderMap,
-    body: Bytes,
     Query(_query): Query<std::collections::HashMap<String, String>>,
+    body: Bytes,
 ) -> ApiResult<Json<Vec<mm::User>>> {
     let ids = parse_users_by_ids(&headers, &body)?;
 

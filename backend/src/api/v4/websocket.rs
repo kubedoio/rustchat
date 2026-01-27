@@ -18,7 +18,7 @@ use chrono;
 
 use crate::api::AppState;
 use crate::auth::validate_token;
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm, MM_VERSION};
+use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::realtime::{TypingEvent, WsEnvelope};
 
 pub fn router() -> Router<AppState> {
@@ -66,7 +66,8 @@ async fn ws_handler(
 
 async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<Uuid>) {
     let (mut sender, mut receiver) = socket.split();
-    let mut seq = 0;
+    let mut seq: i64 = 0;
+    let connection_id = encode_mm_id(Uuid::new_v4());
 
     // 1. Wait for authentication if not already authenticated via handshake
     if user_id.is_none() {
@@ -104,9 +105,12 @@ async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<U
     let hello = json!({
         "event": "hello",
         "data": {
-            "server_version": "9.5.0"
-        }
+            "server_version": "9.5.0",
+            "connection_id": connection_id
+        },
+        "seq": seq
     });
+    seq += 1;
     let _ = sender.send(Message::Text(hello.to_string().into())).await;
 
     // 3. Authenticated. Setup Hub connection.
