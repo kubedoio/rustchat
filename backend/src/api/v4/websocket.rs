@@ -102,22 +102,11 @@ async fn handle_socket(socket: WebSocket, state: AppState, mut user_id: Option<U
 
     // 2. Send Hello event immediately after successful auth
     let hello = json!({
-        "type": "event",
         "event": "hello",
         "data": {
-            "server_version": MM_VERSION,
-            "connection_id": "", 
-            "user_id": encode_mm_id(user_id),
-        },
-        "broadcast": {
-            "user_id": encode_mm_id(user_id),
-            "omit_users": null,
-            "team_id": "",
-            "channel_id": ""
-        },
-        "seq": seq
+            "server_version": "9.5.0"
+        }
     });
-    seq += 1;
     let _ = sender.send(Message::Text(hello.to_string().into())).await;
 
     // 3. Authenticated. Setup Hub connection.
