@@ -44,21 +44,25 @@ async fn client_config(
     .map(|row| row.0 .0)
     .unwrap_or_default();
 
-    if matches!(query.format.as_deref(), Some("old")) {
-        return Ok(Json(LegacyConfig {
+    let body = if matches!(query.format.as_deref(), Some("old")) {
+        serde_json::to_value(LegacyConfig {
             version: "9.5.0".to_string(),
             build_number: "dev".to_string(),
             site_name: site.site_name.clone(),
-        }));
-    }
+        })
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+    } else {
+        serde_json::to_value(mm::Config {
+            site_url: site.site_url.clone(),
+            version: MM_VERSION.to_string(),
+            enable_push_notifications: "false".to_string(),
+            // Hardcoded diagnostic ID to satisfy client requirements
+            diagnostic_id: "00000000-0000-0000-0000-000000000000".to_string(),
+        })
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+    };
 
-    Ok(Json(mm::Config {
-        site_url: site.site_url.clone(),
-        version: MM_VERSION.to_string(),
-        enable_push_notifications: "false".to_string(),
-        // Hardcoded diagnostic ID to satisfy client requirements
-        diagnostic_id: "00000000-0000-0000-0000-000000000000".to_string(),
-    }))
+    Ok(Json(body))
 }
 
 #[derive(Deserialize)]
@@ -71,17 +75,21 @@ async fn client_license(
     State(_state): State<AppState>,
     Query(query): Query<LicenseQuery>,
 ) -> ApiResult<impl IntoResponse> {
-    if matches!(query.format.as_deref(), Some("old")) {
-        return Ok(Json(LegacyLicense {
+    let body = if matches!(query.format.as_deref(), Some("old")) {
+        serde_json::to_value(LegacyLicense {
             is_licensed: "true".to_string(),
             telemetry_id: "12345".to_string(),
-        }));
-    }
+        })
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+    } else {
+        serde_json::to_value(mm::License {
+            is_licensed: false,
+            issued_at: 0,
+            starts_at: 0,
+            expires_at: 0,
+        })
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+    };
 
-    Ok(Json(mm::License {
-        is_licensed: false,
-        issued_at: 0,
-        starts_at: 0,
-        expires_at: 0,
-    }))
+    Ok(Json(body))
 }

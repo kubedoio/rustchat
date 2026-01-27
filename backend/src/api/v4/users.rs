@@ -642,7 +642,7 @@ async fn my_teams(
 }
 
 fn default_team() -> mm::Team {
-    let id = Uuid::new_v5(&Uuid::NAMESPACE_DNS, b"rustchat-default-team");
+    let id = Uuid::new_v4();
     mm::Team {
         id: encode_mm_id(id),
         create_at: 0,
