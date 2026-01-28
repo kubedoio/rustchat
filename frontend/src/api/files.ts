@@ -32,7 +32,6 @@ export const filesApi = {
         formData.append('file', file)
         return api.post<FileUploadResponse>('/files', formData, {
             params: channelId ? { channel_id: channelId } : undefined,
-            headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress: onProgress,
         })
     },
