@@ -20,6 +20,7 @@ pub fn router() -> Router<AppState> {
         .route("/channels/{channel_id}", get(get_channel))
         .route("/channels/{channel_id}/members", get(get_channel_members))
         .route("/channels/{channel_id}/members/me", get(get_channel_member_me))
+        .route("/channels/{channel_id}/timezones", get(get_channel_timezones))
         .route("/channels/{channel_id}/stats", get(get_channel_stats))
         .route("/channels/members/me/view", post(view_channel))
 }
@@ -249,6 +250,12 @@ async fn get_channel_stats(
         channel_id: encode_mm_id(channel_id),
         member_count,
     }))
+}
+
+async fn get_channel_timezones(
+    Path(_channel_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    Ok(Json(vec![]))
 }
 
 async fn get_posts(

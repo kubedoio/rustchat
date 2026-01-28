@@ -1,13 +1,14 @@
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::MM_VERSION;
-use axum::{extract::Query, routing::get, Json, Router, response::IntoResponse};
+use axum::{extract::Query, routing::{get, post}, Json, Router, response::IntoResponse};
 use serde::Serialize;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/system/ping", get(ping))
         .route("/system/version", get(version))
+        .route("/client_perf", post(client_perf))
 }
 
 #[derive(Serialize)]
@@ -58,6 +59,12 @@ async fn ping(Query(query): Query<PingQuery>) -> ApiResult<Json<serde_json::Valu
     .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     Ok(Json(body))
+}
+
+async fn client_perf(
+    Json(_payload): Json<serde_json::Value>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
 }
 
 async fn version() -> ApiResult<impl IntoResponse> {

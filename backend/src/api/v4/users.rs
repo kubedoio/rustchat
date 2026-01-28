@@ -26,6 +26,10 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/teams/members", get(my_team_members))
         .route("/users/me/teams/{team_id}/channels", get(my_team_channels))
         .route("/users/me/channels", get(my_channels))
+        .route(
+            "/users/me/teams/{team_id}/channels/not_members",
+            get(my_team_channels_not_members),
+        )
         .route("/users", get(list_users))
         .route(
             "/users/me/teams/{team_id}/channels/members",
@@ -40,6 +44,10 @@ pub fn router() -> Router<AppState> {
             "/users/me/preferences",
             get(get_preferences).put(update_preferences),
         )
+        .route(
+            "/users/{user_id}/preferences",
+            put(update_preferences_for_user),
+        )
         .route("/users/status/ids", post(get_statuses_by_ids))
         .route("/users/ids", post(get_users_by_ids))
         .route("/users/{user_id}/status", get(get_status))
@@ -48,6 +56,8 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/patch", put(patch_me))
         .route("/users/{user_id}/image", get(get_user_image))
         .route("/roles/names", post(get_roles_by_names))
+        .route("/users/notifications", get(get_notifications).put(update_notifications))
+        .route("/users/me/sessions", get(get_sessions))
         .route(
             "/users/{user_id}/sidebar/categories",
             get(get_categories).post(create_category).put(update_categories),
@@ -801,6 +811,51 @@ async fn my_team_channel_members(
     Ok(Json(mm_members))
 }
 
+#[derive(Deserialize)]
+struct NotMembersQuery {
+    page: Option<i64>,
+    per_page: Option<i64>,
+}
+
+async fn my_team_channels_not_members(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(team_id): Path<String>,
+    Query(query): Query<NotMembersQuery>,
+) -> ApiResult<Json<Vec<mm::Channel>>> {
+    let team_id = parse_mm_or_uuid(&team_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+
+    let page = query.page.unwrap_or(0).max(0);
+    let per_page = query.per_page.unwrap_or(60).clamp(1, 200);
+    let offset = page * per_page;
+
+    let channels: Vec<Channel> = sqlx::query_as(
+        r#"
+        SELECT c.*
+        FROM channels c
+        WHERE c.team_id = $1
+          AND c.is_archived = false
+          AND c.type IN ('public', 'private')
+          AND NOT EXISTS (
+              SELECT 1 FROM channel_members cm
+              WHERE cm.channel_id = c.id AND cm.user_id = $2
+          )
+        ORDER BY COALESCE(c.display_name, c.name) ASC
+        LIMIT $3 OFFSET $4
+        "#,
+    )
+    .bind(team_id)
+    .bind(auth.user_id)
+    .bind(per_page)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
+    Ok(Json(mm_channels))
+}
+
 async fn my_teams_unread(
     State(_state): State<AppState>,
     _auth: MmAuthUser,
@@ -903,6 +958,24 @@ async fn update_preferences(
     auth: MmAuthUser,
     Json(prefs): Json<Vec<mm::Preference>>,
 ) -> ApiResult<impl IntoResponse> {
+    update_preferences_internal(&state, auth.user_id, prefs).await
+}
+
+async fn update_preferences_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    Json(prefs): Json<Vec<mm::Preference>>,
+) -> ApiResult<impl IntoResponse> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    update_preferences_internal(&state, user_id, prefs).await
+}
+
+async fn update_preferences_internal(
+    state: &AppState,
+    user_id: Uuid,
+    prefs: Vec<mm::Preference>,
+) -> ApiResult<impl IntoResponse> {
     let mut tx = state.db.begin().await?;
 
     for p in prefs {
@@ -914,7 +987,7 @@ async fn update_preferences(
             DO UPDATE SET value = $4
             "#,
         )
-        .bind(auth.user_id)
+        .bind(user_id)
         .bind(p.category)
         .bind(p.name)
         .bind(p.value)
@@ -925,6 +998,33 @@ async fn update_preferences(
     tx.commit().await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn get_notifications() -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({
+        "email": "true",
+        "push": "mention",
+        "desktop": "all",
+        "desktop_sound": "Bing",
+        "mention_keys": "",
+        "channel": "true",
+        "first_name": "false",
+        "push_status": "online",
+        "comments": "never",
+        "milestones": "none",
+        "auto_responder_active": "false",
+        "auto_responder_message": ""
+    })))
+}
+
+async fn update_notifications(
+    Json(_input): Json<serde_json::Value>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn get_sessions() -> ApiResult<Json<Vec<serde_json::Value>>> {
+    Ok(Json(vec![]))
 }
 
 async fn get_statuses_by_ids(
