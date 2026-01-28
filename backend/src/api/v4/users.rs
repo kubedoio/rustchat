@@ -60,6 +60,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/sessions", get(get_sessions))
         .route("/users/logout", post(logout))
         .route("/users/autocomplete", get(autocomplete_users))
+        .route("/users/search", post(search_users))
         .route(
             "/users/{user_id}/sidebar/categories",
             get(get_categories).post(create_category).put(update_categories),
@@ -1127,6 +1128,106 @@ async fn autocomplete_users(
     };
 
     users.truncate(limit as usize);
+    let mm_users: Vec<mm::User> = users.into_iter().map(|u| u.into()).collect();
+    Ok(Json(mm_users))
+}
+
+#[derive(Deserialize)]
+struct UserSearchRequest {
+    term: Option<String>,
+    team_id: Option<String>,
+    not_in_channel_id: Option<String>,
+    in_channel_id: Option<String>,
+    limit: Option<i64>,
+}
+
+async fn search_users(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<Vec<mm::User>>> {
+    let input: UserSearchRequest = parse_body(&headers, &body, "Invalid search body")?;
+    let term = input.term.unwrap_or_default();
+    let like = format!("%{}%", term);
+    let limit = input.limit.unwrap_or(100).clamp(1, 200) as i64;
+
+    let users: Vec<User> = if let Some(channel_id) = input.in_channel_id {
+        let channel_id = parse_mm_or_uuid(&channel_id)
+            .ok_or_else(|| AppError::BadRequest("Invalid in_channel_id".to_string()))?;
+
+        let is_member: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
+        )
+        .bind(channel_id)
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
+        if !is_member {
+            return Err(AppError::Forbidden("Not a member of this channel".to_string()));
+        }
+
+        sqlx::query_as(
+            r#"
+            SELECT u.*
+            FROM users u
+            JOIN channel_members cm ON u.id = cm.user_id
+            WHERE cm.channel_id = $1
+              AND (u.username ILIKE $2 OR u.email ILIKE $2)
+              AND u.is_active = true
+            ORDER BY u.username ASC
+            LIMIT $3
+            "#,
+        )
+        .bind(channel_id)
+        .bind(&like)
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    } else if let Some(team_id) = input.team_id {
+        let team_id = parse_mm_or_uuid(&team_id)
+            .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+
+        let is_member: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
+        )
+        .bind(team_id)
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
+        if !is_member {
+            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+        }
+
+        sqlx::query_as(
+            r#"
+            SELECT u.*
+            FROM users u
+            JOIN team_members tm ON u.id = tm.user_id
+            WHERE tm.team_id = $1
+              AND (u.username ILIKE $2 OR u.email ILIKE $2)
+              AND u.is_active = true
+            ORDER BY u.username ASC
+            LIMIT $3
+            "#,
+        )
+        .bind(team_id)
+        .bind(&like)
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    } else {
+        sqlx::query_as(
+            "SELECT * FROM users WHERE (username ILIKE $1 OR email ILIKE $1) AND is_active = true ORDER BY username ASC LIMIT $2",
+        )
+        .bind(&like)
+        .bind(limit)
+        .fetch_all(&state.db)
+        .await?
+    };
+
     let mm_users: Vec<mm::User> = users.into_iter().map(|u| u.into()).collect();
     Ok(Json(mm_users))
 }
