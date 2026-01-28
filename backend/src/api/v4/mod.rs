@@ -4,6 +4,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 pub mod channels;
 pub mod emoji;
+pub mod commands;
 pub mod plugins;
 pub mod categories;
 pub mod config;
@@ -21,6 +22,7 @@ pub fn router() -> Router<AppState> {
         .merge(teams::router())
         .merge(channels::router())
         .merge(emoji::router())
+        .merge(commands::router())
         .merge(plugins::router())
         .merge(categories::router())
         .merge(posts::router())
