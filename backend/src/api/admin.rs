@@ -2,9 +2,10 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, patch},
+    routing::{get, patch, put},
     Json, Router,
 };
+use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
@@ -57,7 +58,10 @@ pub fn router() -> Router<AppState> {
         )
         // Permissions
         .route("/admin/permissions", get(list_permissions))
-        .route("/admin/roles/{role}/permissions", get(get_role_permissions))
+        .route(
+            "/admin/roles/{role}/permissions",
+            get(get_role_permissions).put(update_role_permissions),
+        )
         // Users management
         .route("/admin/users", get(list_users).post(create_admin_user))
         .route("/admin/users/{id}", patch(update_admin_user))
@@ -607,6 +611,47 @@ async fn get_role_permissions(
             .await?;
 
     Ok(Json(permissions.into_iter().map(|p| p.0).collect()))
+}
+
+#[derive(Deserialize)]
+struct RolePermissionsUpdate {
+    permissions: Vec<String>,
+}
+
+async fn update_role_permissions(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(role): Path<String>,
+    Json(input): Json<RolePermissionsUpdate>,
+) -> ApiResult<Json<Vec<String>>> {
+    require_admin(&auth)?;
+
+    let valid_permissions: Vec<(String,)> = sqlx::query_as(
+        "SELECT id FROM permissions WHERE id = ANY($1)",
+    )
+    .bind(&input.permissions)
+    .fetch_all(&state.db)
+    .await?;
+
+    let valid_ids: Vec<String> = valid_permissions.into_iter().map(|p| p.0).collect();
+
+    let mut tx = state.db.begin().await?;
+    sqlx::query("DELETE FROM role_permissions WHERE role = $1")
+        .bind(&role)
+        .execute(&mut *tx)
+        .await?;
+
+    for permission_id in &valid_ids {
+        sqlx::query("INSERT INTO role_permissions (role, permission_id) VALUES ($1, $2)")
+            .bind(&role)
+            .bind(permission_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    tx.commit().await?;
+
+    Ok(Json(valid_ids))
 }
 
 /// Helper function to log audit events

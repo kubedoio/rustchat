@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::models as mm;
+use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::FileInfo;
 
 pub fn router() -> Router<AppState> {
@@ -49,7 +49,7 @@ async fn upload_file(
 
         if name == "channel_id" {
             let txt = field.text().await.unwrap_or_default();
-            if let Ok(id) = Uuid::parse_str(&txt) {
+            if let Some(id) = parse_mm_or_uuid(&txt) {
                 channel_id = Some(id);
             }
         } else if name == "client_ids" {
@@ -152,8 +152,8 @@ async fn upload_file(
         .await?;
 
         file_infos.push(mm::FileInfo {
-            id: file_id.to_string(),
-            user_id: auth.user_id.to_string(),
+            id: encode_mm_id(file_id),
+            user_id: encode_mm_id(auth.user_id),
             create_at: Utc::now().timestamp_millis(),
             update_at: Utc::now().timestamp_millis(),
             delete_at: 0,
@@ -176,8 +176,10 @@ async fn upload_file(
 async fn get_file(
     State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(file_id): Path<Uuid>,
+    Path(file_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
+    let file_id = parse_mm_or_uuid(&file_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
     let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
         .bind(file_id)
         .fetch_optional(&state.db)
@@ -197,8 +199,10 @@ async fn get_file(
 async fn get_thumbnail(
     State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(file_id): Path<Uuid>,
+    Path(file_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
+    let file_id = parse_mm_or_uuid(&file_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
     let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
         .bind(file_id)
         .fetch_optional(&state.db)
@@ -220,8 +224,10 @@ async fn get_thumbnail(
 async fn get_link(
     State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(file_id): Path<Uuid>,
+    Path(file_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
+    let file_id = parse_mm_or_uuid(&file_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
     let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
         .bind(file_id)
         .fetch_optional(&state.db)

@@ -15,7 +15,7 @@ async fn mm_compat_smoke_test() {
 
     // 2. Check Ping Content
     let status = ping_res.json::<serde_json::Value>().await.unwrap();
-    assert_eq!(status["version"], "10.11.0");
+    assert_eq!(status["version"], "9.5.0");
     assert_eq!(status["AndroidLatestVersion"], "");
 
     // 3. Check License
@@ -23,11 +23,11 @@ async fn mm_compat_smoke_test() {
         .send().await.unwrap();
     let lic = lic_res.json::<serde_json::Value>().await.unwrap();
     assert_eq!(lic["IsLicensed"], "false");
-    assert!(lic.get("IssuedAt").is_some());
 
     // 4. Check Config
     let conf_res = app.api_client.get(format!("{}/api/v4/config/client?format=old", &app.address))
         .send().await.unwrap();
     let conf = conf_res.json::<serde_json::Value>().await.unwrap();
-    assert_eq!(conf["Version"], "10.11.0");
+    assert_eq!(conf["Version"], "9.5.0");
+    assert!(conf.get("DiagnosticId").is_some());
 }

@@ -14,6 +14,8 @@ pub async fn create_post(
     input: CreatePost,
     client_msg_id: Option<String>,
 ) -> ApiResult<PostResponse> {
+    ensure_permission(state, user_id, "post.create").await?;
+
     // Check membership
     let _: ChannelMember =
         sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
@@ -208,6 +210,31 @@ pub async fn create_post(
     }
 
     Ok(response)
+}
+
+async fn ensure_permission(
+    state: &AppState,
+    user_id: Uuid,
+    permission: &str,
+) -> ApiResult<()> {
+    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    let allowed: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM role_permissions WHERE role = $1 AND permission_id = $2)",
+    )
+    .bind(&role)
+    .bind(permission)
+    .fetch_one(&state.db)
+    .await?;
+
+    if !allowed {
+        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+    }
+
+    Ok(())
 }
 
 /// Helper to ensure all participants of a DM are members (resurrects DM)

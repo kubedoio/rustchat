@@ -192,9 +192,48 @@ pub struct FileInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Role {
+    pub id: String,
+    pub name: String,
+    pub display_name: String,
+    pub description: String,
+    pub permissions: Vec<String>,
+    pub scheme_managed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelStats {
+    pub channel_id: String,
+    pub member_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Broadcast {
     pub omit_users: Option<Value>,
     pub user_id: String,
     pub channel_id: String,
     pub team_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SidebarCategory {
+    pub id: String,
+    pub team_id: String,
+    pub user_id: String,
+    #[serde(rename = "type")]
+    pub category_type: String,
+    pub display_name: String,
+    pub sorting: String,
+    pub muted: bool,
+    pub collapsed: bool,
+    pub channel_ids: Vec<String>,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SidebarCategories {
+    pub categories: Vec<SidebarCategory>,
+    pub order: Vec<String>,
 }

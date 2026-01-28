@@ -18,6 +18,7 @@ const navItems = [
     { path: '/admin/teams', name: 'Teams & Channels', icon: Building2 },
     { path: '/admin/settings', name: 'Server Settings', icon: Settings },
     { path: '/admin/security', name: 'Security', icon: Shield },
+    { path: '/admin/permissions', name: 'Permissions', icon: Shield },
     { path: '/admin/integrations', name: 'Integrations', icon: Puzzle },
     { path: '/admin/compliance', name: 'Compliance', icon: Scale },
     { path: '/admin/audit', name: 'Audit Logs', icon: FileText },
