@@ -1,5 +1,6 @@
 use crate::common::spawn_app;
 use uuid::Uuid;
+use rustchat::mattermost_compat::id::parse_mm_or_uuid;
 
 mod common;
 
@@ -54,6 +55,7 @@ async fn mm_login_and_features() {
         .send().await.unwrap();
     let me_body: serde_json::Value = me_res.json().await.unwrap();
     let user_id = me_body["id"].as_str().unwrap();
+    let user_uuid = parse_mm_or_uuid(user_id).unwrap();
 
     // --- Device ---
     let device_res = app.api_client
@@ -95,13 +97,13 @@ async fn mm_login_and_features() {
     sqlx::query("INSERT INTO teams (id, org_id, name, display_name, allow_open_invite) VALUES ($1, $2, 'mmteam', 'MM Team', true)")
         .bind(team_id).bind(org_id).execute(&app.db_pool).await.unwrap();
     sqlx::query("INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2::uuid, 'member')")
-        .bind(team_id).bind(user_id).execute(&app.db_pool).await.unwrap();
+        .bind(team_id).bind(user_uuid).execute(&app.db_pool).await.unwrap();
 
     let channel_id = Uuid::new_v4();
     sqlx::query("INSERT INTO channels (id, team_id, name, type) VALUES ($1, $2, 'mmchannel', 'public')")
         .bind(channel_id).bind(team_id).execute(&app.db_pool).await.unwrap();
     sqlx::query("INSERT INTO channel_members (channel_id, user_id, role, notify_props) VALUES ($1, $2::uuid, 'member', '{}')")
-        .bind(channel_id).bind(user_id).execute(&app.db_pool).await.unwrap();
+        .bind(channel_id).bind(user_uuid).execute(&app.db_pool).await.unwrap();
 
     // --- Get Team ---
     let team_res = app.api_client.get(format!("{}/api/v4/teams/{}", &app.address, team_id))

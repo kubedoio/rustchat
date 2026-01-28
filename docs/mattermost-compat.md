@@ -3,7 +3,7 @@
 RustChat implements a subset of the Mattermost API v4 to support mobile clients (Mattermost Mobile for Android/iOS).
 
 ## Compatibility Version
-The server reports version `10.11.0` to clients.
+The server reports version `9.5.0` to clients.
 
 ## Supported Endpoints
 
@@ -28,6 +28,12 @@ The server reports version `10.11.0` to clients.
 - `GET /api/v4/channels/{channel_id}/members`: Get channel members.
 - `GET /api/v4/channels/{channel_id}/posts`: Get posts in a channel (with pagination).
 
+### Sidebar Categories
+- `GET /api/v4/users/{user_id}/teams/{team_id}/channels/categories`: Get sidebar categories for a team.
+- `POST /api/v4/users/{user_id}/teams/{team_id}/channels/categories`: Create a sidebar category.
+- `PUT /api/v4/users/{user_id}/teams/{team_id}/channels/categories`: Bulk update sidebar categories.
+- `PUT /api/v4/users/{user_id}/teams/{team_id}/channels/categories/order`: Update category ordering.
+
 ### Posts
 - `POST /api/v4/posts`: Create a new post.
 - `GET /api/v4/posts/{post_id}`: Get a specific post.
@@ -42,6 +48,12 @@ The server reports version `10.11.0` to clients.
 
 ### WebSocket
 - `/api/v4/websocket`: WebSocket connection for real-time events.
+
+## Sidebar Categories Curl
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$BASE_URL/api/v4/users/$USER_ID/teams/$TEAM_ID/channels/categories" | jq
+```
 
 ## Architecture
 All `/api/v4/*` requests are routed to the Rust backend. The frontend (Nginx) acts as a reverse proxy but does not serve these requests directly (no SPA fallback).

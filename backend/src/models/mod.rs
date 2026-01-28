@@ -4,6 +4,7 @@
 
 pub mod call;
 pub mod channel;
+pub mod channel_category;
 pub mod enterprise;
 pub mod file;
 pub mod integration;
@@ -18,6 +19,7 @@ pub mod user;
 
 pub use call::*;
 pub use channel::*;
+pub use channel_category::*;
 pub use enterprise::*;
 pub use file::*;
 pub use integration::*;

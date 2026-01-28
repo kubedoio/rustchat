@@ -46,10 +46,15 @@ impl WsHub {
         user_id: Uuid,
         username: String,
     ) -> broadcast::Receiver<String> {
-        let (tx, rx) = broadcast::channel(100);
-
         let mut connections = self.connections.write().await;
-        connections.insert(user_id, tx);
+
+        let tx = if let Some(tx) = connections.get(&user_id) {
+            tx.clone()
+        } else {
+            let (tx, _) = broadcast::channel(100);
+            connections.insert(user_id, tx.clone());
+            tx
+        };
 
         let mut presence = self.presence.write().await;
         presence.insert(user_id, "online".to_string());
@@ -57,19 +62,29 @@ impl WsHub {
         let mut usernames = self.usernames.write().await;
         usernames.insert(user_id, username);
 
-        rx
+        tx.subscribe()
     }
 
     /// Remove a connection
     pub async fn remove_connection(&self, user_id: Uuid) {
         let mut connections = self.connections.write().await;
-        connections.remove(&user_id);
 
-        let mut presence = self.presence.write().await;
-        presence.remove(&user_id);
+        // Only remove if no more subscribers
+        let remove = if let Some(tx) = connections.get(&user_id) {
+            tx.receiver_count() == 0
+        } else {
+            false
+        };
 
-        let mut usernames = self.usernames.write().await;
-        usernames.remove(&user_id);
+        if remove {
+            connections.remove(&user_id);
+
+            let mut presence = self.presence.write().await;
+            presence.remove(&user_id);
+
+            let mut usernames = self.usernames.write().await;
+            usernames.remove(&user_id);
+        }
 
         // Note: We don't eagerly remove from subscriptions here as it requires scanning all maps.
         // Lazy cleanup happens if we implement a periodic cleaner or just rely on 'connections' check.

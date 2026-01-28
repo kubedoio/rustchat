@@ -1,5 +1,6 @@
 use crate::common::spawn_app;
 use uuid::Uuid;
+use rustchat::mattermost_compat::id::encode_mm_id;
 use serde_json::Value;
 
 mod common;
@@ -116,9 +117,10 @@ async fn get_channel_posts_returns_200() {
 
     let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_object().unwrap();
-    assert!(posts.contains_key(&post_id.to_string()), "Post not found in response");
+    let post_key = encode_mm_id(post_id);
+    assert!(posts.contains_key(&post_key), "Post not found in response");
 
-    let post = &posts[&post_id.to_string()];
+    let post = &posts[&post_key];
     let reply_count = post["reply_count"].as_i64().expect("reply_count should be a number");
     assert_eq!(reply_count, 0);
 }

@@ -68,8 +68,8 @@ check_json "$BASE/api/v4/license/client?format=old" "IsLicensed"
 
 echo "Checking system version..."
 VERSION_OUT=$(curl -s "$BASE/api/v4/system/version")
-if [[ "$VERSION_OUT" == *"10.11.0"* ]]; then
-    echo "  [OK] Version is 10.11.0"
+if [[ "$VERSION_OUT" == *"9.5.0"* ]]; then
+    echo "  [OK] Version is 9.5.0"
 else
     echo "  [FAIL] Version mismatch: $VERSION_OUT"
     exit 1

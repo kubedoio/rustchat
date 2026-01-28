@@ -1,29 +1,25 @@
 # Build stage
 FROM node:24-alpine AS builder
-
 WORKDIR /app
-
-# Copy package files
 COPY package.json package-lock.json ./
-
-# Install dependencies
 RUN npm ci
-
-# Copy source
 COPY . .
-
-# Build the application
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM openresty/openresty:alpine
 
-# Copy built assets from builder stage
+# 1. Create the log directory and redirect logs to stdout/stderr
+RUN mkdir -p /var/log/nginx && \
+    ln -sf /dev/stdout /var/log/nginx/access.log && \
+    ln -sf /dev/stderr /var/log/nginx/error.log
+
+# 2. Copy built assets - ensure this matches the 'root' in your nginx.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx config
+# 3. Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/usr/local/openresty/bin/openresty", "-g", "daemon off;"]
