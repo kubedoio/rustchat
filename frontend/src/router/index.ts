@@ -53,6 +53,11 @@ const router = createRouter({
                     component: () => import('../views/admin/SecuritySettings.vue'),
                 },
                 {
+                    path: 'permissions',
+                    name: 'admin-permissions',
+                    component: () => import('../views/admin/PermissionsSettings.vue'),
+                },
+                {
                     path: 'integrations',
                     name: 'admin-integrations',
                     component: () => import('../views/admin/IntegrationsSettings.vue'),

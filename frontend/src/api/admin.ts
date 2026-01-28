@@ -141,6 +141,12 @@ export interface MiroTalkStats {
     [key: string]: any;
 }
 
+export interface Permission {
+    id: string;
+    description: string | null;
+    category: string | null;
+}
+
 // API functions
 export const adminApi = {
     // Config
@@ -179,6 +185,12 @@ export const adminApi = {
     // Stats & Health
     getStats: () => api.get<SystemStats>('/admin/stats'),
     getHealth: () => api.get<HealthStatus>('/admin/health'),
+
+    // Permissions
+    listPermissions: () => api.get<Permission[]>('/admin/permissions'),
+    getRolePermissions: (role: string) => api.get<string[]>(`/admin/roles/${role}/permissions`),
+    updateRolePermissions: (role: string, permissions: string[]) =>
+        api.put<string[]>(`/admin/roles/${role}/permissions`, { permissions }),
 
     // Teams & Channels
     listTeams: (params?: {
