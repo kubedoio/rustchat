@@ -30,8 +30,21 @@ pub struct CreateMeetingResponse {
 
 impl MiroTalkClient {
     pub fn new(config: MiroTalkConfig, http: Client) -> ApiResult<Self> {
-        let base_url = Url::parse(&config.base_url)
+        let mut base_url = Url::parse(&config.base_url)
             .map_err(|_| AppError::Config("Invalid MiroTalk base URL".to_string()))?;
+
+        // Ensure trailing slash so .join() works correctly with paths
+        // Url::join replaces the last path segment if it doesn't end in a slash.
+        // We want to treat the user-provided URL as a directory base.
+        if !base_url.path().ends_with('/') {
+            // This is a bit tricky with the `url` crate.
+            // If path is empty, it is "/" which ends with /.
+            // If path is "/foo", we want "/foo/".
+            // path_segments_mut().pop_if_empty().push("") achieves this.
+            if let Ok(mut segments) = base_url.path_segments_mut() {
+                segments.pop_if_empty().push("");
+            }
+        }
 
         Ok(Self {
             base_url,
@@ -155,11 +168,92 @@ impl MiroTalkClient {
 
         // MiroTalk P2P structure: https://url/roomname
         if let Ok(mut segments) = join_url.path_segments_mut() {
-             segments.push(room_name);
+             // Since we normalized base_url to ensure trailing slash (which means last segment is empty string),
+             // we should pop it before pushing the room name to avoid double slash (e.g. /app//room).
+             segments.pop_if_empty().push(room_name);
         } else {
              return Err(AppError::Internal("Invalid P2P URL construction".to_string()));
         }
 
         Ok(join_url.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{MiroTalkConfig, MiroTalkMode, JoinBehavior};
+    use reqwest::Client;
+    use chrono::Utc;
+
+    fn create_config(mode: MiroTalkMode, base_url: &str) -> MiroTalkConfig {
+        MiroTalkConfig {
+            is_active: true,
+            mode,
+            base_url: base_url.to_string(),
+            api_key_secret: "secret".to_string(),
+            default_room_prefix: None,
+            join_behavior: JoinBehavior::NewTab,
+            updated_at: Utc::now(),
+            updated_by: None,
+        }
+    }
+
+    #[test]
+    fn test_base_url_normalization() {
+        // Case 1: Root with slash
+        let config = create_config(MiroTalkMode::Sfu, "https://example.com/");
+        let client = MiroTalkClient::new(config, Client::new()).unwrap();
+        assert_eq!(client.base_url.as_str(), "https://example.com/");
+
+        // Case 2: Root without slash
+        let config = create_config(MiroTalkMode::Sfu, "https://example.com");
+        let client = MiroTalkClient::new(config, Client::new()).unwrap();
+        // Url parsing normalizes root to slash automatically
+        assert_eq!(client.base_url.as_str(), "https://example.com/");
+
+        // Case 3: Path with slash
+        let config = create_config(MiroTalkMode::Sfu, "https://example.com/mirotalk/");
+        let client = MiroTalkClient::new(config, Client::new()).unwrap();
+        assert_eq!(client.base_url.as_str(), "https://example.com/mirotalk/");
+
+        // Case 4: Path without slash - should be normalized to have slash
+        let config = create_config(MiroTalkMode::Sfu, "https://example.com/mirotalk");
+        let client = MiroTalkClient::new(config, Client::new()).unwrap();
+        assert_eq!(client.base_url.as_str(), "https://example.com/mirotalk/");
+    }
+
+    #[tokio::test]
+    async fn test_p2p_url_construction() {
+        let config = create_config(MiroTalkMode::P2p, "https://p2p.mirotalk.com");
+        let client = MiroTalkClient::new(config, Client::new()).unwrap();
+        let url = client.create_meeting("room1").await.unwrap();
+        assert_eq!(url, "https://p2p.mirotalk.com/room1");
+    }
+
+    #[tokio::test]
+    async fn test_p2p_url_construction_trailing_slash() {
+        let config = create_config(MiroTalkMode::P2p, "https://p2p.mirotalk.com/");
+        let client = MiroTalkClient::new(config, Client::new()).unwrap();
+        let url = client.create_meeting("room1").await.unwrap();
+        assert_eq!(url, "https://p2p.mirotalk.com/room1");
+    }
+
+    #[tokio::test]
+    async fn test_p2p_url_construction_with_path() {
+        let config = create_config(MiroTalkMode::P2p, "https://p2p.mirotalk.com/app");
+        let client = MiroTalkClient::new(config, Client::new()).unwrap();
+        let url = client.create_meeting("room1").await.unwrap();
+        assert_eq!(url, "https://p2p.mirotalk.com/app/room1");
+    }
+
+    #[tokio::test]
+    async fn test_sfu_url_construction_logic() {
+         // Verify that .join() works correctly after normalization
+         let config = create_config(MiroTalkMode::Sfu, "https://example.com/app");
+         let client = MiroTalkClient::new(config, Client::new()).unwrap();
+
+         let url = client.base_url.join("api/v1/meeting").unwrap();
+         assert_eq!(url.as_str(), "https://example.com/app/api/v1/meeting");
     }
 }
