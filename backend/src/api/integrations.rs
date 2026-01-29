@@ -81,6 +81,13 @@ pub fn router() -> Router<AppState> {
         .route("/bots/{bot_id}/tokens/{token_id}", delete(revoke_bot_token))
 }
 
+#[derive(Debug, Clone)]
+pub struct CommandAuth {
+    pub user_id: Uuid,
+    pub email: String,
+    pub role: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct TeamQuery {
     pub team_id: Uuid,
@@ -388,6 +395,25 @@ async fn execute_command(
     auth: AuthUser,
     Json(payload): Json<ExecuteCommand>,
 ) -> ApiResult<Json<CommandResponse>> {
+    let response = execute_command_internal(
+        &state,
+        CommandAuth {
+            user_id: auth.user_id,
+            email: auth.email,
+            role: auth.role,
+        },
+        payload,
+    )
+    .await?;
+
+    Ok(Json(response))
+}
+
+pub async fn execute_command_internal(
+    state: &AppState,
+    auth: CommandAuth,
+    payload: ExecuteCommand,
+) -> ApiResult<CommandResponse> {
     // 1. Parse trigger
     let parts: Vec<&str> = payload.command.split_whitespace().collect();
     if parts.is_empty() {
@@ -421,14 +447,14 @@ async fn execute_command(
             });
 
             if !config.is_enabled() {
-                return Ok(Json(CommandResponse {
+                return Ok(CommandResponse {
                     response_type: "ephemeral".to_string(),
                     text: "MiroTalk integration is not enabled".to_string(),
                     username: None,
                     icon_url: None,
                     goto_location: None,
                     attachments: None,
-                }));
+                });
             }
 
             let user = sqlx::query_as::<_, crate::models::User>(
@@ -491,24 +517,24 @@ async fn execute_command(
                     });
                     state.ws_hub.broadcast(broadcast).await;
 
-                    return Ok(Json(CommandResponse {
+                    return Ok(CommandResponse {
                         response_type: "ephemeral".to_string(),
                         text: "Call ended".to_string(),
                         username: None,
                         icon_url: None,
                         goto_location: None,
                         attachments: None,
-                    }));
+                    });
                 }
 
-                return Ok(Json(CommandResponse {
+                return Ok(CommandResponse {
                     response_type: "ephemeral".to_string(),
                     text: "No active call found in this channel".to_string(),
                     username: None,
                     icon_url: None,
                     goto_location: None,
                     attachments: None,
-                }));
+                });
             }
 
             let channel_id_mm = encode_mm_id(payload.channel_id);
@@ -568,7 +594,7 @@ async fn execute_command(
             };
 
             let _ = crate::services::posts::create_post(
-                &state,
+                state,
                 auth.user_id,
                 payload.channel_id,
                 create_post_input,
@@ -576,45 +602,45 @@ async fn execute_command(
             )
             .await?;
 
-            return Ok(Json(CommandResponse {
+            return Ok(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: "Call started".to_string(),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
         "echo" => {
-            return Ok(Json(CommandResponse {
+            return Ok(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Echo: {}", args),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
         "shrug" => {
-            return Ok(Json(CommandResponse {
+            return Ok(CommandResponse {
                 response_type: "in_channel".to_string(),
                 text: format!("{} ¯\\_(ツ)_/¯", args),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
         "invite" => {
             // Mock invite
-            return Ok(Json(CommandResponse {
+            return Ok(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Invitation sent to {}", args),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
         _ => {}
     }
@@ -691,27 +717,27 @@ async fn execute_command(
                         goto_location: None,
                         attachments: None,
                     });
-            return Ok(Json(resp_body));
-        } else {
-            return Ok(Json(CommandResponse {
+                return Ok(resp_body);
+            } else {
+            return Ok(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Command failed with status: {}", res.status()),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
     }
 
-    Ok(Json(CommandResponse {
+    Ok(CommandResponse {
         response_type: "ephemeral".to_string(),
         text: format!("Command /{} not found", trigger),
         username: None,
         icon_url: None,
         goto_location: None,
         attachments: None,
-    }))
+    })
 }
 
 // ============ Bots ============
