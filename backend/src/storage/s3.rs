@@ -34,6 +34,7 @@ impl S3Client {
     ) -> Self {
         let access_key_main = access_key.clone();
         let secret_key_main = secret_key.clone();
+        let region_main = region.clone();
 
         let credentials = match (access_key_main, secret_key_main) {
             (Some(ak), Some(sk)) => Some(Credentials::new(ak, sk, None, None, "rustchat")),
@@ -41,7 +42,7 @@ impl S3Client {
         };
 
         let mut config_builder = Config::builder()
-            .region(Region::new(region))
+            .region(Region::new(region_main))
             .behavior_version_latest()
             .force_path_style(true);
 
