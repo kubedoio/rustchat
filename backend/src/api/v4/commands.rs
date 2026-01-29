@@ -58,7 +58,7 @@ struct AutocompleteParams {
 
 /// Generate a deterministic 26-char MM-style ID from a seed string
 fn generate_mm_id(seed: &str) -> String {
-    use sha2::{Sha256, Digest};
+use sha2::Digest;
     let mut hasher = Sha256::new();
     hasher.update(seed.as_bytes());
     let result = hasher.finalize();
@@ -720,6 +720,12 @@ async fn handle_join_command(
         }));
     }
 
+    // Fetch username
+    let username = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
     // Find the channel
     let team_filter = if let Some(tid) = team_id {
         sqlx::query_as::<_, crate::models::Channel>(
@@ -770,7 +776,7 @@ async fn handle_join_command(
 
         Ok(Json(CommandResponse {
             response_type: "in_channel".to_string(),
-            text: format!("@{} joined the channel.", auth.username),
+            text: format!("@{} joined the channel.", username),
             username: None,
             icon_url: None,
             goto_location: None,
@@ -794,6 +800,12 @@ async fn handle_leave_command(
     auth: MmAuthUser,
     channel_id: uuid::Uuid,
 ) -> ApiResult<Json<CommandResponse>> {
+    // Fetch username
+    let username = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
     // Remove from channel
     let result = sqlx::query(
         "DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2"
@@ -816,7 +828,7 @@ async fn handle_leave_command(
 
     Ok(Json(CommandResponse {
         response_type: "in_channel".to_string(),
-        text: format!("@{} left the channel.", auth.username),
+        text: format!("@{} left the channel.", username),
         username: None,
         icon_url: None,
         goto_location: None,
@@ -854,8 +866,9 @@ async fn handle_mute_command(
     if let Some(channel) = channel {
         // Update notification settings to mute
         sqlx::query(
-            "UPDATE channel_members SET notify_props = jsonb_set(notify_props, '{mark_unread}', '"mute"') WHERE channel_id = $1 AND user_id = $2"
+            "UPDATE channel_members SET notify_props = jsonb_set(notify_props, '{mark_unread}', $1) WHERE channel_id = $2 AND user_id = $3"
         )
+        .bind(serde_json::json!("mute"))
         .bind(channel.id)
         .bind(auth.user_id)
         .execute(&state.db)
@@ -900,6 +913,12 @@ async fn handle_header_command(
         }));
     }
 
+    // Fetch username
+    let username = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
     // Update channel header
     sqlx::query("UPDATE channels SET description = $1 WHERE id = $2")
         .bind(header)
@@ -909,7 +928,7 @@ async fn handle_header_command(
 
     Ok(Json(CommandResponse {
         response_type: "in_channel".to_string(),
-        text: format!("@{} updated the channel header.", auth.username),
+        text: format!("@{} updated the channel header.", username),
         username: None,
         icon_url: None,
         goto_location: None,
@@ -936,6 +955,12 @@ async fn handle_purpose_command(
         }));
     }
 
+    // Fetch username
+    let username = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await?;
+
     // For now, store purpose in channel props
     sqlx::query(
         "UPDATE channels SET props = jsonb_set(props, '{purpose}', $1) WHERE id = $2"
@@ -947,7 +972,7 @@ async fn handle_purpose_command(
 
     Ok(Json(CommandResponse {
         response_type: "in_channel".to_string(),
-        text: format!("@{} updated the channel purpose.", auth.username),
+        text: format!("@{} updated the channel purpose.", username),
         username: None,
         icon_url: None,
         goto_location: None,
@@ -977,7 +1002,7 @@ fn parse_body<T: serde::de::DeserializeOwned>(
 }
 
 async fn autocomplete_suggestions(
-    Path(team): Path<TeamPath>,
+    Path(_team): Path<TeamPath>,
     Query(query): Query<AutocompleteQuery>,
     _auth: MmAuthUser,
 ) -> ApiResult<Json<serde_json::Value>> {
