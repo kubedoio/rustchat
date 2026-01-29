@@ -203,7 +203,7 @@ impl S3Client {
         }
 
         parsed.set_port(public.port()).map_err(|e| {
-            AppError::Internal(format!("Public endpoint port error: {}", e))
+            AppError::Internal(format!("Public endpoint port error: {:?}", e))
         })?;
 
         let base_path = public.path().trim_end_matches('/');
