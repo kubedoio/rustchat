@@ -121,7 +121,9 @@ async fn create_meeting(
             base
         }
     };
-    join_url.query_pairs_mut().append_pair("name", &display_name);
+    if !join_url.query_pairs().any(|(k, _)| k == "name") {
+        join_url.query_pairs_mut().append_pair("name", &display_name);
+    }
 
     // 5. Post system message
     let message_text = "started a video call".to_string();

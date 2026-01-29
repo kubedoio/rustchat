@@ -563,7 +563,9 @@ pub async fn execute_command_internal(
                     base
                 }
             };
-            join_url.query_pairs_mut().append_pair("name", &display_name);
+            if !join_url.query_pairs().any(|(k, _)| k == "name") {
+                join_url.query_pairs_mut().append_pair("name", &display_name);
+            }
 
             let attachments = serde_json::json!([
                 {
