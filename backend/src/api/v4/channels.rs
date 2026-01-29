@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -13,6 +14,7 @@ use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::post::PostResponse;
+use crate::models::Channel;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -85,8 +87,6 @@ async fn view_channel(
             exclude_user_id: None,
         });
         state.ws_hub.broadcast(broadcast).await;
-
-        Ok(Json(serde_json::json!({"status": "OK"})))
     }
 
     Ok(Json(serde_json::json!({"status": "OK"})))
@@ -96,6 +96,14 @@ fn parse_view_channel_request(
     headers: &axum::http::HeaderMap,
     body: &Bytes,
 ) -> ApiResult<ViewChannelRequest> {
+    parse_body(headers, body, "Invalid view body")
+}
+
+fn parse_body<T: DeserializeOwned>(
+    headers: &axum::http::HeaderMap,
+    body: &Bytes,
+    message: &str,
+) -> ApiResult<T> {
     let content_type = headers
         .get(axum::http::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -103,14 +111,14 @@ fn parse_view_channel_request(
 
     if content_type.starts_with("application/json") {
         serde_json::from_slice(body)
-            .map_err(|_| crate::error::AppError::BadRequest("Invalid JSON body".to_string()))
+            .map_err(|_| crate::error::AppError::BadRequest(message.to_string()))
     } else if content_type.starts_with("application/x-www-form-urlencoded") {
         serde_urlencoded::from_bytes(body)
-            .map_err(|_| crate::error::AppError::BadRequest("Invalid form body".to_string()))
+            .map_err(|_| crate::error::AppError::BadRequest(message.to_string()))
     } else {
         serde_json::from_slice(body)
             .or_else(|_| serde_urlencoded::from_bytes(body))
-            .map_err(|_| crate::error::AppError::BadRequest("Unsupported view body".to_string()))
+            .map_err(|_| crate::error::AppError::BadRequest(message.to_string()))
     }
 }
 
@@ -278,8 +286,7 @@ async fn create_direct_channel(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<mm::Channel>> {
-    let input: DirectChannelRequest = parse_view_channel_request(&headers, &body)
-        .map_err(|_| crate::error::AppError::BadRequest("Invalid user_ids".to_string()))?;
+    let input: DirectChannelRequest = parse_body(&headers, &body, "Invalid user_ids")?;
 
     if input.user_ids.len() != 2 {
         return Err(crate::error::AppError::BadRequest("user_ids must contain 2 users".to_string()));
