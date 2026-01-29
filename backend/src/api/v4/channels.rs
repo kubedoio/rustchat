@@ -8,6 +8,7 @@ use axum::{
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
