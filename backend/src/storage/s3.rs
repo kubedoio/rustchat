@@ -9,7 +9,6 @@ use aws_sdk_s3::{
 };
 use std::time::Duration;
 use tracing::error;
-use url::Url;
 
 use crate::error::AppError;
 
@@ -20,6 +19,7 @@ pub struct S3Client {
     bucket: String,
     endpoint: Option<String>,
     public_endpoint: Option<String>,
+    public_client: Option<Client>,
 }
 
 impl S3Client {
@@ -32,7 +32,10 @@ impl S3Client {
         secret_key: Option<String>,
         region: String,
     ) -> Self {
-        let credentials = match (access_key, secret_key) {
+        let access_key_main = access_key.clone();
+        let secret_key_main = secret_key.clone();
+
+        let credentials = match (access_key_main, secret_key_main) {
             (Some(ak), Some(sk)) => Some(Credentials::new(ak, sk, None, None, "rustchat")),
             _ => None,
         };
@@ -54,11 +57,30 @@ impl S3Client {
         let config = config_builder.build();
         let client = Client::from_conf(config);
 
+        let public_client = public_endpoint.as_ref().map(|ep| {
+            let mut public_builder = Config::builder()
+                .region(Region::new(region.clone()))
+                .behavior_version_latest()
+                .force_path_style(true);
+
+            if let (Some(ak), Some(sk)) = (access_key.clone(), secret_key.clone()) {
+                let creds = Credentials::new(ak, sk, None, None, "rustchat");
+                public_builder =
+                    public_builder.credentials_provider(SharedCredentialsProvider::new(creds));
+            }
+
+            public_builder = public_builder.endpoint_url(ep);
+
+            let public_config = public_builder.build();
+            Client::from_conf(public_config)
+        });
+
         Self {
             client,
             bucket,
             endpoint,
             public_endpoint,
+            public_client,
         }
     }
 
@@ -139,8 +161,8 @@ impl S3Client {
             .build()
             .map_err(|e| AppError::Internal(format!("Presigning config error: {}", e)))?;
 
-        let presigned = self
-            .client
+        let presign_client = self.public_client.as_ref().unwrap_or(&self.client);
+        let presigned = presign_client
             .get_object()
             .bucket(&self.bucket)
             .key(key)
@@ -151,8 +173,7 @@ impl S3Client {
                 AppError::Internal(format!("Presigning error: {}", e))
             })?;
 
-        let url = presigned.uri().to_string();
-        self.rewrite_public_url(&url)
+        Ok(presigned.uri().to_string())
     }
 
     /// Generate a presigned upload URL
@@ -167,8 +188,8 @@ impl S3Client {
             .build()
             .map_err(|e| AppError::Internal(format!("Presigning config error: {}", e)))?;
 
-        let presigned = self
-            .client
+        let presign_client = self.public_client.as_ref().unwrap_or(&self.client);
+        let presigned = presign_client
             .put_object()
             .bucket(&self.bucket)
             .key(key)
@@ -180,39 +201,7 @@ impl S3Client {
                 AppError::Internal(format!("Presigning error: {}", e))
             })?;
 
-        let url = presigned.uri().to_string();
-        self.rewrite_public_url(&url)
-    }
-
-    fn rewrite_public_url(&self, url: &str) -> Result<String, AppError> {
-        let Some(public_endpoint) = &self.public_endpoint else {
-            return Ok(url.to_string());
-        };
-
-        let mut parsed = Url::parse(url)
-            .map_err(|e| AppError::Internal(format!("Presigned URL parse error: {}", e)))?;
-        let public = Url::parse(public_endpoint)
-            .map_err(|e| AppError::Internal(format!("Public endpoint parse error: {}", e)))?;
-
-        parsed.set_scheme(public.scheme()).ok();
-
-        if let Some(host) = public.host_str() {
-            parsed.set_host(Some(host)).map_err(|e| {
-                AppError::Internal(format!("Public endpoint host error: {}", e))
-            })?;
-        }
-
-        parsed.set_port(public.port()).map_err(|e| {
-            AppError::Internal(format!("Public endpoint port error: {:?}", e))
-        })?;
-
-        let base_path = public.path().trim_end_matches('/');
-        if !base_path.is_empty() && base_path != "/" {
-            let new_path = format!("{}{}", base_path, parsed.path());
-            parsed.set_path(&new_path);
-        }
-
-        Ok(parsed.to_string())
+        Ok(presigned.uri().to_string())
     }
 
     /// Get the public URL for a file (if bucket is public)
