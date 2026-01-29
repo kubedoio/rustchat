@@ -146,7 +146,26 @@ async fn get_channel(
         .fetch_one(&state.db)
         .await?;
 
-    Ok(Json(channel.into()))
+    let mut mm_channel: mm::Channel = channel.clone().into();
+    
+    // For DM channels, populate display_name with the other user's name
+    if channel.channel_type == crate::models::channel::ChannelType::Direct {
+        if let Ok(other_user) = sqlx::query_as::<_, crate::models::User>(
+            "SELECT u.* FROM users u 
+             JOIN channel_members cm ON cm.user_id = u.id 
+             WHERE cm.channel_id = $1 AND u.id != $2"
+        )
+        .bind(channel_id)
+        .bind(auth.user_id)
+        .fetch_one(&state.db)
+        .await
+        {
+            mm_channel.display_name = other_user.display_name
+                .unwrap_or(other_user.username);
+        }
+    }
+
+    Ok(Json(mm_channel))
 }
 
 async fn get_channel_members(
@@ -277,8 +296,10 @@ async fn get_channel_timezones(
 }
 
 #[derive(serde::Deserialize)]
-struct DirectChannelRequest {
-    user_ids: Vec<String>,
+#[serde(untagged)]
+enum DirectChannelRequest {
+    Array(Vec<String>),
+    Object { user_ids: Vec<String> },
 }
 
 async fn create_direct_channel(
@@ -288,13 +309,18 @@ async fn create_direct_channel(
     body: Bytes,
 ) -> ApiResult<Json<mm::Channel>> {
     let input: DirectChannelRequest = parse_body(&headers, &body, "Invalid user_ids")?;
+    
+    // Extract user_ids from either format (array or object)
+    let user_ids = match input {
+        DirectChannelRequest::Array(ids) => ids,
+        DirectChannelRequest::Object { user_ids } => user_ids,
+    };
 
-    if input.user_ids.len() != 2 {
+    if user_ids.len() != 2 {
         return Err(crate::error::AppError::BadRequest("user_ids must contain 2 users".to_string()));
     }
 
-    let mut ids: Vec<Uuid> = input
-        .user_ids
+    let mut ids: Vec<Uuid> = user_ids
         .iter()
         .filter_map(|id| parse_mm_or_uuid(id))
         .collect();

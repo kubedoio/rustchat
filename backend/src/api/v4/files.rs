@@ -56,7 +56,8 @@ async fn upload_file(
         } else if name == "client_ids" {
              let txt = field.text().await.unwrap_or_default();
              client_ids.push(txt);
-        } else if name == "files" {
+        } else if name == "files" || name == "file" {
+            // Handle explicit "files" or "file" field names
             let filename = field.file_name().unwrap_or("unknown").to_string();
             let content_type = field
                 .content_type()
@@ -73,7 +74,33 @@ async fn upload_file(
                 content_type,
                 data,
             });
+        } else if field.file_name().is_some() {
+            // Handle any field that has a file_name (Mattermost mobile uploads this way)
+            let filename = field.file_name().unwrap_or("unknown").to_string();
+            let content_type = field
+                .content_type()
+                .unwrap_or("application/octet-stream")
+                .to_string();
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
+                .to_vec();
+
+            tracing::info!("Received file upload: field_name={}, filename={}", name, filename);
+
+            pending_files.push(PendingFile {
+                filename,
+                content_type,
+                data,
+            });
         }
+    }
+
+    tracing::info!("File upload processed: {} files, channel_id={:?}", pending_files.len(), channel_id);
+
+    if pending_files.is_empty() {
+        return Err(AppError::BadRequest("No files received in upload".to_string()));
     }
 
     let mut file_infos: Vec<mm::FileInfo> = Vec::new();
