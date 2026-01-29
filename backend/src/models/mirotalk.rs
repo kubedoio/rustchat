@@ -39,3 +39,25 @@ impl MiroTalkConfig {
         self.mode != MiroTalkMode::Disabled && !self.base_url.is_empty()
     }
 }
+
+// API Response Models
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MiroTalkStats {
+    pub peers: Option<i32>,
+    pub rooms: Option<i32>,
+    pub active_rooms: Option<Vec<String>>,
+    // Add other fields as needed based on actual API response
+    #[serde(flatten)]
+    pub extra: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MeetingsResponse {
+    pub meetings: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateMeetingResponse {
+    pub meeting: String, // The URL
+}

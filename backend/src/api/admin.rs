@@ -19,6 +19,7 @@ use crate::models::{
     CreateRetentionPolicy,
     CreateSsoConfig,
     MiroTalkConfig,
+    MiroTalkStats,
     Permission,
     RetentionPolicy,
     ServerConfig,
@@ -29,7 +30,7 @@ use crate::models::{
     TeamMemberResponse,
     UpdateChannel,
 };
-use crate::services::mirotalk::{MiroTalkClient, MiroTalkStats};
+use crate::services::mirotalk::MiroTalkClient;
 use sqlx::FromRow;
 
 /// Build admin routes
