@@ -735,6 +735,15 @@ async fn update_config(
         .fetch_one(&state.db)
         .await?;
 
+    // If authentication config was updated, sync max_simultaneous_connections with WsHub
+    if category == "authentication" {
+        if let Ok(auth_config) = serde_json::from_value::<crate::models::AuthConfig>(result.0.0.clone()) {
+            let max_conn = auth_config.max_simultaneous_connections.max(1) as usize;
+            state.ws_hub.set_max_connections_per_user(max_conn).await;
+            tracing::info!("Updated max_simultaneous_connections to {}", max_conn);
+        }
+    }
+
     // Broadcast config update to all connected users
     let event = crate::realtime::events::WsEnvelope::event(
         crate::realtime::events::EventType::ConfigUpdated,

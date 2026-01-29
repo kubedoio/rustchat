@@ -43,7 +43,6 @@ const currentStatus = computed(() => {
         class="w-3 h-3 fill-current" 
         :class="statuses.find(s => s.id === currentStatus)?.color || 'text-green-500'" 
       />
-      <span class="text-xs font-medium text-gray-700 dark:text-gray-200 capitalize">{{ currentStatus }}</span>
       <ChevronDown class="w-3.5 h-3.5 text-gray-500" />
     </button>
 

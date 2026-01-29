@@ -72,6 +72,12 @@ pub struct AuthConfig {
     pub password_require_symbol: bool,
     #[serde(default = "default_session_length")]
     pub session_length_hours: i32,
+    #[serde(default = "default_max_connections")]
+    pub max_simultaneous_connections: i32,
+}
+
+fn default_max_connections() -> i32 {
+    5
 }
 
 fn default_true() -> bool {
@@ -96,6 +102,7 @@ impl Default for AuthConfig {
             password_require_number: true,
             password_require_symbol: false,
             session_length_hours: 24,
+            max_simultaneous_connections: 5,
         }
     }
 }

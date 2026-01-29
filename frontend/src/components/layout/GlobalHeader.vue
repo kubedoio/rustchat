@@ -215,14 +215,6 @@ const statusLabel = computed(() => {
                     System Console
                 </button>
                 <button 
-                  v-if="auth.user?.role === 'system_admin' || auth.user?.role === 'org_admin'"
-                  @click="$router.push('/admin'); showUserMenu = false"
-                  class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md flex items-center transition-colors"
-                >
-                    <Shield class="w-4 h-4 mr-2" />
-                    System Console
-                </button>
-                <button 
                   @click="ui.openSettings(); showUserMenu = false"
                   class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-md flex items-center transition-colors"
                 >

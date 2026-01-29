@@ -101,8 +101,14 @@ async fn ws_handler(
 async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
 
-    // Add connection to hub
-    let mut rx = state.ws_hub.add_connection(user_id, username.clone()).await;
+    // Add connection to hub with multi-login support
+    let (conn_id, mut rx) = match state.ws_hub.add_connection(user_id, username.clone()).await {
+        Some((id, receiver)) => (id, receiver),
+        None => {
+            tracing::warn!("Max connections reached for user {}, rejecting WebSocket", user_id);
+            return;
+        }
+    };
 
     // Fetch user's teams and subscribe
     let teams =
@@ -365,7 +371,7 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
     }
 
     // Cleanup
-    state.ws_hub.remove_connection(user_id).await;
+    state.ws_hub.remove_connection(user_id, conn_id).await;
 
     // Persist presence and broadcast
     let _ = sqlx::query("UPDATE users SET presence = 'offline' WHERE id = $1")

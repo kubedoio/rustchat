@@ -137,7 +137,18 @@ async fn handle_socket(
         Err(_) => "Unknown".to_string(),
     };
 
-    let rx = state.ws_hub.add_connection(user_id, username.clone()).await;
+    // Add connection with multi-login support
+    let (conn_id, rx) = match state.ws_hub.add_connection(user_id, username.clone()).await {
+        Some((id, receiver)) => (id, receiver),
+        None => {
+            tracing::warn!("Max connections reached for user {}, rejecting WebSocket", user_id);
+            let _ = sender.send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                code: axum::extract::ws::close_code::POLICY,
+                reason: "Max connections reached".into(),
+            }))).await;
+            return;
+        }
+    };
 
     // Subscribe to teams and channels
     let teams = sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
@@ -190,17 +201,26 @@ async fn handle_socket(
                 // Hub events
                 msg_res = hub_rx.recv() => {
                     if let Ok(msg_str) = msg_res {
+                        tracing::debug!("[WS] Received hub event: {}", msg_str);
                         if let Ok(envelope) = serde_json::from_str::<WsEnvelope>(&msg_str) {
+                            tracing::debug!("[WS] Parsed envelope: event={}", envelope.event);
                             if let Some(mm_msg) = map_envelope_to_mm(&envelope, seq) {
+                                tracing::info!("[WS] Sending to client {}: event={} seq={}", user_id, mm_msg.event, seq);
                                 if let Ok(json) = serde_json::to_string(&mm_msg) {
                                     seq += 1;
                                     if sender_sink.send(Message::Text(json.into())).await.is_err() {
+                                        tracing::warn!("[WS] Failed to send to client {}", user_id);
                                         break;
                                     }
                                 }
+                            } else {
+                                tracing::warn!("[WS] Failed to map envelope to MM format: event={}", envelope.event);
                             }
+                        } else {
+                            tracing::error!("[WS] Failed to parse envelope: {}", msg_str);
                         }
                     } else {
+                        tracing::info!("[WS] Hub receiver closed for user {}", user_id);
                         break;
                     }
                 }
@@ -228,7 +248,7 @@ async fn handle_socket(
         _ = receive_task => {},
     }
 
-    state.ws_hub.remove_connection(user_id).await;
+    state.ws_hub.remove_connection(user_id, conn_id).await;
 }
 
 fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage> {
