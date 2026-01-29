@@ -187,7 +187,7 @@ mod tests {
         let now = Utc::now();
         let c = Channel {
             id: channel_id,
-            team_id: team_id,
+            team_id,
             channel_type: ChannelType::Public,
             name: "general".to_string(),
             display_name: Some("General".to_string()),

@@ -2,7 +2,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::error::{AppError, ApiResult};
+use crate::error::{ApiResult, AppError};
 use crate::models::{MiroTalkConfig, MiroTalkMode};
 
 #[derive(Debug, Clone)]
@@ -55,10 +55,14 @@ impl MiroTalkClient {
     }
 
     pub async fn stats(&self) -> ApiResult<MiroTalkStats> {
-        let url = self.base_url.join("api/v1/stats")
+        let url = self
+            .base_url
+            .join("api/v1/stats")
             .map_err(|_| AppError::Internal("Failed to build stats URL".to_string()))?;
 
-        let response = self.http.get(url)
+        let response = self
+            .http
+            .get(url)
             .header("authorization", &self.api_key_secret)
             .header("Content-Type", "application/json")
             .send()
@@ -68,11 +72,15 @@ impl MiroTalkClient {
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(AppError::ExternalService(format!("MiroTalk stats error {}: {}", status, text)));
+            return Err(AppError::ExternalService(format!(
+                "MiroTalk stats error {}: {}",
+                status, text
+            )));
         }
 
-        let stats = response.json::<MiroTalkStats>().await
-            .map_err(|e| AppError::ExternalService(format!("Failed to parse MiroTalk stats: {}", e)))?;
+        let stats = response.json::<MiroTalkStats>().await.map_err(|e| {
+            AppError::ExternalService(format!("Failed to parse MiroTalk stats: {}", e))
+        })?;
 
         Ok(stats)
     }
@@ -86,13 +94,17 @@ impl MiroTalkClient {
         } else {
             // P2P usually doesn't expose active rooms easily via public API unless configured.
             // We'll try same endpoint or return empty.
-             "api/v1/rooms"
+            "api/v1/rooms"
         };
 
-        let url = self.base_url.join(endpoint)
+        let url = self
+            .base_url
+            .join(endpoint)
             .map_err(|_| AppError::Internal("Failed to build meetings URL".to_string()))?;
 
-        let response = self.http.get(url)
+        let response = self
+            .http
+            .get(url)
             .header("authorization", &self.api_key_secret)
             .send()
             .await;
@@ -101,8 +113,8 @@ impl MiroTalkClient {
             Ok(resp) => {
                 if resp.status().is_success() {
                     // Try to parse as list of strings
-                     let rooms = resp.json::<Vec<String>>().await.unwrap_or_default();
-                     Ok(rooms)
+                    let rooms = resp.json::<Vec<String>>().await.unwrap_or_default();
+                    Ok(rooms)
                 } else {
                     // Fail silently or return empty for now as P2P might not support it
                     Ok(vec![])
@@ -116,31 +128,46 @@ impl MiroTalkClient {
         match self.mode {
             MiroTalkMode::Sfu => self.create_meeting_sfu(room_name).await,
             MiroTalkMode::P2p => self.create_meeting_p2p(room_name).await,
-            MiroTalkMode::Disabled => Err(AppError::Config("MiroTalk integration is disabled".to_string())),
+            MiroTalkMode::Disabled => Err(AppError::Config(
+                "MiroTalk integration is disabled".to_string(),
+            )),
         }
     }
 
     async fn create_meeting_sfu(&self, room_name: &str) -> ApiResult<String> {
-        let url = self.base_url.join("api/v1/meeting")
+        let url = self
+            .base_url
+            .join("api/v1/meeting")
             .map_err(|_| AppError::Internal("Failed to build meeting URL".to_string()))?;
 
         let body = serde_json::json!({
             "room": room_name,
         });
 
-        let response = self.http.post(url)
+        let response = self
+            .http
+            .post(url)
             .header("authorization", &self.api_key_secret)
             .json(&body)
             .send()
             .await
-            .map_err(|e| AppError::ExternalService(format!("Failed to create SFU meeting: {}", e)))?;
+            .map_err(|e| {
+                AppError::ExternalService(format!("Failed to create SFU meeting: {}", e))
+            })?;
 
         if !response.status().is_success() {
-             return Err(AppError::ExternalService(format!("MiroTalk create meeting failed: {}", response.status())));
+            return Err(AppError::ExternalService(format!(
+                "MiroTalk create meeting failed: {}",
+                response.status()
+            )));
         }
 
-        let data = response.json::<CreateMeetingResponse>().await
-            .map_err(|e| AppError::ExternalService(format!("Invalid response from MiroTalk: {}", e)))?;
+        let data = response
+            .json::<CreateMeetingResponse>()
+            .await
+            .map_err(|e| {
+                AppError::ExternalService(format!("Invalid response from MiroTalk: {}", e))
+            })?;
 
         Ok(data.meeting)
     }
@@ -168,11 +195,13 @@ impl MiroTalkClient {
 
         // MiroTalk P2P structure: https://url/roomname
         if let Ok(mut segments) = join_url.path_segments_mut() {
-             // Since we normalized base_url to ensure trailing slash (which means last segment is empty string),
-             // we should pop it before pushing the room name to avoid double slash (e.g. /app//room).
-             segments.pop_if_empty().push(room_name);
+            // Since we normalized base_url to ensure trailing slash (which means last segment is empty string),
+            // we should pop it before pushing the room name to avoid double slash (e.g. /app//room).
+            segments.pop_if_empty().push(room_name);
         } else {
-             return Err(AppError::Internal("Invalid P2P URL construction".to_string()));
+            return Err(AppError::Internal(
+                "Invalid P2P URL construction".to_string(),
+            ));
         }
 
         Ok(join_url.to_string())
@@ -182,9 +211,9 @@ impl MiroTalkClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{MiroTalkConfig, MiroTalkMode, JoinBehavior};
-    use reqwest::Client;
+    use crate::models::{JoinBehavior, MiroTalkConfig, MiroTalkMode};
     use chrono::Utc;
+    use reqwest::Client;
 
     fn create_config(mode: MiroTalkMode, base_url: &str) -> MiroTalkConfig {
         MiroTalkConfig {
@@ -249,11 +278,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_sfu_url_construction_logic() {
-         // Verify that .join() works correctly after normalization
-         let config = create_config(MiroTalkMode::Sfu, "https://example.com/app");
-         let client = MiroTalkClient::new(config, Client::new()).unwrap();
+        // Verify that .join() works correctly after normalization
+        let config = create_config(MiroTalkMode::Sfu, "https://example.com/app");
+        let client = MiroTalkClient::new(config, Client::new()).unwrap();
 
-         let url = client.base_url.join("api/v1/meeting").unwrap();
-         assert_eq!(url.as_str(), "https://example.com/app/api/v1/meeting");
+        let url = client.base_url.join("api/v1/meeting").unwrap();
+        assert_eq!(url.as_str(), "https://example.com/app/api/v1/meeting");
     }
 }

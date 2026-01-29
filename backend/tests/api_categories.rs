@@ -1,6 +1,6 @@
 use crate::common::spawn_app;
-use serde_json::json;
 use rustchat::mattermost_compat::id::encode_mm_id;
+use serde_json::json;
 use uuid::Uuid;
 
 mod common;
@@ -18,7 +18,7 @@ async fn test_sidebar_categories() {
     });
 
     app.api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", &app.address))
         .json(&user_data)
         .send()
         .await
@@ -31,14 +31,20 @@ async fn test_sidebar_categories() {
 
     let login_res = app
         .api_client
-        .post(&format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", &app.address))
         .json(&login_data)
         .send()
         .await
         .expect("Failed to login");
 
     assert_eq!(200, login_res.status().as_u16());
-    let token = login_res.headers().get("Token").unwrap().to_str().unwrap().to_string();
+    let token = login_res
+        .headers()
+        .get("Token")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     let user_info: serde_json::Value = login_res.json().await.unwrap();
     let _user_id = user_info["id"].as_str().unwrap();
 
@@ -49,8 +55,9 @@ async fn test_sidebar_categories() {
         "description": "Test Team"
     });
 
-    let team_res = app.api_client
-        .post(&format!("{}/api/v1/teams", &app.address))
+    let team_res = app
+        .api_client
+        .post(format!("{}/api/v1/teams", &app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&team_data)
         .send()
@@ -62,8 +69,12 @@ async fn test_sidebar_categories() {
     let team_id = team["id"].as_str().unwrap();
 
     // 3. Get categories (Default)
-    let get_res = app.api_client
-        .get(&format!("{}/api/v4/users/me/teams/{}/channels/categories", &app.address, team_id))
+    let get_res = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/users/me/teams/{}/channels/categories",
+            &app.address, team_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -80,8 +91,12 @@ async fn test_sidebar_categories() {
         "type": "custom"
     });
 
-    let create_res = app.api_client
-        .post(&format!("{}/api/v4/users/me/teams/{}/channels/categories", &app.address, team_id))
+    let create_res = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/users/me/teams/{}/channels/categories",
+            &app.address, team_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&create_cat_data)
         .send()
@@ -100,8 +115,12 @@ async fn test_sidebar_categories() {
         "display_name": "Category Channel",
         "type": "public"
     });
-    let chan_res = app.api_client
-        .post(&format!("{}/api/v1/teams/{}/channels", &app.address, team_id))
+    let chan_res = app
+        .api_client
+        .post(format!(
+            "{}/api/v1/teams/{}/channels",
+            &app.address, team_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&channel_data)
         .send()
@@ -114,8 +133,12 @@ async fn test_sidebar_categories() {
     let mut updated_cat = new_cat.clone();
     updated_cat["channel_ids"] = json!([channel_id]);
 
-    let update_res = app.api_client
-        .put(&format!("{}/api/v4/users/me/teams/{}/channels/categories", &app.address, team_id))
+    let update_res = app
+        .api_client
+        .put(format!(
+            "{}/api/v4/users/me/teams/{}/channels/categories",
+            &app.address, team_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({ "categories": [updated_cat] }))
         .send()
@@ -129,8 +152,12 @@ async fn test_sidebar_categories() {
 
     // 6. Update category order
     let order_data = json!([cat_id]);
-    let order_res = app.api_client
-        .put(&format!("{}/api/v4/users/me/teams/{}/channels/categories/order", &app.address, team_id))
+    let order_res = app
+        .api_client
+        .put(format!(
+            "{}/api/v4/users/me/teams/{}/channels/categories/order",
+            &app.address, team_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&order_data)
         .send()

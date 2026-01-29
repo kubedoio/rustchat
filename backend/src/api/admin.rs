@@ -2,7 +2,7 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, patch, put},
+    routing::{get, patch},
     Json, Router,
 };
 use serde::Deserialize;
@@ -155,7 +155,7 @@ async fn add_team_member(
         r#"
         INSERT INTO team_members (team_id, user_id, role)
         VALUES ($1, $2, $3)
-        RETURNING *
+        RETURNING team_id, user_id, role, created_at
         "#,
     )
     .bind(id)
@@ -209,7 +209,7 @@ async fn create_admin_channel(
         r#"
         INSERT INTO channels (team_id, name, display_name, purpose, type, creator_id)
         VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
+        RETURNING id, team_id, name, display_name, purpose, header, type as channel_type, creator_id, created_at, updated_at, last_post_at, is_archived
         "#,
     )
     .bind(input.team_id)
@@ -284,7 +284,7 @@ async fn update_admin_channel(
     }
 
     let channel: crate::models::channel::Channel =
-        sqlx::query_as("SELECT * FROM channels WHERE id = $1")
+        sqlx::query_as("SELECT id, team_id, name, display_name, purpose, header, type as channel_type, creator_id, created_at, updated_at, last_post_at, is_archived FROM channels WHERE id = $1")
             .bind(id)
             .fetch_one(&state.db)
             .await?;
@@ -307,7 +307,8 @@ async fn list_audit_logs(
 
     let logs: Vec<AuditLog> = sqlx::query_as(
         r#"
-        SELECT * FROM audit_logs
+        SELECT id, actor_user_id, actor_ip, action, target_type, target_id, old_values, new_values, created_at
+        FROM audit_logs
         WHERE ($1::VARCHAR IS NULL OR action = $1)
           AND ($2::VARCHAR IS NULL OR target_type = $2)
           AND ($3::UUID IS NULL OR actor_user_id = $3)
@@ -342,7 +343,7 @@ async fn get_sso_config(
         .org_id
         .ok_or_else(|| AppError::BadRequest("No organization context".to_string()))?;
 
-    let config: Option<SsoConfig> = sqlx::query_as("SELECT * FROM sso_configs WHERE org_id = $1")
+    let config: Option<SsoConfig> = sqlx::query_as("SELECT org_id, provider, display_name, issuer_url, client_id, client_secret_encrypted, scopes, created_at, updated_at FROM sso_configs WHERE org_id = $1")
         .bind(org_id)
         .fetch_optional(&state.db)
         .await?;
@@ -383,7 +384,7 @@ async fn create_sso_config(
         ON CONFLICT (org_id) DO UPDATE SET
             provider = $2, display_name = $3, issuer_url = $4, 
             client_id = $5, client_secret_encrypted = $6, scopes = $7
-        RETURNING *
+        RETURNING org_id, provider, display_name, issuer_url, client_id, client_secret_encrypted, scopes, created_at, updated_at
         "#,
     )
     .bind(org_id)
@@ -418,13 +419,13 @@ async fn list_retention_policies(
 
     let policies: Vec<RetentionPolicy> = if let Some(org_id) = auth.org_id {
         sqlx::query_as(
-            "SELECT * FROM retention_policies WHERE org_id = $1 ORDER BY created_at DESC",
+            "SELECT id, org_id, team_id, channel_id, retention_days, delete_files, created_at FROM retention_policies WHERE org_id = $1 ORDER BY created_at DESC",
         )
         .bind(org_id)
         .fetch_all(&state.db)
         .await?
     } else if auth.role == "system_admin" {
-        sqlx::query_as("SELECT * FROM retention_policies ORDER BY created_at DESC")
+        sqlx::query_as("SELECT id, org_id, team_id, channel_id, retention_days, delete_files, created_at FROM retention_policies ORDER BY created_at DESC")
             .fetch_all(&state.db)
             .await?
     } else {
@@ -457,7 +458,7 @@ async fn create_retention_policy(
         r#"
         INSERT INTO retention_policies (org_id, team_id, channel_id, retention_days, delete_files)
         VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
+        RETURNING id, org_id, team_id, channel_id, retention_days, delete_files, created_at
         "#,
     )
     .bind(input.org_id)
@@ -478,7 +479,7 @@ async fn get_retention_policy(
 ) -> ApiResult<Json<RetentionPolicy>> {
     require_admin(&auth)?;
 
-    let policy: RetentionPolicy = sqlx::query_as("SELECT * FROM retention_policies WHERE id = $1")
+    let policy: RetentionPolicy = sqlx::query_as("SELECT id, org_id, team_id, channel_id, retention_days, delete_files, created_at FROM retention_policies WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.db)
         .await?
@@ -510,19 +511,20 @@ async fn get_mirotalk_config(
 ) -> ApiResult<Json<MiroTalkConfig>> {
     require_admin(&auth)?;
 
-    let config: MiroTalkConfig = sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
-        .fetch_optional(&state.db)
-        .await?
-        .unwrap_or_else(|| MiroTalkConfig {
-            is_active: true,
-            mode: crate::models::MiroTalkMode::Disabled,
-            base_url: "".to_string(),
-            api_key_secret: "".to_string(),
-            default_room_prefix: None,
-            join_behavior: crate::models::JoinBehavior::NewTab,
-            updated_at: chrono::Utc::now(),
-            updated_by: None,
-        });
+    let config: MiroTalkConfig =
+        sqlx::query_as("SELECT is_active, mode, base_url, api_key_secret, default_room_prefix, join_behavior, updated_at, updated_by FROM mirotalk_config WHERE is_active = true")
+            .fetch_optional(&state.db)
+            .await?
+            .unwrap_or_else(|| MiroTalkConfig {
+                is_active: true,
+                mode: crate::models::MiroTalkMode::Disabled,
+                base_url: "".to_string(),
+                api_key_secret: "".to_string(),
+                default_room_prefix: None,
+                join_behavior: crate::models::JoinBehavior::NewTab,
+                updated_at: chrono::Utc::now(),
+                updated_by: None,
+            });
 
     Ok(Json(config))
 }
@@ -547,7 +549,7 @@ async fn update_mirotalk_config(
             join_behavior = $5,
             updated_by = $6,
             updated_at = NOW()
-        RETURNING *
+        RETURNING is_active, mode, base_url, api_key_secret, default_room_prefix, join_behavior, updated_at, updated_by
         "#,
     )
     .bind(input.mode)
@@ -569,10 +571,11 @@ async fn test_mirotalk_connection(
     require_admin(&auth)?;
 
     // 1. Fetch current config
-    let config: MiroTalkConfig = sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::Config("MiroTalk config not found".to_string()))?;
+    let config: MiroTalkConfig =
+        sqlx::query_as("SELECT is_active, mode, base_url, api_key_secret, default_room_prefix, join_behavior, updated_at, updated_by FROM mirotalk_config WHERE is_active = true")
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Config("MiroTalk config not found".to_string()))?;
 
     // 2. Init client and call stats
     let client = MiroTalkClient::new(config, state.http_client.clone())?;
@@ -590,7 +593,7 @@ async fn list_permissions(
     require_admin(&auth)?;
 
     let permissions: Vec<Permission> =
-        sqlx::query_as("SELECT * FROM permissions ORDER BY category, id")
+        sqlx::query_as("SELECT id, name, description, category FROM permissions ORDER BY category, id")
             .fetch_all(&state.db)
             .await?;
 
@@ -626,12 +629,11 @@ async fn update_role_permissions(
 ) -> ApiResult<Json<Vec<String>>> {
     require_admin(&auth)?;
 
-    let valid_permissions: Vec<(String,)> = sqlx::query_as(
-        "SELECT id FROM permissions WHERE id = ANY($1)",
-    )
-    .bind(&input.permissions)
-    .fetch_all(&state.db)
-    .await?;
+    let valid_permissions: Vec<(String,)> =
+        sqlx::query_as("SELECT id FROM permissions WHERE id = ANY($1)")
+            .bind(&input.permissions)
+            .fetch_all(&state.db)
+            .await?;
 
     let valid_ids: Vec<String> = valid_permissions.into_iter().map(|p| p.0).collect();
 
@@ -694,7 +696,7 @@ async fn get_config(
 ) -> ApiResult<Json<ServerConfigResponse>> {
     require_admin(&auth)?;
 
-    let config: ServerConfig = sqlx::query_as("SELECT * FROM server_config WHERE id = 'default'")
+    let config: ServerConfig = sqlx::query_as("SELECT id, site, authentication, integrations, compliance, email, experimental, updated_at, updated_by FROM server_config WHERE id = 'default'")
         .fetch_one(&state.db)
         .await?;
 
@@ -779,7 +781,8 @@ async fn list_users(
 
     let users: Vec<crate::models::User> = sqlx::query_as(
         r#"
-        SELECT * FROM users
+        SELECT id, username, email, password_hash, role, display_name, avatar_url, is_active, last_login_at, created_at, updated_at, org_id, presence
+        FROM users
         WHERE ($1::BOOL IS NULL OR is_active = $1)
           AND ($2::VARCHAR IS NULL OR role = $2)
           AND ($3::VARCHAR IS NULL OR username ILIKE '%' || $3 || '%' OR email ILIKE '%' || $3 || '%')
@@ -832,7 +835,7 @@ async fn create_admin_user(
         r#"
         INSERT INTO users (username, email, password_hash, role, display_name, is_active)
         VALUES ($1, $2, $3, $4, $5, true)
-        RETURNING *
+        RETURNING id, username, email, password_hash, role, display_name, avatar_url, is_active, last_login_at, created_at, updated_at, org_id, presence
         "#,
     )
     .bind(&input.username)
@@ -867,7 +870,7 @@ async fn update_admin_user(
             display_name = COALESCE($2, display_name),
             updated_at = NOW()
         WHERE id = $3
-        RETURNING *
+        RETURNING id, username, email, password_hash, role, display_name, avatar_url, is_active, last_login_at, created_at, updated_at, org_id, presence
         "#,
     )
     .bind(&input.role)
@@ -1058,7 +1061,7 @@ async fn list_admin_teams(
 
     let teams: Vec<AdminTeamResponse> = sqlx::query_as(
         r#"
-        SELECT t.*, 
+        SELECT t.id, t.name, t.display_name, t.description, t.icon_url, t.allow_open_invite, t.created_at, t.updated_at,
                (SELECT COUNT(*) FROM team_members WHERE team_id = t.id) as members_count,
                (SELECT COUNT(*) FROM channels WHERE team_id = t.id) as channels_count
         FROM teams t
@@ -1092,7 +1095,7 @@ async fn get_admin_team(
 
     let team: AdminTeamResponse = sqlx::query_as(
         r#"
-        SELECT t.*, 
+        SELECT t.id, t.name, t.display_name, t.description, t.icon_url, t.allow_open_invite, t.created_at, t.updated_at,
                (SELECT COUNT(*) FROM team_members WHERE team_id = t.id) as members_count,
                (SELECT COUNT(*) FROM channels WHERE team_id = t.id) as channels_count
         FROM teams t
@@ -1157,7 +1160,7 @@ async fn list_admin_channels(
 
     let channels: Vec<AdminChannelResponse> = sqlx::query_as(
         r#"
-        SELECT c.*, 
+        SELECT c.id, c.team_id, c.name, c.display_name, c.purpose, c.header, c.type as channel_type, c.creator_id, c.created_at, c.updated_at, c.last_post_at, c.is_archived,
                (SELECT COUNT(*) FROM channel_members WHERE channel_id = c.id) as members_count
         FROM channels c
         WHERE ($1::UUID IS NULL OR c.team_id = $1)

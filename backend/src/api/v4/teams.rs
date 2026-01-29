@@ -8,8 +8,11 @@ use axum::{
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::ApiResult;
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
-use crate::models::{Team, Channel};
+use crate::mattermost_compat::{
+    id::{encode_mm_id, parse_mm_or_uuid},
+    models as mm,
+};
+use crate::models::{Channel, Team};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -85,14 +88,15 @@ async fn get_team_member_me(
 ) -> ApiResult<Json<mm::TeamMember>> {
     let team_id = parse_mm_or_uuid(&team_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
-    let member: crate::models::TeamMember = sqlx::query_as(
-        "SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2",
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this team".to_string()))?;
+    let member: crate::models::TeamMember =
+        sqlx::query_as("SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2")
+            .bind(team_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| {
+                crate::error::AppError::Forbidden("Not a member of this team".to_string())
+            })?;
 
     Ok(Json(mm::TeamMember {
         team_id: encode_mm_id(member.team_id),
@@ -113,14 +117,10 @@ async fn get_team_image(
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
 
     const PNG_1X1: &[u8] = &[
-        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0,
-        0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120,
-        156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68,
-        174, 66, 96, 130,
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6,
+        0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1,
+        13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
     ];
 
-    Ok((
-        [(axum::http::header::CONTENT_TYPE, "image/png")],
-        PNG_1X1,
-    ))
+    Ok(([(axum::http::header::CONTENT_TYPE, "image/png")], PNG_1X1))
 }

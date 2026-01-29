@@ -10,7 +10,10 @@ use uuid::Uuid;
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
+use crate::mattermost_compat::{
+    id::{encode_mm_id, parse_mm_or_uuid},
+    models as mm,
+};
 use crate::models::CreatePost;
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 use crate::services::posts;
@@ -18,13 +21,13 @@ use crate::services::posts;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/posts", post(create_post_handler))
-        .route(
-            "/posts/{post_id}",
-            get(get_post).delete(delete_post),
-        )
+        .route("/posts/{post_id}", get(get_post).delete(delete_post))
         .route("/posts/{post_id}/patch", put(patch_post))
         .route("/reactions", post(add_reaction))
-        .route("/users/me/posts/{post_id}/reactions/{emoji_name}", delete(remove_reaction))
+        .route(
+            "/users/me/posts/{post_id}/reactions/{emoji_name}",
+            delete(remove_reaction),
+        )
         .route("/posts/{post_id}/reactions", get(get_reactions))
         .route("/posts/{post_id}/thread", get(get_post_thread))
 }
@@ -219,7 +222,9 @@ async fn delete_post(
         .await?;
 
     if post.user_id != auth.user_id {
-        return Err(AppError::Forbidden("Cannot delete others' posts".to_string()));
+        return Err(AppError::Forbidden(
+            "Cannot delete others' posts".to_string(),
+        ));
     }
 
     let deleted_post: crate::models::post::PostResponse = sqlx::query_as(
@@ -254,7 +259,9 @@ async fn delete_post(
     });
     state.ws_hub.broadcast(broadcast).await;
 
-    Ok(Json(serde_json::json!({"status": "OK", "id": encode_mm_id(post_id)})))
+    Ok(Json(
+        serde_json::json!({"status": "OK", "id": encode_mm_id(post_id)}),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -331,7 +338,9 @@ async fn add_reaction(
     let input_user_id = parse_mm_or_uuid(&input.user_id)
         .ok_or_else(|| AppError::Validation("Invalid user_id".to_string()))?;
     if input_user_id != auth.user_id {
-        return Err(AppError::Forbidden("Cannot react for other user".to_string()));
+        return Err(AppError::Forbidden(
+            "Cannot react for other user".to_string(),
+        ));
     }
 
     let post_id = parse_mm_or_uuid(&input.post_id)
@@ -343,7 +352,7 @@ async fn add_reaction(
         VALUES ($1, $2, $3)
         ON CONFLICT (user_id, post_id, emoji_name) DO UPDATE SET emoji_name = $3
         RETURNING *
-        "#
+        "#,
     )
     .bind(auth.user_id)
     .bind(post_id)
@@ -356,17 +365,13 @@ async fn add_reaction(
         .fetch_one(&state.db)
         .await?;
 
-    let broadcast = WsEnvelope::event(
-        EventType::ReactionAdded,
-        reaction.clone(),
-        Some(channel_id),
-    )
-    .with_broadcast(WsBroadcast {
-        channel_id: Some(channel_id),
-        team_id: None,
-        user_id: None,
-        exclude_user_id: None,
-    });
+    let broadcast = WsEnvelope::event(EventType::ReactionAdded, reaction.clone(), Some(channel_id))
+        .with_broadcast(WsBroadcast {
+            channel_id: Some(channel_id),
+            team_id: None,
+            user_id: None,
+            exclude_user_id: None,
+        });
     state.ws_hub.broadcast(broadcast).await;
 
     Ok(Json(mm::Reaction {
@@ -394,12 +399,14 @@ async fn remove_reaction(
     .await?;
 
     if let Some(r) = reaction {
-        sqlx::query("DELETE FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3")
-            .bind(auth.user_id)
-            .bind(post_id)
-            .bind(&emoji_name)
-            .execute(&state.db)
-            .await?;
+        sqlx::query(
+            "DELETE FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
+        )
+        .bind(auth.user_id)
+        .bind(post_id)
+        .bind(&emoji_name)
+        .execute(&state.db)
+        .await?;
 
         let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
             .bind(post_id)
@@ -425,17 +432,21 @@ async fn get_reactions(
 ) -> ApiResult<Json<Vec<mm::Reaction>>> {
     let post_id = parse_mm_or_uuid(&post_id)
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
-    let reactions: Vec<crate::models::post::Reaction> = sqlx::query_as("SELECT * FROM reactions WHERE post_id = $1")
-        .bind(post_id)
-        .fetch_all(&state.db)
-        .await?;
+    let reactions: Vec<crate::models::post::Reaction> =
+        sqlx::query_as("SELECT * FROM reactions WHERE post_id = $1")
+            .bind(post_id)
+            .fetch_all(&state.db)
+            .await?;
 
-    let mm_reactions = reactions.into_iter().map(|r| mm::Reaction {
-        user_id: encode_mm_id(r.user_id),
-        post_id: encode_mm_id(r.post_id),
-        emoji_name: r.emoji_name,
-        create_at: r.created_at.timestamp_millis(),
-    }).collect();
+    let mm_reactions = reactions
+        .into_iter()
+        .map(|r| mm::Reaction {
+            user_id: encode_mm_id(r.user_id),
+            post_id: encode_mm_id(r.post_id),
+            emoji_name: r.emoji_name,
+            create_at: r.created_at.timestamp_millis(),
+        })
+        .collect();
 
     Ok(Json(mm_reactions))
 }

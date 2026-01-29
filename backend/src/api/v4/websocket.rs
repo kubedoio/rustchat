@@ -8,17 +8,20 @@ use axum::{
     routing::get,
     Router,
 };
+use chrono;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
-use uuid::Uuid;
 use std::time::Duration;
 use tokio::time::interval;
-use chrono;
+use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::auth::validate_token;
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
+use crate::mattermost_compat::{
+    id::{encode_mm_id, parse_mm_or_uuid},
+    models as mm,
+};
 use crate::realtime::{TypingEvent, WsEnvelope};
 
 pub fn router() -> Router<AppState> {
@@ -47,8 +50,8 @@ async fn ws_handler(
     if token.is_none() {
         if let Some(auth_header) = headers.get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
-                if auth_str.starts_with("Bearer ") {
-                    token = Some(auth_str[7..].to_string());
+                if let Some(stripped) = auth_str.strip_prefix("Bearer ") {
+                    token = Some(stripped.to_string());
                 } else {
                     token = Some(auth_str.to_string());
                 }
@@ -57,7 +60,9 @@ async fn ws_handler(
     }
 
     let user_id = if let Some(ref t) = token {
-        validate_token(t, &state.jwt_secret).ok().map(|c| c.claims.sub)
+        validate_token(t, &state.jwt_secret)
+            .ok()
+            .map(|c| c.claims.sub)
     } else {
         None
     };
@@ -124,7 +129,9 @@ async fn handle_socket(
     };
     seq += 1;
     let _ = sender
-        .send(Message::Text(serde_json::to_string(&hello).unwrap_or_default().into()))
+        .send(Message::Text(
+            serde_json::to_string(&hello).unwrap_or_default().into(),
+        ))
         .await;
 
     // 3. Authenticated. Setup Hub connection.
@@ -140,7 +147,8 @@ async fn handle_socket(
     let rx = state.ws_hub.add_connection(user_id, username.clone()).await;
 
     // Subscribe to teams and channels
-    let teams = sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
+    let teams =
+        sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
             .bind(user_id)
             .fetch_all(&state.db)
             .await
@@ -149,7 +157,8 @@ async fn handle_socket(
         state.ws_hub.subscribe_team(user_id, team_id).await;
     }
 
-    let channels = sqlx::query_scalar::<_, Uuid>("SELECT channel_id FROM channel_members WHERE user_id = $1")
+    let channels =
+        sqlx::query_scalar::<_, Uuid>("SELECT channel_id FROM channel_members WHERE user_id = $1")
             .bind(user_id)
             .fetch_all(&state.db)
             .await
@@ -163,7 +172,7 @@ async fn handle_socket(
     let (mut sender_sink, mut receiver_stream) = (sender, receiver);
 
     let state_clone = state.clone();
-    
+
     // Task for forwarding events from hub to client + Heartbeat
     let sender_task = tokio::spawn(async move {
         let mut heartbeat = interval(Duration::from_secs(25));
@@ -215,8 +224,7 @@ async fn handle_socket(
                 Ok(Message::Text(text)) => {
                     handle_upstream_message(&state_clone, user_id, &text).await;
                 }
-                Ok(Message::Ping(_)) => {
-                }
+                Ok(Message::Ping(_)) => {}
                 Ok(Message::Close(_)) | Err(_) => break,
                 _ => {}
             }
@@ -261,10 +269,7 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
         }
         "user_typing" => {
             if let Ok(typing) = serde_json::from_value::<TypingEvent>(env.data.clone()) {
-                let parent_id = typing
-                    .thread_root_id
-                    .map(encode_mm_id)
-                    .unwrap_or_default();
+                let parent_id = typing.thread_root_id.map(encode_mm_id).unwrap_or_default();
                 Some(mm::WebSocketMessage {
                     seq: Some(seq),
                     event: "typing".to_string(),
@@ -353,26 +358,29 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
             }
         }
         "user_updated" => {
-             if let Some(status_str) = env.data.get("status").and_then(|v| v.as_str()) {
-                 let user_id = env
-                     .data
-                     .get("user_id")
-                     .and_then(|v| v.as_str())
-                     .and_then(parse_mm_or_uuid)
-                     .map(encode_mm_id)
-                     .unwrap_or_default();
-                 Some(mm::WebSocketMessage {
+            if let Some(status_str) = env.data.get("status").and_then(|v| v.as_str()) {
+                let user_id = env
+                    .data
+                    .get("user_id")
+                    .and_then(|v| v.as_str())
+                    .and_then(parse_mm_or_uuid)
+                    .map(encode_mm_id)
+                    .unwrap_or_default();
+                Some(mm::WebSocketMessage {
                     seq: Some(seq),
                     event: "status_change".to_string(),
                     data: json!({ "user_id": user_id, "status": status_str }),
                     broadcast: map_broadcast(env.broadcast.as_ref()),
                 })
-             } else {
-                 None
-             }
+            } else {
+                None
+            }
         }
-        "channel_updated" => {
-             env.data.get("channel_id").and_then(|cid| cid.as_str()).map(|cid| {
+        "channel_updated" => env
+            .data
+            .get("channel_id")
+            .and_then(|cid| cid.as_str())
+            .map(|cid| {
                 let channel_id = parse_mm_or_uuid(cid).map(encode_mm_id).unwrap_or_default();
                 mm::WebSocketMessage {
                     seq: Some(seq),
@@ -380,45 +388,43 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
                     data: json!({ "channel_id": channel_id }),
                     broadcast: map_broadcast(env.broadcast.as_ref()),
                 }
-             })
-        }
+            }),
         _ => None,
     }
 }
 
-async fn handle_upstream_message(
-    state: &AppState,
-    user_id: Uuid,
-    msg: &str
-) {
+async fn handle_upstream_message(state: &AppState, user_id: Uuid, msg: &str) {
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(msg) {
         if let Some(action) = value.get("action").and_then(|v| v.as_str()) {
-             if action == "user_typing" {
-                 if let Some(data) = value.get("data") {
-                     if let Some(channel_id_str) = data.get("channel_id").and_then(|v| v.as_str()) {
-                         if let Some(channel_id) = parse_mm_or_uuid(channel_id_str) {
-                              let broadcast = WsEnvelope::event(
-                                    crate::realtime::EventType::UserTyping,
-                                    crate::realtime::TypingEvent {
-                                        user_id,
-                                        display_name: "".to_string(),
-                                        thread_root_id: data
-                                            .get("parent_id")
-                                            .and_then(|v| v.as_str())
-                                            .and_then(parse_mm_or_uuid),
-                                    },
-                                    Some(channel_id),
-                                ).with_broadcast(crate::realtime::WsBroadcast {
+            if action == "user_typing" {
+                if let Some(data) = value.get("data") {
+                    if let Some(channel_id_str) = data.get("channel_id").and_then(|v| v.as_str()) {
+                        if let Some(channel_id) = parse_mm_or_uuid(channel_id_str) {
+                            let broadcast = WsEnvelope::event(
+                                crate::realtime::EventType::UserTyping,
+                                crate::realtime::TypingEvent {
+                                    user_id,
+                                    display_name: "".to_string(),
+                                    thread_root_id: data
+                                        .get("parent_id")
+                                        .and_then(|v| v.as_str())
+                                        .and_then(parse_mm_or_uuid),
+                                },
+                                Some(channel_id),
+                            )
+                            .with_broadcast(
+                                crate::realtime::WsBroadcast {
                                     channel_id: Some(channel_id),
                                     team_id: None,
                                     user_id: None,
                                     exclude_user_id: Some(user_id),
-                                });
-                                state.ws_hub.broadcast(broadcast).await;
-                         }
-                     }
-                 }
-             }
+                                },
+                            );
+                            state.ws_hub.broadcast(broadcast).await;
+                        }
+                    }
+                }
+            }
         }
     }
 }

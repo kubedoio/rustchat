@@ -11,7 +11,10 @@ use std::collections::HashMap;
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::ApiResult;
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
+use crate::mattermost_compat::{
+    id::{encode_mm_id, parse_mm_or_uuid},
+    models as mm,
+};
 use crate::models::post::PostResponse;
 
 pub fn router() -> Router<AppState> {
@@ -19,8 +22,14 @@ pub fn router() -> Router<AppState> {
         .route("/channels/{channel_id}/posts", get(get_posts))
         .route("/channels/{channel_id}", get(get_channel))
         .route("/channels/{channel_id}/members", get(get_channel_members))
-        .route("/channels/{channel_id}/members/me", get(get_channel_member_me))
-        .route("/channels/{channel_id}/timezones", get(get_channel_timezones))
+        .route(
+            "/channels/{channel_id}/members/me",
+            get(get_channel_member_me),
+        )
+        .route(
+            "/channels/{channel_id}/timezones",
+            get(get_channel_timezones),
+        )
         .route("/channels/{channel_id}/stats", get(get_channel_stats))
         .route("/channels/members/me/view", post(view_channel))
 }
@@ -62,7 +71,7 @@ async fn view_channel(
                 "channel_id": channel_id,
                 "user_id": auth.user_id
             }),
-            Some(channel_id)
+            Some(channel_id),
         );
         // We don't usually broadcast view events to EVERYONE, just to the user's other sessions.
         // But Mattermost sends 'channel_viewed' to the user.
@@ -79,7 +88,9 @@ async fn view_channel(
 
         Ok(Json(serde_json::json!({"status": "OK"})))
     } else {
-        Err(crate::error::AppError::BadRequest("Invalid channel_id".to_string()))
+        Err(crate::error::AppError::BadRequest(
+            "Invalid channel_id".to_string(),
+        ))
     }
 }
 
@@ -182,20 +193,24 @@ async fn get_channel_member_me(
 ) -> ApiResult<Json<mm::ChannelMember>> {
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    let member: crate::models::ChannelMember = sqlx::query_as(
-        "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let member: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| {
+                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+            })?;
 
     Ok(Json(mm::ChannelMember {
         channel_id: encode_mm_id(member.channel_id),
         user_id: encode_mm_id(member.user_id),
         roles: "channel_user".to_string(),
-        last_viewed_at: member.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
+        last_viewed_at: member
+            .last_viewed_at
+            .map(|t| t.timestamp_millis())
+            .unwrap_or(0),
         msg_count: 0,
         mention_count: 0,
         notify_props: normalize_notify_props(member.notify_props),
@@ -236,15 +251,16 @@ async fn get_channel_stats(
     .await?;
 
     if !is_member {
-        return Err(crate::error::AppError::Forbidden("Not a member of this channel".to_string()));
+        return Err(crate::error::AppError::Forbidden(
+            "Not a member of this channel".to_string(),
+        ));
     }
 
-    let member_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM channel_members WHERE channel_id = $1",
-    )
-    .bind(channel_id)
-    .fetch_one(&state.db)
-    .await?;
+    let member_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM channel_members WHERE channel_id = $1")
+            .bind(channel_id)
+            .fetch_one(&state.db)
+            .await?;
 
     Ok(Json(mm::ChannelStats {
         channel_id: encode_mm_id(channel_id),

@@ -14,7 +14,9 @@ async fn config_client_returns_diagnostic_id() {
         .expect("Failed to create lazy pool");
 
     let redis_cfg = deadpool_redis::Config::default();
-    let redis = redis_cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1)).unwrap();
+    let redis = redis_cfg
+        .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+        .unwrap();
 
     let ws_hub = WsHub::new();
 
@@ -27,14 +29,7 @@ async fn config_client_returns_diagnostic_id() {
     );
 
     // 2. Build router using public api
-    let app = router(
-        db,
-        redis,
-        "secret".to_string(),
-        1,
-        ws_hub,
-        s3_client
-    );
+    let app = router(db, redis, "secret".to_string(), 1, ws_hub, s3_client);
 
     // 3. Make request
     let response = app
@@ -49,7 +44,9 @@ async fn config_client_returns_diagnostic_id() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
     // Check for DiagnosticId
@@ -57,7 +54,10 @@ async fn config_client_returns_diagnostic_id() {
     assert!(diagnostic_id.is_some(), "DiagnosticId field is missing");
     let diagnostic_id_str = diagnostic_id.unwrap().as_str();
     assert!(diagnostic_id_str.is_some(), "DiagnosticId is not a string");
-    assert!(!diagnostic_id_str.unwrap().is_empty(), "DiagnosticId is empty");
+    assert!(
+        !diagnostic_id_str.unwrap().is_empty(),
+        "DiagnosticId is empty"
+    );
 }
 
 #[tokio::test]
@@ -68,7 +68,9 @@ async fn license_client_returns_boolean() {
         .expect("Failed to create lazy pool");
 
     let redis_cfg = deadpool_redis::Config::default();
-    let redis = redis_cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1)).unwrap();
+    let redis = redis_cfg
+        .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+        .unwrap();
 
     let ws_hub = WsHub::new();
 
@@ -81,14 +83,7 @@ async fn license_client_returns_boolean() {
     );
 
     // 2. Build router using public api
-    let app = router(
-        db,
-        redis,
-        "secret".to_string(),
-        1,
-        ws_hub,
-        s3_client
-    );
+    let app = router(db, redis, "secret".to_string(), 1, ws_hub, s3_client);
 
     // 3. Make request
     let response = app
@@ -103,7 +98,9 @@ async fn license_client_returns_boolean() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
     // Check for IsLicensed
@@ -111,6 +108,14 @@ async fn license_client_returns_boolean() {
     assert!(is_licensed.is_some(), "IsLicensed field is missing");
 
     // This assertion should fail if it returns a string
-    assert!(is_licensed.unwrap().is_boolean(), "IsLicensed is not a boolean: {:?}", is_licensed.unwrap());
-    assert_eq!(is_licensed.unwrap().as_bool(), Some(false), "IsLicensed is not false");
+    assert!(
+        is_licensed.unwrap().is_boolean(),
+        "IsLicensed is not a boolean: {:?}",
+        is_licensed.unwrap()
+    );
+    assert_eq!(
+        is_licensed.unwrap().as_bool(),
+        Some(false),
+        "IsLicensed is not false"
+    );
 }
