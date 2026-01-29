@@ -1,7 +1,7 @@
 use crate::common::spawn_app;
-use uuid::Uuid;
 use rustchat::mattermost_compat::id::encode_mm_id;
 use serde_json::Value;
+use uuid::Uuid;
 
 mod common;
 
@@ -39,7 +39,8 @@ async fn get_channel_posts_returns_200() {
         "password": "Password123!"
     });
 
-    let login_res = app.api_client
+    let login_res = app
+        .api_client
         .post(format!("{}/api/v1/auth/login", &app.address))
         .json(&login_data)
         .send()
@@ -106,14 +107,23 @@ async fn get_channel_posts_returns_200() {
         .expect("Failed to insert post");
 
     // 6. Call GET /api/v4/channels/{channel_id}/posts
-    let response = app.api_client
-        .get(format!("{}/api/v4/channels/{}/posts?page=0&per_page=30", &app.address, channel_id))
+    let response = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/channels/{}/posts?page=0&per_page=30",
+            &app.address, channel_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
         .expect("Failed to get posts");
 
-    assert_eq!(response.status().as_u16(), 200, "Expected 200 OK, got {}", response.status());
+    assert_eq!(
+        response.status().as_u16(),
+        200,
+        "Expected 200 OK, got {}",
+        response.status()
+    );
 
     let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_object().unwrap();
@@ -121,6 +131,8 @@ async fn get_channel_posts_returns_200() {
     assert!(posts.contains_key(&post_key), "Post not found in response");
 
     let post = &posts[&post_key];
-    let reply_count = post["reply_count"].as_i64().expect("reply_count should be a number");
+    let reply_count = post["reply_count"]
+        .as_i64()
+        .expect("reply_count should be a number");
     assert_eq!(reply_count, 0);
 }

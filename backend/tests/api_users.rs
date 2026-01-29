@@ -16,9 +16,9 @@ async fn test_user_custom_status() {
         "display_name": "Status User"
     });
 
-    let reg_res = app
+    let _reg_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", &app.address))
         .json(&user_data)
         .send()
         .await
@@ -36,7 +36,7 @@ async fn test_user_custom_status() {
 
     let login_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", &app.address))
         .json(&login_data)
         .send()
         .await
@@ -65,7 +65,7 @@ async fn test_user_custom_status() {
 
     let update_res = app
         .api_client
-        .put(&format!("{}/api/v1/users/{}", &app.address, user_id))
+        .put(format!("{}/api/v1/users/{}", &app.address, user_id))
         .json(&update_data)
         .send()
         .await
@@ -82,7 +82,7 @@ async fn test_user_custom_status() {
     // 3. Verify Persistence (Get User)
     let get_res = app
         .api_client
-        .get(&format!("{}/api/v1/users/{}", &app.address, user_id))
+        .get(format!("{}/api/v1/users/{}", &app.address, user_id))
         .send()
         .await
         .expect("Failed to get user");

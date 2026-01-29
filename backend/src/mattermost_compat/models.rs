@@ -237,3 +237,23 @@ pub struct SidebarCategories {
     pub categories: Vec<SidebarCategory>,
     pub order: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Command {
+    pub id: String,
+    pub token: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub creator_id: String,
+    pub team_id: String,
+    pub trigger: String,
+    pub method: String,
+    pub username: String,
+    pub icon_url: String,
+    pub auto_complete: bool,
+    pub auto_complete_desc: String,
+    pub auto_complete_hint: String,
+    pub display_name: String,
+    pub description: String,
+}

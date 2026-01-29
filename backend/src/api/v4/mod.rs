@@ -1,15 +1,19 @@
 use crate::api::AppState;
-use axum::{http::{HeaderName, HeaderValue}, response::IntoResponse, Json, Router};
+use axum::{
+    http::{HeaderName, HeaderValue},
+    response::IntoResponse,
+    Json, Router,
+};
 use tower_http::set_header::SetResponseHeaderLayer;
 
-pub mod channels;
-pub mod emoji;
-pub mod commands;
-pub mod plugins;
 pub mod categories;
+pub mod channels;
+pub mod commands;
 pub mod config;
+pub mod emoji;
 pub mod extractors;
 pub mod files;
+pub mod plugins;
 pub mod posts;
 pub mod system;
 pub mod teams;
@@ -44,6 +48,6 @@ async fn not_implemented() -> impl IntoResponse {
             "id": "api.not_implemented",
             "message": "Not implemented",
             "status_code": 501
-        }))
+        })),
     )
 }

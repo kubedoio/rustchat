@@ -29,5 +29,8 @@ async fn emoji_autocomplete() -> ApiResult<Json<Vec<CustomEmoji>>> {
 }
 
 async fn get_emoji_by_name(Path(name): Path<String>) -> ApiResult<Json<CustomEmoji>> {
-    Err(AppError::NotFound(format!("Custom emoji '{}' not found", name)))
+    Err(AppError::NotFound(format!(
+        "Custom emoji '{}' not found",
+        name
+    )))
 }

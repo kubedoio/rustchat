@@ -108,7 +108,7 @@ async fn upload_file(
         let state_clone = state.clone();
         let data_clone = data.clone();
         let auth_id = auth.user_id;
-        
+
         tokio::spawn(async move {
             if let Ok(img) = image::load_from_memory(&data_clone) {
                 let (w, h) = img.dimensions();

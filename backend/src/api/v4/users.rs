@@ -15,7 +15,10 @@ use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::auth::{create_token, verify_password};
 use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
+use crate::mattermost_compat::{
+    id::{encode_mm_id, parse_mm_or_uuid},
+    models as mm,
+};
 use crate::models::{channel::Channel, channel::ChannelMember, Team, TeamMember, User};
 
 pub fn router() -> Router<AppState> {
@@ -52,17 +55,25 @@ pub fn router() -> Router<AppState> {
         .route("/users/ids", post(get_users_by_ids))
         .route("/users/{user_id}/status", get(get_status))
         .route("/users/me/status", get(get_my_status).put(update_status))
-        .route("/users/{user_id}/channels/{channel_id}/typing", post(user_typing))
+        .route(
+            "/users/{user_id}/channels/{channel_id}/typing",
+            post(user_typing),
+        )
         .route("/users/me/patch", put(patch_me))
         .route("/users/{user_id}/image", get(get_user_image))
         .route("/roles/names", post(get_roles_by_names))
-        .route("/users/notifications", get(get_notifications).put(update_notifications))
+        .route(
+            "/users/notifications",
+            get(get_notifications).put(update_notifications),
+        )
         .route("/users/me/sessions", get(get_sessions))
         .route("/users/logout", post(logout))
         .route("/users/autocomplete", get(autocomplete_users))
         .route(
             "/users/{user_id}/sidebar/categories",
-            get(get_categories).post(create_category).put(update_categories),
+            get(get_categories)
+                .post(create_category)
+                .put(update_categories),
         )
         .route(
             "/users/{user_id}/sidebar/categories/order",
@@ -82,7 +93,9 @@ async fn get_categories(
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> ApiResult<Json<mm::SidebarCategories>> {
     let user_id = resolve_user_id(&params.user_id, &auth)?;
-    let team_id_str = query.get("team_id").ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
+    let team_id_str = query
+        .get("team_id")
+        .ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
     let team_id = parse_mm_or_uuid(team_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     get_categories_internal(state, user_id, team_id).await
@@ -96,7 +109,9 @@ async fn create_category(
     Json(input): Json<CreateCategoryRequest>,
 ) -> ApiResult<Json<mm::SidebarCategory>> {
     let user_id = resolve_user_id(&params.user_id, &auth)?;
-    let team_id_str = query.get("team_id").ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
+    let team_id_str = query
+        .get("team_id")
+        .ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
     let team_id = parse_mm_or_uuid(team_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     create_category_internal(state, user_id, team_id, input).await
@@ -110,7 +125,9 @@ async fn update_categories(
     Json(input): Json<UpdateCategoriesRequest>,
 ) -> ApiResult<Json<Vec<mm::SidebarCategory>>> {
     let user_id = resolve_user_id(&params.user_id, &auth)?;
-    let team_id_str = query.get("team_id").ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
+    let team_id_str = query
+        .get("team_id")
+        .ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
     let team_id = parse_mm_or_uuid(team_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     update_categories_internal(state, user_id, team_id, input).await
@@ -124,7 +141,9 @@ async fn update_category_order(
     Json(order): Json<Vec<String>>,
 ) -> ApiResult<Json<Vec<String>>> {
     let user_id = resolve_user_id(&params.user_id, &auth)?;
-    let team_id_str = query.get("team_id").ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
+    let team_id_str = query
+        .get("team_id")
+        .ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
     let team_id = parse_mm_or_uuid(team_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     update_category_order_internal(state, user_id, team_id, order).await
@@ -139,7 +158,9 @@ pub(crate) fn resolve_user_id(user_id_str: &str, auth: &MmAuthUser) -> ApiResult
         .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
 
     if user_id != auth.user_id && auth.role != "system_admin" && auth.role != "org_admin" {
-        return Err(AppError::Forbidden("Cannot access another user's categories".to_string()));
+        return Err(AppError::Forbidden(
+            "Cannot access another user's categories".to_string(),
+        ));
     }
 
     Ok(user_id)
@@ -155,7 +176,7 @@ pub(crate) async fn get_categories_internal(
 
     // Fetch categories
     let categories_rows: Vec<CategoryRow> = sqlx::query_as(
-        "SELECT * FROM channel_categories WHERE user_id = $1 AND team_id = $2 AND delete_at = 0"
+        "SELECT * FROM channel_categories WHERE user_id = $1 AND team_id = $2 AND delete_at = 0",
     )
     .bind(user_id)
     .bind(team_id)
@@ -163,7 +184,9 @@ pub(crate) async fn get_categories_internal(
     .await?;
 
     if categories_rows.is_empty() {
-        return Ok(Json(get_default_categories(&state, user_id, team_id).await?));
+        return Ok(Json(
+            get_default_categories(&state, user_id, team_id).await?,
+        ));
     }
 
     let mut categories = Vec::new();
@@ -224,12 +247,18 @@ fn sort_category_rows(rows: &mut [CategoryRow]) {
 
     if has_custom_order {
         rows.sort_by(|a, b| {
-            a.sort_order
-                .cmp(&b.sort_order)
-                .then_with(|| a.display_name.to_ascii_lowercase().cmp(&b.display_name.to_ascii_lowercase()))
+            a.sort_order.cmp(&b.sort_order).then_with(|| {
+                a.display_name
+                    .to_ascii_lowercase()
+                    .cmp(&b.display_name.to_ascii_lowercase())
+            })
         });
     } else {
-        rows.sort_by(|a, b| a.display_name.to_ascii_lowercase().cmp(&b.display_name.to_ascii_lowercase()));
+        rows.sort_by(|a, b| {
+            a.display_name
+                .to_ascii_lowercase()
+                .cmp(&b.display_name.to_ascii_lowercase())
+        });
     }
 }
 
@@ -256,7 +285,9 @@ async fn ensure_team_member(state: &AppState, user_id: Uuid, team_id: Uuid) -> A
     .await?;
 
     if !is_member {
-        return Err(AppError::Forbidden("User is not a member of the team".to_string()));
+        return Err(AppError::Forbidden(
+            "User is not a member of the team".to_string(),
+        ));
     }
 
     Ok(())
@@ -289,14 +320,18 @@ fn build_default_categories(
     }
 }
 
-async fn get_default_categories(state: &AppState, user_id: Uuid, team_id: Uuid) -> ApiResult<mm::SidebarCategories> {
+async fn get_default_categories(
+    state: &AppState,
+    user_id: Uuid,
+    team_id: Uuid,
+) -> ApiResult<mm::SidebarCategories> {
     let channels: Vec<Uuid> = sqlx::query_scalar(
         r#"
         SELECT c.id FROM channels c
         JOIN channel_members cm ON c.id = cm.channel_id
         WHERE cm.user_id = $1 AND c.team_id = $2
         ORDER BY COALESCE(c.display_name, c.name) ASC
-        "#
+        "#,
     )
     .bind(user_id)
     .bind(team_id)
@@ -334,7 +369,9 @@ pub(crate) async fn create_category_internal(
         let parsed = parse_mm_or_uuid(input_user_id)
             .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
         if parsed != user_id {
-            return Err(AppError::BadRequest("user_id does not match path".to_string()));
+            return Err(AppError::BadRequest(
+                "user_id does not match path".to_string(),
+            ));
         }
     }
 
@@ -342,7 +379,9 @@ pub(crate) async fn create_category_internal(
         let parsed = parse_mm_or_uuid(input_team_id)
             .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
         if parsed != team_id {
-            return Err(AppError::BadRequest("team_id does not match path".to_string()));
+            return Err(AppError::BadRequest(
+                "team_id does not match path".to_string(),
+            ));
         }
     }
 
@@ -351,8 +390,8 @@ pub(crate) async fn create_category_internal(
     let category_type = input.category_type.unwrap_or_else(|| "custom".to_string());
     let sorting = input.sorting.unwrap_or_else(|| "alpha".to_string());
 
-    let next_order: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM channel_categories WHERE user_id = $1 AND team_id = $2",
+    let next_order: i32 = sqlx::query_scalar(
+        "SELECT (COALESCE(MAX(sort_order), -1) + 1)::int4 FROM channel_categories WHERE user_id = $1 AND team_id = $2",
     )
     .bind(user_id)
     .bind(team_id)
@@ -368,7 +407,7 @@ pub(crate) async fn create_category_internal(
     .bind(&category_type)
     .bind(&input.display_name)
     .bind(&sorting)
-    .bind(next_order as i32)
+    .bind(next_order)
     .bind(now)
     .bind(now)
     .execute(&state.db)
@@ -416,13 +455,17 @@ pub(crate) async fn update_categories_internal(
         let cat_user_id = parse_mm_or_uuid(&cat.user_id)
             .ok_or_else(|| AppError::BadRequest("Invalid category user_id".to_string()))?;
         if cat_user_id != user_id {
-            return Err(AppError::BadRequest("category user_id does not match path".to_string()));
+            return Err(AppError::BadRequest(
+                "category user_id does not match path".to_string(),
+            ));
         }
 
         let cat_team_id = parse_mm_or_uuid(&cat.team_id)
             .ok_or_else(|| AppError::BadRequest("Invalid category team_id".to_string()))?;
         if cat_team_id != team_id {
-            return Err(AppError::BadRequest("category team_id does not match path".to_string()));
+            return Err(AppError::BadRequest(
+                "category team_id does not match path".to_string(),
+            ));
         }
 
         sqlx::query(
@@ -506,7 +549,7 @@ mod tests {
     use super::*;
 
     fn is_millis_timestamp(value: i64) -> bool {
-        value >= 1_000_000_000_000 && value <= 9_999_999_999_999
+        (1_000_000_000_000..=9_999_999_999_999).contains(&value)
     }
 
     fn row(display_name: &str, sort_order: i32) -> CategoryRow {
@@ -934,11 +977,13 @@ async fn get_preferences(
     State(state): State<AppState>,
     auth: MmAuthUser,
 ) -> ApiResult<Json<Vec<mm::Preference>>> {
-    let rows = sqlx::query("SELECT user_id, category, name, value FROM mattermost_preferences WHERE user_id = $1")
-        .bind(auth.user_id)
-        .fetch_all(&state.db)
-        .await
-        .unwrap_or_default();
+    let rows = sqlx::query(
+        "SELECT user_id, category, name, value FROM mattermost_preferences WHERE user_id = $1",
+    )
+    .bind(auth.user_id)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
 
     let mut prefs = Vec::new();
     for row in rows {
@@ -1046,7 +1091,7 @@ async fn autocomplete_users(
     auth: MmAuthUser,
     Query(query): Query<AutocompleteQuery>,
 ) -> ApiResult<Json<Vec<mm::User>>> {
-    let limit = query.limit.unwrap_or(25).clamp(1, 200) as i64;
+    let limit = query.limit.unwrap_or(25).clamp(1, 200);
     let name = query.name.unwrap_or_default();
     let name_like = format!("%{}%", name);
 
@@ -1063,7 +1108,9 @@ async fn autocomplete_users(
         .await?;
 
         if !is_member {
-            return Err(AppError::Forbidden("Not a member of this channel".to_string()));
+            return Err(AppError::Forbidden(
+                "Not a member of this channel".to_string(),
+            ));
         }
 
         sqlx::query_as(
@@ -1143,21 +1190,25 @@ async fn get_statuses_by_ids(
         return Ok(Json(vec![]));
     }
 
-    let users: Vec<(Uuid, String, Option<DateTime<Utc>>)> = sqlx::query_as(
-        "SELECT id, presence, last_login_at FROM users WHERE id = ANY($1)",
-    )
-    .bind(&uuids)
-    .fetch_all(&state.db)
-    .await?;
+    let users: Vec<(Uuid, String, Option<DateTime<Utc>>)> =
+        sqlx::query_as("SELECT id, presence, last_login_at FROM users WHERE id = ANY($1)")
+            .bind(&uuids)
+            .fetch_all(&state.db)
+            .await?;
 
-    let statuses = users.into_iter().map(|(id, presence, last_login)| {
-        mm::Status {
+    let statuses = users
+        .into_iter()
+        .map(|(id, presence, last_login)| mm::Status {
             user_id: encode_mm_id(id),
-            status: if presence.is_empty() { "offline".to_string() } else { presence },
+            status: if presence.is_empty() {
+                "offline".to_string()
+            } else {
+                presence
+            },
             manual: false,
             last_activity_at: last_login.map(|t| t.timestamp_millis()).unwrap_or(0),
-        }
-    }).collect();
+        })
+        .collect();
 
     Ok(Json(statuses))
 }
@@ -1175,11 +1226,12 @@ async fn get_users_by_ids(
     Query(_query): Query<std::collections::HashMap<String, String>>,
     body: Bytes,
 ) -> ApiResult<Json<Vec<mm::User>>> {
-    let ids = parse_body::<UsersByIdsRequest>(&headers, &body, "Invalid users/ids body")
-        .map(|parsed| match parsed {
+    let ids = parse_body::<UsersByIdsRequest>(&headers, &body, "Invalid users/ids body").map(
+        |parsed| match parsed {
             UsersByIdsRequest::Ids(ids) => ids,
             UsersByIdsRequest::Wrapped { user_ids } => user_ids,
-        })?;
+        },
+    )?;
 
     let uuids: Vec<Uuid> = ids.iter().filter_map(|id| parse_mm_or_uuid(id)).collect();
 
@@ -1187,10 +1239,11 @@ async fn get_users_by_ids(
         return Ok(Json(vec![]));
     }
 
-    let users: Vec<User> = sqlx::query_as("SELECT * FROM users WHERE id = ANY($1) AND is_active = true")
-        .bind(&uuids)
-        .fetch_all(&state.db)
-        .await?;
+    let users: Vec<User> =
+        sqlx::query_as("SELECT * FROM users WHERE id = ANY($1) AND is_active = true")
+            .bind(&uuids)
+            .fetch_all(&state.db)
+            .await?;
 
     let mm_users: Vec<mm::User> = users.into_iter().map(|u| u.into()).collect();
     Ok(Json(mm_users))
@@ -1209,8 +1262,7 @@ fn parse_body<T: DeserializeOwned>(
     if content_type.starts_with("application/json") {
         serde_json::from_slice(body).map_err(|_| AppError::BadRequest(message.to_string()))
     } else if content_type.starts_with("application/x-www-form-urlencoded") {
-        serde_urlencoded::from_bytes(body)
-            .map_err(|_| AppError::BadRequest(message.to_string()))
+        serde_urlencoded::from_bytes(body).map_err(|_| AppError::BadRequest(message.to_string()))
     } else {
         serde_json::from_slice(body)
             .or_else(|_| serde_urlencoded::from_bytes(body))
@@ -1224,16 +1276,19 @@ async fn get_status(
 ) -> ApiResult<Json<mm::Status>> {
     let user_id = parse_mm_or_uuid(&user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
-    let (presence, last_login): (String, Option<DateTime<Utc>>) = sqlx::query_as(
-        "SELECT presence, last_login_at FROM users WHERE id = $1",
-    )
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let (presence, last_login): (String, Option<DateTime<Utc>>) =
+        sqlx::query_as("SELECT presence, last_login_at FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await?;
 
     Ok(Json(mm::Status {
         user_id: encode_mm_id(user_id),
-        status: if presence.is_empty() { "offline".to_string() } else { presence },
+        status: if presence.is_empty() {
+            "offline".to_string()
+        } else {
+            presence
+        },
         manual: false,
         last_activity_at: last_login.map(|t| t.timestamp_millis()).unwrap_or(0),
     }))
@@ -1243,16 +1298,19 @@ async fn get_my_status(
     State(state): State<AppState>,
     auth: MmAuthUser,
 ) -> ApiResult<Json<mm::Status>> {
-    let (presence, last_login): (String, Option<DateTime<Utc>>) = sqlx::query_as(
-        "SELECT presence, last_login_at FROM users WHERE id = $1",
-    )
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let (presence, last_login): (String, Option<DateTime<Utc>>) =
+        sqlx::query_as("SELECT presence, last_login_at FROM users WHERE id = $1")
+            .bind(auth.user_id)
+            .fetch_one(&state.db)
+            .await?;
 
     Ok(Json(mm::Status {
         user_id: encode_mm_id(auth.user_id),
-        status: if presence.is_empty() { "offline".to_string() } else { presence },
+        status: if presence.is_empty() {
+            "offline".to_string()
+        } else {
+            presence
+        },
         manual: false,
         last_activity_at: last_login.map(|t| t.timestamp_millis()).unwrap_or(0),
     }))
@@ -1284,7 +1342,9 @@ async fn update_status(
     let input_user_id = parse_mm_or_uuid(&input.user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
     if input_user_id != auth.user_id {
-        return Err(AppError::Forbidden("Cannot update other user's status".to_string()));
+        return Err(AppError::Forbidden(
+            "Cannot update other user's status".to_string(),
+        ));
     }
 
     sqlx::query("UPDATE users SET presence = $1 WHERE id = $2")
@@ -1337,7 +1397,9 @@ async fn get_roles_by_names(
     body: Bytes,
 ) -> ApiResult<Json<Vec<mm::Role>>> {
     let names: Vec<String> = parse_body(&headers, &body, "Invalid roles body")?;
-    let permissions = fetch_role_permissions(&state, &names).await.unwrap_or_default();
+    let permissions = fetch_role_permissions(&state, &names)
+        .await
+        .unwrap_or_default();
 
     let roles = names
         .into_iter()
@@ -1365,12 +1427,11 @@ async fn fetch_role_permissions(
     state: &AppState,
     roles: &[String],
 ) -> Result<std::collections::HashMap<String, Vec<String>>, sqlx::Error> {
-    let rows: Vec<(String, String)> = sqlx::query_as(
-        "SELECT role, permission_id FROM role_permissions WHERE role = ANY($1)",
-    )
-    .bind(roles)
-    .fetch_all(&state.db)
-    .await?;
+    let rows: Vec<(String, String)> =
+        sqlx::query_as("SELECT role, permission_id FROM role_permissions WHERE role = ANY($1)")
+            .bind(roles)
+            .fetch_all(&state.db)
+            .await?;
 
     let mut map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
     for (role, permission_id) in rows {
@@ -1433,7 +1494,9 @@ async fn list_users(
     .await?;
 
     if !is_member {
-        return Err(AppError::Forbidden("Not a member of this channel".to_string()));
+        return Err(AppError::Forbidden(
+            "Not a member of this channel".to_string(),
+        ));
     }
 
     let users: Vec<User> = sqlx::query_as(
@@ -1464,16 +1527,12 @@ async fn get_user_image(
         .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
 
     const PNG_1X1: &[u8] = &[
-        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0,
-        0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120,
-        156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68,
-        174, 66, 96, 130,
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6,
+        0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1,
+        13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
     ];
 
-    Ok((
-        [(axum::http::header::CONTENT_TYPE, "image/png")],
-        PNG_1X1,
-    ))
+    Ok(([(axum::http::header::CONTENT_TYPE, "image/png")], PNG_1X1))
 }
 
 async fn user_typing(
@@ -1486,7 +1545,7 @@ async fn user_typing(
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| AppError::BadRequest("Invalid channel ID".to_string()))?;
     if user_id != auth.user_id {
-         return Err(AppError::Forbidden("Mismatch user_id".to_string()));
+        return Err(AppError::Forbidden("Mismatch user_id".to_string()));
     }
 
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -1497,7 +1556,8 @@ async fn user_typing(
             thread_root_id: None,
         },
         Some(channel_id),
-    ).with_broadcast(crate::realtime::WsBroadcast {
+    )
+    .with_broadcast(crate::realtime::WsBroadcast {
         channel_id: Some(channel_id),
         team_id: None,
         user_id: None,

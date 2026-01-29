@@ -39,7 +39,7 @@ async fn ws_handler(
     headers: HeaderMap,
 ) -> Response {
     let mut token = query.token.clone().unwrap_or_default();
-    
+
     // Extract protocol to echo back (required by spec if sent by client)
     let requested_protocol = headers
         .get("Sec-WebSocket-Protocol")
@@ -61,7 +61,11 @@ async fn ws_handler(
         token = token.trim_start_matches("Bearer ").to_string();
     }
 
-    tracing::info!("WS Handshake - Token present: {}, Protocol: {:?}", !token.is_empty(), requested_protocol);
+    tracing::info!(
+        "WS Handshake - Token present: {}, Protocol: {:?}",
+        !token.is_empty(),
+        requested_protocol
+    );
 
     // Validate token
     let claims = match validate_token(&token, &state.jwt_secret) {
@@ -90,7 +94,9 @@ async fn ws_handler(
     // Spec compliance: if client requested a protocol, we MUST return it
     if let Some(p) = requested_protocol {
         if let Ok(header_val) = p.parse() {
-            response.headers_mut().insert("Sec-WebSocket-Protocol", header_val);
+            response
+                .headers_mut()
+                .insert("Sec-WebSocket-Protocol", header_val);
         }
     }
 

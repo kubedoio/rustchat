@@ -2,17 +2,17 @@
 
 use axum::{
     extract::State,
-    routing::{post, get},
+    routing::{get, post},
     Json, Router,
 };
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::Utc;
 
 use super::AppState;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
-use crate::models::{MiroTalkConfig, JoinBehavior};
+use crate::models::{JoinBehavior, MiroTalkConfig};
 use crate::services::mirotalk::MiroTalkClient;
 
 pub fn router() -> Router<AppState> {
@@ -47,29 +47,36 @@ async fn create_meeting(
     Json(payload): Json<CreateMeetingRequest>,
 ) -> ApiResult<Json<CreateMeetingResponse>> {
     // 1. Get MiroTalk config
-    let config: MiroTalkConfig = sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
-        .fetch_optional(&state.db)
-        .await?
-        .unwrap_or_else(|| MiroTalkConfig {
-            is_active: true,
-            mode: crate::models::MiroTalkMode::Disabled,
-            base_url: "".to_string(),
-            api_key_secret: "".to_string(),
-            default_room_prefix: None,
-            join_behavior: crate::models::JoinBehavior::NewTab,
-            updated_at: Utc::now(),
-            updated_by: None,
-        });
+    let config: MiroTalkConfig =
+        sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
+            .fetch_optional(&state.db)
+            .await?
+            .unwrap_or_else(|| MiroTalkConfig {
+                is_active: true,
+                mode: crate::models::MiroTalkMode::Disabled,
+                base_url: "".to_string(),
+                api_key_secret: "".to_string(),
+                default_room_prefix: None,
+                join_behavior: crate::models::JoinBehavior::NewTab,
+                updated_at: Utc::now(),
+                updated_by: None,
+            });
 
     if !config.is_enabled() {
-        return Err(AppError::Config("MiroTalk integration is not enabled".to_string()));
+        return Err(AppError::Config(
+            "MiroTalk integration is not enabled".to_string(),
+        ));
     }
 
     // 2. Validate scope and IDs
     let channel_id = match payload.scope {
-        MeetingScope::Channel => payload.channel_id.ok_or(AppError::BadRequest("channel_id required for channel scope".to_string()))?,
+        MeetingScope::Channel => payload.channel_id.ok_or(AppError::BadRequest(
+            "channel_id required for channel scope".to_string(),
+        ))?,
         MeetingScope::Dm => {
-            let target_id = payload.dm_user_id.ok_or(AppError::BadRequest("dm_user_id required for dm scope".to_string()))?;
+            let target_id = payload.dm_user_id.ok_or(AppError::BadRequest(
+                "dm_user_id required for dm scope".to_string(),
+            ))?;
             // Resolve DM channel ID between auth.user_id and target_id
             let dm_channel: Option<Uuid> = sqlx::query_scalar(
                 r#"
@@ -77,7 +84,7 @@ async fn create_meeting(
                 JOIN channel_members cm1 ON c.id = cm1.channel_id
                 JOIN channel_members cm2 ON c.id = cm2.channel_id
                 WHERE c.channel_type = 'D' AND cm1.user_id = $1 AND cm2.user_id = $2
-                "#
+                "#,
             )
             .bind(auth.user_id)
             .bind(target_id)
@@ -89,7 +96,10 @@ async fn create_meeting(
     };
 
     // 3. Generate room name
-    let prefix = config.default_room_prefix.clone().unwrap_or_else(|| "rustchat".to_string());
+    let prefix = config
+        .default_room_prefix
+        .clone()
+        .unwrap_or_else(|| "rustchat".to_string());
     // Use channel ID as part of room name to keep it related to context
     let timestamp = Utc::now().timestamp();
     let room_name = format!("{}-{}-{}", prefix, channel_id, timestamp);
@@ -122,9 +132,9 @@ async fn create_meeting(
         auth.user_id,
         channel_id,
         create_post_input,
-        None
-    ).await?;
-
+        None,
+    )
+    .await?;
 
     Ok(Json(CreateMeetingResponse {
         meeting_url,
@@ -138,13 +148,14 @@ async fn get_active_meetings(
 ) -> ApiResult<Json<Vec<String>>> {
     // Check for admin or permission if needed. For now just let auth users see.
 
-    let config: MiroTalkConfig = sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
-        .fetch_optional(&state.db)
-        .await?
-        .ok_or_else(|| AppError::Config("MiroTalk config not found".to_string()))?;
+    let config: MiroTalkConfig =
+        sqlx::query_as("SELECT * FROM mirotalk_config WHERE is_active = true")
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Config("MiroTalk config not found".to_string()))?;
 
     if !config.is_enabled() {
-         return Ok(Json(vec![]));
+        return Ok(Json(vec![]));
     }
 
     let client = MiroTalkClient::new(config, state.http_client.clone())?;

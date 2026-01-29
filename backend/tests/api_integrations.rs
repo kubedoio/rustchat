@@ -17,7 +17,7 @@ async fn test_slash_command_lifecycle() {
     });
 
     app.api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", &app.address))
         .json(&user_data)
         .send()
         .await
@@ -29,7 +29,7 @@ async fn test_slash_command_lifecycle() {
     });
 
     app.api_client
-        .post(&format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", &app.address))
         .json(&login_data)
         .send()
         .await
@@ -44,7 +44,7 @@ async fn test_slash_command_lifecycle() {
 
     let team_res = app
         .api_client
-        .post(&format!("{}/api/v1/teams", &app.address))
+        .post(format!("{}/api/v1/teams", &app.address))
         .json(&team_data)
         .send()
         .await
@@ -56,7 +56,7 @@ async fn test_slash_command_lifecycle() {
     // 3. Get Channels to find a channel ID
     let channels_res = app
         .api_client
-        .get(&format!(
+        .get(format!(
             "{}/api/v1/teams/{}/channels",
             &app.address, team.id
         ))
@@ -80,7 +80,7 @@ async fn test_slash_command_lifecycle() {
         });
         let c_res = app
             .api_client
-            .post(&format!("{}/api/v1/channels", &app.address))
+            .post(format!("{}/api/v1/channels", &app.address))
             .json(&channel_data)
             .send()
             .await
@@ -102,7 +102,7 @@ async fn test_slash_command_lifecycle() {
 
     let echo_res = app
         .api_client
-        .post(&format!(
+        .post(format!(
             "{}/api/v1/integrations/commands/execute",
             &app.address
         ))
@@ -130,7 +130,7 @@ async fn test_slash_command_lifecycle() {
 
     let create_res = app
         .api_client
-        .post(&format!(
+        .post(format!(
             "{}/api/v1/integrations/commands?team_id={}",
             &app.address, team.id
         ))
@@ -157,7 +157,7 @@ async fn test_slash_command_lifecycle() {
 
     let exec_res = app
         .api_client
-        .post(&format!(
+        .post(format!(
             "{}/api/v1/integrations/commands/execute",
             &app.address
         ))

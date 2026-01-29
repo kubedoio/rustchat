@@ -4,16 +4,19 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use chrono::Utc;
 use image::{GenericImageView, ImageFormat};
+use sha2::{Digest, Sha256};
 use std::io::Cursor;
 use uuid::Uuid;
-use chrono::Utc;
-use sha2::{Digest, Sha256};
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
+use crate::mattermost_compat::{
+    id::{encode_mm_id, parse_mm_or_uuid},
+    models as mm,
+};
 use crate::models::FileInfo;
 
 pub fn router() -> Router<AppState> {
@@ -53,8 +56,8 @@ async fn upload_file(
                 channel_id = Some(id);
             }
         } else if name == "client_ids" {
-             let txt = field.text().await.unwrap_or_default();
-             client_ids.push(txt);
+            let txt = field.text().await.unwrap_or_default();
+            client_ids.push(txt);
         } else if name == "files" {
             let filename = field.file_name().unwrap_or("unknown").to_string();
             let content_type = field
@@ -87,7 +90,10 @@ async fn upload_file(
         let hash = hex::encode(hasher.finalize());
         let size = file.data.len() as i64;
 
-        state.s3_client.upload(&key, file.data.clone(), &file.content_type).await?;
+        state
+            .s3_client
+            .upload(&key, file.data.clone(), &file.content_type)
+            .await?;
 
         // Image processing (Blocking offloaded)
         let (width, height, thumbnail_data) = if file.content_type.starts_with("image/") {
@@ -100,13 +106,16 @@ async fn upload_file(
                     let h_out = Some(h as i32);
 
                     let thumb_data = if w > 400 || h > 400 {
-                         let thumb = img.thumbnail(400, 400);
-                         let mut buf = Vec::new();
-                         if thumb.write_to(&mut Cursor::new(&mut buf), ImageFormat::WebP).is_ok() {
-                             Some(buf)
-                         } else {
-                             None
-                         }
+                        let thumb = img.thumbnail(400, 400);
+                        let mut buf = Vec::new();
+                        if thumb
+                            .write_to(&mut Cursor::new(&mut buf), ImageFormat::WebP)
+                            .is_ok()
+                        {
+                            Some(buf)
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     };
@@ -114,17 +123,24 @@ async fn upload_file(
                 } else {
                     (None, None, None)
                 }
-            }).await.unwrap_or((None, None, None))
+            })
+            .await
+            .unwrap_or((None, None, None))
         } else {
-             (None, None, None)
+            (None, None, None)
         };
 
         let mut thumbnail_key = None;
         if let Some(t_data) = thumbnail_data {
-             let t_key = format!("thumbnails/{}/{}.webp", auth.user_id, file_id);
-             if state.s3_client.upload(&t_key, t_data, "image/webp").await.is_ok() {
-                 thumbnail_key = Some(t_key);
-             }
+            let t_key = format!("thumbnails/{}/{}.webp", auth.user_id, file_id);
+            if state
+                .s3_client
+                .upload(&t_key, t_data, "image/webp")
+                .await
+                .is_ok()
+            {
+                thumbnail_key = Some(t_key);
+            }
         }
 
         let has_thumbnail = thumbnail_key.is_some();
@@ -190,7 +206,10 @@ async fn get_file(
     // For now, we redirect to S3 presigned URL or proxy it.
     // Mobile client usually handles redirects.
 
-    let url = state.s3_client.presigned_download_url(&file.key, 3600).await?;
+    let url = state
+        .s3_client
+        .presigned_download_url(&file.key, 3600)
+        .await?;
 
     // Redirect to S3
     Ok(axum::response::Redirect::temporary(&url))
@@ -234,7 +253,10 @@ async fn get_link(
         .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
 
-    let url = state.s3_client.presigned_download_url(&file.key, 3600).await?;
+    let url = state
+        .s3_client
+        .presigned_download_url(&file.key, 3600)
+        .await?;
 
     Ok(Json(serde_json::json!({"link": url})))
 }

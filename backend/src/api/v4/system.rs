@@ -1,7 +1,12 @@
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::MM_VERSION;
-use axum::{extract::Query, routing::{get, post}, Json, Router, response::IntoResponse};
+use axum::{
+    extract::Query,
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::Serialize;
 
 pub fn router() -> Router<AppState> {
@@ -68,8 +73,11 @@ async fn client_perf(
 }
 
 async fn version() -> ApiResult<impl IntoResponse> {
-     Ok((
-        [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-        MM_VERSION.to_string()
+    Ok((
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
+        MM_VERSION.to_string(),
     ))
 }

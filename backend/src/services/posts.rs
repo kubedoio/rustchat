@@ -212,11 +212,7 @@ pub async fn create_post(
     Ok(response)
 }
 
-async fn ensure_permission(
-    state: &AppState,
-    user_id: Uuid,
-    permission: &str,
-) -> ApiResult<()> {
+async fn ensure_permission(state: &AppState, user_id: Uuid, permission: &str) -> ApiResult<()> {
     let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_one(&state.db)

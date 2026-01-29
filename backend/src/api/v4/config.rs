@@ -3,7 +3,12 @@ use crate::error::ApiResult;
 use crate::mattermost_compat::models as mm;
 use crate::mattermost_compat::{id::encode_mm_id, MM_VERSION};
 use crate::models::server_config::SiteConfig;
-use axum::{extract::{Query, State}, response::IntoResponse, routing::get, Json, Router};
+use axum::{
+    extract::{Query, State},
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -80,12 +85,24 @@ fn legacy_config(site: &SiteConfig, diagnostic_id: &str) -> serde_json::Value {
         map.insert(key.to_string(), Value::String(value.to_string()));
     };
 
-    insert(&mut map, "AboutLink", "https://docs.mattermost.com/about/product.html/");
+    insert(
+        &mut map,
+        "AboutLink",
+        "https://docs.mattermost.com/about/product.html/",
+    );
     insert(&mut map, "AllowDownloadLogs", "true");
-    insert(&mut map, "AndroidAppDownloadLink", "https://mattermost.com/mattermost-android-app/");
+    insert(
+        &mut map,
+        "AndroidAppDownloadLink",
+        "https://mattermost.com/mattermost-android-app/",
+    );
     insert(&mut map, "AndroidLatestVersion", "");
     insert(&mut map, "AndroidMinVersion", "");
-    insert(&mut map, "AppDownloadLink", "https://mattermost.com/download/#mattermostApps");
+    insert(
+        &mut map,
+        "AppDownloadLink",
+        "https://mattermost.com/download/#mattermostApps",
+    );
     insert(&mut map, "AppsPluginEnabled", "true");
     insert(&mut map, "AsymmetricSigningPublicKey", "");
     insert(&mut map, "BuildDate", "");
@@ -139,10 +156,22 @@ fn legacy_config(site: &SiteConfig, diagnostic_id: &str) -> serde_json::Value {
     insert(&mut map, "FeatureFlagEnableExportDirectDownload", "false");
     insert(&mut map, "FeatureFlagEnableRemoteClusterService", "false");
     insert(&mut map, "FeatureFlagEnableSharedChannelsDMs", "false");
-    insert(&mut map, "FeatureFlagEnableSharedChannelsMemberSync", "false");
+    insert(
+        &mut map,
+        "FeatureFlagEnableSharedChannelsMemberSync",
+        "false",
+    );
     insert(&mut map, "FeatureFlagEnableSharedChannelsPlugins", "true");
-    insert(&mut map, "FeatureFlagEnableSyncAllUsersForRemoteCluster", "false");
-    insert(&mut map, "FeatureFlagExperimentalAuditSettingsSystemConsoleUI", "false");
+    insert(
+        &mut map,
+        "FeatureFlagEnableSyncAllUsersForRemoteCluster",
+        "false",
+    );
+    insert(
+        &mut map,
+        "FeatureFlagExperimentalAuditSettingsSystemConsoleUI",
+        "false",
+    );
     insert(&mut map, "FeatureFlagMoveThreadsEnabled", "false");
     insert(&mut map, "FeatureFlagNormalizeLdapDNs", "false");
     insert(&mut map, "FeatureFlagNotificationMonitoring", "true");
@@ -157,11 +186,19 @@ fn legacy_config(site: &SiteConfig, diagnostic_id: &str) -> serde_json::Value {
     insert(&mut map, "ForgotPasswordLink", "");
     insert(&mut map, "GitLabButtonColor", "");
     insert(&mut map, "GitLabButtonText", "");
-    insert(&mut map, "GuestAccountsEnforceMultifactorAuthentication", "false");
+    insert(
+        &mut map,
+        "GuestAccountsEnforceMultifactorAuthentication",
+        "false",
+    );
     insert(&mut map, "HasImageProxy", "false");
     insert(&mut map, "HelpLink", "https://mattermost.com/default-help/");
     insert(&mut map, "HideGuestTags", "false");
-    insert(&mut map, "IosAppDownloadLink", "https://mattermost.com/mattermost-ios-app/");
+    insert(
+        &mut map,
+        "IosAppDownloadLink",
+        "https://mattermost.com/mattermost-ios-app/",
+    );
     insert(&mut map, "IosLatestVersion", "");
     insert(&mut map, "IosMinVersion", "");
     insert(&mut map, "LdapLoginButtonBorderColor", "");
