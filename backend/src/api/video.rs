@@ -95,10 +95,6 @@ async fn create_meeting(
     let timestamp = Utc::now().timestamp();
     let room_name = format!("{}-{}-{}", prefix, channel_id, timestamp);
 
-    // 4. Create meeting via client
-    let client = MiroTalkClient::new(config.clone(), state.http_client.clone())?;
-    let meeting_url = client.create_meeting(&room_name).await?;
-
     let display_name = sqlx::query_scalar::<_, Option<String>>(
         "SELECT display_name FROM users WHERE id = $1",
     )
@@ -106,6 +102,12 @@ async fn create_meeting(
     .fetch_one(&state.db)
     .await?
     .unwrap_or_else(|| auth.email.clone());
+
+    // 4. Create meeting via client
+    let client = MiroTalkClient::new(config.clone(), state.http_client.clone())?;
+    let meeting_url = client
+        .create_meeting(&room_name, Some(&display_name), true, true)
+        .await?;
 
     let mut join_url = match Url::parse(&meeting_url) {
         Ok(url) => url,

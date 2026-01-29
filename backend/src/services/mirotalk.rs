@@ -25,7 +25,9 @@ pub struct MiroTalkStats {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateMeetingResponse {
-    pub meeting: String, // The URL
+    pub meeting: Option<String>,
+    pub join: Option<String>,
+    pub url: Option<String>,
 }
 
 impl MiroTalkClient {
@@ -128,37 +130,75 @@ impl MiroTalkClient {
         }
     }
 
-    pub async fn create_meeting(&self, room_name: &str) -> ApiResult<String> {
+    pub async fn create_meeting(
+        &self,
+        room_name: &str,
+        name: Option<&str>,
+        audio: bool,
+        video: bool,
+    ) -> ApiResult<String> {
         match self.mode {
-            MiroTalkMode::Sfu => self.create_meeting_sfu(room_name).await,
+            MiroTalkMode::Sfu => self.create_meeting_sfu(room_name, name, audio, video).await,
             MiroTalkMode::P2p => self.create_meeting_p2p(room_name).await,
             MiroTalkMode::Disabled => Err(AppError::Config("MiroTalk integration is disabled".to_string())),
         }
     }
 
-    async fn create_meeting_sfu(&self, room_name: &str) -> ApiResult<String> {
-        let endpoints = ["api/v1/meeting", "api/v1/meeting/create", "api/meeting"]; 
-        let body = serde_json::json!({
+    async fn create_meeting_sfu(
+        &self,
+        room_name: &str,
+        name: Option<&str>,
+        audio: bool,
+        video: bool,
+    ) -> ApiResult<String> {
+        let endpoints = [
+            ("api/v1/join", true),
+            ("api/v1/meeting", false),
+            ("api/v1/meeting/create", false),
+            ("api/meeting", false),
+        ];
+
+        let mut join_body = serde_json::json!({
+            "room": room_name,
+            "audio": audio,
+            "video": video,
+        });
+
+        if let Some(display_name) = name {
+            if let Some(obj) = join_body.as_object_mut() {
+                obj.insert(
+                    "name".to_string(),
+                    serde_json::Value::String(display_name.to_string()),
+                );
+            }
+        }
+
+        let meeting_body = serde_json::json!({
             "room": room_name,
         });
 
         let mut last_error = "MiroTalk create meeting failed".to_string();
 
-        for endpoint in endpoints {
+        for (endpoint, is_join) in endpoints {
             let url = self
                 .base_url
                 .join(endpoint)
                 .map_err(|_| AppError::Internal("Failed to build meeting URL".to_string()))?;
 
+            let body = if is_join { &join_body } else { &meeting_body };
+
             let response = self
-                .send_with_auth(self.http.post(url).json(&body))
+                .send_with_auth(self.http.post(url).json(body))
                 .await
                 .map_err(|e| AppError::ExternalService(format!("Failed to create SFU meeting: {}", e)))?;
 
             if response.status().is_success() {
                 let data = response.json::<CreateMeetingResponse>().await
                     .map_err(|e| AppError::ExternalService(format!("Invalid response from MiroTalk: {}", e)))?;
-                return Ok(data.meeting);
+                if let Some(url) = data.join.or(data.meeting).or(data.url) {
+                    return Ok(url);
+                }
+                return Err(AppError::ExternalService("Invalid MiroTalk response: missing URL".to_string()));
             }
 
             let status = response.status();
@@ -284,7 +324,10 @@ mod tests {
     async fn test_p2p_url_construction() {
         let config = create_config(MiroTalkMode::P2p, "https://p2p.mirotalk.com");
         let client = MiroTalkClient::new(config, Client::new()).unwrap();
-        let url = client.create_meeting("room1").await.unwrap();
+        let url = client
+            .create_meeting("room1", Some("user"), true, true)
+            .await
+            .unwrap();
         assert_eq!(url, "https://p2p.mirotalk.com/room1");
     }
 
@@ -292,7 +335,10 @@ mod tests {
     async fn test_p2p_url_construction_trailing_slash() {
         let config = create_config(MiroTalkMode::P2p, "https://p2p.mirotalk.com/");
         let client = MiroTalkClient::new(config, Client::new()).unwrap();
-        let url = client.create_meeting("room1").await.unwrap();
+        let url = client
+            .create_meeting("room1", Some("user"), true, true)
+            .await
+            .unwrap();
         assert_eq!(url, "https://p2p.mirotalk.com/room1");
     }
 
@@ -300,7 +346,10 @@ mod tests {
     async fn test_p2p_url_construction_with_path() {
         let config = create_config(MiroTalkMode::P2p, "https://p2p.mirotalk.com/app");
         let client = MiroTalkClient::new(config, Client::new()).unwrap();
-        let url = client.create_meeting("room1").await.unwrap();
+        let url = client
+            .create_meeting("room1", Some("user"), true, true)
+            .await
+            .unwrap();
         assert_eq!(url, "https://p2p.mirotalk.com/app/room1");
     }
 

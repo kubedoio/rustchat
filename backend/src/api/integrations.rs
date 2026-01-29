@@ -547,7 +547,9 @@ pub async fn execute_command_internal(
             let room_id = URL_SAFE_NO_PAD.encode(room_seed.as_bytes());
 
             let client = MiroTalkClient::new(config.clone(), state.http_client.clone())?;
-            let meeting_url = client.create_meeting(&room_id).await?;
+            let meeting_url = client
+                .create_meeting(&room_id, Some(&display_name), true, true)
+                .await?;
 
             let mut join_url = match Url::parse(&meeting_url) {
                 Ok(url) => url,
