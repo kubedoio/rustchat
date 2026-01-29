@@ -177,24 +177,32 @@ async fn handle_socket(
     
     // Task for forwarding events from hub to client + Heartbeat
     let sender_task = tokio::spawn(async move {
-        let mut heartbeat = interval(Duration::from_secs(25));
+        let mut heartbeat = interval(Duration::from_secs(15));  // Send heartbeat every 15 seconds
         let mut seq = seq;
+        let mut last_ping = std::time::Instant::now();
         loop {
             tokio::select! {
                 // Heartbeat
                 _ = heartbeat.tick() => {
+                    let now = std::time::Instant::now();
+                    let elapsed = now.duration_since(last_ping).as_secs();
+                    tracing::debug!("[WS] Sending heartbeat ping to user {} (last ping {}s ago)", user_id, elapsed);
+                    
                     // Send a ping event or frame. MM uses a "ping" event or WS Ping.
                     // We'll send a JSON ping event for visibility.
                     let ping = json!({
                         "type": "event",
                         "event": "ping",
                         "data": {
-                            "server_time": chrono::Utc::now().timestamp_millis()
+                            "server_time": chrono::Utc::now().timestamp_millis(),
+                            "interval": 15000
                         },
                         "seq": seq
                     });
                     seq += 1;
+                    last_ping = now;
                     if sender_sink.send(Message::Text(ping.to_string().into())).await.is_err() {
+                        tracing::warn!("[WS] Failed to send heartbeat to user {}, connection may be dead", user_id);
                         break;
                     }
                 }
@@ -235,9 +243,23 @@ async fn handle_socket(
                 Ok(Message::Text(text)) => {
                     handle_upstream_message(&state_clone, user_id, &text).await;
                 }
-                Ok(Message::Ping(_)) => {
+                Ok(Message::Ping(data)) => {
+                    // Respond with Pong to keep connection alive
+                    tracing::debug!("[WS] Received Ping from {}, sending Pong", user_id);
+                    // Note: We can't easily send Pong from here since sender is in another task
+                    // But the tokio-tungstenite library should auto-respond to Ping
                 }
-                Ok(Message::Close(_)) | Err(_) => break,
+                Ok(Message::Pong(_)) => {
+                    tracing::debug!("[WS] Received Pong from {}", user_id);
+                }
+                Ok(Message::Close(frame)) => {
+                    tracing::info!("[WS] Client {} closed connection: {:?}", user_id, frame);
+                    break;
+                }
+                Err(e) => {
+                    tracing::error!("[WS] Error from client {}: {}", user_id, e);
+                    break;
+                }
                 _ => {}
             }
         }

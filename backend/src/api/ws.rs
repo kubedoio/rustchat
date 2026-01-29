@@ -357,8 +357,20 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
                         println!("DEBUG: Failed to parse ClientEnvelope: {}", text);
                     }
                 }
-                Ok(Message::Close(_)) => break,
-                Err(_) => break,
+                Ok(Message::Ping(data)) => {
+                    tracing::debug!("[WS] Received Ping from user {}", user_id);
+                }
+                Ok(Message::Pong(_)) => {
+                    tracing::debug!("[WS] Received Pong from user {}", user_id);
+                }
+                Ok(Message::Close(frame)) => {
+                    tracing::info!("[WS] Client {} closed connection: {:?}", user_id, frame);
+                    break;
+                }
+                Err(e) => {
+                    tracing::error!("[WS] Error from client {}: {}", user_id, e);
+                    break;
+                }
                 _ => {}
             }
         }
