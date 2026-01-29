@@ -8,6 +8,7 @@ use aws_sdk_s3::{
     Client, Config,
 };
 use std::time::Duration;
+use tracing::error;
 
 use crate::error::AppError;
 
@@ -74,7 +75,10 @@ impl S3Client {
             .content_type(content_type)
             .send()
             .await
-            .map_err(|e| AppError::Internal(format!("S3 upload error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 upload failed");
+                AppError::Internal(format!("S3 upload error: {}", e))
+            })?;
 
         Ok(())
     }
@@ -88,7 +92,10 @@ impl S3Client {
             .key(key)
             .send()
             .await
-            .map_err(|e| AppError::Internal(format!("S3 download error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 download failed");
+                AppError::Internal(format!("S3 download error: {}", e))
+            })?;
 
         let data = response
             .body
@@ -109,7 +116,10 @@ impl S3Client {
             .key(key)
             .send()
             .await
-            .map_err(|e| AppError::Internal(format!("S3 delete error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 delete failed");
+                AppError::Internal(format!("S3 delete error: {}", e))
+            })?;
 
         Ok(())
     }
@@ -132,7 +142,10 @@ impl S3Client {
             .key(key)
             .presigned(presigning_config)
             .await
-            .map_err(|e| AppError::Internal(format!("Presigning error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 presign download failed");
+                AppError::Internal(format!("Presigning error: {}", e))
+            })?;
 
         Ok(presigned.uri().to_string())
     }
@@ -157,7 +170,10 @@ impl S3Client {
             .content_type(content_type)
             .presigned(presigning_config)
             .await
-            .map_err(|e| AppError::Internal(format!("Presigning error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 presign upload failed");
+                AppError::Internal(format!("Presigning error: {}", e))
+            })?;
 
         Ok(presigned.uri().to_string())
     }
