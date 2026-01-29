@@ -107,15 +107,18 @@ async fn create_meeting(
     .await?
     .unwrap_or_else(|| auth.email.clone());
 
-    let mut join_url = Url::parse(&meeting_url).or_else(|_| {
-        let mut base = Url::parse(&config.base_url)
-            .map_err(|_| AppError::Config("Invalid MiroTalk base URL".to_string()))?;
-        if let Ok(mut segments) = base.path_segments_mut() {
-            segments.pop_if_empty();
-            segments.push(meeting_url.trim_start_matches('/'));
+    let mut join_url = match Url::parse(&meeting_url) {
+        Ok(url) => url,
+        Err(_) => {
+            let mut base = Url::parse(&config.base_url)
+                .map_err(|_| AppError::Config("Invalid MiroTalk base URL".to_string()))?;
+            if let Ok(mut segments) = base.path_segments_mut() {
+                segments.pop_if_empty();
+                segments.push(meeting_url.trim_start_matches('/'));
+            }
+            base
         }
-        Ok(base)
-    })?;
+    };
     join_url.query_pairs_mut().append_pair("name", &display_name);
 
     // 5. Post system message
