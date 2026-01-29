@@ -21,6 +21,7 @@ pub fn router() -> Router<AppState> {
         .route("/files", post(upload_file))
         .route("/files/{file_id}", get(get_file))
         .route("/files/{file_id}/thumbnail", get(get_thumbnail))
+        .route("/files/{file_id}/preview", get(get_preview))
         .route("/files/{file_id}/link", get(get_link))
 }
 
@@ -219,6 +220,32 @@ async fn get_thumbnail(
     // Fallback to original if no thumbnail or just 404?
     // MM returns 404 if no thumbnail.
     Err(AppError::NotFound("Thumbnail not found".to_string()))
+}
+
+async fn get_preview(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(file_id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    let file_id = parse_mm_or_uuid(&file_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
+    let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
+        .bind(file_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+
+    if file.mime_type.starts_with("image/") {
+        if file.has_thumbnail {
+            if let Some(key) = file.thumbnail_key.as_ref() {
+                let url = state.s3_client.presigned_download_url(key, 3600).await?;
+                return Ok(axum::response::Redirect::temporary(&url));
+            }
+        }
+    }
+
+    let url = state.s3_client.presigned_download_url(&file.key, 3600).await?;
+    Ok(axum::response::Redirect::temporary(&url))
 }
 
 async fn get_link(

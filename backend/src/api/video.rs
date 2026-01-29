@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use url::Url;
 use uuid::Uuid;
 use chrono::Utc;
 
@@ -94,15 +95,41 @@ async fn create_meeting(
     let timestamp = Utc::now().timestamp();
     let room_name = format!("{}-{}-{}", prefix, channel_id, timestamp);
 
+    let display_name = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT display_name FROM users WHERE id = $1",
+    )
+    .bind(auth.user_id)
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or_else(|| auth.email.clone());
+
     // 4. Create meeting via client
     let client = MiroTalkClient::new(config.clone(), state.http_client.clone())?;
-    let meeting_url = client.create_meeting(&room_name).await?;
+    let meeting_url = client
+        .create_meeting(&room_name, Some(&display_name), true, true)
+        .await?;
+
+    let mut join_url = match Url::parse(&meeting_url) {
+        Ok(url) => url,
+        Err(_) => {
+            let mut base = Url::parse(&config.base_url)
+                .map_err(|_| AppError::Config("Invalid MiroTalk base URL".to_string()))?;
+            if let Ok(mut segments) = base.path_segments_mut() {
+                segments.pop_if_empty();
+                segments.push(meeting_url.trim_start_matches('/'));
+            }
+            base
+        }
+    };
+    if !join_url.query_pairs().any(|(k, _)| k == "name") {
+        join_url.query_pairs_mut().append_pair("name", &display_name);
+    }
 
     // 5. Post system message
     let message_text = "started a video call".to_string();
     let props = serde_json::json!({
         "type": "video_call",
-        "meeting_url": meeting_url,
+        "meeting_url": join_url.to_string(),
         "mode": config.join_behavior,
         "initiator_id": auth.user_id,
         "initiator_email": auth.email
@@ -127,7 +154,7 @@ async fn create_meeting(
 
 
     Ok(Json(CreateMeetingResponse {
-        meeting_url,
+        meeting_url: join_url.to_string(),
         mode: config.join_behavior,
     }))
 }

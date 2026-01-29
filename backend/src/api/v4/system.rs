@@ -62,8 +62,29 @@ async fn ping(Query(query): Query<PingQuery>) -> ApiResult<Json<serde_json::Valu
 }
 
 async fn client_perf(
-    Json(_payload): Json<serde_json::Value>,
+    headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
 ) -> ApiResult<Json<serde_json::Value>> {
+    let _payload: serde_json::Value = if body.is_empty() {
+        serde_json::json!({})
+    } else {
+        let content_type = headers
+            .get(axum::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if content_type.starts_with("application/json") {
+            serde_json::from_slice(&body)
+                .unwrap_or_else(|_| serde_json::json!({}))
+        } else if content_type.starts_with("application/x-www-form-urlencoded") {
+            serde_urlencoded::from_bytes(&body)
+                .unwrap_or_else(|_| serde_json::json!({}))
+        } else {
+            serde_json::from_slice(&body)
+                .or_else(|_| serde_urlencoded::from_bytes(&body))
+                .unwrap_or_else(|_| serde_json::json!({}))
+        }
+    };
+
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
 

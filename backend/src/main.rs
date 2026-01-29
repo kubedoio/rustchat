@@ -62,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
     // Create S3 client
     let s3_client = S3Client::new(
         config.s3_endpoint.clone(),
+        config.s3_public_endpoint.clone(),
         config.s3_bucket.clone(),
         config.s3_access_key.clone(),
         config.s3_secret_key.clone(),

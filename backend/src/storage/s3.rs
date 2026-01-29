@@ -8,6 +8,7 @@ use aws_sdk_s3::{
     Client, Config,
 };
 use std::time::Duration;
+use tracing::error;
 
 use crate::error::AppError;
 
@@ -17,24 +18,31 @@ pub struct S3Client {
     client: Client,
     bucket: String,
     endpoint: Option<String>,
+    public_endpoint: Option<String>,
+    public_client: Option<Client>,
 }
 
 impl S3Client {
     /// Create a new S3 client
     pub fn new(
         endpoint: Option<String>,
+        public_endpoint: Option<String>,
         bucket: String,
         access_key: Option<String>,
         secret_key: Option<String>,
         region: String,
     ) -> Self {
-        let credentials = match (access_key, secret_key) {
+        let access_key_main = access_key.clone();
+        let secret_key_main = secret_key.clone();
+        let region_main = region.clone();
+
+        let credentials = match (access_key_main, secret_key_main) {
             (Some(ak), Some(sk)) => Some(Credentials::new(ak, sk, None, None, "rustchat")),
             _ => None,
         };
 
         let mut config_builder = Config::builder()
-            .region(Region::new(region))
+            .region(Region::new(region_main))
             .behavior_version_latest()
             .force_path_style(true);
 
@@ -50,10 +58,30 @@ impl S3Client {
         let config = config_builder.build();
         let client = Client::from_conf(config);
 
+        let public_client = public_endpoint.as_ref().map(|ep| {
+            let mut public_builder = Config::builder()
+                .region(Region::new(region.clone()))
+                .behavior_version_latest()
+                .force_path_style(true);
+
+            if let (Some(ak), Some(sk)) = (access_key.clone(), secret_key.clone()) {
+                let creds = Credentials::new(ak, sk, None, None, "rustchat");
+                public_builder =
+                    public_builder.credentials_provider(SharedCredentialsProvider::new(creds));
+            }
+
+            public_builder = public_builder.endpoint_url(ep);
+
+            let public_config = public_builder.build();
+            Client::from_conf(public_config)
+        });
+
         Self {
             client,
             bucket,
             endpoint,
+            public_endpoint,
+            public_client,
         }
     }
 
@@ -74,7 +102,10 @@ impl S3Client {
             .content_type(content_type)
             .send()
             .await
-            .map_err(|e| AppError::Internal(format!("S3 upload error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 upload failed");
+                AppError::Internal(format!("S3 upload error: {}", e))
+            })?;
 
         Ok(())
     }
@@ -88,7 +119,10 @@ impl S3Client {
             .key(key)
             .send()
             .await
-            .map_err(|e| AppError::Internal(format!("S3 download error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 download failed");
+                AppError::Internal(format!("S3 download error: {}", e))
+            })?;
 
         let data = response
             .body
@@ -109,7 +143,10 @@ impl S3Client {
             .key(key)
             .send()
             .await
-            .map_err(|e| AppError::Internal(format!("S3 delete error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 delete failed");
+                AppError::Internal(format!("S3 delete error: {}", e))
+            })?;
 
         Ok(())
     }
@@ -125,14 +162,17 @@ impl S3Client {
             .build()
             .map_err(|e| AppError::Internal(format!("Presigning config error: {}", e)))?;
 
-        let presigned = self
-            .client
+        let presign_client = self.public_client.as_ref().unwrap_or(&self.client);
+        let presigned = presign_client
             .get_object()
             .bucket(&self.bucket)
             .key(key)
             .presigned(presigning_config)
             .await
-            .map_err(|e| AppError::Internal(format!("Presigning error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 presign download failed");
+                AppError::Internal(format!("Presigning error: {}", e))
+            })?;
 
         Ok(presigned.uri().to_string())
     }
@@ -149,15 +189,18 @@ impl S3Client {
             .build()
             .map_err(|e| AppError::Internal(format!("Presigning config error: {}", e)))?;
 
-        let presigned = self
-            .client
+        let presign_client = self.public_client.as_ref().unwrap_or(&self.client);
+        let presigned = presign_client
             .put_object()
             .bucket(&self.bucket)
             .key(key)
             .content_type(content_type)
             .presigned(presigning_config)
             .await
-            .map_err(|e| AppError::Internal(format!("Presigning error: {}", e)))?;
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 presign upload failed");
+                AppError::Internal(format!("Presigning error: {}", e))
+            })?;
 
         Ok(presigned.uri().to_string())
     }

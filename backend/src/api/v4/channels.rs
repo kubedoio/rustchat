@@ -5,14 +5,17 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::post::PostResponse;
+use crate::models::Channel;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -23,6 +26,7 @@ pub fn router() -> Router<AppState> {
         .route("/channels/{channel_id}/timezones", get(get_channel_timezones))
         .route("/channels/{channel_id}/stats", get(get_channel_stats))
         .route("/channels/members/me/view", post(view_channel))
+        .route("/channels/direct", post(create_direct_channel))
 }
 
 #[derive(Deserialize)]
@@ -44,7 +48,15 @@ async fn view_channel(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
-    let input = parse_view_channel_request(&headers, &body)?;
+    if body.is_empty() {
+        return Ok(Json(serde_json::json!({"status": "OK"})));
+    }
+
+    let input = match parse_view_channel_request(&headers, &body) {
+        Ok(value) => value,
+        Err(_) => return Ok(Json(serde_json::json!({"status": "OK"}))),
+    };
+
     if let Some(channel_id) = parse_mm_or_uuid(&input.channel_id) {
         // Update last_viewed_at
         sqlx::query(
@@ -76,17 +88,23 @@ async fn view_channel(
             exclude_user_id: None,
         });
         state.ws_hub.broadcast(broadcast).await;
-
-        Ok(Json(serde_json::json!({"status": "OK"})))
-    } else {
-        Err(crate::error::AppError::BadRequest("Invalid channel_id".to_string()))
     }
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
 }
 
 fn parse_view_channel_request(
     headers: &axum::http::HeaderMap,
     body: &Bytes,
 ) -> ApiResult<ViewChannelRequest> {
+    parse_body(headers, body, "Invalid view body")
+}
+
+fn parse_body<T: DeserializeOwned>(
+    headers: &axum::http::HeaderMap,
+    body: &Bytes,
+    message: &str,
+) -> ApiResult<T> {
     let content_type = headers
         .get(axum::http::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -94,14 +112,14 @@ fn parse_view_channel_request(
 
     if content_type.starts_with("application/json") {
         serde_json::from_slice(body)
-            .map_err(|_| crate::error::AppError::BadRequest("Invalid JSON body".to_string()))
+            .map_err(|_| crate::error::AppError::BadRequest(message.to_string()))
     } else if content_type.starts_with("application/x-www-form-urlencoded") {
         serde_urlencoded::from_bytes(body)
-            .map_err(|_| crate::error::AppError::BadRequest("Invalid form body".to_string()))
+            .map_err(|_| crate::error::AppError::BadRequest(message.to_string()))
     } else {
         serde_json::from_slice(body)
             .or_else(|_| serde_urlencoded::from_bytes(body))
-            .map_err(|_| crate::error::AppError::BadRequest("Unsupported view body".to_string()))
+            .map_err(|_| crate::error::AppError::BadRequest(message.to_string()))
     }
 }
 
@@ -256,6 +274,71 @@ async fn get_channel_timezones(
     Path(_channel_id): Path<String>,
 ) -> ApiResult<Json<Vec<serde_json::Value>>> {
     Ok(Json(vec![]))
+}
+
+#[derive(serde::Deserialize)]
+struct DirectChannelRequest {
+    user_ids: Vec<String>,
+}
+
+async fn create_direct_channel(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<mm::Channel>> {
+    let input: DirectChannelRequest = parse_body(&headers, &body, "Invalid user_ids")?;
+
+    if input.user_ids.len() != 2 {
+        return Err(crate::error::AppError::BadRequest("user_ids must contain 2 users".to_string()));
+    }
+
+    let mut ids: Vec<Uuid> = input
+        .user_ids
+        .iter()
+        .filter_map(|id| parse_mm_or_uuid(id))
+        .collect();
+
+    if !ids.contains(&auth.user_id) {
+        return Err(crate::error::AppError::Forbidden("Must include your user id".to_string()));
+    }
+
+    ids.sort();
+    let name = format!("dm_{}_{}", ids[0], ids[1]);
+
+    let team_id: Uuid = sqlx::query_scalar(
+        "SELECT team_id FROM team_members WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1",
+    )
+    .bind(auth.user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| crate::error::AppError::BadRequest("User has no team".to_string()))?;
+
+    let channel: Channel = sqlx::query_as(
+        r#"
+        INSERT INTO channels (team_id, type, name, display_name, purpose, header, creator_id)
+        VALUES ($1, 'direct', $2, '', '', '', $3)
+        ON CONFLICT (team_id, name) DO UPDATE SET name = EXCLUDED.name
+        RETURNING *
+        "#,
+    )
+    .bind(team_id)
+    .bind(&name)
+    .bind(auth.user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    for user_id in ids {
+        sqlx::query(
+            "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+        )
+        .bind(channel.id)
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+    }
+
+    Ok(Json(channel.into()))
 }
 
 async fn get_posts(

@@ -14,8 +14,14 @@ use crate::error::{ApiResult, AppError};
 use crate::models::{
     Bot, BotToken, CommandResponse, CreateBot, CreateIncomingWebhook, CreateOutgoingWebhook,
     CreateSlashCommand, ExecuteCommand, IncomingWebhook, OutgoingWebhook, OutgoingWebhookPayload,
-    SlashCommand, WebhookPayload,
+    SlashCommand, WebhookPayload, MiroTalkConfig,
 };
+use crate::mattermost_compat::id::encode_mm_id;
+use crate::services::mirotalk::MiroTalkClient;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
+use chrono::Utc;
+use url::Url;
 
 /// Generate a secure random token
 fn generate_token() -> String {
@@ -73,6 +79,13 @@ pub fn router() -> Router<AppState> {
             get(list_bot_tokens).post(create_bot_token),
         )
         .route("/bots/{bot_id}/tokens/{token_id}", delete(revoke_bot_token))
+}
+
+#[derive(Debug, Clone)]
+pub struct CommandAuth {
+    pub user_id: Uuid,
+    pub email: String,
+    pub role: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -382,6 +395,25 @@ async fn execute_command(
     auth: AuthUser,
     Json(payload): Json<ExecuteCommand>,
 ) -> ApiResult<Json<CommandResponse>> {
+    let response = execute_command_internal(
+        &state,
+        CommandAuth {
+            user_id: auth.user_id,
+            email: auth.email,
+            role: auth.role,
+        },
+        payload,
+    )
+    .await?;
+
+    Ok(Json(response))
+}
+
+pub async fn execute_command_internal(
+    state: &AppState,
+    auth: CommandAuth,
+    payload: ExecuteCommand,
+) -> ApiResult<CommandResponse> {
     // 1. Parse trigger
     let parts: Vec<&str> = payload.command.split_whitespace().collect();
     if parts.is_empty() {
@@ -397,36 +429,227 @@ async fn execute_command(
 
     // 2. Handle built-in commands
     match trigger {
+        "call" => {
+            let config: MiroTalkConfig = sqlx::query_as(
+                "SELECT * FROM mirotalk_config WHERE is_active = true",
+            )
+            .fetch_optional(&state.db)
+            .await?
+            .unwrap_or_else(|| MiroTalkConfig {
+                is_active: true,
+                mode: crate::models::MiroTalkMode::Disabled,
+                base_url: "".to_string(),
+                api_key_secret: "".to_string(),
+                default_room_prefix: None,
+                join_behavior: crate::models::JoinBehavior::NewTab,
+                updated_at: Utc::now(),
+                updated_by: None,
+            });
+
+            if !config.is_enabled() {
+                return Ok(CommandResponse {
+                    response_type: "ephemeral".to_string(),
+                    text: "MiroTalk integration is not enabled".to_string(),
+                    username: None,
+                    icon_url: None,
+                    goto_location: None,
+                    attachments: None,
+                });
+            }
+
+            let user = sqlx::query_as::<_, crate::models::User>(
+                "SELECT * FROM users WHERE id = $1",
+            )
+            .bind(auth.user_id)
+            .fetch_one(&state.db)
+            .await?;
+
+            let display_name = user
+                .display_name
+                .clone()
+                .unwrap_or_else(|| user.username.clone());
+
+            if args == "end" || args == "stop" {
+                let existing: Option<crate::models::post::Post> = sqlx::query_as(
+                    "SELECT * FROM posts WHERE channel_id = $1 AND props->>'type' = 'custom_calls' ORDER BY created_at DESC LIMIT 1",
+                )
+                .bind(payload.channel_id)
+                .fetch_optional(&state.db)
+                .await?;
+
+                if let Some(post) = existing {
+                    let mut props = post.props.as_object().cloned().unwrap_or_default();
+                    props.insert("ended".to_string(), serde_json::Value::Bool(true));
+                    props.insert("attachments".to_string(), serde_json::Value::Array(vec![]));
+
+                    let updated: crate::models::post::PostResponse = sqlx::query_as(
+                        r#"
+                        WITH updated_post AS (
+                            UPDATE posts SET message = $1, props = $2, edited_at = NOW()
+                            WHERE id = $3
+                            RETURNING *
+                        )
+                        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                               p.reply_count::int8 as reply_count,
+                               p.last_reply_at, p.seq,
+                               u.username, u.avatar_url, u.email
+                        FROM updated_post p
+                        LEFT JOIN users u ON p.user_id = u.id
+                        "#,
+                    )
+                    .bind(format!("Video call ended by @{}", user.username))
+                    .bind(serde_json::Value::Object(props))
+                    .bind(post.id)
+                    .fetch_one(&state.db)
+                    .await?;
+
+                    let broadcast = crate::realtime::WsEnvelope::event(
+                        crate::realtime::EventType::MessageUpdated,
+                        updated.clone(),
+                        Some(post.channel_id),
+                    )
+                    .with_broadcast(crate::realtime::WsBroadcast {
+                        channel_id: Some(post.channel_id),
+                        team_id: None,
+                        user_id: None,
+                        exclude_user_id: None,
+                    });
+                    state.ws_hub.broadcast(broadcast).await;
+
+                    return Ok(CommandResponse {
+                        response_type: "ephemeral".to_string(),
+                        text: "Call ended".to_string(),
+                        username: None,
+                        icon_url: None,
+                        goto_location: None,
+                        attachments: None,
+                    });
+                }
+
+                return Ok(CommandResponse {
+                    response_type: "ephemeral".to_string(),
+                    text: "No active call found in this channel".to_string(),
+                    username: None,
+                    icon_url: None,
+                    goto_location: None,
+                    attachments: None,
+                });
+            }
+
+            let channel_id_mm = encode_mm_id(payload.channel_id);
+            let salt = if config.api_key_secret.is_empty() {
+                "rustchat".to_string()
+            } else {
+                config.api_key_secret.clone()
+            };
+            let room_seed = format!("{}:{}", channel_id_mm, salt);
+            let room_id = URL_SAFE_NO_PAD.encode(room_seed.as_bytes());
+
+            let client = MiroTalkClient::new(config.clone(), state.http_client.clone())?;
+            let meeting_url = client
+                .create_meeting(&room_id, Some(&display_name), true, true)
+                .await?;
+
+            let mut join_url = match Url::parse(&meeting_url) {
+                Ok(url) => url,
+                Err(_) => {
+                    let mut base = Url::parse(&config.base_url)
+                        .map_err(|_| AppError::Config("Invalid MiroTalk base URL".to_string()))?;
+                    if let Ok(mut segments) = base.path_segments_mut() {
+                        segments.pop_if_empty();
+                        segments.push(meeting_url.trim_start_matches('/'));
+                    }
+                    base
+                }
+            };
+            if !join_url.query_pairs().any(|(k, _)| k == "name") {
+                join_url.query_pairs_mut().append_pair("name", &display_name);
+            }
+
+            let attachments = serde_json::json!([
+                {
+                    "color": "#166de0",
+                    "title": "Mirotalk Conference",
+                    "text": "The meeting is active. Tap to join.",
+                    "actions": [
+                        {
+                            "id": "join_call",
+                            "name": "Join Meeting",
+                            "type": "button",
+                            "style": "primary",
+                            "integration": {
+                                "url": join_url.to_string(),
+                                "context": { "action": "open_url" }
+                            }
+                        }
+                    ]
+                }
+            ]);
+
+            let props = serde_json::json!({
+                "type": "custom_calls",
+                "attachments": attachments,
+                "call": {
+                    "room_id": room_id
+                }
+            });
+
+            let create_post_input = crate::models::CreatePost {
+                message: format!("Video call started by @{}", user.username),
+                file_ids: vec![],
+                props: Some(props),
+                root_post_id: None,
+            };
+
+            let _ = crate::services::posts::create_post(
+                state,
+                auth.user_id,
+                payload.channel_id,
+                create_post_input,
+                None,
+            )
+            .await?;
+
+            return Ok(CommandResponse {
+                response_type: "ephemeral".to_string(),
+                text: "Call started".to_string(),
+                username: None,
+                icon_url: None,
+                goto_location: None,
+                attachments: None,
+            });
+        }
         "echo" => {
-            return Ok(Json(CommandResponse {
+            return Ok(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Echo: {}", args),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
         "shrug" => {
-            return Ok(Json(CommandResponse {
+            return Ok(CommandResponse {
                 response_type: "in_channel".to_string(),
                 text: format!("{} ¯\\_(ツ)_/¯", args),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
         "invite" => {
             // Mock invite
-            return Ok(Json(CommandResponse {
+            return Ok(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Invitation sent to {}", args),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
         _ => {}
     }
@@ -503,27 +726,27 @@ async fn execute_command(
                         goto_location: None,
                         attachments: None,
                     });
-            return Ok(Json(resp_body));
-        } else {
-            return Ok(Json(CommandResponse {
+                return Ok(resp_body);
+            } else {
+            return Ok(CommandResponse {
                 response_type: "ephemeral".to_string(),
                 text: format!("Command failed with status: {}", res.status()),
                 username: None,
                 icon_url: None,
                 goto_location: None,
                 attachments: None,
-            }));
+            });
         }
     }
 
-    Ok(Json(CommandResponse {
+    Ok(CommandResponse {
         response_type: "ephemeral".to_string(),
         text: format!("Command /{} not found", trigger),
         username: None,
         icon_url: None,
         goto_location: None,
         attachments: None,
-    }))
+    })
 }
 
 // ============ Bots ============

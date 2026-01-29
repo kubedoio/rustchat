@@ -24,7 +24,7 @@ mod ws;
 
 use std::sync::Arc;
 
-use axum::{http::Method, Router};
+use axum::{extract::DefaultBodyLimit, http::Method, Router};
 use sqlx::PgPool;
 use tower_http::{
     compression::CompressionLayer,
@@ -101,7 +101,7 @@ pub fn router(
         .nest("/video", video::router())
         .merge(ws::router());
 
-    let api_v4 = v4::router();
+    let api_v4 = v4::router().layer(DefaultBodyLimit::max(50 * 1024 * 1024));
 
     Router::new()
         .nest("/api/v1", api_v1)
