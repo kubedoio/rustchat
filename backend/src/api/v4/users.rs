@@ -892,8 +892,10 @@ struct AttachDeviceRequest {
 async fn attach_device(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(input): Json<AttachDeviceRequest>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
+    let input: AttachDeviceRequest = parse_body(&headers, &body, "Invalid device body")?;
     sqlx::query(
         r#"
         INSERT INTO user_devices (user_id, device_id, token, platform)
