@@ -1,4 +1,4 @@
-use reqwest::Client;
+use reqwest::{Client, RequestBuilder, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -55,26 +55,42 @@ impl MiroTalkClient {
     }
 
     pub async fn stats(&self) -> ApiResult<MiroTalkStats> {
-        let url = self.base_url.join("api/v1/stats")
-            .map_err(|_| AppError::Internal("Failed to build stats URL".to_string()))?;
+        let endpoints = ["api/v1/stats", "api/stats", "stats"];
+        let mut last_error = "MiroTalk stats request failed".to_string();
 
-        let response = self.http.get(url)
-            .header("authorization", &self.api_key_secret)
-            .header("Content-Type", "application/json")
-            .send()
-            .await
-            .map_err(|e| AppError::ExternalService(format!("MiroTalk connection failed: {}", e)))?;
+        for endpoint in endpoints {
+            let url = self
+                .base_url
+                .join(endpoint)
+                .map_err(|_| AppError::Internal("Failed to build stats URL".to_string()))?;
 
-        if !response.status().is_success() {
+            let response = self
+                .send_with_auth(self.http.get(url).header("Content-Type", "application/json"))
+                .await?;
+
+            if response.status().is_success() {
+                let stats = response
+                    .json::<MiroTalkStats>()
+                    .await
+                    .map_err(|e| {
+                        AppError::ExternalService(format!(
+                            "Failed to parse MiroTalk stats: {}",
+                            e
+                        ))
+                    })?;
+                return Ok(stats);
+            }
+
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(AppError::ExternalService(format!("MiroTalk stats error {}: {}", status, text)));
+            last_error = format!("MiroTalk stats error {}: {}", status, text);
+
+            if status != StatusCode::NOT_FOUND {
+                break;
+            }
         }
 
-        let stats = response.json::<MiroTalkStats>().await
-            .map_err(|e| AppError::ExternalService(format!("Failed to parse MiroTalk stats: {}", e)))?;
-
-        Ok(stats)
+        Err(AppError::ExternalService(last_error))
     }
 
     pub async fn get_active_meetings(&self) -> ApiResult<Vec<String>> {
@@ -121,28 +137,40 @@ impl MiroTalkClient {
     }
 
     async fn create_meeting_sfu(&self, room_name: &str) -> ApiResult<String> {
-        let url = self.base_url.join("api/v1/meeting")
-            .map_err(|_| AppError::Internal("Failed to build meeting URL".to_string()))?;
-
+        let endpoints = ["api/v1/meeting", "api/v1/meeting/create", "api/meeting"]; 
         let body = serde_json::json!({
             "room": room_name,
         });
 
-        let response = self.http.post(url)
-            .header("authorization", &self.api_key_secret)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| AppError::ExternalService(format!("Failed to create SFU meeting: {}", e)))?;
+        let mut last_error = "MiroTalk create meeting failed".to_string();
 
-        if !response.status().is_success() {
-             return Err(AppError::ExternalService(format!("MiroTalk create meeting failed: {}", response.status())));
+        for endpoint in endpoints {
+            let url = self
+                .base_url
+                .join(endpoint)
+                .map_err(|_| AppError::Internal("Failed to build meeting URL".to_string()))?;
+
+            let response = self
+                .send_with_auth(self.http.post(url).json(&body))
+                .await
+                .map_err(|e| AppError::ExternalService(format!("Failed to create SFU meeting: {}", e)))?;
+
+            if response.status().is_success() {
+                let data = response.json::<CreateMeetingResponse>().await
+                    .map_err(|e| AppError::ExternalService(format!("Invalid response from MiroTalk: {}", e)))?;
+                return Ok(data.meeting);
+            }
+
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            last_error = format!("MiroTalk create meeting error {}: {}", status, text);
+
+            if status != StatusCode::NOT_FOUND {
+                break;
+            }
         }
 
-        let data = response.json::<CreateMeetingResponse>().await
-            .map_err(|e| AppError::ExternalService(format!("Invalid response from MiroTalk: {}", e)))?;
-
-        Ok(data.meeting)
+        Err(AppError::ExternalService(last_error))
     }
 
     async fn create_meeting_p2p(&self, room_name: &str) -> ApiResult<String> {
@@ -176,6 +204,35 @@ impl MiroTalkClient {
         }
 
         Ok(join_url.to_string())
+    }
+
+    async fn send_with_auth(&self, request: RequestBuilder) -> ApiResult<Response> {
+        let retry_builder = request.try_clone();
+        let response = request
+            .header("Authorization", &self.api_key_secret)
+            .header("x-api-key", &self.api_key_secret)
+            .header("api-key", &self.api_key_secret)
+            .send()
+            .await
+            .map_err(|e| AppError::ExternalService(format!("MiroTalk request failed: {}", e)))?;
+
+        if response.status() == StatusCode::UNAUTHORIZED
+            || response.status() == StatusCode::FORBIDDEN
+        {
+            if let Some(retry) = retry_builder {
+                let bearer = format!("Bearer {}", self.api_key_secret);
+                let retry = retry
+                    .header("Authorization", bearer)
+                    .header("x-api-key", &self.api_key_secret)
+                    .header("api-key", &self.api_key_secret)
+                    .send()
+                    .await
+                    .map_err(|e| AppError::ExternalService(format!("MiroTalk request failed: {}", e)))?;
+                return Ok(retry);
+            }
+        }
+
+        Ok(response)
     }
 }
 

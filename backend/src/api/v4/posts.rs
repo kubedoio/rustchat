@@ -1,4 +1,5 @@
 use axum::{
+    body::Bytes,
     extract::{Path, State},
     response::IntoResponse,
     routing::{delete, get, post, put},
@@ -46,8 +47,10 @@ pub struct CreatePostRequest {
 async fn create_post_handler(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(input): Json<CreatePostRequest>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Json<mm::Post>> {
+    let input: CreatePostRequest = parse_body(&headers, &body, "Invalid post body")?;
     let channel_id = parse_mm_or_uuid(&input.channel_id)
         .ok_or_else(|| AppError::Validation("Invalid channel_id".to_string()))?;
 
@@ -89,6 +92,27 @@ async fn create_post_handler(
     .await?;
 
     Ok(Json(post_resp.into()))
+}
+
+fn parse_body<T: serde::de::DeserializeOwned>(
+    headers: &axum::http::HeaderMap,
+    body: &Bytes,
+    message: &str,
+) -> ApiResult<T> {
+    let content_type = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if content_type.starts_with("application/json") {
+        serde_json::from_slice(body).map_err(|_| AppError::BadRequest(message.to_string()))
+    } else if content_type.starts_with("application/x-www-form-urlencoded") {
+        serde_urlencoded::from_bytes(body).map_err(|_| AppError::BadRequest(message.to_string()))
+    } else {
+        serde_json::from_slice(body)
+            .or_else(|_| serde_urlencoded::from_bytes(body))
+            .map_err(|_| AppError::BadRequest(message.to_string()))
+    }
 }
 
 async fn get_post(

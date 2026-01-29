@@ -38,7 +38,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/teams/unread", get(my_teams_unread))
         .route(
             "/users/sessions/device",
-            post(attach_device).delete(detach_device),
+            post(attach_device).put(attach_device).delete(detach_device),
         )
         .route(
             "/users/me/preferences",
@@ -58,6 +58,9 @@ pub fn router() -> Router<AppState> {
         .route("/roles/names", post(get_roles_by_names))
         .route("/users/notifications", get(get_notifications).put(update_notifications))
         .route("/users/me/sessions", get(get_sessions))
+        .route("/users/logout", get(logout).post(logout))
+        .route("/users/autocomplete", get(autocomplete_users))
+        .route("/users/search", post(search_users))
         .route("/users/logout", post(logout))
         .route("/users/autocomplete", get(autocomplete_users))
         .route("/users/search", post(search_users))
