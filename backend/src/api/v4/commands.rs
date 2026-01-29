@@ -1,4 +1,9 @@
-use axum::{extract::{Path, Query, State}, routing::{get, post}, Json, Router};
+use axum::{
+    body::Bytes,
+    extract::{Path, Query, State},
+    routing::{get, post},
+    Json, Router,
+};
 use serde::Deserialize;
 
 use crate::api::AppState;
@@ -59,8 +64,10 @@ async fn list_commands(Query(_query): Query<CommandsQuery>) -> ApiResult<Json<Ve
 async fn execute_command(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(payload): Json<ExecuteCommandRequest>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Json<CommandResponse>> {
+    let payload: ExecuteCommandRequest = parse_body(&headers, &body, "Invalid command body")?;
     let channel_id = parse_mm_or_uuid(&payload.channel_id)
         .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
 
@@ -89,6 +96,27 @@ async fn execute_command(
     .await?;
 
     Ok(Json(response))
+}
+
+fn parse_body<T: serde::de::DeserializeOwned>(
+    headers: &axum::http::HeaderMap,
+    body: &Bytes,
+    message: &str,
+) -> ApiResult<T> {
+    let content_type = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if content_type.starts_with("application/json") {
+        serde_json::from_slice(body).map_err(|_| AppError::BadRequest(message.to_string()))
+    } else if content_type.starts_with("application/x-www-form-urlencoded") {
+        serde_urlencoded::from_bytes(body).map_err(|_| AppError::BadRequest(message.to_string()))
+    } else {
+        serde_json::from_slice(body)
+            .or_else(|_| serde_urlencoded::from_bytes(body))
+            .map_err(|_| AppError::BadRequest(message.to_string()))
+    }
 }
 
 async fn autocomplete_suggestions(

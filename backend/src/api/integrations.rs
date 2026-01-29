@@ -547,15 +547,17 @@ pub async fn execute_command_internal(
             let room_id = URL_SAFE_NO_PAD.encode(room_seed.as_bytes());
 
             let client = MiroTalkClient::new(config.clone(), state.http_client.clone())?;
-            let _ = client.create_meeting(&room_id).await?;
+            let meeting_url = client.create_meeting(&room_id).await?;
 
-            let mut join_url = Url::parse(&config.base_url)
-                .map_err(|_| AppError::Config("Invalid MiroTalk base URL".to_string()))?;
-            if let Ok(mut segments) = join_url.path_segments_mut() {
-                segments.pop_if_empty();
-                segments.push("join");
-                segments.push(&room_id);
-            }
+            let mut join_url = Url::parse(&meeting_url).or_else(|_| {
+                let mut base = Url::parse(&config.base_url)
+                    .map_err(|_| AppError::Config("Invalid MiroTalk base URL".to_string()))?;
+                if let Ok(mut segments) = base.path_segments_mut() {
+                    segments.pop_if_empty();
+                    segments.push(meeting_url.trim_start_matches('/'));
+                }
+                Ok(base)
+            })?;
             join_url.query_pairs_mut().append_pair("name", &display_name);
 
             let attachments = serde_json::json!([
