@@ -50,7 +50,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/users/status/ids", post(get_statuses_by_ids))
         .route("/users/ids", post(get_users_by_ids))
-        .route("/users/{user_id}/status", get(get_status))
+        .route("/users/{user_id}/status", get(get_status).put(update_status))
         .route("/users/me/status", get(get_my_status).put(update_status))
         .route("/users/{user_id}/channels/{channel_id}/typing", post(user_typing))
         .route("/users/me/patch", put(patch_me))

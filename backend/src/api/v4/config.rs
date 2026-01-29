@@ -107,7 +107,7 @@ fn legacy_config(site: &SiteConfig, diagnostic_id: &str) -> serde_json::Value {
     insert(&mut map, "EnableClientMetrics", "true");
     insert(&mut map, "EnableComplianceExport", "false");
     insert(&mut map, "EnableCustomBrand", "false");
-    insert(&mut map, "EnableCustomEmoji", "true");
+    insert(&mut map, "EnableCustomEmoji", "false");
     insert(&mut map, "EnableDesktopLandingPage", "true");
     insert(&mut map, "EnableDiagnostics", "true");
     insert(&mut map, "EnableFile", "true");

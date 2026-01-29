@@ -13,5 +13,15 @@ struct CommandsQuery {
 }
 
 async fn list_commands(Query(_query): Query<CommandsQuery>) -> ApiResult<Json<Vec<serde_json::Value>>> {
-    Ok(Json(vec![]))
+    let commands = vec![serde_json::json!({
+        "id": "builtin-call",
+        "trigger": "call",
+        "display_name": "Call",
+        "description": "Start a Mirotalk call",
+        "auto_complete": true,
+        "auto_complete_desc": "Start a Mirotalk call",
+        "auto_complete_hint": "[end]",
+    })];
+
+    Ok(Json(commands))
 }
