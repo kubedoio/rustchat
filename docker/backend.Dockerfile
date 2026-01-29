@@ -3,6 +3,9 @@ FROM rust:1.93-alpine AS builder
 
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev
 
+# Ensure portable builds (avoid CPU-specific instructions)
+ENV RUSTFLAGS="-C target-cpu=x86-64"
+
 WORKDIR /app
 
 # Copy manifests
