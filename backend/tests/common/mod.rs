@@ -40,6 +40,7 @@ pub async fn spawn_app() -> TestApp {
     // Dummy S3 client
     let s3_client = S3Client::new(
         Some("http://localhost:9000".to_string()),
+        None,
         "test-bucket".to_string(),
         Some("minioadmin".to_string()),
         Some("minioadmin".to_string()),

@@ -20,6 +20,7 @@ async fn config_client_returns_diagnostic_id() {
 
     let s3_client = S3Client::new(
         Some("http://localhost:9000".to_string()),
+        None,
         "test".to_string(),
         Some("a".to_string()),
         Some("s".to_string()),
@@ -74,6 +75,7 @@ async fn license_client_returns_boolean() {
 
     let s3_client = S3Client::new(
         Some("http://localhost:9000".to_string()),
+        None,
         "test".to_string(),
         Some("a".to_string()),
         Some("s".to_string()),

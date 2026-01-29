@@ -40,6 +40,10 @@ pub struct Config {
     #[serde(default)]
     pub s3_endpoint: Option<String>,
 
+    /// Public S3 endpoint URL (for presigned URLs returned to clients)
+    #[serde(default)]
+    pub s3_public_endpoint: Option<String>,
+
     /// S3 bucket name
     #[serde(default = "default_s3_bucket")]
     pub s3_bucket: String,

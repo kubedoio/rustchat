@@ -9,6 +9,7 @@ use aws_sdk_s3::{
 };
 use std::time::Duration;
 use tracing::error;
+use url::Url;
 
 use crate::error::AppError;
 
@@ -18,12 +19,14 @@ pub struct S3Client {
     client: Client,
     bucket: String,
     endpoint: Option<String>,
+    public_endpoint: Option<String>,
 }
 
 impl S3Client {
     /// Create a new S3 client
     pub fn new(
         endpoint: Option<String>,
+        public_endpoint: Option<String>,
         bucket: String,
         access_key: Option<String>,
         secret_key: Option<String>,
@@ -55,6 +58,7 @@ impl S3Client {
             client,
             bucket,
             endpoint,
+            public_endpoint,
         }
     }
 
@@ -147,7 +151,8 @@ impl S3Client {
                 AppError::Internal(format!("Presigning error: {}", e))
             })?;
 
-        Ok(presigned.uri().to_string())
+        let url = presigned.uri().to_string();
+        self.rewrite_public_url(&url)
     }
 
     /// Generate a presigned upload URL
@@ -175,7 +180,39 @@ impl S3Client {
                 AppError::Internal(format!("Presigning error: {}", e))
             })?;
 
-        Ok(presigned.uri().to_string())
+        let url = presigned.uri().to_string();
+        self.rewrite_public_url(&url)
+    }
+
+    fn rewrite_public_url(&self, url: &str) -> Result<String, AppError> {
+        let Some(public_endpoint) = &self.public_endpoint else {
+            return Ok(url.to_string());
+        };
+
+        let mut parsed = Url::parse(url)
+            .map_err(|e| AppError::Internal(format!("Presigned URL parse error: {}", e)))?;
+        let public = Url::parse(public_endpoint)
+            .map_err(|e| AppError::Internal(format!("Public endpoint parse error: {}", e)))?;
+
+        parsed.set_scheme(public.scheme()).ok();
+
+        if let Some(host) = public.host_str() {
+            parsed.set_host(Some(host)).map_err(|e| {
+                AppError::Internal(format!("Public endpoint host error: {}", e))
+            })?;
+        }
+
+        parsed.set_port(public.port()).map_err(|e| {
+            AppError::Internal(format!("Public endpoint port error: {}", e))
+        })?;
+
+        let base_path = public.path().trim_end_matches('/');
+        if !base_path.is_empty() && base_path != "/" {
+            let new_path = format!("{}{}", base_path, parsed.path());
+            parsed.set_path(&new_path);
+        }
+
+        Ok(parsed.to_string())
     }
 
     /// Get the public URL for a file (if bucket is public)
