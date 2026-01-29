@@ -592,10 +592,11 @@ async fn list_permissions(
 ) -> ApiResult<Json<Vec<Permission>>> {
     require_admin(&auth)?;
 
-    let permissions: Vec<Permission> =
-        sqlx::query_as("SELECT id, name, description, category FROM permissions ORDER BY category, id")
-            .fetch_all(&state.db)
-            .await?;
+    let permissions: Vec<Permission> = sqlx::query_as(
+        "SELECT id, name, description, category FROM permissions ORDER BY category, id",
+    )
+    .fetch_all(&state.db)
+    .await?;
 
     Ok(Json(permissions))
 }
