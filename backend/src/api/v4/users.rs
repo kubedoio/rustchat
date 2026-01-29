@@ -61,9 +61,6 @@ pub fn router() -> Router<AppState> {
         .route("/users/logout", get(logout).post(logout))
         .route("/users/autocomplete", get(autocomplete_users))
         .route("/users/search", post(search_users))
-        .route("/users/logout", post(logout))
-        .route("/users/autocomplete", get(autocomplete_users))
-        .route("/users/search", post(search_users))
         .route(
             "/users/{user_id}/sidebar/categories",
             get(get_categories).post(create_category).put(update_categories),
