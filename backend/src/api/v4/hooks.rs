@@ -1,10 +1,18 @@
+use axum::{
     extract::{State, Query},
-    Json,
+    routing::{get, post},
+    Json, Router,
 };
+
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/hooks/incoming", get(list_incoming_hooks).post(create_incoming_hook))
+        .route("/hooks/outgoing", get(list_outgoing_hooks).post(create_outgoing_hook))
+}
 use crate::api::AppState;
 use crate::api::v4::extractors::MmAuthUser;
-use crate::error::{ApiResult};
-use crate::mattermost_compat::{id::{encode_mm_id}, models as mm};
+use crate::error::{ApiResult, AppError};
+use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::{IncomingWebhook, OutgoingWebhook};
 use uuid::Uuid;
 

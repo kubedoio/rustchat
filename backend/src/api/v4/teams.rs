@@ -21,6 +21,7 @@ pub fn router() -> Router<AppState> {
         .route("/teams/{team_id}/members/me", get(get_team_member_me))
         .route("/teams/{team_id}/channels", get(get_team_channels))
         .route("/teams/{team_id}/channels/search", post(search_channels))
+        .route("/teams/search", post(search_teams))
 }
 
 async fn get_teams(
@@ -190,3 +191,20 @@ async fn search_channels(
     Ok(Json(mm_channels))
 }
 
+
+async fn search_teams(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Json(input): Json<HashMap<String, String>>,
+) -> ApiResult<Json<Vec<mm::Team>>> {
+    let term = input.get("term").cloned().unwrap_or_default();
+    
+    let teams: Vec<Team> = sqlx::query_as(
+        "SELECT * FROM teams WHERE name ILIKE $1 OR display_name ILIKE $1"
+    )
+    .bind(format!("%{}%", term))
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(teams.into_iter().map(|t| t.into()).collect()))
+}

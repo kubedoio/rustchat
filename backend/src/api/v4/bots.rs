@@ -1,5 +1,13 @@
-    Json,
+use axum::{
+    extract::{Query, State},
+    routing::{get, post},
+    Json, Router,
 };
+
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/bots", get(list_bots).post(create_bot))
+}
 use crate::api::AppState;
 use crate::api::v4::extractors::MmAuthUser;
 use crate::error::{ApiResult};

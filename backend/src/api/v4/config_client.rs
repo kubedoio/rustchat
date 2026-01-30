@@ -3,10 +3,16 @@ use crate::error::ApiResult;
 use crate::mattermost_compat::models as mm;
 use crate::mattermost_compat::{id::encode_mm_id, MM_VERSION};
 use crate::models::server_config::SiteConfig;
-use axum::{extract::{Query, State}, response::IntoResponse, Json};
+use axum::{extract::{Query, State}, response::IntoResponse, routing::get, Json, Router};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
+
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/config/client", get(get_client_config))
+        .route("/license/client", get(get_client_license))
+}
 
 #[derive(Deserialize)]
 pub struct LicenseQuery {

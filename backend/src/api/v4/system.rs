@@ -9,6 +9,9 @@ pub fn router() -> Router<AppState> {
         .route("/system/ping", get(ping))
         .route("/system/version", get(version))
         .route("/client_perf", post(client_perf))
+        .route("/caches/invalidate", post(invalidate_caches))
+        .route("/logs", post(post_logs))
+        .route("/database/recycle", post(recycle_database))
 }
 
 #[derive(Serialize)]
@@ -93,4 +96,29 @@ async fn version() -> ApiResult<impl IntoResponse> {
         [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
         MM_VERSION.to_string()
     ))
+}
+
+pub async fn invalidate_caches(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+pub async fn recycle_database(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+pub async fn post_logs(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+    Json(input): Json<Vec<String>>,
+) -> ApiResult<Json<serde_json::Value>> {
+    for log in input {
+        tracing::info!("Client log: {}", log);
+    }
+    Ok(Json(serde_json::json!({"status": "OK"})))
 }

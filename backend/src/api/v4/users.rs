@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me", get(me))
         .route("/users/me/teams", get(my_teams))
         .route("/users/me/teams/members", get(my_team_members))
+        .route("/users/me/channels/categories", get(get_my_categories))
         .route("/users/me/teams/{team_id}/channels", get(my_team_channels))
         .route("/users/me/channels", get(my_channels))
         .route(
@@ -91,6 +92,17 @@ async fn get_categories(
     let team_id = parse_mm_or_uuid(team_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     get_categories_internal(state, user_id, team_id).await
+}
+
+async fn get_my_categories(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> ApiResult<Json<mm::SidebarCategories>> {
+    let team_id_str = query.get("team_id").ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(team_id_str)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    get_categories_internal(state, auth.user_id, team_id).await
 }
 
 async fn create_category(
@@ -640,6 +652,11 @@ async fn login(
 
     let mut headers = HeaderMap::new();
     headers.insert("Token", HeaderValue::from_str(&token).unwrap());
+    headers.insert("token", HeaderValue::from_str(&token).unwrap());
+    headers.insert(
+        axum::http::header::AUTHORIZATION,
+        HeaderValue::from_str(&format!("Token {}", token)).unwrap(),
+    );
 
     Ok((headers, Json(mm_user)))
 }

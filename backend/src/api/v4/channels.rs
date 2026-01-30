@@ -35,6 +35,7 @@ pub fn router() -> Router<AppState> {
         .route("/channels/direct", post(create_direct_channel))
         .route("/channels/group", post(create_group_channel))
         .route("/channels", post(create_channel))
+        .route("/channels/search", post(search_channels_compat))
 }
 
 
@@ -1091,3 +1092,26 @@ async fn get_posts(
     }))
 }
 
+
+async fn search_channels_compat(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Json(input): Json<HashMap<String, String>>,
+) -> ApiResult<Json<Vec<mm::Channel>>> {
+    let term = input.get("term").cloned().unwrap_or_default();
+    let team_id_str = input.get("team_id").cloned();
+    
+    let mut sql = "SELECT * FROM channels WHERE name ILIKE $1".to_string();
+    if let Some(tid_str) = team_id_str {
+        if let Some(tid) = parse_mm_or_uuid(&tid_str) {
+            sql.push_str(&format!(" AND team_id = '{}'", tid));
+        }
+    }
+    
+    let channels: Vec<Channel> = sqlx::query_as(&sql)
+        .bind(format!("%{}%", term))
+        .fetch_all(&state.db)
+        .await?;
+
+    Ok(Json(channels.into_iter().map(|c| c.into()).collect()))
+}
