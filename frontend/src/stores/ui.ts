@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 export type RhsView = 'thread' | 'search' | 'info' | 'saved' | 'pinned' | 'members' | null
 
@@ -11,6 +11,52 @@ export const useUIStore = defineStore('ui', () => {
 
     const videoCallUrl = ref<string | null>(null)
     const isVideoCallOpen = ref(false)
+    
+    // Mobile state
+    const isMobile = ref(false)
+    const isSidebarOpen = ref(false)
+    const isTeamRailOpen = ref(false)
+    
+    // Check if mobile based on screen width
+    const MOBILE_BREAKPOINT = 768 // md breakpoint
+    
+    function checkMobile() {
+        isMobile.value = window.innerWidth < MOBILE_BREAKPOINT
+    }
+    
+    function openSidebar() {
+        isSidebarOpen.value = true
+    }
+    
+    function closeSidebar() {
+        isSidebarOpen.value = false
+    }
+    
+    function toggleSidebar() {
+        isSidebarOpen.value = !isSidebarOpen.value
+    }
+    
+    function openTeamRail() {
+        isTeamRailOpen.value = true
+    }
+    
+    function closeTeamRail() {
+        isTeamRailOpen.value = false
+    }
+    
+    function toggleTeamRail() {
+        isTeamRailOpen.value = !isTeamRailOpen.value
+    }
+    
+    // Initialize mobile check
+    onMounted(() => {
+        checkMobile()
+        window.addEventListener('resize', checkMobile)
+    })
+    
+    onUnmounted(() => {
+        window.removeEventListener('resize', checkMobile)
+    })
 
     function openSettings() {
         isSettingsOpen.value = true
