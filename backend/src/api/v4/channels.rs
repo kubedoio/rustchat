@@ -15,7 +15,7 @@ use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::post::PostResponse;
-use crate::models::Channel;
+use crate::models::{Channel, Reaction};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -411,10 +411,14 @@ async fn get_posts(
     .fetch_all(&state.db)
     .await?;
 
+    // Populate reactions for posts
+    let mut posts_with_reactions: Vec<PostResponse> = posts;
+    populate_reactions(&state, &mut posts_with_reactions).await?;
+    
     let mut order = Vec::new();
     let mut posts_map = HashMap::new();
 
-    for p in posts {
+    for p in posts_with_reactions {
         let id = encode_mm_id(p.id);
         order.push(id.clone());
         posts_map.insert(id, p.into());
@@ -426,4 +430,45 @@ async fn get_posts(
         next_post_id: "".to_string(),
         prev_post_id: "".to_string(),
     }))
+}
+
+/// Helper to populate reactions for posts
+async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> ApiResult<()> {
+    if posts.is_empty() {
+        return Ok(());
+    }
+
+    let post_ids: Vec<Uuid> = posts.iter().map(|p| p.id).collect();
+
+    let reactions: Vec<Reaction> =
+        sqlx::query_as("SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY created_at")
+            .bind(&post_ids)
+            .fetch_all(&state.db)
+            .await?;
+
+    let mut reaction_map: HashMap<Uuid, Vec<Reaction>> = HashMap::new();
+    for r in reactions {
+        reaction_map.entry(r.post_id).or_default().push(r);
+    }
+
+    for post in posts {
+        let post_reactions = reaction_map.remove(&post.id).unwrap_or_default();
+        let mut aggregated: HashMap<String, crate::models::ReactionResponse> = HashMap::new();
+
+        for r in post_reactions {
+            let entry = aggregated.entry(r.emoji_name.clone()).or_insert_with(|| {
+                crate::models::ReactionResponse {
+                    emoji: r.emoji_name,
+                    count: 0,
+                    users: vec![],
+                }
+            });
+            entry.count += 1;
+            entry.users.push(r.user_id);
+        }
+
+        post.reactions = aggregated.into_values().collect();
+    }
+
+    Ok(())
 }

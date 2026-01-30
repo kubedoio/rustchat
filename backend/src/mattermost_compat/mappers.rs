@@ -121,6 +121,24 @@ impl From<Post> for mm::Post {
 
 impl From<PostResponse> for mm::Post {
     fn from(post: PostResponse) -> Self {
+        // Build metadata with reactions if present
+        let metadata = if !post.reactions.is_empty() {
+            let reactions: Vec<serde_json::Value> = post.reactions.iter().map(|r| {
+                serde_json::json!({
+                    "user_id": encode_mm_id(r.user_id),
+                    "post_id": encode_mm_id(post.id),
+                    "emoji_name": r.emoji_name,
+                    "create_at": r.created_at.map(|t| t.timestamp_millis()).unwrap_or(0),
+                })
+            }).collect();
+            
+            Some(serde_json::json!({
+                "reactions": reactions
+            }))
+        } else {
+            None
+        };
+        
         mm::Post {
             id: encode_mm_id(post.id),
             create_at: post.created_at.timestamp_millis(),
@@ -132,13 +150,15 @@ impl From<PostResponse> for mm::Post {
             root_id: post.root_post_id.map(encode_mm_id).unwrap_or_default(),
             original_id: "".to_string(),
             message: post.message,
-            post_type: "".to_string(),
+            post_type: "",
             props: post.props,
-            hashtags: "".to_string(),
+            hashtags: "",
             file_ids: post.file_ids.iter().map(|id| encode_mm_id(*id)).collect(),
             pending_post_id: post.client_msg_id.unwrap_or_default(),
-            metadata: None,
+            metadata,
         }
+    }
+}
     }
 }
 
