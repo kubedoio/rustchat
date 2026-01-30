@@ -7,6 +7,7 @@ import { useChannelStore } from '../../stores/channels';
 import { useAuthStore } from '../../stores/auth';
 import { usePresenceStore } from '../../stores/presence';
 import { useUnreadStore } from '../../stores/unreads';
+import { useUIStore } from '../../stores/ui';
 import CreateChannelModal from '../modals/CreateChannelModal.vue';
 import DirectMessageModal from '../modals/DirectMessageModal.vue';
 import TeamSettingsModal from '../modals/TeamSettingsModal.vue';
@@ -18,6 +19,7 @@ const channelStore = useChannelStore();
 const authStore = useAuthStore();
 const presenceStore = usePresenceStore();
 const unreadStore = useUnreadStore();
+const uiStore = useUIStore();
 
 const showCreateModal = ref(false);
 const showDirectMessageModal = ref(false);
@@ -115,6 +117,10 @@ function selectChannel(channelId: string) {
     channelStore.selectChannel(channelId);
     // Mark as read when selecting
     unreadStore.markAsRead(channelId);
+    // Close sidebar on mobile after selecting
+    if (uiStore.isMobile) {
+        uiStore.closeSidebar();
+    }
 }
 
 const collapsedCategories = ref(new Set<string>());
