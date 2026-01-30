@@ -1423,8 +1423,11 @@ struct PatchMeRequest {
 async fn update_status(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(input): Json<UpdateStatusRequest>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Json<mm::Status>> {
+    let input: UpdateStatusRequest = parse_body(&headers, &body, "Invalid status update request")?;
+    
     let input_user_id = parse_mm_or_uuid(&input.user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
     if input_user_id != auth.user_id {
