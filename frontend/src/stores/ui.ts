@@ -103,12 +103,22 @@ export const useUIStore = defineStore('ui', () => {
         rhsContextId,
         videoCallUrl,
         isVideoCallOpen,
+        isMobile,
+        isSidebarOpen,
+        isTeamRailOpen,
         openRhs,
         closeRhs,
         toggleRhs,
         openSettings,
         closeSettings,
         openVideoCall,
-        closeVideoCall
+        closeVideoCall,
+        openSidebar,
+        closeSidebar,
+        toggleSidebar,
+        openTeamRail,
+        closeTeamRail,
+        toggleTeamRail,
+        checkMobile
     }
 })
