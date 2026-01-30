@@ -1646,16 +1646,22 @@ async fn upload_user_image(
         .map_err(|e| AppError::BadRequest(format!("Multipart error: {}", e)))?
     {
         let name = field.name().unwrap_or("").to_string();
-        if name == "image" {
-            let content_type = field
-                .content_type()
-                .unwrap_or("image/png")
-                .to_string();
+        let content_type = field
+            .content_type()
+            .unwrap_or("application/octet-stream")
+            .to_string();
+        
+        // Accept field named "image" or any field with image content type
+        if name == "image" || content_type.starts_with("image/") {
             let data = field
                 .bytes()
                 .await
                 .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
                 .to_vec();
+
+            if data.is_empty() {
+                continue;
+            }
 
             // Upload to S3
             let key = format!("avatars/{}.png", user_uuid);
@@ -1673,7 +1679,7 @@ async fn upload_user_image(
         }
     }
 
-    Err(AppError::BadRequest("No image field found".to_string()))
+    Err(AppError::BadRequest("No image field found in upload".to_string()))
 }
 
 async fn user_typing(
