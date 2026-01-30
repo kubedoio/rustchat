@@ -52,6 +52,11 @@ pub struct ThreadsPath {
 }
 
 #[derive(Deserialize)]
+pub struct ThreadsAllPath {
+    pub user_id: String,
+}
+
+#[derive(Deserialize)]
 pub struct ThreadPath {
     pub user_id: String,
     pub team_id: String,
@@ -272,6 +277,83 @@ pub async fn get_threads_internal(
         total,
         total_unread_threads,
         total_unread_mentions,
+    }))
+}
+
+pub async fn get_all_threads_internal(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(path): Path<ThreadsAllPath>,
+    Query(query): Query<ThreadsQuery>,
+) -> ApiResult<Json<mm::ThreadResponse>> {
+    let user_id = parse_mm_or_uuid(&path.user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+
+    if user_id != auth.user_id && path.user_id != "me" {
+        return Err(AppError::Forbidden("Can only access your own threads".to_string()));
+    }
+    let user_id = auth.user_id;
+
+    let per_page = query.per_page.min(100);
+    let offset = query.page * per_page;
+
+    let threads: Vec<ThreadRow> = sqlx::query_as(r#"
+        SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
+               p.reply_count, p.last_reply_at,
+               tm.following, tm.last_read_at, tm.mention_count, tm.unread_replies_count
+        FROM posts p
+        JOIN thread_memberships tm ON tm.post_id = p.id
+        WHERE tm.user_id = $1
+          AND tm.following = true
+          AND p.root_post_id IS NULL
+          AND p.deleted_at IS NULL
+        ORDER BY COALESCE(p.last_reply_at, p.created_at) DESC
+        LIMIT $2 OFFSET $3
+    "#)
+    .bind(user_id)
+    .bind(per_page)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar(r#"
+        SELECT COUNT(*)
+        FROM thread_memberships tm
+        JOIN posts p ON tm.post_id = p.id
+        WHERE tm.user_id = $1 AND tm.following = true AND p.deleted_at IS NULL
+    "#)
+    .bind(user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    let mm_threads: Vec<mm::Thread> = threads
+        .into_iter()
+        .map(|t| {
+            mm::Thread {
+                id: encode_mm_id(t.id),
+                reply_count: t.reply_count,
+                last_reply_at: t.last_reply_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
+                last_viewed_at: t.last_read_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
+                participants: vec![],
+                post: mm::PostInThread {
+                    id: encode_mm_id(t.id),
+                    channel_id: encode_mm_id(t.channel_id),
+                    user_id: encode_mm_id(t.user_id),
+                    message: t.message,
+                    create_at: t.created_at.timestamp_millis(),
+                },
+                unread_replies: t.unread_replies_count as i64,
+                unread_mentions: t.mention_count as i64,
+                is_following: Some(t.following),
+            }
+        })
+        .collect();
+
+    Ok(Json(mm::ThreadResponse {
+        threads: mm_threads,
+        total,
+        total_unread_threads: 0,
+        total_unread_mentions: 0,
     }))
 }
 

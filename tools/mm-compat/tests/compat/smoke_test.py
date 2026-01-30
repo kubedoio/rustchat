@@ -3,16 +3,17 @@ import requests
 import json
 import argparse
 import sys
+import uuid
 
 def main():
     parser = argparse.ArgumentParser(description="Live compatibility smoke test")
-    parser.add_argument("--url", default="https://rustchat.io", help="Target server URL")
+    parser.add_argument("--url", default="https://app.rustchat.io", help="Target server URL")
     parser.add_argument("--username", required=True, help="Username/Email")
     parser.add_argument("--password", required=True, help="Password")
     args = parser.parse_args()
 
     base_url = args.url.rstrip('/')
-    print(f"--- Running Compatibility Smoke Test against {base_url} ---")
+    print(f"--- Running Expanded Compatibility Smoke Test against {base_url} ---")
 
     # 1. Login
     login_url = f"{base_url}/api/v4/users/login"
@@ -35,7 +36,6 @@ def main():
             sys.exit(1)
             
         print("SUCCESS")
-        print(f"  Token: {token[:10]}...")
     except Exception as e:
         print(f"ERROR: {e}")
         sys.exit(1)
@@ -50,39 +50,130 @@ def main():
     resp = requests.get(f"{base_url}/api/v4/users/me", headers=headers)
     if resp.status_code == 200:
         me = resp.json()
-        print(f"SUCCESS (Username: {me.get('username')})")
+        user_id = me.get('id')
+        username = me.get('username')
+        print(f"SUCCESS (Username: {username})")
     else:
         print(f"FAILED ({resp.status_code})")
+        sys.exit(1)
 
-    # 3. Get Teams
-    print(f"Step 3: GET /api/v4/users/me/teams ... ", end="")
+    # 3. Get Teams & Channels
+    print(f"Step 3: Discovering Workspace ... ", end="")
     resp = requests.get(f"{base_url}/api/v4/users/me/teams", headers=headers)
     if resp.status_code == 200:
         teams = resp.json()
-        print(f"SUCCESS ({len(teams)} teams found)")
-        if teams:
-            team_id = teams[0]['id']
-            # 4. Get Channels
-            print(f"Step 4: GET /api/v4/users/me/teams/{team_id}/channels ... ", end="")
-            resp = requests.get(f"{base_url}/api/v4/users/me/teams/{team_id}/channels", headers=headers)
-            if resp.status_code == 200:
-                channels = resp.json()
-                print(f"SUCCESS ({len(channels)} channels found)")
+        if not teams:
+            print("FAILED (No teams found)")
+            sys.exit(1)
+        
+        team_id = teams[0]['id']
+        resp = requests.get(f"{base_url}/api/v4/users/me/teams/{team_id}/channels", headers=headers)
+        if resp.status_code == 200:
+            channels = resp.json()
+            if not channels:
+                 print("FAILED (No channels found in team)")
+                 sys.exit(1)
+            
+            # Find a non-direct channel to post to
+            channel = next((c for c in channels if c['type'] in ['O', 'P']), channels[0])
+            channel_id = channel['id']
+            print(f"SUCCESS (Team: {team_id}, Target Channel: {channel['display_name']})")
+        else:
+            print(f"FAILED (Channels: {resp.status_code})")
+            sys.exit(1)
+    else:
+        print(f"FAILED (Teams: {resp.status_code})")
+        sys.exit(1)
+
+    # 4. Messaging (Phase 3)
+    test_msg = f"In-situ compatibility smoke test {uuid.uuid4().hex[:8]}"
+    print(f"Step 4: POST /api/v4/posts (Create Message) ... ", end="")
+    payload = {
+        "channel_id": channel_id,
+        "message": test_msg
+    }
+    resp = requests.post(f"{base_url}/api/v4/posts", headers=headers, json=payload)
+    if resp.status_code in [200, 201]:
+        post = resp.json()
+        post_id = post['id']
+        print(f"SUCCESS (Post ID: {post_id})")
+        
+        print(f"        GET /api/v4/channels/{channel_id}/posts (Verify) ... ", end="")
+        resp = requests.get(f"{base_url}/api/v4/channels/{channel_id}/posts", headers=headers)
+        if resp.status_code == 200:
+            posts = resp.json().get('posts', {})
+            if any(p['message'] == test_msg for p in posts.values()):
+                print("SUCCESS")
             else:
-                print(f"FAILED ({resp.status_code})")
+                print("FAILED (Post not found in feed)")
+        else:
+             print(f"FAILED ({resp.status_code})")
     else:
         print(f"FAILED ({resp.status_code})")
 
-    # 5. Check WebSocket
-    print(f"Step 5: Check Compatibility Header ... ", end="")
-    # The mappers/router should add X-MM-Compat: 1
-    resp = requests.get(f"{base_url}/api/v4/system/ping", headers=headers)
-    if resp.headers.get("X-MM-Compat") == "1":
-         print("SUCCESS (X-MM-Compat: 1 found)")
+    # 5. Advanced Search (Phase 4)
+    print(f"Step 5: POST /api/v4/users/search ... ", end="")
+    payload = {"term": username}
+    resp = requests.post(f"{base_url}/api/v4/users/search", headers=headers, json=payload)
+    if resp.status_code == 200:
+        results = resp.json()
+        if any(u['id'] == user_id for u in results):
+             print("SUCCESS (User found)")
+        else:
+             print("FAILED (User not found in search results)")
     else:
-         print("WARNING (X-MM-Compat header missing - check router/middleware)")
+        print(f"FAILED ({resp.status_code})")
 
-    print("\n--- Smoke Test Completed ---")
+    # 6. Preferences (Phase 4)
+    print(f"Step 6: GET /api/v4/users/me/preferences ... ", end="")
+    resp = requests.get(f"{base_url}/api/v4/users/me/preferences", headers=headers)
+    if resp.status_code == 200:
+        prefs = resp.json()
+        print(f"SUCCESS ({len(prefs)} preference entries)")
+    else:
+        print(f"FAILED ({resp.status_code})")
+
+    # 7. Threads (Phase 3)
+    print(f"Step 7: GET /api/v4/users/me/threads ... ", end="")
+    resp = requests.get(f"{base_url}/api/v4/users/me/threads", headers=headers)
+    if resp.status_code == 200:
+        print("SUCCESS")
+    else:
+        print(f"FAILED ({resp.status_code})")
+
+    # 8. Reactions (Phase 6)
+    print(f"Step 8: Social Interaction - Reactions ... ", end="")
+    payload = {
+        "user_id": user_id,
+        "post_id": post_id,
+        "emoji_name": "thumbsup"
+    }
+    resp = requests.post(f"{base_url}/api/v4/reactions", headers=headers, json=payload)
+    if resp.status_code == 200:
+        print("ADDED ... ", end="")
+        resp = requests.get(f"{base_url}/api/v4/posts/{post_id}/reactions", headers=headers)
+        if resp.status_code == 200 and any(r['emoji_name'] == 'thumbsup' for r in resp.json()):
+            print("VERIFIED ... ", end="")
+            resp = requests.delete(f"{base_url}/api/v4/users/{user_id}/posts/{post_id}/reactions/thumbsup", headers=headers)
+            if resp.status_code == 200:
+                print("REMOVED SUCCESS")
+            else:
+                print(f"REMOVE FAILED ({resp.status_code})")
+        else:
+            print(f"VERIFY FAILED ({resp.status_code})")
+    else:
+        print(f"ADD FAILED ({resp.status_code})")
+
+    # 9. Emojis (Phase 6)
+    print(f"Step 9: Social Interaction - Emojis ... ", end="")
+    resp = requests.get(f"{base_url}/api/v4/emoji", headers=headers)
+    if resp.status_code == 200:
+        emojis = resp.json()
+        print(f"SUCCESS ({len(emojis)} custom emojis found)")
+    else:
+        print(f"FAILED ({resp.status_code})")
+
+    print("\n--- Expanded Smoke Test Completed ---")
 
 if __name__ == "__main__":
     main()

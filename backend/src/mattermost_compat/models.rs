@@ -272,3 +272,89 @@ pub struct ThreadResponse {
     pub total_unread_mentions: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Emoji {
+    pub id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub creator_id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IncomingWebhook {
+    pub id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub user_id: String,
+    pub channel_id: String,
+    pub team_id: String,
+    pub display_name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutgoingWebhook {
+    pub id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub creator_id: String,
+    pub channel_id: String,
+    pub team_id: String,
+    pub trigger_words: Vec<String>,
+    pub trigger_when: i32,
+    pub callback_urls: Vec<String>,
+    pub display_name: String,
+    pub description: String,
+    pub content_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Bot {
+    pub user_id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub username: String,
+    pub display_name: String,
+    pub description: String,
+    pub owner_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ScheduledPost {
+    pub id: String,
+    pub user_id: String,
+    pub channel_id: String,
+    pub root_id: String,
+    pub message: String,
+    pub props: serde_json::Value,
+    pub file_ids: Vec<String>,
+    pub scheduled_at: i64,
+    pub create_at: i64,
+    pub update_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Audit {
+    pub id: String,
+    pub create_at: i64,
+    pub user_id: String,
+    pub action: String,
+    pub extra_info: String,
+    pub ip_address: String,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginStatus {
+    pub plugin_id: String,
+    pub name: String,
+    pub version: String,
+    pub is_active: bool,
+    pub state: i32,
+}
+

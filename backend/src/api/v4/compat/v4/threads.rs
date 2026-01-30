@@ -7,8 +7,8 @@ use crate::api::v4::extractors::MmAuthUser;
 use crate::error::ApiResult;
 use crate::mattermost_compat::models as mm;
 use crate::api::v4::threads::{
-    ThreadsPath, ThreadPath, ThreadsQuery,
-    get_threads_internal, get_thread_internal,
+    ThreadsPath, ThreadsAllPath, ThreadPath, ThreadsQuery,
+    get_threads_internal, get_all_threads_internal, get_thread_internal,
     mark_all_read_internal, follow_thread_internal, unfollow_thread_internal
 };
 
@@ -19,6 +19,15 @@ pub async fn get_threads(
     query: Query<ThreadsQuery>,
 ) -> ApiResult<Json<mm::ThreadResponse>> {
     get_threads_internal(state, auth, path, query).await
+}
+
+pub async fn get_all_threads(
+    state: State<AppState>,
+    auth: MmAuthUser,
+    path: Path<ThreadsAllPath>,
+    query: Query<ThreadsQuery>,
+) -> ApiResult<Json<mm::ThreadResponse>> {
+    get_all_threads_internal(state, auth, path, query).await
 }
 
 pub async fn mark_all_read(
