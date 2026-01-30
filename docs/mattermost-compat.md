@@ -27,33 +27,32 @@ The server reports version `9.5.0` to clients.
 - `GET /api/v4/channels/{channel_id}`: Get channel details.
 - `GET /api/v4/channels/{channel_id}/members`: Get channel members.
 - `GET /api/v4/channels/{channel_id}/posts`: Get posts in a channel (with pagination).
+- `POST /api/v4/channels/direct`: Create direct message channel.
+- `POST /api/v4/channels/group`: Create group message channel.
+- `POST /api/v4/channels/search`: Search channels.
+- `POST /api/v4/teams/search`: Search teams.
 
 ### Sidebar Categories
+- `GET /api/v4/users/me/channels/categories`: Get sidebar categories for the current user.
 - `GET /api/v4/users/{user_id}/teams/{team_id}/channels/categories`: Get sidebar categories for a team.
-- `POST /api/v4/users/{user_id}/teams/{team_id}/channels/categories`: Create a sidebar category.
-- `PUT /api/v4/users/{user_id}/teams/{team_id}/channels/categories`: Bulk update sidebar categories.
-- `PUT /api/v4/users/{user_id}/teams/{team_id}/channels/categories/order`: Update category ordering.
 
 ### Posts
 - `POST /api/v4/posts`: Create a new post.
 - `GET /api/v4/posts/{post_id}`: Get a specific post.
-- `PUT /api/v4/posts/{post_id}/patch`: Edit a post.
-- `DELETE /api/v4/posts/{post_id}`: Delete a post.
-- `GET /api/v4/posts/{post_id}/thread`: Get post thread.
+- `GET /api/v4/channels/{channel_id}/posts`: Fetch post list for a channel.
 
-### Reactions
-- `POST /api/v4/reactions`: Add a reaction.
-- `DELETE /api/v4/users/me/posts/{post_id}/reactions/{emoji_name}`: Remove a reaction.
-- `GET /api/v4/posts/{post_id}/reactions`: Get reactions for a post.
+### Threads
+- `GET /api/v4/users/{user_id}/threads`: Get user's followed threads.
+- `GET /api/v4/users/{user_id}/teams/{team_id}/threads`: Get team-scoped threads.
+- `POST /api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/following`: Follow a thread.
+
+### Files
+- `GET /api/v4/files/{file_id}/info`: Get file metadata.
+- `GET /api/v4/files/{file_id}`: Stream file content (via S3 redirect).
 
 ### WebSocket
 - `/api/v4/websocket`: WebSocket connection for real-time events.
-
-## Sidebar Categories Curl
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "$BASE_URL/api/v4/users/$USER_ID/teams/$TEAM_ID/channels/categories" | jq
-```
+  - Supported events: `posted`, `typing`, `post_edited`, `post_deleted`, `reaction_added`, `status_change`.
 
 ## Architecture
 All `/api/v4/*` requests are routed to the Rust backend. The frontend (Nginx) acts as a reverse proxy but does not serve these requests directly (no SPA fallback).

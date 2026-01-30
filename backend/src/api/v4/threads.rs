@@ -28,63 +28,63 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route(
             "/users/{user_id}/teams/{team_id}/threads",
-            get(get_threads).put(mark_all_read),
+            get(get_threads_internal).put(mark_all_read_internal),
         )
         .route(
             "/users/{user_id}/teams/{team_id}/threads/{thread_id}",
-            get(get_thread),
+            get(get_thread_internal),
         )
         .route(
             "/users/{user_id}/teams/{team_id}/threads/{thread_id}/read/{timestamp}",
-            put(mark_thread_read),
+            put(mark_thread_read_internal),
         )
         .route(
             "/users/{user_id}/teams/{team_id}/threads/{thread_id}/following",
-            put(follow_thread).delete(unfollow_thread),
+            put(follow_thread_internal).delete(unfollow_thread_internal),
         )
 }
 
 // Path parameters for threads endpoints
 #[derive(Deserialize)]
-struct ThreadsPath {
-    user_id: String,
-    team_id: String,
+pub struct ThreadsPath {
+    pub user_id: String,
+    pub team_id: String,
 }
 
 #[derive(Deserialize)]
-struct ThreadPath {
-    user_id: String,
-    team_id: String,
-    thread_id: String,
+pub struct ThreadPath {
+    pub user_id: String,
+    pub team_id: String,
+    pub thread_id: String,
 }
 
 #[derive(Deserialize)]
-struct ThreadReadPath {
-    user_id: String,
-    team_id: String,
-    thread_id: String,
-    timestamp: i64,
+pub struct ThreadReadPath {
+    pub user_id: String,
+    pub team_id: String,
+    pub thread_id: String,
+    pub timestamp: i64,
 }
 
 // Query parameters for thread list
 #[derive(Deserialize)]
-struct ThreadsQuery {
+pub struct ThreadsQuery {
     #[serde(default)]
-    deleted: bool,
+    pub deleted: bool,
     #[serde(default)]
-    extended: bool,
+    pub extended: bool,
     #[serde(default)]
-    since: Option<i64>,
+    pub since: Option<i64>,
     #[serde(default = "default_per_page")]
-    per_page: i64,
+    pub per_page: i64,
     #[serde(default)]
-    page: i64,
+    pub page: i64,
     #[serde(default)]
-    totals_only: bool,
+    pub totals_only: bool,
     #[serde(default)]
-    threads_only: bool,
+    pub threads_only: bool,
     #[serde(default)]
-    unread: bool,
+    pub unread: bool,
 }
 
 fn default_per_page() -> i64 {
@@ -121,7 +121,7 @@ struct ThreadRow {
 }
 
 /// GET /users/{user_id}/teams/{team_id}/threads
-async fn get_threads(
+pub async fn get_threads_internal(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(path): Path<ThreadsPath>,
@@ -276,7 +276,7 @@ async fn get_threads(
 }
 
 /// GET /users/{user_id}/teams/{team_id}/threads/{thread_id}
-async fn get_thread(
+pub async fn get_thread_internal(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(path): Path<ThreadPath>,
@@ -325,7 +325,7 @@ async fn get_thread(
 }
 
 /// PUT /users/{user_id}/teams/{team_id}/threads/{thread_id}/read/{timestamp}
-async fn mark_thread_read(
+pub async fn mark_thread_read_internal(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(path): Path<ThreadReadPath>,
@@ -353,7 +353,7 @@ async fn mark_thread_read(
     .await?;
 
     // Return updated thread
-    get_thread(
+    get_thread_internal(
         State(state),
         auth,
         Path(ThreadPath {
@@ -366,7 +366,7 @@ async fn mark_thread_read(
 }
 
 /// PUT /users/{user_id}/teams/{team_id}/threads/read
-async fn mark_all_read(
+pub async fn mark_all_read_internal(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(path): Path<ThreadsPath>,
@@ -396,7 +396,7 @@ async fn mark_all_read(
 }
 
 /// PUT /users/{user_id}/teams/{team_id}/threads/{thread_id}/following
-async fn follow_thread(
+pub async fn follow_thread_internal(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(path): Path<ThreadPath>,
@@ -418,11 +418,11 @@ async fn follow_thread(
     .await?;
 
     // Return updated thread
-    get_thread(State(state), auth, Path(path)).await
+    get_thread_internal(State(state), auth, Path(path)).await
 }
 
 /// DELETE /users/{user_id}/teams/{team_id}/threads/{thread_id}/following
-async fn unfollow_thread(
+pub async fn unfollow_thread_internal(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(path): Path<ThreadPath>,
@@ -443,5 +443,5 @@ async fn unfollow_thread(
     .await?;
 
     // Return updated thread
-    get_thread(State(state), auth, Path(path)).await
+    get_thread_internal(State(state), auth, Path(path)).await
 }

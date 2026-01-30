@@ -1,10 +1,10 @@
 use super::{id::encode_mm_id, models as mm};
 use crate::models::{
     channel::{Channel, ChannelMember, ChannelType},
-    channel_category::{ChannelCategory, ChannelCategoryChannel},
     post::{Post, PostResponse},
     team::{Team, TeamMember},
     user::User,
+    file::FileInfo,
 };
 use serde_json::json;
 
@@ -175,6 +175,25 @@ impl From<ChannelMember> for mm::ChannelMember {
     }
 }
 
+impl From<FileInfo> for mm::FileInfo {
+    fn from(f: FileInfo) -> Self {
+        mm::FileInfo {
+            id: encode_mm_id(f.id),
+            user_id: encode_mm_id(f.uploader_id),
+            create_at: f.created_at.timestamp_millis(),
+            update_at: f.created_at.timestamp_millis(),
+            delete_at: 0,
+            name: f.name.clone(),
+            extension: f.name.rsplit('.').next().unwrap_or_default().to_string(),
+            size: f.size,
+            mime_type: f.mime_type,
+            width: f.width.unwrap_or(0),
+            height: f.height.unwrap_or(0),
+            has_preview_image: f.has_thumbnail,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,6 +223,7 @@ mod tests {
             last_login_at: None,
             created_at: now,
             updated_at: now,
+            password_updated_at: now,
         };
 
         let mm_u: mm::User = u.into();

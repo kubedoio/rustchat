@@ -398,18 +398,30 @@ async fn create_direct_channel(
         return Err(crate::error::AppError::Forbidden("Must include your user id".to_string()));
     }
 
+    let other_id = if ids[0] == auth.user_id { ids[1] } else { ids[0] };
+
+    let channel = create_direct_channel_internal(&state, auth.user_id, other_id).await?;
+    Ok(Json(channel.into()))
+}
+
+pub async fn create_direct_channel_internal(
+    state: &AppState,
+    creator_id: Uuid,
+    other_id: Uuid,
+) -> ApiResult<crate::models::channel::Channel> {
+    let mut ids = vec![creator_id, other_id];
     ids.sort();
     let name = format!("dm_{}_{}", ids[0], ids[1]);
 
     let team_id: Uuid = sqlx::query_scalar(
         "SELECT team_id FROM team_members WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1",
     )
-    .bind(auth.user_id)
+    .bind(creator_id)
     .fetch_optional(&state.db)
     .await?
     .ok_or_else(|| crate::error::AppError::BadRequest("User has no team".to_string()))?;
 
-    let channel: Channel = sqlx::query_as(
+    let channel: crate::models::Channel = sqlx::query_as(
         r#"
         INSERT INTO channels (team_id, type, name, display_name, purpose, header, creator_id)
         VALUES ($1, 'direct', $2, '', '', '', $3)
@@ -419,7 +431,7 @@ async fn create_direct_channel(
     )
     .bind(team_id)
     .bind(&name)
-    .bind(auth.user_id)
+    .bind(creator_id)
     .fetch_one(&state.db)
     .await?;
 
@@ -433,7 +445,7 @@ async fn create_direct_channel(
         .await?;
     }
 
-    Ok(Json(channel.into()))
+    Ok(channel)
 }
 
 /// POST /channels/group - Create group DM (3+ users)
@@ -450,14 +462,24 @@ async fn create_group_channel(
         return Err(crate::error::AppError::BadRequest("user_ids must contain at least 2 users".to_string()));
     }
 
-    let mut ids: Vec<Uuid> = input
+    let uuids: Vec<Uuid> = input
         .user_ids
         .iter()
         .filter_map(|id| parse_mm_or_uuid(id))
         .collect();
 
-    if !ids.contains(&auth.user_id) {
-        ids.push(auth.user_id);
+    let channel = create_group_channel_internal(&state, auth.user_id, uuids).await?;
+    Ok(Json(channel.into()))
+}
+
+pub async fn create_group_channel_internal(
+    state: &AppState,
+    creator_id: Uuid,
+    user_ids: Vec<Uuid>,
+) -> ApiResult<crate::models::channel::Channel> {
+    let mut ids = user_ids;
+    if !ids.contains(&creator_id) {
+        ids.push(creator_id);
     }
 
     ids.sort();
@@ -466,7 +488,7 @@ async fn create_group_channel(
     let team_id: Uuid = sqlx::query_scalar(
         "SELECT team_id FROM team_members WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1",
     )
-    .bind(auth.user_id)
+    .bind(creator_id)
     .fetch_optional(&state.db)
     .await?
     .ok_or_else(|| crate::error::AppError::BadRequest("User has no team".to_string()))?;
@@ -478,7 +500,7 @@ async fn create_group_channel(
         .await?;
     let display_name = usernames.join(", ");
 
-    let channel: Channel = sqlx::query_as(
+    let channel: crate::models::Channel = sqlx::query_as(
         r#"
         INSERT INTO channels (team_id, type, name, display_name, purpose, header, creator_id)
         VALUES ($1, 'group', $2, $3, '', '', $4)
@@ -489,7 +511,7 @@ async fn create_group_channel(
     .bind(team_id)
     .bind(&name)
     .bind(&display_name)
-    .bind(auth.user_id)
+    .bind(creator_id)
     .fetch_one(&state.db)
     .await?;
 
@@ -503,7 +525,7 @@ async fn create_group_channel(
         .await?;
     }
 
-    Ok(Json(channel.into()))
+    Ok(channel)
 }
 
 /// POST /channels - Create a new channel
