@@ -5,7 +5,7 @@ import TeamRail from './TeamRail.vue';
 import ChannelSidebar from './ChannelSidebar.vue';
 import RightSidebar from './RightSidebar.vue';
 import { useUIStore } from '../../stores/ui';
-import { Menu, X } from 'lucide-vue-next';
+import { Menu } from 'lucide-vue-next';
 
 const ui = useUIStore();
 

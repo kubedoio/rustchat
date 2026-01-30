@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 export type RhsView = 'thread' | 'search' | 'info' | 'saved' | 'pinned' | 'members' | null
 
