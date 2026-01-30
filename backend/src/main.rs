@@ -54,6 +54,24 @@ async fn main() -> anyhow::Result<()> {
     let ws_hub = WsHub::new();
     info!("WebSocket hub initialized");
 
+    // Load max_simultaneous_connections from database and set in WsHub
+    let max_conn_config: Option<(sqlx::types::Json<serde_json::Value>,)> = 
+        sqlx::query_as("SELECT authentication FROM server_config WHERE id = 'default'")
+            .fetch_optional(&db_pool)
+            .await?;
+    
+    if let Some((auth_json,)) = max_conn_config {
+        if let Ok(auth_config) = serde_json::from_value::<rustchat::models::AuthConfig>(auth_json.0) {
+            let max_conn = auth_config.max_simultaneous_connections.max(1) as usize;
+            ws_hub.set_max_connections_per_user(max_conn).await;
+            info!("Loaded max_simultaneous_connections: {}", max_conn);
+        } else {
+            info!("Using default max_simultaneous_connections: 5");
+        }
+    } else {
+        info!("No server config found, using default max_simultaneous_connections: 5");
+    }
+
     // Initialize Redis Pool
     let redis_cfg = deadpool_redis::Config::from_url(&config.redis_url);
     let redis_pool = redis_cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1))?;

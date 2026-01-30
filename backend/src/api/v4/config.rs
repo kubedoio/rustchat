@@ -127,6 +127,12 @@ fn legacy_config(site: &SiteConfig, diagnostic_id: &str) -> serde_json::Value {
     insert(&mut map, "EnableUserCreation", "true");
     insert(&mut map, "EnableUserStatuses", "true");
     insert(&mut map, "EnforceMultifactorAuthentication", "false");
+    
+    // Calls plugin configuration - enable for all users (not just admins)
+    insert(&mut map, "PluginSettings", r#"{"plugins":{"com.mattermost.calls":{"enablecalls":true,"testmode":false,"allowscreensharing":true,"enabletranscriptions":false,"enablerecordings":false}}}"#);
+    insert(&mut map, "EnableCalls", "true");
+    insert(&mut map, "CallsTestMode", "false");
+    insert(&mut map, "CallsEnabled", "true");
     insert(&mut map, "FeatureFlagAppsEnabled", "false");
     insert(&mut map, "FeatureFlagAttributeBasedAccessControl", "true");
     insert(&mut map, "FeatureFlagChannelBookmarks", "true");

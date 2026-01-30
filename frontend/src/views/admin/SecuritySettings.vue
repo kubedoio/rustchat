@@ -15,6 +15,7 @@ const authForm = ref({
     password_require_number: true,
     password_require_symbol: false,
     session_length_hours: 24,
+    max_simultaneous_connections: 5,
 });
 
 const ssoForm = ref({
@@ -199,6 +200,32 @@ const saveSettings = async () => {
                 </div>
                 <input type="checkbox" v-model="authForm.allow_registration" class="w-5 h-5 text-indigo-600 rounded" />
             </label>
+        </div>
+
+        <!-- Session Management -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <div class="flex items-center mb-6">
+                <Users class="w-5 h-5 text-gray-400 mr-2" />
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Session Management</h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Max Simultaneous Connections
+                    </label>
+                    <input 
+                        v-model.number="authForm.max_simultaneous_connections"
+                        type="number"
+                        min="1"
+                        max="20"
+                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                    />
+                    <p class="text-xs text-gray-500 mt-1">
+                        Maximum number of concurrent WebSocket connections per user (1-20)
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 </template>
