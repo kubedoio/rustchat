@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { Bell, Search, HelpCircle, LogOut, Settings, Smile, Shield, Menu, X } from 'lucide-vue-next';
 import { useAuthStore } from '../../stores/auth';
 import { useUIStore } from '../../stores/ui';
@@ -23,14 +23,16 @@ const showUserMenu = ref(false);
 const showSetStatus = ref(false);
 const showNotifications = ref(false);
 
-// Initialize self presence
-if (auth.user) {
-  presenceStore.setSelfPresence({
-    userId: auth.user.id,
-    username: auth.user.username,
-    presence: (auth.user.presence as any) || 'online'
-  });
-}
+// Initialize self presence - reactive watch to handle when auth.user loads
+watch(() => auth.user, (user) => {
+  if (user) {
+    presenceStore.setSelfPresence({
+      userId: user.id,
+      username: user.username,
+      presence: (user.presence as any) || 'online'
+    });
+  }
+}, { immediate: true })
 
 // Keyboard shortcut for search
 function handleKeydown(e: KeyboardEvent) {
