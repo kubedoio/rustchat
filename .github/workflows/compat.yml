@@ -1,0 +1,37 @@
+name: MM-Mobile Compatibility
+
+on:
+  push:
+    branches: [ master, main, opus45-v2 ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install PyYAML requests
+          
+      - name: Extract OpenAPI Paths
+        run: |
+          ./tools/mm-compat/openapi/download_openapi.sh
+          python tools/mm-compat/openapi/extract_paths.py
+          
+      - name: Merge & Diff report
+        run: |
+          python tools/mm-compat/report/merge_and_diff.py
+          
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: compatibility-reports
+          path: tools/mm-compat/output/

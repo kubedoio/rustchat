@@ -15,6 +15,7 @@ pub mod system;
 pub mod teams;
 pub mod threads;
 pub mod users;
+pub mod compat;
 pub mod websocket;
 
 pub fn router() -> Router<AppState> {
@@ -32,6 +33,7 @@ pub fn router() -> Router<AppState> {
         .merge(system::router())
         .merge(threads::router())
         .merge(websocket::router())
+        .merge(compat::router::router())
         .fallback(not_implemented)
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("x-mm-compat"),

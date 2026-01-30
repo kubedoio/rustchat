@@ -1,0 +1,27 @@
+# compat/router/mapping.yaml
+# Map normalized Mattermost endpoints to RustChat internal modules/handlers
+
+- path: "/api/v4/config/client"
+  method: "GET"
+  handler: "config_client"
+  module: "v4::config_client"
+
+- path: "/api/v4/users/login"
+  method: "POST"
+  handler: "login"
+  module: "v4::users_login"
+
+- path: "/api/v4/teams"
+  method: "GET"
+  handler: "get_teams"
+  module: "v4::teams"
+
+- path: "/api/v4/channels/direct"
+  method: "POST"
+  handler: "create_direct_channel"
+  module: "v4::channels"
+
+- path: "/api/v4/websocket"
+  method: "GET"
+  handler: "connect"
+  module: "websocket"
