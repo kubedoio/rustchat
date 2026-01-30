@@ -31,6 +31,8 @@ pub fn router() -> Router<AppState> {
             get(my_team_channels_not_members),
         )
         .route("/users", get(list_users))
+        .route("/users/{user_id}", get(get_user_by_id))
+        .route("/users/username/{username}", get(get_user_by_username))
         .route(
             "/users/me/teams/{team_id}/channels/members",
             get(my_team_channel_members),
@@ -664,6 +666,45 @@ async fn me(State(state): State<AppState>, auth: MmAuthUser) -> ApiResult<Json<m
 
     Ok(Json(user.into()))
 }
+
+/// GET /users/{user_id} - Get user by ID
+async fn get_user_by_id(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<mm::User>> {
+    // Handle "me" as a special case
+    let user_uuid = if user_id == "me" {
+        return Err(AppError::BadRequest("Use /users/me endpoint".to_string()));
+    } else {
+        parse_mm_or_uuid(&user_id)
+            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?
+    };
+
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(user_uuid)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    Ok(Json(user.into()))
+}
+
+/// GET /users/username/{username} - Get user by username
+async fn get_user_by_username(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(username): Path<String>,
+) -> ApiResult<Json<mm::User>> {
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE username = $1")
+        .bind(&username)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    Ok(Json(user.into()))
+}
+
 
 async fn my_teams(
     State(state): State<AppState>,

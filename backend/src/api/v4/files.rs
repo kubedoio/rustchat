@@ -20,6 +20,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/files", post(upload_file))
         .route("/files/{file_id}", get(get_file))
+        .route("/files/{file_id}/info", get(get_file_info))
         .route("/files/{file_id}/thumbnail", get(get_thumbnail))
         .route("/files/{file_id}/preview", get(get_preview))
         .route("/files/{file_id}/link", get(get_link))
@@ -195,6 +196,39 @@ async fn get_file(
 
     // Redirect to S3
     Ok(axum::response::Redirect::temporary(&url))
+}
+
+/// GET /files/{file_id}/info - Get file metadata
+async fn get_file_info(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(file_id): Path<String>,
+) -> ApiResult<Json<mm::FileInfo>> {
+    let file_id = parse_mm_or_uuid(&file_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
+    let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
+        .bind(file_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+
+    // Get file extension from name
+    let extension = file.name.rsplit('.').next().unwrap_or("").to_string();
+
+    Ok(Json(mm::FileInfo {
+        id: encode_mm_id(file.id),
+        user_id: encode_mm_id(file.uploader_id),
+        create_at: file.created_at.timestamp_millis(),
+        update_at: file.created_at.timestamp_millis(),
+        delete_at: 0,
+        name: file.name,
+        extension,
+        size: file.size,
+        mime_type: file.mime_type,
+        width: file.width.unwrap_or(0),
+        height: file.height.unwrap_or(0),
+        has_preview_image: file.has_thumbnail,
+    }))
 }
 
 async fn get_thumbnail(

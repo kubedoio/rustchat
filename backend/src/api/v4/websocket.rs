@@ -382,6 +382,136 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
                 }
              })
         }
+        "member_added" => {
+            // Maps to user_added event in MM
+            let user_id = env.data.get("user_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            let channel_id = env.data.get("channel_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            let team_id = env.data.get("team_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            
+            Some(mm::WebSocketMessage {
+                seq: Some(seq),
+                event: "user_added".to_string(),
+                data: json!({
+                    "user_id": user_id,
+                    "channel_id": channel_id,
+                    "team_id": team_id
+                }),
+                broadcast: map_broadcast(env.broadcast.as_ref()),
+            })
+        }
+        "member_removed" => {
+            // Maps to user_removed event in MM
+            let user_id = env.data.get("user_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            let channel_id = env.data.get("channel_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            
+            Some(mm::WebSocketMessage {
+                seq: Some(seq),
+                event: "user_removed".to_string(),
+                data: json!({
+                    "user_id": user_id,
+                    "channel_id": channel_id
+                }),
+                broadcast: map_broadcast(env.broadcast.as_ref()),
+            })
+        }
+        "channel_created" => {
+            // For DMs, use direct_added; for regular channels, channel_created
+            let channel_type = env.data.get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let event_name = if channel_type == "D" || channel_type == "direct" {
+                "direct_added"
+            } else {
+                "channel_created"
+            };
+            
+            let channel_id = env.data.get("id")
+                .or_else(|| env.data.get("channel_id"))
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            let team_id = env.data.get("team_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            
+            // For channel_created, the data should contain the full channel object as JSON string
+            let channel_json = serde_json::to_string(&env.data).unwrap_or_default();
+            
+            Some(mm::WebSocketMessage {
+                seq: Some(seq),
+                event: event_name.to_string(),
+                data: json!({
+                    "channel": channel_json,
+                    "channel_id": channel_id,
+                    "team_id": team_id
+                }),
+                broadcast: map_broadcast(env.broadcast.as_ref()),
+            })
+        }
+        "preferences_changed" => {
+            // Preferences update event
+            let user_id = env.data.get("user_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            
+            Some(mm::WebSocketMessage {
+                seq: Some(seq),
+                event: "preferences_changed".to_string(),
+                data: json!({
+                    "user_id": user_id,
+                    "preferences": env.data.get("preferences").cloned().unwrap_or(json!([]))
+                }),
+                broadcast: map_broadcast(env.broadcast.as_ref()),
+            })
+        }
+        "post_acknowledgement" | "post_ack" => {
+            // Post acknowledgment event
+            let post_id = env.data.get("post_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            let user_id = env.data.get("user_id")
+                .and_then(|v| v.as_str())
+                .and_then(parse_mm_or_uuid)
+                .map(encode_mm_id)
+                .unwrap_or_default();
+            
+            Some(mm::WebSocketMessage {
+                seq: Some(seq),
+                event: "post_acknowledgement".to_string(),
+                data: json!({
+                    "post_id": post_id,
+                    "user_id": user_id
+                }),
+                broadcast: map_broadcast(env.broadcast.as_ref()),
+            })
+        }
         _ => None,
     }
 }

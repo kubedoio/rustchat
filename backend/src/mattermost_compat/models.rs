@@ -237,3 +237,36 @@ pub struct SidebarCategories {
     pub categories: Vec<SidebarCategory>,
     pub order: Vec<String>,
 }
+
+// Thread models for Mattermost threads API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Thread {
+    pub id: String,
+    pub reply_count: i64,
+    pub last_reply_at: i64,
+    pub last_viewed_at: i64,
+    pub participants: Vec<User>,
+    pub post: PostInThread,
+    pub unread_replies: i64,
+    pub unread_mentions: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_following: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostInThread {
+    pub id: String,
+    pub channel_id: String,
+    pub user_id: String,
+    pub message: String,
+    pub create_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreadResponse {
+    pub threads: Vec<Thread>,
+    pub total: i64,
+    pub total_unread_threads: i64,
+    pub total_unread_mentions: i64,
+}
+

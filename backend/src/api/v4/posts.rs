@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
             get(get_post).delete(delete_post),
         )
         .route("/posts/{post_id}/patch", put(patch_post))
+        .route("/posts/{post_id}/ack", post(ack_post))
         .route("/reactions", post(add_reaction))
         .route("/users/me/posts/{post_id}/reactions/{emoji_name}", delete(remove_reaction))
         .route("/posts/{post_id}/reactions", get(get_reactions))
@@ -463,3 +464,29 @@ async fn get_reactions(
 
     Ok(Json(mm_reactions))
 }
+
+/// POST /posts/{post_id}/ack - Acknowledge a post (push notification receipt)
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct AckPostRequest {
+    #[serde(default)]
+    post_id: String,
+}
+
+async fn ack_post(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(post_id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    // Parse and validate the post ID
+    let _post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    // Acknowledgments are typically used for:
+    // 1. Confirming push notification receipt
+    // 2. Analytics/delivery tracking
+    // For now, we just return success - can be extended to track delivery status
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+

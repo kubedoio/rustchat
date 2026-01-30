@@ -13,6 +13,7 @@ pub mod files;
 pub mod posts;
 pub mod system;
 pub mod teams;
+pub mod threads;
 pub mod users;
 pub mod websocket;
 
@@ -29,6 +30,7 @@ pub fn router() -> Router<AppState> {
         .merge(files::router())
         .merge(config::router())
         .merge(system::router())
+        .merge(threads::router())
         .merge(websocket::router())
         .fallback(not_implemented)
         .layer(SetResponseHeaderLayer::overriding(
