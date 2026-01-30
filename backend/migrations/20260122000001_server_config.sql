@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS server_config (
         "site_description": "A self-hosted team collaboration platform",
         "site_url": "",
         "max_file_size_mb": 50,
-        "max_simultaneous_connections": 5,
         "default_locale": "en",
         "default_timezone": "UTC"
     }'::jsonb,
