@@ -56,13 +56,14 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/status", get(get_my_status).put(update_status))
         .route("/users/{user_id}/channels/{channel_id}/typing", post(user_typing))
         .route("/users/me/patch", put(patch_me))
-        .route("/users/{user_id}/image", get(get_user_image))
+        .route("/users/{user_id}/image", get(get_user_image).post(upload_user_image))
         .route("/roles/names", post(get_roles_by_names))
         .route("/users/notifications", get(get_notifications).put(update_notifications))
         .route("/users/me/sessions", get(get_sessions))
         .route("/users/logout", get(logout).post(logout))
         .route("/users/autocomplete", get(autocomplete_users))
         .route("/users/search", post(search_users))
+        .route("/custom_profile_attributes/fields", get(get_custom_profile_attributes))
         .route(
             "/users/{user_id}/sidebar/categories",
             get(get_categories).post(create_category).put(update_categories),
@@ -1623,6 +1624,57 @@ async fn get_user_image(
     ))
 }
 
+/// POST /users/{user_id}/image - Upload user profile image
+async fn upload_user_image(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    mut multipart: axum::extract::Multipart,
+) -> ApiResult<Json<serde_json::Value>> {
+    let user_uuid = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
+    
+    if user_uuid != auth.user_id {
+        return Err(AppError::Forbidden("Cannot update other user's image".to_string()));
+    }
+
+    // Process multipart upload
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Multipart error: {}", e)))?
+    {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "image" {
+            let content_type = field
+                .content_type()
+                .unwrap_or("image/png")
+                .to_string();
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
+                .to_vec();
+
+            // Upload to S3
+            let key = format!("avatars/{}.png", user_uuid);
+            state.s3_client.upload(&key, data, &content_type).await?;
+
+            // Update user avatar_url
+            let avatar_url = format!("/api/v4/users/{}/image", encode_mm_id(user_uuid));
+            sqlx::query("UPDATE users SET avatar_url = $1 WHERE id = $2")
+                .bind(&avatar_url)
+                .bind(user_uuid)
+                .execute(&state.db)
+                .await?;
+
+            return Ok(Json(serde_json::json!({"status": "OK"})));
+        }
+    }
+
+    Err(AppError::BadRequest("No image field found".to_string()))
+}
+
 async fn user_typing(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -1655,3 +1707,10 @@ async fn user_typing(
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
+
+/// GET /custom_profile_attributes/fields - Custom profile attributes (stub)
+async fn get_custom_profile_attributes() -> ApiResult<Json<Vec<serde_json::Value>>> {
+    // MM Enterprise feature - return empty array for compatibility
+    Ok(Json(vec![]))
+}
+
