@@ -21,6 +21,10 @@ use crate::models::{channel::Channel, channel::ChannelMember, Team, TeamMember, 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/users/login", post(login))
+        .route("/users/login/type", post(login_type))
+        .route("/users/login/cws", post(login_cws))
+        .route("/users/login/sso/code-exchange", post(login_sso_code_exchange))
+        .route("/users/login/switch", post(login_switch))
         .route("/users/me", get(me))
         .route("/users/me/teams", get(my_teams))
         .route("/users/me/teams/members", get(my_team_members))
@@ -605,6 +609,50 @@ struct LoginRequest {
     device_id: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct LoginTypeRequest {
+    #[allow(dead_code)]
+    id: Option<String>,
+    #[allow(dead_code)]
+    login_id: Option<String>,
+    #[allow(dead_code)]
+    device_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct LoginSwitchRequest {
+    #[allow(dead_code)]
+    current_service: Option<String>,
+    #[allow(dead_code)]
+    new_service: Option<String>,
+    #[allow(dead_code)]
+    email: Option<String>,
+    #[allow(dead_code)]
+    password: Option<String>,
+    #[allow(dead_code)]
+    mfa_code: Option<String>,
+    #[allow(dead_code)]
+    ldap_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct LoginCwsRequest {
+    #[allow(dead_code)]
+    login_id: Option<String>,
+    #[allow(dead_code)]
+    cws_token: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct LoginSsoCodeExchangeRequest {
+    #[allow(dead_code)]
+    login_code: Option<String>,
+    #[allow(dead_code)]
+    code_verifier: Option<String>,
+    #[allow(dead_code)]
+    state: Option<String>,
+}
+
 async fn login(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -657,11 +705,66 @@ async fn login(
         axum::http::header::AUTHORIZATION,
         HeaderValue::from_str(&format!("Token {}", token)).unwrap(),
     );
+    let max_age = state.jwt_expiry_hours.saturating_mul(3600);
+    headers.insert(
+        axum::http::header::SET_COOKIE,
+        HeaderValue::from_str(&format!(
+            "MMAUTHTOKEN={}; Path=/; Max-Age={}; HttpOnly",
+            token, max_age
+        ))
+        .unwrap(),
+    );
 
     Ok((headers, Json(mm_user)))
 }
 
+async fn login_type(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _input: LoginTypeRequest = parse_request_body(&headers, &body)?;
+
+    Ok(Json(serde_json::json!({
+        "auth_service": ""
+    })))
+}
+
+async fn login_cws(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _input: LoginCwsRequest = parse_request_body(&headers, &body)?;
+
+    Err(AppError::BadRequest("CWS login is not supported".to_string()))
+}
+
+async fn login_sso_code_exchange(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _input: LoginSsoCodeExchangeRequest = parse_request_body(&headers, &body)?;
+
+    Err(AppError::BadRequest(
+        "SSO code exchange is not supported".to_string(),
+    ))
+}
+
+async fn login_switch(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _input: LoginSwitchRequest = parse_request_body(&headers, &body)?;
+
+    Err(AppError::BadRequest(
+        "Login method switching is not supported".to_string(),
+    ))
+}
+
 fn parse_login_request(headers: &HeaderMap, body: &Bytes) -> ApiResult<LoginRequest> {
+    parse_request_body(headers, body)
+}
+
+fn parse_request_body<T: DeserializeOwned>(headers: &HeaderMap, body: &Bytes) -> ApiResult<T> {
     let content_type = headers
         .get(axum::http::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -676,7 +779,7 @@ fn parse_login_request(headers: &HeaderMap, body: &Bytes) -> ApiResult<LoginRequ
     } else {
         serde_json::from_slice(body)
             .or_else(|_| serde_urlencoded::from_bytes(body))
-            .map_err(|_| AppError::BadRequest("Unsupported login body".to_string()))
+            .map_err(|_| AppError::BadRequest("Unsupported request body".to_string()))
     }
 }
 
@@ -1748,5 +1851,4 @@ async fn get_user_custom_profile_attributes(
     // MM Enterprise feature - return empty array for compatibility
     Ok(Json(vec![]))
 }
-
 
