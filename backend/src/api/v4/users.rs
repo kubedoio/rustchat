@@ -64,6 +64,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/autocomplete", get(autocomplete_users))
         .route("/users/search", post(search_users))
         .route("/custom_profile_attributes/fields", get(get_custom_profile_attributes))
+        .route("/users/{user_id}/custom_profile_attributes", get(get_user_custom_profile_attributes))
         .route(
             "/users/{user_id}/sidebar/categories",
             get(get_categories).post(create_category).put(update_categories),
@@ -1713,4 +1714,13 @@ async fn get_custom_profile_attributes() -> ApiResult<Json<Vec<serde_json::Value
     // MM Enterprise feature - return empty array for compatibility
     Ok(Json(vec![]))
 }
+
+/// GET /users/{user_id}/custom_profile_attributes - Per-user custom profile attributes (stub)
+async fn get_user_custom_profile_attributes(
+    Path(_user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    // MM Enterprise feature - return empty array for compatibility
+    Ok(Json(vec![]))
+}
+
 
