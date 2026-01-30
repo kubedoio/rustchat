@@ -122,16 +122,21 @@ impl From<Post> for mm::Post {
 impl From<PostResponse> for mm::Post {
     fn from(post: PostResponse) -> Self {
         // Build metadata with reactions if present
+        // Note: ReactionResponse contains aggregated data (emoji, count, users)
+        // We need to create individual reaction entries for each user
         let metadata = if !post.reactions.is_empty() {
             let reactions: Vec<serde_json::Value> = post
                 .reactions
                 .iter()
-                .map(|r| {
-                    serde_json::json!({
-                        "user_id": encode_mm_id(r.user_id),
-                        "post_id": encode_mm_id(post.id),
-                        "emoji_name": r.emoji_name,
-                        "create_at": r.created_at.map(|t| t.timestamp_millis()).unwrap_or(0),
+                .flat_map(|r| {
+                    // Create a reaction entry for each user who reacted with this emoji
+                    r.users.iter().map(move |user_id| {
+                        serde_json::json!({
+                            "user_id": encode_mm_id(*user_id),
+                            "post_id": encode_mm_id(post.id),
+                            "emoji_name": r.emoji,
+                            "create_at": 0, // Aggregated reactions don't have individual timestamps
+                        })
                     })
                 })
                 .collect();
@@ -154,9 +159,9 @@ impl From<PostResponse> for mm::Post {
             root_id: post.root_post_id.map(encode_mm_id).unwrap_or_default(),
             original_id: "".to_string(),
             message: post.message,
-            post_type: "",
+            post_type: "".to_string(),
             props: post.props,
-            hashtags: "",
+            hashtags: "".to_string(),
             file_ids: post.file_ids.iter().map(|id| encode_mm_id(*id)).collect(),
             pending_post_id: post.client_msg_id.unwrap_or_default(),
             metadata,
