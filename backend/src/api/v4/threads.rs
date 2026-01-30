@@ -9,11 +9,11 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{delete, get, put},
+    routing::{get, put},
     Json, Router,
 };
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use uuid::Uuid;
 
 use super::extractors::MmAuthUser;

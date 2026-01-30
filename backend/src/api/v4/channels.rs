@@ -2,7 +2,7 @@ use axum::{
     body::Bytes,
     extract::{Path, Query, State},
     response::IntoResponse,
-    routing::{delete, get, post, put},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::de::DeserializeOwned;
@@ -385,7 +385,7 @@ async fn create_direct_channel(
         return Err(crate::error::AppError::BadRequest("Request body must contain exactly 2 user IDs".to_string()));
     }
 
-    let mut ids: Vec<Uuid> = user_ids
+    let ids: Vec<Uuid> = user_ids
         .iter()
         .filter_map(|id| parse_mm_or_uuid(id))
         .collect();

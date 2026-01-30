@@ -3,7 +3,6 @@ use axum::{
     response::Redirect,
     Json,
 };
-use uuid::Uuid;
 use crate::api::AppState;
 use crate::api::v4::extractors::MmAuthUser;
 use crate::error::{ApiResult, AppError};

@@ -6,7 +6,6 @@ pub mod threads;
 pub mod files;
 pub mod channels;
 pub mod teams;
-pub mod reactions;
 pub mod emoji;
 pub mod hooks;
 pub mod bots;

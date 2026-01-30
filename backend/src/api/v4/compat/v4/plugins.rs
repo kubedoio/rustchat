@@ -1,12 +1,9 @@
-use axum::{
-    extract::{Path, State},
-    response::IntoResponse,
+    extract::{State},
     Json,
 };
 use crate::api::AppState;
-use crate::api::v4::extractors::MmAuthUser;
-use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
+use crate::error::{ApiResult};
+use crate::mattermost_compat::{models as mm};
 
 pub async fn get_webapp_plugins(
     State(_state): State<AppState>,

@@ -1,13 +1,11 @@
-use axum::{
-    extract::{Path, State, Query},
-    response::IntoResponse,
+    extract::{State, Query},
     Json,
 };
 use crate::api::AppState;
 use crate::api::v4::extractors::MmAuthUser;
-use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
-use crate::models::{CreateIncomingWebhook, CreateOutgoingWebhook, IncomingWebhook, OutgoingWebhook};
+use crate::error::{ApiResult};
+use crate::mattermost_compat::{id::{encode_mm_id}, models as mm};
+use crate::models::{IncomingWebhook, OutgoingWebhook};
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
