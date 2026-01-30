@@ -27,6 +27,10 @@ pub fn router() -> Router<AppState> {
         .route("/posts/{post_id}/ack", post(ack_post))
         .route("/reactions", post(add_reaction))
         .route("/users/me/posts/{post_id}/reactions/{emoji_name}", delete(remove_reaction))
+        .route(
+            "/users/{user_id}/posts/{post_id}/reactions/{emoji_name}",
+            delete(remove_reaction_for_user),
+        )
         .route("/posts/{post_id}/reactions", get(get_reactions))
         .route("/posts/{post_id}/thread", get(get_post_thread))
         .route("/posts/ephemeral", post(create_ephemeral_post))
@@ -413,20 +417,58 @@ async fn remove_reaction(
 ) -> ApiResult<impl IntoResponse> {
     let post_id = parse_mm_or_uuid(&post_id)
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    remove_reaction_internal(&state, auth.user_id, post_id, &emoji_name).await?;
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn remove_reaction_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path((user_id, post_id, emoji_name)): Path<(String, String, String)>,
+) -> ApiResult<impl IntoResponse> {
+    let resolved_user_id = if user_id == "me" {
+        auth.user_id
+    } else {
+        parse_mm_or_uuid(&user_id)
+            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?
+    };
+
+    if resolved_user_id != auth.user_id {
+        return Err(AppError::Forbidden(
+            "Cannot remove reactions for other user".to_string(),
+        ));
+    }
+
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    remove_reaction_internal(&state, resolved_user_id, post_id, &emoji_name).await?;
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn remove_reaction_internal(
+    state: &AppState,
+    user_id: Uuid,
+    post_id: Uuid,
+    emoji_name: &str,
+) -> ApiResult<()> {
     let reaction: Option<crate::models::post::Reaction> = sqlx::query_as(
         "SELECT * FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
     )
-    .bind(auth.user_id)
+    .bind(user_id)
     .bind(post_id)
-    .bind(&emoji_name)
+    .bind(emoji_name)
     .fetch_optional(&state.db)
     .await?;
 
     if let Some(r) = reaction {
         sqlx::query("DELETE FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3")
-            .bind(auth.user_id)
+            .bind(user_id)
             .bind(post_id)
-            .bind(&emoji_name)
+            .bind(emoji_name)
             .execute(&state.db)
             .await?;
 
@@ -445,7 +487,7 @@ async fn remove_reaction(
         state.ws_hub.broadcast(broadcast).await;
     }
 
-    Ok(Json(serde_json::json!({"status": "OK"})))
+    Ok(())
 }
 
 async fn get_reactions(
@@ -692,4 +734,3 @@ async fn set_post_reminder(
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
-

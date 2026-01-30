@@ -26,6 +26,7 @@ use crate::mattermost_compat::{
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/users/{user_id}/threads", get(get_all_threads_internal))
         .route(
             "/users/{user_id}/teams/{team_id}/threads",
             get(get_threads_internal).put(mark_all_read_internal),
