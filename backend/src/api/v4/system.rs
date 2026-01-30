@@ -1,7 +1,7 @@
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::MM_VERSION;
-use axum::{extract::Query, routing::{get, post}, Json, Router, response::IntoResponse};
+use axum::{extract::{Query, State}, routing::{get, post}, Json, Router, response::IntoResponse};
 use serde::Serialize;
 
 pub fn router() -> Router<AppState> {

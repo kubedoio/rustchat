@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
+use std::collections::HashMap;
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
@@ -197,7 +198,7 @@ async fn search_teams(
     _auth: MmAuthUser,
     Json(input): Json<HashMap<String, String>>,
 ) -> ApiResult<Json<Vec<mm::Team>>> {
-    let term = input.get("term").cloned().unwrap_or_default();
+    let term = input.get("term").map(|s| s.as_str()).unwrap_or_default();
     
     let teams: Vec<Team> = sqlx::query_as(
         "SELECT * FROM teams WHERE name ILIKE $1 OR display_name ILIKE $1"

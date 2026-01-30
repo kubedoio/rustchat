@@ -1,6 +1,6 @@
 use axum::{
     extract::{Query, State},
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 
@@ -108,5 +108,18 @@ pub async fn list_bots(
     }).collect();
 
     Ok(Json(mm_bots))
+}
+
+fn map_bot(bot: Bot, username: String) -> mm::Bot {
+    mm::Bot {
+        user_id: encode_mm_id(bot.user_id),
+        username,
+        display_name: bot.display_name,
+        description: bot.description.unwrap_or_default(),
+        owner_id: encode_mm_id(bot.owner_id),
+        create_at: bot.created_at.timestamp_millis(),
+        update_at: bot.updated_at.timestamp_millis(),
+        delete_at: 0,
+    }
 }
 
