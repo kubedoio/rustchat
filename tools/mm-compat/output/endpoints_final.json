@@ -1,0 +1,5091 @@
+[
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/install_from_url",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 10
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/websocket",
+    "sources": [
+      "static"
+    ],
+    "priority": 7
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/actions/dialogs/open",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/bots",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/direct",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/group",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/client_perf",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/config",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/config",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/email/test",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/image",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/sync",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/test",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/license",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/license",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/license/client",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/system/ping",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/logout",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/playbooks",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs",
+    "sources": [
+      "openapi",
+      "static"
+    ],
+    "priority": 5
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/channels/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/channels/members/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/error",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/plugins/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/posts/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/teams/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/teams/name/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/users/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/users/me",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/users/me/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/users/me/unknown",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/api/v4/users/username/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/abc/api/testroute",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/asset",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/assetImportMetaUrl",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/blob/master/LICENSE",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/blob/master/packages/json/src/index",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/clientInjections",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/com",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/completeAmdWrap",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/completeSystemWrap",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/css",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/dataUri",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/define",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/dynamicImportVars",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/esbuild",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/file",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/html",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/importAnalysis",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/importAnalysisBuild",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/importMetaGlob",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/index",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/json",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/license",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/loadFallback",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/manifest",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/mattermost",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/metadata",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/modulePreloadPolyfill",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/optimizedDeps",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/playbooks/api/v0",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/playbooks/api/v0/query",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/playbooks/api/v0/runs/",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_fields",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_fields/field1/value",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_fields/field2/value",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_fields/field3/value",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_values",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/pluginFilter",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/preAlias",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/prepareOutDir",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/reporter",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/resolve",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/shared",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/terser",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/tree/master/packages/alias",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/tree/master/packages/dynamic",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/vue",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/wasm",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/worker",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "ANY",
+    "path": "/plugins/workerImportMetaUrl",
+    "sources": [
+      "static"
+    ],
+    "priority": 2
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/access_control_policies",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/access_control_policies/activate",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/access_control_policies/cel/autocomplete/fields",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/cel/check",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/cel/test",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/cel/validate_requester",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/cel/visual_ast",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/access_control_policies/{policy_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/access_control_policies/{policy_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/access_control_policies/{policy_id}/activate",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/{policy_id}/assign",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/access_control_policies/{policy_id}/resources/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/{policy_id}/resources/channels/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/access_control_policies/{policy_id}/unassign",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/actions/dialogs/lookup",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/actions/dialogs/submit",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/agents",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/agents/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ai/agents",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ai/services",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/analytics/old",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/audit_logs/certificate",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/audit_logs/certificate",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/audits",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bleve/purge_indexes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/bots/{bot_user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/bots/{bot_user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/assign/{user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/convert_to_user",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/disable",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/enable",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/bots/{bot_user_id}/icon",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/bots/{bot_user_id}/icon",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/icon",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/brand/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/brand/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/brand/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/caches/invalidate",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/group/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/members/{user_id}/view",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/channels/{channel_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/access_control/attributes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/bookmarks",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/bookmarks",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}/sort_order",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/common_teams",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/groups",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/member_counts_by_group",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/members/ids",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}/notify_props",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}/roles",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}/schemeRoles",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/members_minus_group_members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/moderations",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/moderations/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/move",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/pinned",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/posts",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/privacy",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/restore",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/scheme",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/stats",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/timezones",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/customer",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/cloud/customer",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/cloud/customer/address",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/installation",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/limits",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/cloud/payment",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/cloud/payment/confirm",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/preview/modal_data",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/products",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/subscription",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/subscription/invoices",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/subscription/invoices/{invoice_id}/pdf",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/cloud/webhook",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cluster/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/commands",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/commands",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/commands/execute",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/commands/{command_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/commands/{command_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/commands/{command_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/commands/{command_id}/move",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/commands/{command_id}/regen_token",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/compliance/reports",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/compliance/reports",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/compliance/reports/{report_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/compliance/reports/{report_id}/download",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/config/client",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/config/environment",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/config/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/config/reload",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/config",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/content_flagging/config",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/fields",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/flag/config",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/post/{post_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/content_flagging/post/{post_id}/assign/{content_reviewer_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/post/{post_id}/field_values",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/content_flagging/post/{post_id}/flag",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/content_flagging/post/{post_id}/keep",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/content_flagging/post/{post_id}/remove",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/team/{team_id}/reviewers/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/team/{team_id}/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/custom_profile_attributes/fields",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/custom_profile_attributes/fields",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/custom_profile_attributes/fields/{field_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/custom_profile_attributes/fields/{field_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/custom_profile_attributes/group",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/custom_profile_attributes/values",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/data_retention/policies/{policy_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies/{policy_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/data_retention/policies/{policy_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/data_retention/policies/{policy_id}/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies/{policy_id}/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies/{policy_id}/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies/{policy_id}/channels/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/data_retention/policies/{policy_id}/teams",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies/{policy_id}/teams",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies/{policy_id}/teams",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies/{policy_id}/teams/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies_count",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policy",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/database/recycle",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/elasticsearch/purge_indexes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/elasticsearch/test",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/emoji",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji/autocomplete",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji/name/{emoji_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/emoji/names",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/emoji/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/emoji/{emoji_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji/{emoji_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji/{emoji_id}/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/exports",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/exports/{export_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/exports/{export_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/file/s3_test",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/files",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/files/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}/info",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}/link",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}/preview",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}/thumbnail",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/names",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/groups/{group_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/channels/{channel_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/groups/{group_id}/channels/{channel_id}/link",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/{group_id}/channels/{channel_id}/link",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/groups/{group_id}/channels/{channel_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/groups/{group_id}/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/{group_id}/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/groups/{group_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/{group_id}/restore",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/stats",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/teams",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/teams/{team_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/groups/{group_id}/teams/{team_id}/link",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/{group_id}/teams/{team_id}/link",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/groups/{group_id}/teams/{team_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/hooks/incoming",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/hooks/incoming",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/hooks/incoming/{hook_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/hooks/incoming/{hook_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/hooks/incoming/{hook_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/hooks/outgoing",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/hooks/outgoing",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/hooks/outgoing/{hook_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/hooks/outgoing/{hook_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/hooks/outgoing/{hook_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/hooks/outgoing/{hook_id}/regen_token",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/imports",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/imports/{import_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/integrity",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ip_filtering",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ip_filtering",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ip_filtering/my_ip",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/jobs",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/jobs",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/jobs/type/{type}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/jobs/{job_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/jobs/{job_id}/cancel",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/jobs/{job_id}/download",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/jobs/{job_id}/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/ldap/certificate/private",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/certificate/private",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/ldap/certificate/public",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/certificate/public",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ldap/groups",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/ldap/groups/{remote_id}/link",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/groups/{remote_id}/link",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/migrateid",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/test_connection",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/test_diagnostics",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/users/{user_id}/group_sync_memberships",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/license/load_metric",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/license/renewal",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/limits/server",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/llmservices",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/logs",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/logs",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/logs/download",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/notifications/ack",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/notifications/test",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/apps",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/apps",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/apps/register",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/oauth/apps/{app_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/apps/{app_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/oauth/apps/{app_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/apps/{app_id}/info",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/apps/{app_id}/regen_secret",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/outgoing_connections",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/outgoing_connections",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/outgoing_connections/validate",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/oauth/outgoing_connections/{connection_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/outgoing_connections/{connection_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/oauth/outgoing_connections/{connection_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/permissions/ancillary",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins/marketplace",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/marketplace",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins/marketplace/first_admin_visit",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/marketplace/first_admin_visit",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins/statuses",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins/webapp",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/plugins/{plugin_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/{plugin_id}/disable",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/{plugin_id}/enable",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/ephemeral",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/ids",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/ids/reactions",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/rewrite",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/schedule",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/posts/schedule/{scheduled_post_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/posts/schedule/{scheduled_post_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/scheduled/team/{team_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/posts/{post_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/posts/{post_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/actions/{action_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/posts/{post_id}/burn",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}/files/info",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/move",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/posts/{post_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/pin",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}/reactions",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/restore/{restore_version_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}/reveal",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}/thread",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/unpin",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/reactions",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/recaps",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/recaps",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/recaps/{recap_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/recaps/{recap_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/recaps/{recap_id}/read",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/recaps/{recap_id}/regenerate",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/redirect_location",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/remotecluster",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster/accept_invite",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/remotecluster/{remote_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/remotecluster/{remote_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/remotecluster/{remote_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster/{remote_id}/channels/{channel_id}/invite",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster/{remote_id}/channels/{channel_id}/uninvite",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster/{remote_id}/generate_invite",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/remotecluster/{remote_id}/sharedchannelremotes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/reports/posts",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/reports/users",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/reports/users/count",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/reports/users/export",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/restart",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/roles",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/roles/name/{role_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/roles/names",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/roles/{role_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/roles/{role_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/saml/certificate/idp",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/certificate/idp",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/saml/certificate/private",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/certificate/private",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/saml/certificate/public",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/certificate/public",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/saml/certificate/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/saml/metadata",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/metadatafromidp",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/reset_auth_data",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/schemes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/schemes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/schemes/{scheme_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/schemes/{scheme_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/schemes/{scheme_id}/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/schemes/{scheme_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/schemes/{scheme_id}/teams",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/server_busy",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/server_busy",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/server_busy",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/sharedchannels/remote_info/{remote_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/sharedchannels/users/{user_id}/can_dm/{other_user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/sharedchannels/{channel_id}/remotes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/sharedchannels/{team_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/site_url/test",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/system/notices/view",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/system/notices/{teamId}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/system/support_packet",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/system/timezones",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/invite/{invite_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/teams/invites/email",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/members/invite",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/name/{name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/name/{name}/exists",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/name/{team_name}/channels/name/{channel_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/teams/{team_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/autocomplete",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/deleted",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/channels/ids",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/name/{channel_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/private",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/channels/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/search_autocomplete",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/commands/autocomplete",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/commands/autocomplete_suggestions",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/files/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/groups",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/groups_by_channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/teams/{team_id}/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/import",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/invite-guests/email",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/invite/email",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/members/batch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/members/ids",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/teams/{team_id}/members/{user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/members/{user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/members/{user_id}/roles",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/members/{user_id}/schemeRoles",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/members_minus_group_members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/posts/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/privacy",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/regenerate_invite_id",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/restore",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/scheme",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/stats",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/terms_of_service",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/terms_of_service",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/trial-license",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/trial-license/prev",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/upgrade_to_enterprise",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/upgrade_to_enterprise/allowed",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/upgrade_to_enterprise/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/uploads",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/uploads/{upload_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/uploads/{upload_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/usage/posts",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/usage/storage",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/autocomplete",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/email/verify",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/email/verify/send",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/email/{email}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/group_channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/ids",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/invalid_emails",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/known",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login/cws",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login/sso/code-exchange",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login/switch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login/type",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/mfa",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/migrate_auth/ldap",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/migrate_auth/saml",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/password/reset",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/password/reset/send",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/sessions/device",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/sessions/revoke/all",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/stats",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/stats/filtered",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/status/ids",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/tokens",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/tokens/disable",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/tokens/enable",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/tokens/revoke",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/tokens/search",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/tokens/{token_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/username/{username}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/usernames",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/active",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/audits",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/auth",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/channel_members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/channels/{channel_id}/posts/unread",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/channels/{channel_id}/unread",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/convert_to_bot",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/custom_profile_attributes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/users/{user_id}/custom_profile_attributes",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/data_retention/channel_policies",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/data_retention/team_policies",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/demote",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/email/verify/member",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/groups",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/image",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/image/default",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/mfa",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/mfa/generate",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/oauth/apps/authorized",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/password",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/patch",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/posts/flagged",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/ack",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/ack",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/reactions/{emoji_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/reminder",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/set_unread",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/preferences",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/preferences",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/preferences/delete",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/preferences/{category}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/preferences/{category}/name/{preference_name}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/promote",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/reset_failed_attempts",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/roles",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/sessions",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/sessions/revoke",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/sessions/revoke/all",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/status/custom",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/status/custom",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/status/custom/recent",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/status/custom/recent/delete",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/unread",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/order",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/order",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/members",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/mention_counts",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/read",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/following",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/following",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/read/{timestamp}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/set_unread/{post_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/unread",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/terms_of_service",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/terms_of_service",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/tokens",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/tokens",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/typing",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/uploads",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/files/{file_id}/public",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/intune",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/autofollows",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/conditions",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/conditions",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/conditions/{conditionID}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/conditions/{conditionID}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/reorder",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/{field_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/{field_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/channel/{channel_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/channels",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/checklist-autocomplete",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/dialog",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/owners",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PATCH",
+    "path": "/plugins/playbooks/api/v0/runs/{id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/add",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/assignee",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/run",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/state",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/reorder",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/conditions",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/end",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/end",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/finish",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/metadata",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/next-stage-dialog",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/owner",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/property_fields",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/property_fields/{field_id}/value",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/property_values",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/restart",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/status",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/timeline/{event_id}",
+    "sources": [
+      "openapi"
+    ],
+    "priority": 0
+  }
+]

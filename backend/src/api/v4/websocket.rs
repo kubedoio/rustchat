@@ -5,8 +5,6 @@ use axum::{
     },
     http::HeaderMap,
     response::Response,
-    routing::get,
-    Router,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -21,20 +19,31 @@ use crate::auth::validate_token;
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::realtime::{TypingEvent, WsEnvelope};
 
-pub fn router() -> Router<AppState> {
-    Router::new().route("/websocket", get(ws_handler))
-}
-
 #[derive(Debug, Deserialize)]
-struct WsQuery {
-    token: Option<String>,
+pub struct WsQuery {
+    pub token: Option<String>,
     #[allow(dead_code)]
-    connection_id: Option<String>,
+    pub connection_id: Option<String>,
     #[allow(dead_code)]
-    sequence_number: Option<i64>,
+    pub sequence_number: Option<i64>,
 }
 
-async fn ws_handler(
+async fn get_max_simultaneous_connections(state: &AppState) -> usize {
+    let value: Option<String> = sqlx::query_scalar(
+        "SELECT site->>'max_simultaneous_connections' FROM server_config WHERE id = 'default'",
+    )
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
+
+    match value.and_then(|val| val.parse::<i64>().ok()) {
+        Some(max) if max > 0 => max as usize,
+        _ => 5,
+    }
+}
+
+pub async fn handle_websocket(
     ws: WebSocketUpgrade,
     headers: HeaderMap,
     State(state): State<AppState>,
@@ -49,6 +58,8 @@ async fn ws_handler(
             if let Ok(auth_str) = auth_header.to_str() {
                 if auth_str.starts_with("Bearer ") {
                     token = Some(auth_str[7..].to_string());
+                } else if auth_str.starts_with("Token ") {
+                    token = Some(auth_str[6..].to_string());
                 } else {
                     token = Some(auth_str.to_string());
                 }
@@ -62,10 +73,10 @@ async fn ws_handler(
         None
     };
 
-    ws.on_upgrade(move |socket| handle_socket(socket, state, user_id, seq_start))
+    ws.on_upgrade(move |socket| websocket_loop(socket, state, user_id, seq_start))
 }
 
-async fn handle_socket(
+async fn websocket_loop(
     socket: WebSocket,
     state: AppState,
     mut user_id: Option<Uuid>,
@@ -107,6 +118,15 @@ async fn handle_socket(
         None => return, // Failed to auth
     };
 
+    let max_connections = get_max_simultaneous_connections(&state).await;
+    let current_connections = state.ws_hub.user_connection_count(user_id).await;
+    if current_connections >= max_connections {
+        let _ = sender
+            .send(Message::Close(None))
+            .await;
+        return;
+    }
+
     // 2. Send Hello event immediately after successful auth
     let hello = mm::WebSocketMessage {
         seq: Some(seq),
@@ -137,7 +157,7 @@ async fn handle_socket(
         Err(_) => "Unknown".to_string(),
     };
 
-    let rx = state.ws_hub.add_connection(user_id, username.clone()).await;
+    let (connection_id, rx) = state.ws_hub.add_connection(user_id, username.clone()).await;
 
     // Subscribe to teams and channels
     let teams = sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
@@ -172,8 +192,6 @@ async fn handle_socket(
             tokio::select! {
                 // Heartbeat
                 _ = heartbeat.tick() => {
-                    // Send a ping event or frame. MM uses a "ping" event or WS Ping.
-                    // We'll send a JSON ping event for visibility.
                     let ping = json!({
                         "type": "event",
                         "event": "ping",
@@ -228,7 +246,7 @@ async fn handle_socket(
         _ = receive_task => {},
     }
 
-    state.ws_hub.remove_connection(user_id).await;
+    state.ws_hub.remove_connection(user_id, connection_id).await;
 }
 
 fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage> {
@@ -370,17 +388,6 @@ fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage
              } else {
                  None
              }
-        }
-        "channel_updated" => {
-             env.data.get("channel_id").and_then(|cid| cid.as_str()).map(|cid| {
-                let channel_id = parse_mm_or_uuid(cid).map(encode_mm_id).unwrap_or_default();
-                mm::WebSocketMessage {
-                    seq: Some(seq),
-                    event: "channel_viewed".to_string(),
-                    data: json!({ "channel_id": channel_id }),
-                    broadcast: map_broadcast(env.broadcast.as_ref()),
-                }
-             })
         }
         _ => None,
     }

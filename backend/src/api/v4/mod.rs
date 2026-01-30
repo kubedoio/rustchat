@@ -7,14 +7,18 @@ pub mod emoji;
 pub mod commands;
 pub mod plugins;
 pub mod categories;
-pub mod config;
+pub mod config_client;
+pub mod hooks;
+pub mod bots;
+pub mod admin;
+pub mod websocket;
 pub mod extractors;
 pub mod files;
 pub mod posts;
 pub mod system;
 pub mod teams;
+pub mod threads;
 pub mod users;
-pub mod websocket;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -27,9 +31,13 @@ pub fn router() -> Router<AppState> {
         .merge(categories::router())
         .merge(posts::router())
         .merge(files::router())
-        .merge(config::router())
         .merge(system::router())
-        .merge(websocket::router())
+        .merge(threads::router())
+        .merge(config_client::router())
+        .merge(hooks::router())
+        .merge(bots::router())
+        .merge(admin::router())
+        .route("/websocket", axum::routing::get(websocket::handle_websocket))
         .fallback(not_implemented)
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("x-mm-compat"),

@@ -29,6 +29,9 @@ Thumbs.db
 *.log
 logs/
 
+# mattermost
+mattermost-mobile
+
 # Test coverage
 *.gcno
 *.gcda

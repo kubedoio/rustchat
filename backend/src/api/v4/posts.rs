@@ -24,10 +24,15 @@ pub fn router() -> Router<AppState> {
             get(get_post).delete(delete_post),
         )
         .route("/posts/{post_id}/patch", put(patch_post))
+        .route("/posts/{post_id}/ack", post(ack_post))
         .route("/reactions", post(add_reaction))
         .route("/users/me/posts/{post_id}/reactions/{emoji_name}", delete(remove_reaction))
         .route("/posts/{post_id}/reactions", get(get_reactions))
         .route("/posts/{post_id}/thread", get(get_post_thread))
+        .route("/posts/ephemeral", post(create_ephemeral_post))
+        .route("/posts/schedule", post(create_scheduled_post))
+        .route("/posts/scheduled/team/{team_id}", get(list_scheduled_posts))
+        .route("/users/{user_id}/posts/{post_id}/reminder", post(set_post_reminder))
 }
 
 #[derive(Debug, Deserialize)]
@@ -463,3 +468,228 @@ async fn get_reactions(
 
     Ok(Json(mm_reactions))
 }
+
+/// POST /posts/{post_id}/ack - Acknowledge a post (push notification receipt)
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct AckPostRequest {
+    #[serde(default)]
+    post_id: String,
+}
+
+async fn ack_post(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(post_id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    // Parse and validate the post ID
+    let _post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    // Acknowledgments are typically used for:
+    // 1. Confirming push notification receipt
+    // 2. Analytics/delivery tracking
+    // For now, we just return success - can be extended to track delivery status
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+#[derive(serde::Deserialize)]
+pub struct CreateScheduledPostRequest {
+    pub channel_id: String,
+    pub message: String,
+    #[serde(default)]
+    pub root_id: String,
+    #[serde(default)]
+    pub props: serde_json::Value,
+    #[serde(default)]
+    pub file_ids: Vec<String>,
+    pub scheduled_at: i64,
+}
+
+async fn list_scheduled_posts(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(team_id_str): Path<String>,
+) -> ApiResult<Json<Vec<mm::ScheduledPost>>> {
+    let team_id = parse_mm_or_uuid(&team_id_str)
+        .ok_or_else(|| AppError::Validation("Invalid team_id".to_string()))?;
+
+    let rows: Vec<(Uuid, Uuid, Uuid, Option<Uuid>, String, serde_json::Value, Vec<Uuid>, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
+        r#"
+        SELECT id, user_id, channel_id, root_id, message, props, file_ids, scheduled_at, created_at, updated_at
+        FROM scheduled_posts
+        WHERE user_id = $1 AND channel_id IN (SELECT id FROM channels WHERE team_id = $2)
+        AND state = 'pending'
+        "#
+    )
+    .bind(auth.user_id)
+    .bind(team_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let posts = rows.into_iter().map(|r| mm::ScheduledPost {
+        id: encode_mm_id(r.0),
+        user_id: encode_mm_id(r.1),
+        channel_id: encode_mm_id(r.2),
+        root_id: r.3.map(encode_mm_id).unwrap_or_default(),
+        message: r.4,
+        props: r.5,
+        file_ids: r.6.into_iter().map(encode_mm_id).collect(),
+        scheduled_at: r.7.timestamp_millis(),
+        create_at: r.8.timestamp_millis(),
+        update_at: r.9.timestamp_millis(),
+    }).collect();
+
+    Ok(Json(posts))
+}
+
+async fn create_scheduled_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Json(input): Json<CreateScheduledPostRequest>,
+) -> ApiResult<Json<mm::ScheduledPost>> {
+    let channel_id = parse_mm_or_uuid(&input.channel_id)
+        .ok_or_else(|| AppError::Validation("Invalid channel_id".to_string()))?;
+
+    let root_id = if !input.root_id.is_empty() {
+        Some(parse_mm_or_uuid(&input.root_id)
+            .ok_or_else(|| AppError::Validation("Invalid root_id".to_string()))?)
+    } else {
+        None
+    };
+
+    let file_ids = input.file_ids.iter().filter_map(|id| parse_mm_or_uuid(id)).collect::<Vec<_>>();
+    let scheduled_at = chrono::DateTime::from_timestamp_millis(input.scheduled_at)
+        .ok_or_else(|| AppError::Validation("Invalid scheduled_at".to_string()))?;
+
+    let row: (Uuid, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
+        r#"
+        INSERT INTO scheduled_posts (user_id, channel_id, root_id, message, props, file_ids, scheduled_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, created_at, updated_at
+        "#
+    )
+    .bind(auth.user_id)
+    .bind(channel_id)
+    .bind(root_id)
+    .bind(&input.message)
+    .bind(&input.props)
+    .bind(&file_ids)
+    .bind(scheduled_at)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(mm::ScheduledPost {
+        id: encode_mm_id(row.0),
+        user_id: encode_mm_id(auth.user_id),
+        channel_id: input.channel_id,
+        root_id: input.root_id,
+        message: input.message,
+        props: input.props,
+        file_ids: input.file_ids,
+        scheduled_at: input.scheduled_at,
+        create_at: row.1.timestamp_millis(),
+        update_at: row.2.timestamp_millis(),
+    }))
+}
+
+#[derive(serde::Deserialize)]
+pub struct EphemeralPostRequest {
+    pub user_id: String,
+    pub post: CreatePostRequest,
+}
+
+async fn create_ephemeral_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Json(input): Json<EphemeralPostRequest>,
+) -> ApiResult<Json<mm::Post>> {
+    let target_user_id = parse_mm_or_uuid(&input.user_id)
+        .ok_or_else(|| AppError::Validation("Invalid user_id".to_string()))?;
+
+    if target_user_id != auth.user_id && input.user_id != "me" {
+        return Err(AppError::Forbidden("Cannot send ephemeral post to others".to_string()));
+    }
+
+    let channel_id = parse_mm_or_uuid(&input.post.channel_id)
+        .ok_or_else(|| AppError::Validation("Invalid channel_id".to_string()))?;
+
+    let post_id = Uuid::new_v4();
+    let now = chrono::Utc::now().timestamp_millis();
+    
+    let ephemeral_post = mm::Post {
+        id: encode_mm_id(post_id),
+        create_at: now,
+        update_at: now,
+        delete_at: 0,
+        edit_at: 0,
+        user_id: encode_mm_id(auth.user_id),
+        channel_id: input.post.channel_id,
+        root_id: input.post.root_id,
+        original_id: "".to_string(),
+        message: input.post.message,
+        post_type: "ephemeral".to_string(),
+        props: input.post.props,
+        hashtags: "".to_string(),
+        file_ids: input.post.file_ids,
+        pending_post_id: input.post.pending_post_id,
+        metadata: None,
+    };
+
+    let broadcast = WsEnvelope::event(
+        EventType::EphemeralMessage,
+        ephemeral_post.clone(),
+        Some(channel_id),
+    )
+    .with_broadcast(WsBroadcast {
+        channel_id: Some(channel_id),
+        team_id: None,
+        user_id: Some(auth.user_id),
+        exclude_user_id: None,
+    });
+    state.ws_hub.broadcast(broadcast).await;
+
+    Ok(Json(ephemeral_post))
+}
+
+#[derive(serde::Deserialize)]
+pub struct PostReminderRequest {
+    pub target_at: i64,
+}
+
+async fn set_post_reminder(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path((user_id_str, post_id_str)): Path<(String, String)>,
+    Json(input): Json<PostReminderRequest>,
+) -> ApiResult<impl axum::response::IntoResponse> {
+    let target_user_id = parse_mm_or_uuid(&user_id_str)
+        .ok_or_else(|| AppError::Validation("Invalid user_id".to_string()))?;
+
+    if target_user_id != auth.user_id && user_id_str != "me" {
+        return Err(AppError::Forbidden("Cannot set reminder for others".to_string()));
+    }
+
+    let post_id = parse_mm_or_uuid(&post_id_str)
+        .ok_or_else(|| AppError::Validation("Invalid post_id".to_string()))?;
+
+    let target_at = chrono::DateTime::from_timestamp_millis(input.target_at)
+        .ok_or_else(|| AppError::Validation("Invalid target_at".to_string()))?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO post_reminders (user_id, post_id, target_at)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (user_id, post_id) DO UPDATE SET target_at = $3
+        "#
+    )
+    .bind(auth.user_id)
+    .bind(post_id)
+    .bind(target_at)
+    .execute(&state.db)
+    .await?;
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+

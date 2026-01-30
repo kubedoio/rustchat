@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me", get(me))
         .route("/users/me/teams", get(my_teams))
         .route("/users/me/teams/members", get(my_team_members))
+        .route("/users/me/channels/categories", get(get_my_categories))
         .route("/users/me/teams/{team_id}/channels", get(my_team_channels))
         .route("/users/me/channels", get(my_channels))
         .route(
@@ -31,6 +32,8 @@ pub fn router() -> Router<AppState> {
             get(my_team_channels_not_members),
         )
         .route("/users", get(list_users))
+        .route("/users/{user_id}", get(get_user_by_id))
+        .route("/users/username/{username}", get(get_user_by_username))
         .route(
             "/users/me/teams/{team_id}/channels/members",
             get(my_team_channel_members),
@@ -54,13 +57,15 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/status", get(get_my_status).put(update_status))
         .route("/users/{user_id}/channels/{channel_id}/typing", post(user_typing))
         .route("/users/me/patch", put(patch_me))
-        .route("/users/{user_id}/image", get(get_user_image))
+        .route("/users/{user_id}/image", get(get_user_image).post(upload_user_image))
         .route("/roles/names", post(get_roles_by_names))
         .route("/users/notifications", get(get_notifications).put(update_notifications))
         .route("/users/me/sessions", get(get_sessions))
         .route("/users/logout", get(logout).post(logout))
         .route("/users/autocomplete", get(autocomplete_users))
         .route("/users/search", post(search_users))
+        .route("/custom_profile_attributes/fields", get(get_custom_profile_attributes))
+        .route("/users/{user_id}/custom_profile_attributes", get(get_user_custom_profile_attributes))
         .route(
             "/users/{user_id}/sidebar/categories",
             get(get_categories).post(create_category).put(update_categories),
@@ -87,6 +92,17 @@ async fn get_categories(
     let team_id = parse_mm_or_uuid(team_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     get_categories_internal(state, user_id, team_id).await
+}
+
+async fn get_my_categories(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> ApiResult<Json<mm::SidebarCategories>> {
+    let team_id_str = query.get("team_id").ok_or_else(|| AppError::BadRequest("Missing team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(team_id_str)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    get_categories_internal(state, auth.user_id, team_id).await
 }
 
 async fn create_category(
@@ -193,6 +209,7 @@ pub(crate) async fn get_categories_internal(
             muted: row.muted,
             collapsed: row.collapsed,
             channel_ids,
+            sort_order: row.sort_order,
             create_at: row.create_at,
             update_at: row.update_at,
             delete_at: row.delete_at,
@@ -213,7 +230,6 @@ struct CategoryRow {
     sorting: String,
     muted: bool,
     collapsed: bool,
-    #[allow(dead_code)]
     sort_order: i32,
     create_at: i64,
     update_at: i64,
@@ -278,6 +294,7 @@ fn build_default_categories(
         sorting: "alpha".to_string(),
         muted: false,
         collapsed: false,
+        sort_order: 0,
         channel_ids,
         create_at: now,
         update_at: now,
@@ -384,6 +401,7 @@ pub(crate) async fn create_category_internal(
         sorting,
         muted: false,
         collapsed: false,
+        sort_order: next_order as i32,
         channel_ids: vec![],
         create_at: now,
         update_at: now,
@@ -463,6 +481,7 @@ pub(crate) async fn update_categories_internal(
         cat_out.id = encode_mm_id(cat_uuid);
         cat_out.user_id = encode_mm_id(user_id);
         cat_out.team_id = encode_mm_id(team_id);
+        cat_out.sort_order = 0; // Assuming sort_order is not part of the update request, or defaults to 0
         cat_out.channel_ids = parsed_channel_ids.into_iter().map(encode_mm_id).collect();
         updated_categories.push(cat_out);
     }
@@ -633,6 +652,11 @@ async fn login(
 
     let mut headers = HeaderMap::new();
     headers.insert("Token", HeaderValue::from_str(&token).unwrap());
+    headers.insert("token", HeaderValue::from_str(&token).unwrap());
+    headers.insert(
+        axum::http::header::AUTHORIZATION,
+        HeaderValue::from_str(&format!("Token {}", token)).unwrap(),
+    );
 
     Ok((headers, Json(mm_user)))
 }
@@ -664,6 +688,45 @@ async fn me(State(state): State<AppState>, auth: MmAuthUser) -> ApiResult<Json<m
 
     Ok(Json(user.into()))
 }
+
+/// GET /users/{user_id} - Get user by ID
+async fn get_user_by_id(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<mm::User>> {
+    // Handle "me" as a special case
+    let user_uuid = if user_id == "me" {
+        return Err(AppError::BadRequest("Use /users/me endpoint".to_string()));
+    } else {
+        parse_mm_or_uuid(&user_id)
+            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?
+    };
+
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(user_uuid)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    Ok(Json(user.into()))
+}
+
+/// GET /users/username/{username} - Get user by username
+async fn get_user_by_username(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(username): Path<String>,
+) -> ApiResult<Json<mm::User>> {
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE username = $1")
+        .bind(&username)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    Ok(Json(user.into()))
+}
+
 
 async fn my_teams(
     State(state): State<AppState>,
@@ -1382,8 +1445,11 @@ struct PatchMeRequest {
 async fn update_status(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(input): Json<UpdateStatusRequest>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Json<mm::Status>> {
+    let input: UpdateStatusRequest = parse_body(&headers, &body, "Invalid status update request")?;
+    
     let input_user_id = parse_mm_or_uuid(&input.user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
     if input_user_id != auth.user_id {
@@ -1579,6 +1645,63 @@ async fn get_user_image(
     ))
 }
 
+/// POST /users/{user_id}/image - Upload user profile image
+async fn upload_user_image(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    mut multipart: axum::extract::Multipart,
+) -> ApiResult<Json<serde_json::Value>> {
+    let user_uuid = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
+    
+    if user_uuid != auth.user_id {
+        return Err(AppError::Forbidden("Cannot update other user's image".to_string()));
+    }
+
+    // Process multipart upload
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Multipart error: {}", e)))?
+    {
+        let name = field.name().unwrap_or("").to_string();
+        let content_type = field
+            .content_type()
+            .unwrap_or("application/octet-stream")
+            .to_string();
+        
+        // Accept field named "image" or any field with image content type
+        if name == "image" || content_type.starts_with("image/") {
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
+                .to_vec();
+
+            if data.is_empty() {
+                continue;
+            }
+
+            // Upload to S3
+            let key = format!("avatars/{}.png", user_uuid);
+            state.s3_client.upload(&key, data, &content_type).await?;
+
+            // Update user avatar_url
+            let avatar_url = format!("/api/v4/users/{}/image", encode_mm_id(user_uuid));
+            sqlx::query("UPDATE users SET avatar_url = $1 WHERE id = $2")
+                .bind(&avatar_url)
+                .bind(user_uuid)
+                .execute(&state.db)
+                .await?;
+
+            return Ok(Json(serde_json::json!({"status": "OK"})));
+        }
+    }
+
+    Err(AppError::BadRequest("No image field found in upload".to_string()))
+}
+
 async fn user_typing(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -1611,3 +1734,19 @@ async fn user_typing(
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
+
+/// GET /custom_profile_attributes/fields - Custom profile attributes (stub)
+async fn get_custom_profile_attributes() -> ApiResult<Json<Vec<serde_json::Value>>> {
+    // MM Enterprise feature - return empty array for compatibility
+    Ok(Json(vec![]))
+}
+
+/// GET /users/{user_id}/custom_profile_attributes - Per-user custom profile attributes (stub)
+async fn get_user_custom_profile_attributes(
+    Path(_user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    // MM Enterprise feature - return empty array for compatibility
+    Ok(Json(vec![]))
+}
+
+

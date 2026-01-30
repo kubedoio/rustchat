@@ -1,0 +1,1101 @@
+[
+  {
+    "path": "/api/v4/actions/dialogs/open",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/webhook_server.js",
+        "line": 142
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/bots",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/bot.ts",
+        "line": 34
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/channels",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 55
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/channels/",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 32
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 114
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 201
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 220
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/post.ts",
+        "line": 58
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/channels/direct",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 75
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/channels/group",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 95
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/channels/members/",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 240
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/client_perf",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/managers/performance_metrics_manager/index.test.ts",
+        "line": 42
+      },
+      {
+        "file": "mattermost-mobile/app/managers/performance_metrics_manager/index.test.ts",
+        "line": 204
+      },
+      {
+        "file": "mattermost-mobile/app/managers/performance_metrics_manager/index.test.ts",
+        "line": 258
+      },
+      {
+        "file": "mattermost-mobile/app/managers/performance_metrics_manager/index.test.ts",
+        "line": 266
+      },
+      {
+        "file": "mattermost-mobile/app/managers/performance_metrics_manager/index.test.ts",
+        "line": 269
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/config",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/playbooks.ts",
+        "line": 10
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/system.ts",
+        "line": 74
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/system.ts",
+        "line": 105
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/email/test",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/system.ts",
+        "line": 44
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/error",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/client/rest/index.test.js",
+        "line": 69
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/image",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/database/operator/server_data_operator/handlers/post.test.ts",
+        "line": 62
+      },
+      {
+        "file": "mattermost-mobile/app/database/operator/server_data_operator/handlers/post.test.ts",
+        "line": 93
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/ldap/sync",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/ldap.ts",
+        "line": 29
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/ldap/test",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/ldap.ts",
+        "line": 43
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/license",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/system.ts",
+        "line": 204
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/license/client",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/system.ts",
+        "line": 58
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/plugins",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/plugin.ts",
+        "line": 124
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/plugin.ts",
+        "line": 175
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/playbooks.ts",
+        "line": 11
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/plugins/",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/plugin.ts",
+        "line": 95
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/plugin.ts",
+        "line": 110
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/plugin.ts",
+        "line": 159
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/plugins/install_from_url",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/plugin.ts",
+        "line": 142
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/posts",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/managers/network_performance_manager.test.ts",
+        "line": 156
+      },
+      {
+        "file": "mattermost-mobile/detox/webhook_server.js",
+        "line": 87
+      },
+      {
+        "file": "mattermost-mobile/detox/utils/post_message_as.js",
+        "line": 24
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/post.ts",
+        "line": 41
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/posts/",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/post.ts",
+        "line": 93
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/system/ping",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/system.ts",
+        "line": 134
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/teams",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/managers/network_performance_manager.test.ts",
+        "line": 169
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/team.ts",
+        "line": 55
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/team.ts",
+        "line": 129
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/teams/",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/team.ts",
+        "line": 33
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/team.ts",
+        "line": 75
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/team.ts",
+        "line": 112
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/team.ts",
+        "line": 170
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 132
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/teams/name/",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 150
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/users",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/user.ts",
+        "line": 47
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/users/",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/status.ts",
+        "line": 28
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/status.ts",
+        "line": 47
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/team.ts",
+        "line": 146
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 168
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/channel.ts",
+        "line": 186
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/users/login",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/utils/post_message_as.js",
+        "line": 8
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/user.ts",
+        "line": 145
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/users/logout",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/user.ts",
+        "line": 167
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/users/me",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/managers/network_performance_manager.test.ts",
+        "line": 139
+      },
+      {
+        "file": "mattermost-mobile/app/utils/url/index.test.ts",
+        "line": 380
+      },
+      {
+        "file": "mattermost-mobile/app/utils/url/index.test.ts",
+        "line": 382
+      },
+      {
+        "file": "mattermost-mobile/app/utils/url/index.test.ts",
+        "line": 386
+      },
+      {
+        "file": "mattermost-mobile/app/utils/url/index.test.ts",
+        "line": 388
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/users/me/",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/utils/url/index.test.ts",
+        "line": 394
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/users/me/unknown",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/utils/url/index.test.ts",
+        "line": 392
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/users/username/",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/user.ts",
+        "line": 126
+      }
+    ]
+  },
+  {
+    "path": "/api/v4/websocket",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/calls/connection/websocket_client.test.ts",
+        "line": 16
+      },
+      {
+        "file": "mattermost-mobile/app/client/websocket/index.test.ts",
+        "line": 93
+      },
+      {
+        "file": "mattermost-mobile/app/client/websocket/index.test.ts",
+        "line": 94
+      },
+      {
+        "file": "mattermost-mobile/app/client/websocket/index.test.ts",
+        "line": 105
+      },
+      {
+        "file": "mattermost-mobile/app/client/websocket/index.test.ts",
+        "line": 115
+      }
+    ]
+  },
+  {
+    "path": "/plugins/abc/api/testroute",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/utils/url/test.ts",
+        "line": 409
+      }
+    ]
+  },
+  {
+    "path": "/plugins/asset",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 8604
+      }
+    ]
+  },
+  {
+    "path": "/plugins/assetImportMetaUrl",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 27656
+      }
+    ]
+  },
+  {
+    "path": "/plugins/blob/master/LICENSE",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 8837
+      }
+    ]
+  },
+  {
+    "path": "/plugins/blob/master/packages/json/src/index",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 8833
+      }
+    ]
+  },
+  {
+    "path": "/plugins/clientInjections",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 27388
+      }
+    ]
+  },
+  {
+    "path": "/plugins/com",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/calls/client/rest.test.ts",
+        "line": 8
+      },
+      {
+        "file": "mattermost-mobile/app/products/calls/client/rest.test.ts",
+        "line": 26
+      },
+      {
+        "file": "mattermost-mobile/app/products/calls/client/rest.test.ts",
+        "line": 40
+      },
+      {
+        "file": "mattermost-mobile/app/products/calls/client/rest.test.ts",
+        "line": 48
+      },
+      {
+        "file": "mattermost-mobile/app/products/calls/client/rest.test.ts",
+        "line": 58
+      }
+    ]
+  },
+  {
+    "path": "/plugins/completeAmdWrap",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 33178
+      }
+    ]
+  },
+  {
+    "path": "/plugins/completeSystemWrap",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 33200
+      }
+    ]
+  },
+  {
+    "path": "/plugins/css",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 2903
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 29474
+      }
+    ]
+  },
+  {
+    "path": "/plugins/dataUri",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 33037
+      }
+    ]
+  },
+  {
+    "path": "/plugins/define",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 26416
+      }
+    ]
+  },
+  {
+    "path": "/plugins/dynamicImportVars",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 27856
+      }
+    ]
+  },
+  {
+    "path": "/plugins/esbuild",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 2993
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 6051
+      }
+    ]
+  },
+  {
+    "path": "/plugins/file",
+    "references": [
+      {
+        "file": "frontend/node_modules/@vue/language-core/lib/plugins.js",
+        "line": 21
+      },
+      {
+        "file": "frontend/node_modules/@vue/language-core/lib/plugins.js",
+        "line": 22
+      },
+      {
+        "file": "frontend/node_modules/@vue/language-core/lib/plugins.js",
+        "line": 23
+      }
+    ]
+  },
+  {
+    "path": "/plugins/html",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 2605
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 23704
+      }
+    ]
+  },
+  {
+    "path": "/plugins/importAnalysis",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 26961
+      }
+    ]
+  },
+  {
+    "path": "/plugins/importAnalysisBuild",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 23276
+      }
+    ]
+  },
+  {
+    "path": "/plugins/importMetaGlob",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 27980
+      }
+    ]
+  },
+  {
+    "path": "/plugins/index",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 28382
+      }
+    ]
+  },
+  {
+    "path": "/plugins/install_from_url",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/plugin.ts",
+        "line": 142
+      }
+    ]
+  },
+  {
+    "path": "/plugins/json",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 3008
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 8831
+      }
+    ]
+  },
+  {
+    "path": "/plugins/license",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 1906
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 33218
+      }
+    ]
+  },
+  {
+    "path": "/plugins/loadFallback",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 33155
+      }
+    ]
+  },
+  {
+    "path": "/plugins/manifest",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 3662
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 29361
+      }
+    ]
+  },
+  {
+    "path": "/plugins/mattermost",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/agents/client/rest.ts",
+        "line": 13
+      }
+    ]
+  },
+  {
+    "path": "/plugins/metadata",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 27779
+      }
+    ]
+  },
+  {
+    "path": "/plugins/modulePreloadPolyfill",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 23647
+      }
+    ]
+  },
+  {
+    "path": "/plugins/optimizedDeps",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 8908
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.ts",
+        "line": 50
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/playbooks",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 675
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 703
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 728
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 760
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/playbooks.ts",
+        "line": 9
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/query",
+    "references": [
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/playbooks.ts",
+        "line": 659
+      },
+      {
+        "file": "mattermost-mobile/detox/e2e/support/server_api/playbooks.ts",
+        "line": 693
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/runs",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 21
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 36
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 785
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 828
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 875
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/runs/",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 72
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 89
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 116
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 150
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 177
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_fields",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1157
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1186
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_fields/field1/value",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1281
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1393
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_fields/field2/value",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1303
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_fields/field3/value",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1325
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1348
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1371
+      }
+    ]
+  },
+  {
+    "path": "/plugins/playbooks/api/v0/runs/run123/property_values",
+    "references": [
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1220
+      },
+      {
+        "file": "mattermost-mobile/app/products/playbooks/client/rest.test.ts",
+        "line": 1244
+      }
+    ]
+  },
+  {
+    "path": "/plugins/pluginFilter",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 2642
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 28313
+      }
+    ]
+  },
+  {
+    "path": "/plugins/preAlias",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 26906
+      }
+    ]
+  },
+  {
+    "path": "/plugins/prepareOutDir",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 33297
+      }
+    ]
+  },
+  {
+    "path": "/plugins/reporter",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 5033
+      }
+    ]
+  },
+  {
+    "path": "/plugins/resolve",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 1829
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 32459
+      }
+    ]
+  },
+  {
+    "path": "/plugins/shared",
+    "references": [
+      {
+        "file": "frontend/node_modules/@vue/language-core/lib/plugins.js",
+        "line": 36
+      },
+      {
+        "file": "frontend/node_modules/@vue/language-core/lib/plugins.d.ts",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "path": "/plugins/terser",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 1818
+      },
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 32968
+      }
+    ]
+  },
+  {
+    "path": "/plugins/tree/master/packages/alias",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/index.d.ts",
+        "line": 55
+      }
+    ]
+  },
+  {
+    "path": "/plugins/tree/master/packages/dynamic",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 27213
+      }
+    ]
+  },
+  {
+    "path": "/plugins/vue",
+    "references": [
+      {
+        "file": "frontend/node_modules/@vue/language-core/index.js",
+        "line": 53
+      },
+      {
+        "file": "frontend/node_modules/@vue/language-core/index.d.ts",
+        "line": 14
+      },
+      {
+        "file": "frontend/node_modules/@vue/language-core/lib/plugins.js",
+        "line": 24
+      },
+      {
+        "file": "frontend/node_modules/@vue/language-core/lib/plugins.js",
+        "line": 25
+      },
+      {
+        "file": "frontend/node_modules/@vue/language-core/lib/plugins.js",
+        "line": 26
+      }
+    ]
+  },
+  {
+    "path": "/plugins/wasm",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 27463
+      }
+    ]
+  },
+  {
+    "path": "/plugins/worker",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 26586
+      }
+    ]
+  },
+  {
+    "path": "/plugins/workerImportMetaUrl",
+    "references": [
+      {
+        "file": "frontend/node_modules/vite/dist/node/chunks/config.js",
+        "line": 27525
+      }
+    ]
+  },
+  {
+    "path": "/websocket",
+    "references": [
+      {
+        "file": "tools/mm-compat/venv/lib/python3.14/site-packages/mitmproxy/tools/web/static/index-Bt--WL1e.js",
+        "line": 1
+      },
+      {
+        "file": "tools/mm-compat/venv/lib/python3.14/site-packages/mitmproxy/tools/web/static/index-Bt--WL1e.js",
+        "line": 1
+      },
+      {
+        "file": "tools/mm-compat/venv/lib/python3.14/site-packages/mitmproxy/tools/web/static/index-Bt--WL1e.js",
+        "line": 1
+      },
+      {
+        "file": "tools/mm-compat/venv/lib/python3.14/site-packages/mitmproxy/tools/web/static/index-Bt--WL1e.js",
+        "line": 1
+      },
+      {
+        "file": "tools/mm-compat/venv/lib/python3.14/site-packages/mitmproxy/tools/web/static/index-Bt--WL1e.js",
+        "line": 1
+      }
+    ]
+  }
+]

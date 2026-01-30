@@ -1,9 +1,12 @@
 use axum::{
+    body::Bytes,
     extract::{Path, State},
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
+use std::collections::HashMap;
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
@@ -18,6 +21,8 @@ pub fn router() -> Router<AppState> {
         .route("/teams/{team_id}/image", get(get_team_image))
         .route("/teams/{team_id}/members/me", get(get_team_member_me))
         .route("/teams/{team_id}/channels", get(get_team_channels))
+        .route("/teams/{team_id}/channels/search", post(search_channels))
+        .route("/teams/search", post(search_teams))
 }
 
 async fn get_teams(
@@ -123,4 +128,84 @@ async fn get_team_image(
         [(axum::http::header::CONTENT_TYPE, "image/png")],
         PNG_1X1,
     ))
+}
+
+/// POST /teams/{team_id}/channels/search - Search channels in a team
+#[derive(Deserialize)]
+struct SearchChannelsRequest {
+    term: String,
+}
+
+fn parse_body<T: serde::de::DeserializeOwned>(
+    headers: &axum::http::HeaderMap,
+    body: &Bytes,
+    message: &str,
+) -> ApiResult<T> {
+    let content_type = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if content_type.starts_with("application/json") {
+        serde_json::from_slice(body)
+            .map_err(|_| crate::error::AppError::BadRequest(message.to_string()))
+    } else {
+        serde_json::from_slice(body)
+            .or_else(|_| serde_urlencoded::from_bytes(body))
+            .map_err(|_| crate::error::AppError::BadRequest(message.to_string()))
+    }
+}
+
+async fn search_channels(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(team_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<Vec<mm::Channel>>> {
+    let team_id = parse_mm_or_uuid(&team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+
+    let input: SearchChannelsRequest = parse_body(&headers, &body, "Invalid search request")?;
+    let search_term = format!("%{}%", input.term.to_lowercase());
+
+    // Search public channels and private channels the user is a member of
+    let channels: Vec<Channel> = sqlx::query_as(
+        r#"
+        SELECT DISTINCT c.* FROM channels c
+        LEFT JOIN channel_members cm ON c.id = cm.channel_id AND cm.user_id = $2
+        WHERE c.team_id = $1
+          AND c.deleted_at IS NULL
+          AND (LOWER(c.name) LIKE $3 OR LOWER(c.display_name) LIKE $3)
+          AND (c.type = 'public' OR cm.user_id IS NOT NULL)
+        ORDER BY c.display_name ASC
+        LIMIT 50
+        "#,
+    )
+    .bind(team_id)
+    .bind(auth.user_id)
+    .bind(&search_term)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
+    Ok(Json(mm_channels))
+}
+
+
+async fn search_teams(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Json(input): Json<HashMap<String, String>>,
+) -> ApiResult<Json<Vec<mm::Team>>> {
+    let term = input.get("term").map(|s| s.as_str()).unwrap_or_default();
+    
+    let teams: Vec<Team> = sqlx::query_as(
+        "SELECT * FROM teams WHERE name ILIKE $1 OR display_name ILIKE $1"
+    )
+    .bind(format!("%{}%", term))
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(teams.into_iter().map(|t| t.into()).collect()))
 }

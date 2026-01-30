@@ -1,0 +1,2852 @@
+[
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server",
+    "original": "/.well-known/oauth-authorization-server"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/access_control_policies",
+    "original": "/api/v4/access_control_policies"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/access_control_policies/activate",
+    "original": "/api/v4/access_control_policies/activate"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/access_control_policies/cel/autocomplete/fields",
+    "original": "/api/v4/access_control_policies/cel/autocomplete/fields"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/cel/check",
+    "original": "/api/v4/access_control_policies/cel/check"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/cel/test",
+    "original": "/api/v4/access_control_policies/cel/test"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/cel/validate_requester",
+    "original": "/api/v4/access_control_policies/cel/validate_requester"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/cel/visual_ast",
+    "original": "/api/v4/access_control_policies/cel/visual_ast"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/search",
+    "original": "/api/v4/access_control_policies/search"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/access_control_policies/{policy_id}",
+    "original": "/api/v4/access_control_policies/{policy_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/access_control_policies/{policy_id}",
+    "original": "/api/v4/access_control_policies/{policy_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/access_control_policies/{policy_id}/activate",
+    "original": "/api/v4/access_control_policies/{policy_id}/activate"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/{policy_id}/assign",
+    "original": "/api/v4/access_control_policies/{policy_id}/assign"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/access_control_policies/{policy_id}/resources/channels",
+    "original": "/api/v4/access_control_policies/{policy_id}/resources/channels"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/access_control_policies/{policy_id}/resources/channels/search",
+    "original": "/api/v4/access_control_policies/{policy_id}/resources/channels/search"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/access_control_policies/{policy_id}/unassign",
+    "original": "/api/v4/access_control_policies/{policy_id}/unassign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/actions/dialogs/lookup",
+    "original": "/api/v4/actions/dialogs/lookup"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/actions/dialogs/open",
+    "original": "/api/v4/actions/dialogs/open"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/actions/dialogs/submit",
+    "original": "/api/v4/actions/dialogs/submit"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/agents",
+    "original": "/api/v4/agents"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/agents/status",
+    "original": "/api/v4/agents/status"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ai/agents",
+    "original": "/api/v4/ai/agents"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ai/services",
+    "original": "/api/v4/ai/services"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/analytics/old",
+    "original": "/api/v4/analytics/old"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/audit_logs/certificate",
+    "original": "/api/v4/audit_logs/certificate"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/audit_logs/certificate",
+    "original": "/api/v4/audit_logs/certificate"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/audits",
+    "original": "/api/v4/audits"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bleve/purge_indexes",
+    "original": "/api/v4/bleve/purge_indexes"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/bots",
+    "original": "/api/v4/bots"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots",
+    "original": "/api/v4/bots"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/bots/{bot_user_id}",
+    "original": "/api/v4/bots/{bot_user_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/bots/{bot_user_id}",
+    "original": "/api/v4/bots/{bot_user_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/assign/{user_id}",
+    "original": "/api/v4/bots/{bot_user_id}/assign/{user_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/convert_to_user",
+    "original": "/api/v4/bots/{bot_user_id}/convert_to_user"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/disable",
+    "original": "/api/v4/bots/{bot_user_id}/disable"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/enable",
+    "original": "/api/v4/bots/{bot_user_id}/enable"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/bots/{bot_user_id}/icon",
+    "original": "/api/v4/bots/{bot_user_id}/icon"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/bots/{bot_user_id}/icon",
+    "original": "/api/v4/bots/{bot_user_id}/icon"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/bots/{bot_user_id}/icon",
+    "original": "/api/v4/bots/{bot_user_id}/icon"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/brand/image",
+    "original": "/api/v4/brand/image"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/brand/image",
+    "original": "/api/v4/brand/image"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/brand/image",
+    "original": "/api/v4/brand/image"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/caches/invalidate",
+    "original": "/api/v4/caches/invalidate"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels",
+    "original": "/api/v4/channels"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels",
+    "original": "/api/v4/channels"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/direct",
+    "original": "/api/v4/channels/direct"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/group",
+    "original": "/api/v4/channels/group"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/group/search",
+    "original": "/api/v4/channels/group/search"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/members/{user_id}/view",
+    "original": "/api/v4/channels/members/{user_id}/view"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/search",
+    "original": "/api/v4/channels/search"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/channels/{channel_id}",
+    "original": "/api/v4/channels/{channel_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}",
+    "original": "/api/v4/channels/{channel_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}",
+    "original": "/api/v4/channels/{channel_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/access_control/attributes",
+    "original": "/api/v4/channels/{channel_id}/access_control/attributes"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/bookmarks",
+    "original": "/api/v4/channels/{channel_id}/bookmarks"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/bookmarks",
+    "original": "/api/v4/channels/{channel_id}/bookmarks"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}",
+    "original": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}",
+    "original": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}/sort_order",
+    "original": "/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}/sort_order"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/common_teams",
+    "original": "/api/v4/channels/{channel_id}/common_teams"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/groups",
+    "original": "/api/v4/channels/{channel_id}/groups"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/member_counts_by_group",
+    "original": "/api/v4/channels/{channel_id}/member_counts_by_group"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/members",
+    "original": "/api/v4/channels/{channel_id}/members"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/members",
+    "original": "/api/v4/channels/{channel_id}/members"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/members/ids",
+    "original": "/api/v4/channels/{channel_id}/members/ids"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}",
+    "original": "/api/v4/channels/{channel_id}/members/{user_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}",
+    "original": "/api/v4/channels/{channel_id}/members/{user_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}/notify_props",
+    "original": "/api/v4/channels/{channel_id}/members/{user_id}/notify_props"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}/roles",
+    "original": "/api/v4/channels/{channel_id}/members/{user_id}/roles"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/members/{user_id}/schemeRoles",
+    "original": "/api/v4/channels/{channel_id}/members/{user_id}/schemeRoles"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/members_minus_group_members",
+    "original": "/api/v4/channels/{channel_id}/members_minus_group_members"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/moderations",
+    "original": "/api/v4/channels/{channel_id}/moderations"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/moderations/patch",
+    "original": "/api/v4/channels/{channel_id}/moderations/patch"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/move",
+    "original": "/api/v4/channels/{channel_id}/move"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/patch",
+    "original": "/api/v4/channels/{channel_id}/patch"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/pinned",
+    "original": "/api/v4/channels/{channel_id}/pinned"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/posts",
+    "original": "/api/v4/channels/{channel_id}/posts"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/privacy",
+    "original": "/api/v4/channels/{channel_id}/privacy"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/channels/{channel_id}/restore",
+    "original": "/api/v4/channels/{channel_id}/restore"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/channels/{channel_id}/scheme",
+    "original": "/api/v4/channels/{channel_id}/scheme"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/stats",
+    "original": "/api/v4/channels/{channel_id}/stats"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/channels/{channel_id}/timezones",
+    "original": "/api/v4/channels/{channel_id}/timezones"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/client_perf",
+    "original": "/api/v4/client_perf"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/customer",
+    "original": "/api/v4/cloud/customer"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/cloud/customer",
+    "original": "/api/v4/cloud/customer"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/cloud/customer/address",
+    "original": "/api/v4/cloud/customer/address"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/installation",
+    "original": "/api/v4/cloud/installation"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/limits",
+    "original": "/api/v4/cloud/limits"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/cloud/payment",
+    "original": "/api/v4/cloud/payment"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/cloud/payment/confirm",
+    "original": "/api/v4/cloud/payment/confirm"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/preview/modal_data",
+    "original": "/api/v4/cloud/preview/modal_data"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/products",
+    "original": "/api/v4/cloud/products"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/subscription",
+    "original": "/api/v4/cloud/subscription"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/subscription/invoices",
+    "original": "/api/v4/cloud/subscription/invoices"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cloud/subscription/invoices/{invoice_id}/pdf",
+    "original": "/api/v4/cloud/subscription/invoices/{invoice_id}/pdf"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/cloud/webhook",
+    "original": "/api/v4/cloud/webhook"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/cluster/status",
+    "original": "/api/v4/cluster/status"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/commands",
+    "original": "/api/v4/commands"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/commands",
+    "original": "/api/v4/commands"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/commands/execute",
+    "original": "/api/v4/commands/execute"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/commands/{command_id}",
+    "original": "/api/v4/commands/{command_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/commands/{command_id}",
+    "original": "/api/v4/commands/{command_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/commands/{command_id}",
+    "original": "/api/v4/commands/{command_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/commands/{command_id}/move",
+    "original": "/api/v4/commands/{command_id}/move"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/commands/{command_id}/regen_token",
+    "original": "/api/v4/commands/{command_id}/regen_token"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/compliance/reports",
+    "original": "/api/v4/compliance/reports"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/compliance/reports",
+    "original": "/api/v4/compliance/reports"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/compliance/reports/{report_id}",
+    "original": "/api/v4/compliance/reports/{report_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/compliance/reports/{report_id}/download",
+    "original": "/api/v4/compliance/reports/{report_id}/download"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/config",
+    "original": "/api/v4/config"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/config",
+    "original": "/api/v4/config"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/config/client",
+    "original": "/api/v4/config/client"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/config/environment",
+    "original": "/api/v4/config/environment"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/config/patch",
+    "original": "/api/v4/config/patch"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/config/reload",
+    "original": "/api/v4/config/reload"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/config",
+    "original": "/api/v4/content_flagging/config"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/content_flagging/config",
+    "original": "/api/v4/content_flagging/config"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/fields",
+    "original": "/api/v4/content_flagging/fields"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/flag/config",
+    "original": "/api/v4/content_flagging/flag/config"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/post/{post_id}",
+    "original": "/api/v4/content_flagging/post/{post_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/content_flagging/post/{post_id}/assign/{content_reviewer_id}",
+    "original": "/api/v4/content_flagging/post/{post_id}/assign/{content_reviewer_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/post/{post_id}/field_values",
+    "original": "/api/v4/content_flagging/post/{post_id}/field_values"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/content_flagging/post/{post_id}/flag",
+    "original": "/api/v4/content_flagging/post/{post_id}/flag"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/content_flagging/post/{post_id}/keep",
+    "original": "/api/v4/content_flagging/post/{post_id}/keep"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/content_flagging/post/{post_id}/remove",
+    "original": "/api/v4/content_flagging/post/{post_id}/remove"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/team/{team_id}/reviewers/search",
+    "original": "/api/v4/content_flagging/team/{team_id}/reviewers/search"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/content_flagging/team/{team_id}/status",
+    "original": "/api/v4/content_flagging/team/{team_id}/status"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/custom_profile_attributes/fields",
+    "original": "/api/v4/custom_profile_attributes/fields"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/custom_profile_attributes/fields",
+    "original": "/api/v4/custom_profile_attributes/fields"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/custom_profile_attributes/fields/{field_id}",
+    "original": "/api/v4/custom_profile_attributes/fields/{field_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/custom_profile_attributes/fields/{field_id}",
+    "original": "/api/v4/custom_profile_attributes/fields/{field_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/custom_profile_attributes/group",
+    "original": "/api/v4/custom_profile_attributes/group"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/custom_profile_attributes/values",
+    "original": "/api/v4/custom_profile_attributes/values"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies",
+    "original": "/api/v4/data_retention/policies"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies",
+    "original": "/api/v4/data_retention/policies"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/data_retention/policies/{policy_id}",
+    "original": "/api/v4/data_retention/policies/{policy_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies/{policy_id}",
+    "original": "/api/v4/data_retention/policies/{policy_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/data_retention/policies/{policy_id}",
+    "original": "/api/v4/data_retention/policies/{policy_id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/data_retention/policies/{policy_id}/channels",
+    "original": "/api/v4/data_retention/policies/{policy_id}/channels"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies/{policy_id}/channels",
+    "original": "/api/v4/data_retention/policies/{policy_id}/channels"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies/{policy_id}/channels",
+    "original": "/api/v4/data_retention/policies/{policy_id}/channels"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies/{policy_id}/channels/search",
+    "original": "/api/v4/data_retention/policies/{policy_id}/channels/search"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/data_retention/policies/{policy_id}/teams",
+    "original": "/api/v4/data_retention/policies/{policy_id}/teams"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies/{policy_id}/teams",
+    "original": "/api/v4/data_retention/policies/{policy_id}/teams"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies/{policy_id}/teams",
+    "original": "/api/v4/data_retention/policies/{policy_id}/teams"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/data_retention/policies/{policy_id}/teams/search",
+    "original": "/api/v4/data_retention/policies/{policy_id}/teams/search"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policies_count",
+    "original": "/api/v4/data_retention/policies_count"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/data_retention/policy",
+    "original": "/api/v4/data_retention/policy"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/database/recycle",
+    "original": "/api/v4/database/recycle"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/elasticsearch/purge_indexes",
+    "original": "/api/v4/elasticsearch/purge_indexes"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/elasticsearch/test",
+    "original": "/api/v4/elasticsearch/test"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/email/test",
+    "original": "/api/v4/email/test"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji",
+    "original": "/api/v4/emoji"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/emoji",
+    "original": "/api/v4/emoji"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji/autocomplete",
+    "original": "/api/v4/emoji/autocomplete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji/name/{emoji_name}",
+    "original": "/api/v4/emoji/name/{emoji_name}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/emoji/names",
+    "original": "/api/v4/emoji/names"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/emoji/search",
+    "original": "/api/v4/emoji/search"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/emoji/{emoji_id}",
+    "original": "/api/v4/emoji/{emoji_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji/{emoji_id}",
+    "original": "/api/v4/emoji/{emoji_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/emoji/{emoji_id}/image",
+    "original": "/api/v4/emoji/{emoji_id}/image"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/exports",
+    "original": "/api/v4/exports"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/exports/{export_name}",
+    "original": "/api/v4/exports/{export_name}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/exports/{export_name}",
+    "original": "/api/v4/exports/{export_name}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/file/s3_test",
+    "original": "/api/v4/file/s3_test"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/files",
+    "original": "/api/v4/files"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/files/search",
+    "original": "/api/v4/files/search"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}",
+    "original": "/api/v4/files/{file_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}/info",
+    "original": "/api/v4/files/{file_id}/info"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}/link",
+    "original": "/api/v4/files/{file_id}/link"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}/preview",
+    "original": "/api/v4/files/{file_id}/preview"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/files/{file_id}/thumbnail",
+    "original": "/api/v4/files/{file_id}/thumbnail"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups",
+    "original": "/api/v4/groups"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups",
+    "original": "/api/v4/groups"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/names",
+    "original": "/api/v4/groups/names"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/groups/{group_id}",
+    "original": "/api/v4/groups/{group_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}",
+    "original": "/api/v4/groups/{group_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/channels",
+    "original": "/api/v4/groups/{group_id}/channels"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/channels/{channel_id}",
+    "original": "/api/v4/groups/{group_id}/channels/{channel_id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/groups/{group_id}/channels/{channel_id}/link",
+    "original": "/api/v4/groups/{group_id}/channels/{channel_id}/link"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/{group_id}/channels/{channel_id}/link",
+    "original": "/api/v4/groups/{group_id}/channels/{channel_id}/link"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/groups/{group_id}/channels/{channel_id}/patch",
+    "original": "/api/v4/groups/{group_id}/channels/{channel_id}/patch"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/groups/{group_id}/members",
+    "original": "/api/v4/groups/{group_id}/members"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/members",
+    "original": "/api/v4/groups/{group_id}/members"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/{group_id}/members",
+    "original": "/api/v4/groups/{group_id}/members"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/groups/{group_id}/patch",
+    "original": "/api/v4/groups/{group_id}/patch"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/{group_id}/restore",
+    "original": "/api/v4/groups/{group_id}/restore"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/stats",
+    "original": "/api/v4/groups/{group_id}/stats"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/teams",
+    "original": "/api/v4/groups/{group_id}/teams"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/groups/{group_id}/teams/{team_id}",
+    "original": "/api/v4/groups/{group_id}/teams/{team_id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/groups/{group_id}/teams/{team_id}/link",
+    "original": "/api/v4/groups/{group_id}/teams/{team_id}/link"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/groups/{group_id}/teams/{team_id}/link",
+    "original": "/api/v4/groups/{group_id}/teams/{team_id}/link"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/groups/{group_id}/teams/{team_id}/patch",
+    "original": "/api/v4/groups/{group_id}/teams/{team_id}/patch"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/hooks/incoming",
+    "original": "/api/v4/hooks/incoming"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/hooks/incoming",
+    "original": "/api/v4/hooks/incoming"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/hooks/incoming/{hook_id}",
+    "original": "/api/v4/hooks/incoming/{hook_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/hooks/incoming/{hook_id}",
+    "original": "/api/v4/hooks/incoming/{hook_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/hooks/incoming/{hook_id}",
+    "original": "/api/v4/hooks/incoming/{hook_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/hooks/outgoing",
+    "original": "/api/v4/hooks/outgoing"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/hooks/outgoing",
+    "original": "/api/v4/hooks/outgoing"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/hooks/outgoing/{hook_id}",
+    "original": "/api/v4/hooks/outgoing/{hook_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/hooks/outgoing/{hook_id}",
+    "original": "/api/v4/hooks/outgoing/{hook_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/hooks/outgoing/{hook_id}",
+    "original": "/api/v4/hooks/outgoing/{hook_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/hooks/outgoing/{hook_id}/regen_token",
+    "original": "/api/v4/hooks/outgoing/{hook_id}/regen_token"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/image",
+    "original": "/api/v4/image"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/imports",
+    "original": "/api/v4/imports"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/imports/{import_name}",
+    "original": "/api/v4/imports/{import_name}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/integrity",
+    "original": "/api/v4/integrity"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ip_filtering",
+    "original": "/api/v4/ip_filtering"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ip_filtering",
+    "original": "/api/v4/ip_filtering"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ip_filtering/my_ip",
+    "original": "/api/v4/ip_filtering/my_ip"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/jobs",
+    "original": "/api/v4/jobs"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/jobs",
+    "original": "/api/v4/jobs"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/jobs/type/{type}",
+    "original": "/api/v4/jobs/type/{type}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/jobs/{job_id}",
+    "original": "/api/v4/jobs/{job_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/jobs/{job_id}/cancel",
+    "original": "/api/v4/jobs/{job_id}/cancel"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/jobs/{job_id}/download",
+    "original": "/api/v4/jobs/{job_id}/download"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/jobs/{job_id}/status",
+    "original": "/api/v4/jobs/{job_id}/status"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/ldap/certificate/private",
+    "original": "/api/v4/ldap/certificate/private"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/certificate/private",
+    "original": "/api/v4/ldap/certificate/private"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/ldap/certificate/public",
+    "original": "/api/v4/ldap/certificate/public"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/certificate/public",
+    "original": "/api/v4/ldap/certificate/public"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/ldap/groups",
+    "original": "/api/v4/ldap/groups"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/ldap/groups/{remote_id}/link",
+    "original": "/api/v4/ldap/groups/{remote_id}/link"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/groups/{remote_id}/link",
+    "original": "/api/v4/ldap/groups/{remote_id}/link"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/migrateid",
+    "original": "/api/v4/ldap/migrateid"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/sync",
+    "original": "/api/v4/ldap/sync"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/test",
+    "original": "/api/v4/ldap/test"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/test_connection",
+    "original": "/api/v4/ldap/test_connection"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/test_diagnostics",
+    "original": "/api/v4/ldap/test_diagnostics"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/ldap/users/{user_id}/group_sync_memberships",
+    "original": "/api/v4/ldap/users/{user_id}/group_sync_memberships"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/license",
+    "original": "/api/v4/license"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/license",
+    "original": "/api/v4/license"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/license/client",
+    "original": "/api/v4/license/client"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/license/load_metric",
+    "original": "/api/v4/license/load_metric"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/license/renewal",
+    "original": "/api/v4/license/renewal"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/limits/server",
+    "original": "/api/v4/limits/server"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/llmservices",
+    "original": "/api/v4/llmservices"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/logs",
+    "original": "/api/v4/logs"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/logs",
+    "original": "/api/v4/logs"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/logs/download",
+    "original": "/api/v4/logs/download"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/notifications/ack",
+    "original": "/api/v4/notifications/ack"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/notifications/test",
+    "original": "/api/v4/notifications/test"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/apps",
+    "original": "/api/v4/oauth/apps"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/apps",
+    "original": "/api/v4/oauth/apps"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/apps/register",
+    "original": "/api/v4/oauth/apps/register"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/oauth/apps/{app_id}",
+    "original": "/api/v4/oauth/apps/{app_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/apps/{app_id}",
+    "original": "/api/v4/oauth/apps/{app_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/oauth/apps/{app_id}",
+    "original": "/api/v4/oauth/apps/{app_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/apps/{app_id}/info",
+    "original": "/api/v4/oauth/apps/{app_id}/info"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/apps/{app_id}/regen_secret",
+    "original": "/api/v4/oauth/apps/{app_id}/regen_secret"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/outgoing_connections",
+    "original": "/api/v4/oauth/outgoing_connections"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/outgoing_connections",
+    "original": "/api/v4/oauth/outgoing_connections"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/oauth/outgoing_connections/validate",
+    "original": "/api/v4/oauth/outgoing_connections/validate"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/oauth/outgoing_connections/{connection_id}",
+    "original": "/api/v4/oauth/outgoing_connections/{connection_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/oauth/outgoing_connections/{connection_id}",
+    "original": "/api/v4/oauth/outgoing_connections/{connection_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/oauth/outgoing_connections/{connection_id}",
+    "original": "/api/v4/oauth/outgoing_connections/{connection_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/permissions/ancillary",
+    "original": "/api/v4/permissions/ancillary"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins",
+    "original": "/api/v4/plugins"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins",
+    "original": "/api/v4/plugins"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/install_from_url",
+    "original": "/api/v4/plugins/install_from_url"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins/marketplace",
+    "original": "/api/v4/plugins/marketplace"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/marketplace",
+    "original": "/api/v4/plugins/marketplace"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins/marketplace/first_admin_visit",
+    "original": "/api/v4/plugins/marketplace/first_admin_visit"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/marketplace/first_admin_visit",
+    "original": "/api/v4/plugins/marketplace/first_admin_visit"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins/statuses",
+    "original": "/api/v4/plugins/statuses"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/plugins/webapp",
+    "original": "/api/v4/plugins/webapp"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/plugins/{plugin_id}",
+    "original": "/api/v4/plugins/{plugin_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/{plugin_id}/disable",
+    "original": "/api/v4/plugins/{plugin_id}/disable"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/plugins/{plugin_id}/enable",
+    "original": "/api/v4/plugins/{plugin_id}/enable"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts",
+    "original": "/api/v4/posts"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/ephemeral",
+    "original": "/api/v4/posts/ephemeral"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/ids",
+    "original": "/api/v4/posts/ids"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/ids/reactions",
+    "original": "/api/v4/posts/ids/reactions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/rewrite",
+    "original": "/api/v4/posts/rewrite"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/schedule",
+    "original": "/api/v4/posts/schedule"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/posts/schedule/{scheduled_post_id}",
+    "original": "/api/v4/posts/schedule/{scheduled_post_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/posts/schedule/{scheduled_post_id}",
+    "original": "/api/v4/posts/schedule/{scheduled_post_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/scheduled/team/{team_id}",
+    "original": "/api/v4/posts/scheduled/team/{team_id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/posts/{post_id}",
+    "original": "/api/v4/posts/{post_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}",
+    "original": "/api/v4/posts/{post_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/posts/{post_id}",
+    "original": "/api/v4/posts/{post_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/actions/{action_id}",
+    "original": "/api/v4/posts/{post_id}/actions/{action_id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/posts/{post_id}/burn",
+    "original": "/api/v4/posts/{post_id}/burn"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}/files/info",
+    "original": "/api/v4/posts/{post_id}/files/info"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/move",
+    "original": "/api/v4/posts/{post_id}/move"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/posts/{post_id}/patch",
+    "original": "/api/v4/posts/{post_id}/patch"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/pin",
+    "original": "/api/v4/posts/{post_id}/pin"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}/reactions",
+    "original": "/api/v4/posts/{post_id}/reactions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/restore/{restore_version_id}",
+    "original": "/api/v4/posts/{post_id}/restore/{restore_version_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}/reveal",
+    "original": "/api/v4/posts/{post_id}/reveal"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/posts/{post_id}/thread",
+    "original": "/api/v4/posts/{post_id}/thread"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/posts/{post_id}/unpin",
+    "original": "/api/v4/posts/{post_id}/unpin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/reactions",
+    "original": "/api/v4/reactions"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/recaps",
+    "original": "/api/v4/recaps"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/recaps",
+    "original": "/api/v4/recaps"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/recaps/{recap_id}",
+    "original": "/api/v4/recaps/{recap_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/recaps/{recap_id}",
+    "original": "/api/v4/recaps/{recap_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/recaps/{recap_id}/read",
+    "original": "/api/v4/recaps/{recap_id}/read"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/recaps/{recap_id}/regenerate",
+    "original": "/api/v4/recaps/{recap_id}/regenerate"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/redirect_location",
+    "original": "/api/v4/redirect_location"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/remotecluster",
+    "original": "/api/v4/remotecluster"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster",
+    "original": "/api/v4/remotecluster"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster/accept_invite",
+    "original": "/api/v4/remotecluster/accept_invite"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/remotecluster/{remote_id}",
+    "original": "/api/v4/remotecluster/{remote_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/remotecluster/{remote_id}",
+    "original": "/api/v4/remotecluster/{remote_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/remotecluster/{remote_id}",
+    "original": "/api/v4/remotecluster/{remote_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster/{remote_id}/channels/{channel_id}/invite",
+    "original": "/api/v4/remotecluster/{remote_id}/channels/{channel_id}/invite"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster/{remote_id}/channels/{channel_id}/uninvite",
+    "original": "/api/v4/remotecluster/{remote_id}/channels/{channel_id}/uninvite"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/remotecluster/{remote_id}/generate_invite",
+    "original": "/api/v4/remotecluster/{remote_id}/generate_invite"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/remotecluster/{remote_id}/sharedchannelremotes",
+    "original": "/api/v4/remotecluster/{remote_id}/sharedchannelremotes"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/reports/posts",
+    "original": "/api/v4/reports/posts"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/reports/users",
+    "original": "/api/v4/reports/users"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/reports/users/count",
+    "original": "/api/v4/reports/users/count"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/reports/users/export",
+    "original": "/api/v4/reports/users/export"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/restart",
+    "original": "/api/v4/restart"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/roles",
+    "original": "/api/v4/roles"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/roles/name/{role_name}",
+    "original": "/api/v4/roles/name/{role_name}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/roles/names",
+    "original": "/api/v4/roles/names"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/roles/{role_id}",
+    "original": "/api/v4/roles/{role_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/roles/{role_id}/patch",
+    "original": "/api/v4/roles/{role_id}/patch"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/saml/certificate/idp",
+    "original": "/api/v4/saml/certificate/idp"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/certificate/idp",
+    "original": "/api/v4/saml/certificate/idp"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/saml/certificate/private",
+    "original": "/api/v4/saml/certificate/private"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/certificate/private",
+    "original": "/api/v4/saml/certificate/private"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/saml/certificate/public",
+    "original": "/api/v4/saml/certificate/public"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/certificate/public",
+    "original": "/api/v4/saml/certificate/public"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/saml/certificate/status",
+    "original": "/api/v4/saml/certificate/status"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/saml/metadata",
+    "original": "/api/v4/saml/metadata"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/metadatafromidp",
+    "original": "/api/v4/saml/metadatafromidp"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/saml/reset_auth_data",
+    "original": "/api/v4/saml/reset_auth_data"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/schemes",
+    "original": "/api/v4/schemes"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/schemes",
+    "original": "/api/v4/schemes"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/schemes/{scheme_id}",
+    "original": "/api/v4/schemes/{scheme_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/schemes/{scheme_id}",
+    "original": "/api/v4/schemes/{scheme_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/schemes/{scheme_id}/channels",
+    "original": "/api/v4/schemes/{scheme_id}/channels"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/schemes/{scheme_id}/patch",
+    "original": "/api/v4/schemes/{scheme_id}/patch"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/schemes/{scheme_id}/teams",
+    "original": "/api/v4/schemes/{scheme_id}/teams"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/server_busy",
+    "original": "/api/v4/server_busy"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/server_busy",
+    "original": "/api/v4/server_busy"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/server_busy",
+    "original": "/api/v4/server_busy"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/sharedchannels/remote_info/{remote_id}",
+    "original": "/api/v4/sharedchannels/remote_info/{remote_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/sharedchannels/users/{user_id}/can_dm/{other_user_id}",
+    "original": "/api/v4/sharedchannels/users/{user_id}/can_dm/{other_user_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/sharedchannels/{channel_id}/remotes",
+    "original": "/api/v4/sharedchannels/{channel_id}/remotes"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/sharedchannels/{team_id}",
+    "original": "/api/v4/sharedchannels/{team_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/site_url/test",
+    "original": "/api/v4/site_url/test"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/system/notices/view",
+    "original": "/api/v4/system/notices/view"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/system/notices/{teamId}",
+    "original": "/api/v4/system/notices/{teamId}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/system/ping",
+    "original": "/api/v4/system/ping"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/system/support_packet",
+    "original": "/api/v4/system/support_packet"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/system/timezones",
+    "original": "/api/v4/system/timezones"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams",
+    "original": "/api/v4/teams"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams",
+    "original": "/api/v4/teams"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/invite/{invite_id}",
+    "original": "/api/v4/teams/invite/{invite_id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/teams/invites/email",
+    "original": "/api/v4/teams/invites/email"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/members/invite",
+    "original": "/api/v4/teams/members/invite"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/name/{name}",
+    "original": "/api/v4/teams/name/{name}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/name/{name}/exists",
+    "original": "/api/v4/teams/name/{name}/exists"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/name/{team_name}/channels/name/{channel_name}",
+    "original": "/api/v4/teams/name/{team_name}/channels/name/{channel_name}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/search",
+    "original": "/api/v4/teams/search"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/teams/{team_id}",
+    "original": "/api/v4/teams/{team_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}",
+    "original": "/api/v4/teams/{team_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}",
+    "original": "/api/v4/teams/{team_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels",
+    "original": "/api/v4/teams/{team_id}/channels"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/autocomplete",
+    "original": "/api/v4/teams/{team_id}/channels/autocomplete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/deleted",
+    "original": "/api/v4/teams/{team_id}/channels/deleted"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/channels/ids",
+    "original": "/api/v4/teams/{team_id}/channels/ids"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/name/{channel_name}",
+    "original": "/api/v4/teams/{team_id}/channels/name/{channel_name}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/private",
+    "original": "/api/v4/teams/{team_id}/channels/private"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/channels/search",
+    "original": "/api/v4/teams/{team_id}/channels/search"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/channels/search_autocomplete",
+    "original": "/api/v4/teams/{team_id}/channels/search_autocomplete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/commands/autocomplete",
+    "original": "/api/v4/teams/{team_id}/commands/autocomplete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/commands/autocomplete_suggestions",
+    "original": "/api/v4/teams/{team_id}/commands/autocomplete_suggestions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/files/search",
+    "original": "/api/v4/teams/{team_id}/files/search"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/groups",
+    "original": "/api/v4/teams/{team_id}/groups"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/groups_by_channels",
+    "original": "/api/v4/teams/{team_id}/groups_by_channels"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/teams/{team_id}/image",
+    "original": "/api/v4/teams/{team_id}/image"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/image",
+    "original": "/api/v4/teams/{team_id}/image"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/image",
+    "original": "/api/v4/teams/{team_id}/image"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/import",
+    "original": "/api/v4/teams/{team_id}/import"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/invite-guests/email",
+    "original": "/api/v4/teams/{team_id}/invite-guests/email"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/invite/email",
+    "original": "/api/v4/teams/{team_id}/invite/email"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/members",
+    "original": "/api/v4/teams/{team_id}/members"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/members",
+    "original": "/api/v4/teams/{team_id}/members"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/members/batch",
+    "original": "/api/v4/teams/{team_id}/members/batch"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/members/ids",
+    "original": "/api/v4/teams/{team_id}/members/ids"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/teams/{team_id}/members/{user_id}",
+    "original": "/api/v4/teams/{team_id}/members/{user_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/members/{user_id}",
+    "original": "/api/v4/teams/{team_id}/members/{user_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/members/{user_id}/roles",
+    "original": "/api/v4/teams/{team_id}/members/{user_id}/roles"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/members/{user_id}/schemeRoles",
+    "original": "/api/v4/teams/{team_id}/members/{user_id}/schemeRoles"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/members_minus_group_members",
+    "original": "/api/v4/teams/{team_id}/members_minus_group_members"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/patch",
+    "original": "/api/v4/teams/{team_id}/patch"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/posts/search",
+    "original": "/api/v4/teams/{team_id}/posts/search"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/privacy",
+    "original": "/api/v4/teams/{team_id}/privacy"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/regenerate_invite_id",
+    "original": "/api/v4/teams/{team_id}/regenerate_invite_id"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/teams/{team_id}/restore",
+    "original": "/api/v4/teams/{team_id}/restore"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/teams/{team_id}/scheme",
+    "original": "/api/v4/teams/{team_id}/scheme"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/teams/{team_id}/stats",
+    "original": "/api/v4/teams/{team_id}/stats"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/terms_of_service",
+    "original": "/api/v4/terms_of_service"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/terms_of_service",
+    "original": "/api/v4/terms_of_service"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/trial-license",
+    "original": "/api/v4/trial-license"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/trial-license/prev",
+    "original": "/api/v4/trial-license/prev"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/upgrade_to_enterprise",
+    "original": "/api/v4/upgrade_to_enterprise"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/upgrade_to_enterprise/allowed",
+    "original": "/api/v4/upgrade_to_enterprise/allowed"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/upgrade_to_enterprise/status",
+    "original": "/api/v4/upgrade_to_enterprise/status"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/uploads",
+    "original": "/api/v4/uploads"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/uploads/{upload_id}",
+    "original": "/api/v4/uploads/{upload_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/uploads/{upload_id}",
+    "original": "/api/v4/uploads/{upload_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/usage/posts",
+    "original": "/api/v4/usage/posts"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/usage/storage",
+    "original": "/api/v4/usage/storage"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users",
+    "original": "/api/v4/users"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users",
+    "original": "/api/v4/users"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users",
+    "original": "/api/v4/users"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/autocomplete",
+    "original": "/api/v4/users/autocomplete"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/email/verify",
+    "original": "/api/v4/users/email/verify"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/email/verify/send",
+    "original": "/api/v4/users/email/verify/send"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/email/{email}",
+    "original": "/api/v4/users/email/{email}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/group_channels",
+    "original": "/api/v4/users/group_channels"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/ids",
+    "original": "/api/v4/users/ids"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/invalid_emails",
+    "original": "/api/v4/users/invalid_emails"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/known",
+    "original": "/api/v4/users/known"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login",
+    "original": "/api/v4/users/login"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login/cws",
+    "original": "/api/v4/users/login/cws"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login/sso/code-exchange",
+    "original": "/api/v4/users/login/sso/code-exchange"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login/switch",
+    "original": "/api/v4/users/login/switch"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/login/type",
+    "original": "/api/v4/users/login/type"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/logout",
+    "original": "/api/v4/users/logout"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/mfa",
+    "original": "/api/v4/users/mfa"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/migrate_auth/ldap",
+    "original": "/api/v4/users/migrate_auth/ldap"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/migrate_auth/saml",
+    "original": "/api/v4/users/migrate_auth/saml"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/password/reset",
+    "original": "/api/v4/users/password/reset"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/password/reset/send",
+    "original": "/api/v4/users/password/reset/send"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/search",
+    "original": "/api/v4/users/search"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/sessions/device",
+    "original": "/api/v4/users/sessions/device"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/sessions/revoke/all",
+    "original": "/api/v4/users/sessions/revoke/all"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/stats",
+    "original": "/api/v4/users/stats"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/stats/filtered",
+    "original": "/api/v4/users/stats/filtered"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/status/ids",
+    "original": "/api/v4/users/status/ids"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/tokens",
+    "original": "/api/v4/users/tokens"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/tokens/disable",
+    "original": "/api/v4/users/tokens/disable"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/tokens/enable",
+    "original": "/api/v4/users/tokens/enable"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/tokens/revoke",
+    "original": "/api/v4/users/tokens/revoke"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/tokens/search",
+    "original": "/api/v4/users/tokens/search"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/tokens/{token_id}",
+    "original": "/api/v4/users/tokens/{token_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/username/{username}",
+    "original": "/api/v4/users/username/{username}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/usernames",
+    "original": "/api/v4/users/usernames"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}",
+    "original": "/api/v4/users/{user_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}",
+    "original": "/api/v4/users/{user_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}",
+    "original": "/api/v4/users/{user_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/active",
+    "original": "/api/v4/users/{user_id}/active"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/audits",
+    "original": "/api/v4/users/{user_id}/audits"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/auth",
+    "original": "/api/v4/users/{user_id}/auth"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/channel_members",
+    "original": "/api/v4/users/{user_id}/channel_members"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/channels",
+    "original": "/api/v4/users/{user_id}/channels"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/channels/{channel_id}/posts/unread",
+    "original": "/api/v4/users/{user_id}/channels/{channel_id}/posts/unread"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/channels/{channel_id}/unread",
+    "original": "/api/v4/users/{user_id}/channels/{channel_id}/unread"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/convert_to_bot",
+    "original": "/api/v4/users/{user_id}/convert_to_bot"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/custom_profile_attributes",
+    "original": "/api/v4/users/{user_id}/custom_profile_attributes"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v4/users/{user_id}/custom_profile_attributes",
+    "original": "/api/v4/users/{user_id}/custom_profile_attributes"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/data_retention/channel_policies",
+    "original": "/api/v4/users/{user_id}/data_retention/channel_policies"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/data_retention/team_policies",
+    "original": "/api/v4/users/{user_id}/data_retention/team_policies"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/demote",
+    "original": "/api/v4/users/{user_id}/demote"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/email/verify/member",
+    "original": "/api/v4/users/{user_id}/email/verify/member"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/groups",
+    "original": "/api/v4/users/{user_id}/groups"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/image",
+    "original": "/api/v4/users/{user_id}/image"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/image",
+    "original": "/api/v4/users/{user_id}/image"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/image",
+    "original": "/api/v4/users/{user_id}/image"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/image/default",
+    "original": "/api/v4/users/{user_id}/image/default"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/mfa",
+    "original": "/api/v4/users/{user_id}/mfa"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/mfa/generate",
+    "original": "/api/v4/users/{user_id}/mfa/generate"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/oauth/apps/authorized",
+    "original": "/api/v4/users/{user_id}/oauth/apps/authorized"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/password",
+    "original": "/api/v4/users/{user_id}/password"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/patch",
+    "original": "/api/v4/users/{user_id}/patch"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/posts/flagged",
+    "original": "/api/v4/users/{user_id}/posts/flagged"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/ack",
+    "original": "/api/v4/users/{user_id}/posts/{post_id}/ack"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/ack",
+    "original": "/api/v4/users/{user_id}/posts/{post_id}/ack"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/reactions/{emoji_name}",
+    "original": "/api/v4/users/{user_id}/posts/{post_id}/reactions/{emoji_name}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/reminder",
+    "original": "/api/v4/users/{user_id}/posts/{post_id}/reminder"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/posts/{post_id}/set_unread",
+    "original": "/api/v4/users/{user_id}/posts/{post_id}/set_unread"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/preferences",
+    "original": "/api/v4/users/{user_id}/preferences"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/preferences",
+    "original": "/api/v4/users/{user_id}/preferences"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/preferences/delete",
+    "original": "/api/v4/users/{user_id}/preferences/delete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/preferences/{category}",
+    "original": "/api/v4/users/{user_id}/preferences/{category}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/preferences/{category}/name/{preference_name}",
+    "original": "/api/v4/users/{user_id}/preferences/{category}/name/{preference_name}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/promote",
+    "original": "/api/v4/users/{user_id}/promote"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/reset_failed_attempts",
+    "original": "/api/v4/users/{user_id}/reset_failed_attempts"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/roles",
+    "original": "/api/v4/users/{user_id}/roles"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/sessions",
+    "original": "/api/v4/users/{user_id}/sessions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/sessions/revoke",
+    "original": "/api/v4/users/{user_id}/sessions/revoke"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/sessions/revoke/all",
+    "original": "/api/v4/users/{user_id}/sessions/revoke/all"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/status",
+    "original": "/api/v4/users/{user_id}/status"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/status",
+    "original": "/api/v4/users/{user_id}/status"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/status/custom",
+    "original": "/api/v4/users/{user_id}/status/custom"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/status/custom",
+    "original": "/api/v4/users/{user_id}/status/custom"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/status/custom/recent",
+    "original": "/api/v4/users/{user_id}/status/custom/recent"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/status/custom/recent/delete",
+    "original": "/api/v4/users/{user_id}/status/custom/recent/delete"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams",
+    "original": "/api/v4/users/{user_id}/teams"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/members",
+    "original": "/api/v4/users/{user_id}/teams/members"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/unread",
+    "original": "/api/v4/users/{user_id}/teams/unread"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/order",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/order"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/order",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/order"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/channels/members",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/channels/members"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/threads"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/mention_counts",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/threads/mention_counts"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/read",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/threads/read"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/following",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/following"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/following",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/following"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/read/{timestamp}",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/read/{timestamp}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/set_unread/{post_id}",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/set_unread/{post_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/teams/{team_id}/unread",
+    "original": "/api/v4/users/{user_id}/teams/{team_id}/unread"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/terms_of_service",
+    "original": "/api/v4/users/{user_id}/terms_of_service"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/terms_of_service",
+    "original": "/api/v4/users/{user_id}/terms_of_service"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/tokens",
+    "original": "/api/v4/users/{user_id}/tokens"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/tokens",
+    "original": "/api/v4/users/{user_id}/tokens"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v4/users/{user_id}/typing",
+    "original": "/api/v4/users/{user_id}/typing"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v4/users/{user_id}/uploads",
+    "original": "/api/v4/users/{user_id}/uploads"
+  },
+  {
+    "method": "GET",
+    "path": "/files/{file_id}/public",
+    "original": "/files/{file_id}/public"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/intune",
+    "original": "/oauth/intune"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks",
+    "original": "/plugins/playbooks/api/v0/playbooks"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/playbooks",
+    "original": "/plugins/playbooks/api/v0/playbooks"
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/autofollows",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/autofollows"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/conditions",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/conditions"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/conditions",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/conditions"
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/conditions/{conditionID}",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/conditions/{conditionID}"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/conditions/{conditionID}",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/conditions/{conditionID}"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/reorder",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/reorder"
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/{field_id}",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/{field_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/{field_id}",
+    "original": "/plugins/playbooks/api/v0/playbooks/{id}/property_fields/{field_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs",
+    "original": "/plugins/playbooks/api/v0/runs"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs",
+    "original": "/plugins/playbooks/api/v0/runs"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/channel/{channel_id}",
+    "original": "/plugins/playbooks/api/v0/runs/channel/{channel_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/channels",
+    "original": "/plugins/playbooks/api/v0/runs/channels"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/checklist-autocomplete",
+    "original": "/plugins/playbooks/api/v0/runs/checklist-autocomplete"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/dialog",
+    "original": "/plugins/playbooks/api/v0/runs/dialog"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/owners",
+    "original": "/plugins/playbooks/api/v0/runs/owners"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}",
+    "original": "/plugins/playbooks/api/v0/runs/{id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/plugins/playbooks/api/v0/runs/{id}",
+    "original": "/plugins/playbooks/api/v0/runs/{id}"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/add",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/add"
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/assignee",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/assignee"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/run",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/run"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/state",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/item/{item}/state"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/reorder",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/checklists/{checklist}/reorder"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/conditions",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/conditions"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/end",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/end"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/end",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/end"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/finish",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/finish"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/metadata",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/metadata"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/next-stage-dialog",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/next-stage-dialog"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/owner",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/owner"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/property_fields",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/property_fields"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/property_fields/{field_id}/value",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/property_fields/{field_id}/value"
+  },
+  {
+    "method": "GET",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/property_values",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/property_values"
+  },
+  {
+    "method": "PUT",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/restart",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/restart"
+  },
+  {
+    "method": "POST",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/status",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/status"
+  },
+  {
+    "method": "DELETE",
+    "path": "/plugins/playbooks/api/v0/runs/{id}/timeline/{event_id}",
+    "original": "/plugins/playbooks/api/v0/runs/{id}/timeline/{event_id}"
+  }
+]

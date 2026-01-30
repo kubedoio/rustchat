@@ -1,9 +1,10 @@
 use super::{id::encode_mm_id, models as mm};
 use crate::models::{
-    channel::{Channel, ChannelType},
+    channel::{Channel, ChannelMember, ChannelType},
     post::{Post, PostResponse},
-    team::Team,
+    team::{Team, TeamMember},
     user::User,
+    file::FileInfo,
 };
 use serde_json::json;
 
@@ -142,6 +143,57 @@ impl From<PostResponse> for mm::Post {
     }
 }
 
+impl From<TeamMember> for mm::TeamMember {
+    fn from(m: TeamMember) -> Self {
+        mm::TeamMember {
+            team_id: encode_mm_id(m.team_id),
+            user_id: encode_mm_id(m.user_id),
+            roles: map_role(&m.role),
+            delete_at: 0,
+            scheme_guest: false,
+            scheme_user: true,
+            scheme_admin: m.role == "admin" || m.role == "system_admin",
+        }
+    }
+}
+
+impl From<ChannelMember> for mm::ChannelMember {
+    fn from(m: ChannelMember) -> Self {
+        mm::ChannelMember {
+            channel_id: encode_mm_id(m.channel_id),
+            user_id: encode_mm_id(m.user_id),
+            roles: map_role(&m.role),
+            last_viewed_at: m.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
+            msg_count: 0,
+            mention_count: 0,
+            notify_props: m.notify_props.clone(),
+            last_update_at: m.created_at.timestamp_millis(),
+            scheme_guest: false,
+            scheme_user: true,
+            scheme_admin: m.role == "admin" || m.role == "channel_admin",
+        }
+    }
+}
+
+impl From<FileInfo> for mm::FileInfo {
+    fn from(f: FileInfo) -> Self {
+        mm::FileInfo {
+            id: encode_mm_id(f.id),
+            user_id: encode_mm_id(f.uploader_id),
+            create_at: f.created_at.timestamp_millis(),
+            update_at: f.created_at.timestamp_millis(),
+            delete_at: 0,
+            name: f.name.clone(),
+            extension: f.name.rsplit('.').next().unwrap_or_default().to_string(),
+            size: f.size,
+            mime_type: f.mime_type,
+            width: f.width.unwrap_or(0),
+            height: f.height.unwrap_or(0),
+            has_preview_image: f.has_thumbnail,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,6 +223,7 @@ mod tests {
             last_login_at: None,
             created_at: now,
             updated_at: now,
+            password_updated_at: now,
         };
 
         let mm_u: mm::User = u.into();

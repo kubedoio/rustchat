@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useAdminStore } from '../../stores/admin';
-import { Save, Globe, Upload, Clock } from 'lucide-vue-next';
+import { Save, Globe, Upload, Clock, Activity } from 'lucide-vue-next';
 
 const adminStore = useAdminStore();
 
@@ -11,6 +11,7 @@ const form = ref({
     site_description: '',
     site_url: '',
     max_file_size_mb: 50,
+    max_simultaneous_connections: 5,
     default_locale: 'en',
     default_timezone: 'UTC',
 });
@@ -117,6 +118,24 @@ const saveSettings = async () => {
                         type="number"
                         min="1"
                         max="500"
+                        class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                    />
+                </div>
+            </div>
+
+            <!-- Connection Limits -->
+            <div class="p-6">
+                <div class="flex items-center mb-4">
+                    <Activity class="w-5 h-5 text-gray-400 mr-2" />
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Connection Limits</h2>
+                </div>
+                <div class="max-w-xs">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Max Simultaneous Connections per User</label>
+                    <input 
+                        v-model.number="form.max_simultaneous_connections"
+                        type="number"
+                        min="1"
+                        max="100"
                         class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                     />
                 </div>

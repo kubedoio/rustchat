@@ -215,18 +215,20 @@ pub struct Broadcast {
     pub team_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SidebarCategory {
     pub id: String,
     pub team_id: String,
     pub user_id: String,
     #[serde(rename = "type")]
+    #[sqlx(rename = "type")]
     pub category_type: String,
     pub display_name: String,
     pub sorting: String,
     pub muted: bool,
     pub collapsed: bool,
     pub channel_ids: Vec<String>,
+    pub sort_order: i32,
     pub create_at: i64,
     pub update_at: i64,
     pub delete_at: i64,
@@ -237,3 +239,122 @@ pub struct SidebarCategories {
     pub categories: Vec<SidebarCategory>,
     pub order: Vec<String>,
 }
+
+// Thread models for Mattermost threads API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Thread {
+    pub id: String,
+    pub reply_count: i64,
+    pub last_reply_at: i64,
+    pub last_viewed_at: i64,
+    pub participants: Vec<User>,
+    pub post: PostInThread,
+    pub unread_replies: i64,
+    pub unread_mentions: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_following: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostInThread {
+    pub id: String,
+    pub channel_id: String,
+    pub user_id: String,
+    pub message: String,
+    pub create_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreadResponse {
+    pub threads: Vec<Thread>,
+    pub total: i64,
+    pub total_unread_threads: i64,
+    pub total_unread_mentions: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Emoji {
+    pub id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub creator_id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IncomingWebhook {
+    pub id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub user_id: String,
+    pub channel_id: String,
+    pub team_id: String,
+    pub display_name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutgoingWebhook {
+    pub id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub creator_id: String,
+    pub channel_id: String,
+    pub team_id: String,
+    pub trigger_words: Vec<String>,
+    pub trigger_when: i32,
+    pub callback_urls: Vec<String>,
+    pub display_name: String,
+    pub description: String,
+    pub content_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Bot {
+    pub user_id: String,
+    pub create_at: i64,
+    pub update_at: i64,
+    pub delete_at: i64,
+    pub username: String,
+    pub display_name: String,
+    pub description: String,
+    pub owner_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ScheduledPost {
+    pub id: String,
+    pub user_id: String,
+    pub channel_id: String,
+    pub root_id: String,
+    pub message: String,
+    pub props: serde_json::Value,
+    pub file_ids: Vec<String>,
+    pub scheduled_at: i64,
+    pub create_at: i64,
+    pub update_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Audit {
+    pub id: String,
+    pub create_at: i64,
+    pub user_id: String,
+    pub action: String,
+    pub extra_info: String,
+    pub ip_address: String,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginStatus {
+    pub plugin_id: String,
+    pub name: String,
+    pub version: String,
+    pub is_active: bool,
+    pub state: i32,
+}
+

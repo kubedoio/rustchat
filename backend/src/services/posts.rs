@@ -6,6 +6,15 @@ use crate::error::{ApiResult, AppError};
 use crate::models::{ChannelMember, CreatePost, FileUploadResponse, Post, PostResponse};
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 
+#[derive(Debug, Default)]
+pub struct PostsQuery {
+    pub page: i64,
+    pub per_page: i64,
+    pub since: Option<i64>,
+    pub before: Option<Uuid>,
+    pub after: Option<Uuid>,
+}
+
 /// Create a new post
 pub async fn create_post(
     state: &AppState,
@@ -506,4 +515,151 @@ async fn check_playbook_triggers(
         }
     }
     Ok(())
+}
+
+/// Get posts for a channel with various pagination options
+pub async fn get_posts(
+    state: &AppState,
+    channel_id: Uuid,
+    query: PostsQuery,
+) -> ApiResult<(Vec<PostResponse>, i64)> {
+    let per_page = if query.per_page > 0 { query.per_page } else { 60 }.min(200);
+    let offset = query.page * per_page;
+
+    let posts: Vec<PostResponse> = if let Some(since) = query.since {
+        let since_time = chrono::DateTime::from_timestamp_millis(since)
+            .unwrap_or_else(|| chrono::Utc::now());
+        
+        sqlx::query_as(
+            r#"
+            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                   p.reply_count::int8 as reply_count,
+                   p.last_reply_at, p.seq,
+                   u.username, u.avatar_url, u.email
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.channel_id = $1 
+              AND (p.created_at >= $2 OR p.edited_at >= $2)
+            ORDER BY p.created_at ASC
+            LIMIT $3
+            "#,
+        )
+        .bind(channel_id)
+        .bind(since_time)
+        .bind(per_page)
+        .fetch_all(&state.db)
+        .await?
+    } else if let Some(before_id) = query.before {
+        let before_time: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+            "SELECT created_at FROM posts WHERE id = $1"
+        )
+        .bind(before_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+        let before_time = before_time.ok_or_else(|| AppError::NotFound("Before post not found".to_string()))?;
+
+        sqlx::query_as(
+            r#"
+            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                   p.reply_count::int8 as reply_count,
+                   p.last_reply_at, p.seq,
+                   u.username, u.avatar_url, u.email
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.channel_id = $1 
+              AND p.deleted_at IS NULL
+              AND p.created_at < $2
+            ORDER BY p.created_at DESC
+            LIMIT $3
+            "#,
+        )
+        .bind(channel_id)
+        .bind(before_time)
+        .bind(per_page)
+        .fetch_all(&state.db)
+        .await?
+    } else if let Some(after_id) = query.after {
+        let after_time: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+            "SELECT created_at FROM posts WHERE id = $1"
+        )
+        .bind(after_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+        let after_time = after_time.ok_or_else(|| AppError::NotFound("After post not found".to_string()))?;
+
+        sqlx::query_as(
+            r#"
+            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                   p.reply_count::int8 as reply_count,
+                   p.last_reply_at, p.seq,
+                   u.username, u.avatar_url, u.email
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.channel_id = $1 
+              AND p.deleted_at IS NULL
+              AND p.created_at > $2
+            ORDER BY p.created_at ASC
+            LIMIT $3
+            "#,
+        )
+        .bind(channel_id)
+        .bind(after_time)
+        .bind(per_page)
+        .fetch_all(&state.db)
+        .await?
+    } else {
+        sqlx::query_as(
+            r#"
+            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                   p.reply_count::int8 as reply_count,
+                   p.last_reply_at, p.seq,
+                   u.username, u.avatar_url, u.email
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.channel_id = $1 
+              AND p.deleted_at IS NULL
+            ORDER BY p.created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(channel_id)
+        .bind(per_page)
+        .bind(offset)
+        .fetch_all(&state.db)
+        .await?
+    };
+
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts WHERE channel_id = $1 AND deleted_at IS NULL")
+        .bind(channel_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok((posts, total))
+}
+
+pub async fn get_post_by_id(state: &AppState, post_id: Uuid) -> ApiResult<PostResponse> {
+    let post: PostResponse = sqlx::query_as(
+        r#"
+        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+               p.reply_count::int8 as reply_count,
+               p.last_reply_at, p.seq,
+               u.username, u.avatar_url, u.email
+        FROM posts p
+        LEFT JOIN users u ON p.user_id = u.id
+        WHERE p.id = $1
+        "#,
+    )
+    .bind(post_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+
+    Ok(post)
 }
