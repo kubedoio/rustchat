@@ -373,17 +373,26 @@ async fn create_direct_channel(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<mm::Channel>> {
-    let input: DirectChannelRequest = parse_body(&headers, &body, "Invalid user_ids")?;
+    // Mattermost sends either a plain array ["id1", "id2"] or an object {"user_ids": ["id1", "id2"]}
+    // Try parsing as plain array first, then fall back to object format
+    let user_ids: Vec<String> = serde_json::from_slice::<Vec<String>>(&body)
+        .or_else(|_| {
+            parse_body::<DirectChannelRequest>(&headers, &body, "Invalid user_ids")
+                .map(|req| req.user_ids)
+        })?;
 
-    if input.user_ids.len() != 2 {
-        return Err(crate::error::AppError::BadRequest("user_ids must contain 2 users".to_string()));
+    if user_ids.len() != 2 {
+        return Err(crate::error::AppError::BadRequest("Request body must contain exactly 2 user IDs".to_string()));
     }
 
-    let mut ids: Vec<Uuid> = input
-        .user_ids
+    let mut ids: Vec<Uuid> = user_ids
         .iter()
         .filter_map(|id| parse_mm_or_uuid(id))
         .collect();
+
+    if ids.len() != 2 {
+        return Err(crate::error::AppError::BadRequest("Invalid user IDs provided".to_string()));
+    }
 
     if !ids.contains(&auth.user_id) {
         return Err(crate::error::AppError::Forbidden("Must include your user id".to_string()));
