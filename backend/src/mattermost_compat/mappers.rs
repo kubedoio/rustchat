@@ -1,8 +1,9 @@
 use super::{id::encode_mm_id, models as mm};
 use crate::models::{
-    channel::{Channel, ChannelType},
+    channel::{Channel, ChannelMember, ChannelType},
+    channel_category::{ChannelCategory, ChannelCategoryChannel},
     post::{Post, PostResponse},
-    team::Team,
+    team::{Team, TeamMember},
     user::User,
 };
 use serde_json::json;
@@ -138,6 +139,38 @@ impl From<PostResponse> for mm::Post {
             file_ids: post.file_ids.iter().map(|id| encode_mm_id(*id)).collect(),
             pending_post_id: post.client_msg_id.unwrap_or_default(),
             metadata: None,
+        }
+    }
+}
+
+impl From<TeamMember> for mm::TeamMember {
+    fn from(m: TeamMember) -> Self {
+        mm::TeamMember {
+            team_id: encode_mm_id(m.team_id),
+            user_id: encode_mm_id(m.user_id),
+            roles: map_role(&m.role),
+            delete_at: 0,
+            scheme_guest: false,
+            scheme_user: true,
+            scheme_admin: m.role == "admin" || m.role == "system_admin",
+        }
+    }
+}
+
+impl From<ChannelMember> for mm::ChannelMember {
+    fn from(m: ChannelMember) -> Self {
+        mm::ChannelMember {
+            channel_id: encode_mm_id(m.channel_id),
+            user_id: encode_mm_id(m.user_id),
+            roles: map_role(&m.role),
+            last_viewed_at: m.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
+            msg_count: 0,
+            mention_count: 0,
+            notify_props: m.notify_props.clone(),
+            last_update_at: m.created_at.timestamp_millis(),
+            scheme_guest: false,
+            scheme_user: true,
+            scheme_admin: m.role == "admin" || m.role == "channel_admin",
         }
     }
 }

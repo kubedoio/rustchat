@@ -7,7 +7,7 @@ pub mod emoji;
 pub mod commands;
 pub mod plugins;
 pub mod categories;
-pub mod config;
+pub mod compat;
 pub mod extractors;
 pub mod files;
 pub mod posts;
@@ -15,8 +15,6 @@ pub mod system;
 pub mod teams;
 pub mod threads;
 pub mod users;
-pub mod compat;
-pub mod websocket;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -29,10 +27,8 @@ pub fn router() -> Router<AppState> {
         .merge(categories::router())
         .merge(posts::router())
         .merge(files::router())
-        .merge(config::router())
         .merge(system::router())
         .merge(threads::router())
-        .merge(websocket::router())
         .merge(compat::router::router())
         .fallback(not_implemented)
         .layer(SetResponseHeaderLayer::overriding(

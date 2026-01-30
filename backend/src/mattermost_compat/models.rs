@@ -215,18 +215,20 @@ pub struct Broadcast {
     pub team_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SidebarCategory {
     pub id: String,
     pub team_id: String,
     pub user_id: String,
     #[serde(rename = "type")]
+    #[sqlx(rename = "type")]
     pub category_type: String,
     pub display_name: String,
     pub sorting: String,
     pub muted: bool,
     pub collapsed: bool,
     pub channel_ids: Vec<String>,
+    pub sort_order: i32,
     pub create_at: i64,
     pub update_at: i64,
     pub delete_at: i64,

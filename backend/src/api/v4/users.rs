@@ -197,6 +197,7 @@ pub(crate) async fn get_categories_internal(
             muted: row.muted,
             collapsed: row.collapsed,
             channel_ids,
+            sort_order: row.sort_order,
             create_at: row.create_at,
             update_at: row.update_at,
             delete_at: row.delete_at,
@@ -217,7 +218,6 @@ struct CategoryRow {
     sorting: String,
     muted: bool,
     collapsed: bool,
-    #[allow(dead_code)]
     sort_order: i32,
     create_at: i64,
     update_at: i64,
@@ -282,6 +282,7 @@ fn build_default_categories(
         sorting: "alpha".to_string(),
         muted: false,
         collapsed: false,
+        sort_order: 0,
         channel_ids,
         create_at: now,
         update_at: now,
@@ -388,6 +389,7 @@ pub(crate) async fn create_category_internal(
         sorting,
         muted: false,
         collapsed: false,
+        sort_order: next_order as i32,
         channel_ids: vec![],
         create_at: now,
         update_at: now,
@@ -467,6 +469,7 @@ pub(crate) async fn update_categories_internal(
         cat_out.id = encode_mm_id(cat_uuid);
         cat_out.user_id = encode_mm_id(user_id);
         cat_out.team_id = encode_mm_id(team_id);
+        cat_out.sort_order = 0; // Assuming sort_order is not part of the update request, or defaults to 0
         cat_out.channel_ids = parsed_channel_ids.into_iter().map(encode_mm_id).collect();
         updated_categories.push(cat_out);
     }
