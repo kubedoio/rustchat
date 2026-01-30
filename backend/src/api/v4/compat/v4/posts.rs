@@ -291,8 +291,7 @@ pub struct CreateScheduledPostRequest {
     pub scheduled_at: i64,
 }
 
-    pub update_at: i64,
-}
+
 
 pub async fn list_scheduled_posts(
     State(state): State<AppState>,
