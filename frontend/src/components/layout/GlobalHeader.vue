@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import { Bell, Search, HelpCircle, LogOut, Settings, Smile, Shield, Menu, X } from 'lucide-vue-next';
+import { Bell, Search, HelpCircle, LogOut, Settings, Smile, Shield, Menu } from 'lucide-vue-next';
 import { useAuthStore } from '../../stores/auth';
 import { useUIStore } from '../../stores/ui';
 import SearchModal from '../modals/SearchModal.vue';
@@ -89,15 +89,13 @@ const statusLabel = computed(() => {
   <header class="h-[56px] md:h-[60px] bg-gray-900 border-b border-gray-800 flex items-center justify-between px-2 md:px-3 text-white shrink-0 z-20 relative">
     <!-- Left: Mobile Menu Button + Logo -->
     <div class="flex items-center min-w-0 flex-shrink-0">
-      <!-- Mobile Menu Button -->
+      <!-- Mobile Menu Button - Only visible on mobile (<768px) -->
       <button
-        v-if="ui.isMobile"
         @click="ui.toggleSidebar"
-        class="p-2 mr-2 text-gray-400 hover:text-white transition-colors lg:hidden"
+        class="md:hidden p-2 mr-2 text-gray-400 hover:text-white transition-colors"
         aria-label="Toggle menu"
       >
-        <Menu v-if="!ui.isSidebarOpen" class="w-5 h-5" />
-        <X v-else class="w-5 h-5" />
+        <Menu class="w-5 h-5" />
       </button>
 
       <!-- Logo -->
@@ -166,20 +164,20 @@ const statusLabel = computed(() => {
 
       <!-- User Menu -->
       <div class="ml-1 md:ml-2 relative">
-        <div class="cursor-pointer relative" @click="showUserMenu = !showUserMenu">
+         <div class="cursor-pointer relative" @click="showUserMenu = !showUserMenu">
            <RcAvatar 
              :userId="auth.user?.id"
              :src="auth.user?.avatar_url" 
              :username="auth.user?.username" 
              size="sm"
-             class="md:hidden"
+             class="lg:hidden"
            />
            <RcAvatar 
              :userId="auth.user?.id"
              :src="auth.user?.avatar_url" 
              :username="auth.user?.username" 
              size="md"
-             class="hidden md:block"
+             class="hidden lg:block"
            />
         </div>
 

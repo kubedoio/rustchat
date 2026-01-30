@@ -209,6 +209,7 @@ export function useWebSocket() {
                 break
 
             case 'user_presence':
+            case 'status_change': // Mattermost mobile compatibility
                 if (envelope.data) {
                     presenceStore.updatePresenceFromEvent(
                         envelope.data.user_id,

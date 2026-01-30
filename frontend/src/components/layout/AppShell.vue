@@ -5,7 +5,6 @@ import TeamRail from './TeamRail.vue';
 import ChannelSidebar from './ChannelSidebar.vue';
 import RightSidebar from './RightSidebar.vue';
 import { useUIStore } from '../../stores/ui';
-import { Menu } from 'lucide-vue-next';
 
 const ui = useUIStore();
 
@@ -68,16 +67,6 @@ function closeMobileDrawers() {
 
         <!-- Main Content (Center) -->
         <main class="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900 relative w-full">
-            <!-- Mobile Sidebar Toggle Button (shown when sidebar is closed) -->
-            <button
-                v-if="ui.isMobile && !ui.isSidebarOpen"
-                @click="ui.toggleSidebar"
-                class="fixed top-20 left-4 z-20 p-2 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 lg:hidden"
-                aria-label="Open channels"
-            >
-                <Menu class="w-5 h-5 text-gray-600 dark:text-gray-300" />
-            </button>
-
             <slot />
         </main>
 
