@@ -31,6 +31,21 @@ pub struct WsQuery {
     token: Option<String>,
 }
 
+async fn get_max_simultaneous_connections(state: &AppState) -> usize {
+    let value: Option<String> = sqlx::query_scalar(
+        "SELECT site->>'max_simultaneous_connections' FROM server_config WHERE id = 'default'",
+    )
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
+
+    match value.and_then(|val| val.parse::<i64>().ok()) {
+        Some(max) if max > 0 => max as usize,
+        _ => 5,
+    }
+}
+
 /// WebSocket upgrade handler
 async fn ws_handler(
     ws: WebSocketUpgrade,
@@ -76,6 +91,14 @@ async fn ws_handler(
     };
 
     let user_id = claims.sub;
+    let max_connections = get_max_simultaneous_connections(&state).await;
+    let current_connections = state.ws_hub.user_connection_count(user_id).await;
+    if current_connections >= max_connections {
+        return Response::builder()
+            .status(429)
+            .body("Too many connections".into())
+            .unwrap();
+    }
     let username = match sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_one(&state.db)
@@ -102,7 +125,7 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
     let (mut sender, mut receiver) = socket.split();
 
     // Add connection to hub
-    let mut rx = state.ws_hub.add_connection(user_id, username.clone()).await;
+    let (connection_id, mut rx) = state.ws_hub.add_connection(user_id, username.clone()).await;
 
     // Fetch user's teams and subscribe
     let teams =
@@ -365,7 +388,11 @@ async fn handle_socket(socket: WebSocket, user_id: uuid::Uuid, username: String,
     }
 
     // Cleanup
-    state.ws_hub.remove_connection(user_id).await;
+    state.ws_hub.remove_connection(user_id, connection_id).await;
+
+    if state.ws_hub.user_connection_count(user_id).await > 0 {
+        return;
+    }
 
     // Persist presence and broadcast
     let _ = sqlx::query("UPDATE users SET presence = 'offline' WHERE id = $1")

@@ -68,16 +68,18 @@ pub async fn get_emoji(
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
 
-    let emoji: mm::Emoji = sqlx::query_as(
+    let emoji: Option<mm::Emoji> = sqlx::query_as(
         "SELECT id::text, name, creator_id::text, 
                 extract(epoch from create_at)*1000 as create_at, 
                 extract(epoch from update_at)*1000 as update_at, 
                 extract(epoch from delete_at)*1000 as delete_at 
-         FROM custom_emojis WHERE id = $1"
+         FROM custom_emojis WHERE id = $1 AND delete_at IS NULL"
     )
     .bind(emoji_id)
-    .fetch_one(&state.db)
+    .fetch_optional(&state.db)
     .await?;
+
+    let emoji = emoji.ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
     Ok(Json(emoji))
 }
@@ -87,16 +89,18 @@ pub async fn get_emoji_by_name(
     _auth: MmAuthUser,
     Path(name): Path<String>,
 ) -> ApiResult<Json<mm::Emoji>> {
-    let emoji: mm::Emoji = sqlx::query_as(
+    let emoji: Option<mm::Emoji> = sqlx::query_as(
         "SELECT id::text, name, creator_id::text, 
                 extract(epoch from create_at)*1000 as create_at, 
                 extract(epoch from update_at)*1000 as update_at, 
                 extract(epoch from delete_at)*1000 as delete_at 
-         FROM custom_emojis WHERE name = $1"
+         FROM custom_emojis WHERE name = $1 AND delete_at IS NULL"
     )
     .bind(name)
-    .fetch_one(&state.db)
+    .fetch_optional(&state.db)
     .await?;
+
+    let emoji = emoji.ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
     Ok(Json(emoji))
 }

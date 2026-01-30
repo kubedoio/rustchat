@@ -32,6 +32,8 @@ pub struct SiteConfig {
     pub site_url: String,
     #[serde(default = "default_max_file_size")]
     pub max_file_size_mb: i32,
+    #[serde(default = "default_max_simultaneous_connections")]
+    pub max_simultaneous_connections: i32,
     #[serde(default = "default_locale")]
     pub default_locale: String,
     #[serde(default = "default_timezone")]
@@ -43,6 +45,9 @@ fn default_site_name() -> String {
 }
 fn default_max_file_size() -> i32 {
     50
+}
+fn default_max_simultaneous_connections() -> i32 {
+    5
 }
 fn default_locale() -> String {
     "en".to_string()

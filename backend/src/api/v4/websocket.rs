@@ -28,6 +28,21 @@ pub struct WsQuery {
     pub sequence_number: Option<i64>,
 }
 
+async fn get_max_simultaneous_connections(state: &AppState) -> usize {
+    let value: Option<String> = sqlx::query_scalar(
+        "SELECT site->>'max_simultaneous_connections' FROM server_config WHERE id = 'default'",
+    )
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
+
+    match value.and_then(|val| val.parse::<i64>().ok()) {
+        Some(max) if max > 0 => max as usize,
+        _ => 5,
+    }
+}
+
 pub async fn handle_websocket(
     ws: WebSocketUpgrade,
     headers: HeaderMap,
@@ -103,6 +118,15 @@ async fn websocket_loop(
         None => return, // Failed to auth
     };
 
+    let max_connections = get_max_simultaneous_connections(&state).await;
+    let current_connections = state.ws_hub.user_connection_count(user_id).await;
+    if current_connections >= max_connections {
+        let _ = sender
+            .send(Message::Close(None))
+            .await;
+        return;
+    }
+
     // 2. Send Hello event immediately after successful auth
     let hello = mm::WebSocketMessage {
         seq: Some(seq),
@@ -133,7 +157,7 @@ async fn websocket_loop(
         Err(_) => "Unknown".to_string(),
     };
 
-    let rx = state.ws_hub.add_connection(user_id, username.clone()).await;
+    let (connection_id, rx) = state.ws_hub.add_connection(user_id, username.clone()).await;
 
     // Subscribe to teams and channels
     let teams = sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM team_members WHERE user_id = $1")
@@ -222,7 +246,7 @@ async fn websocket_loop(
         _ = receive_task => {},
     }
 
-    state.ws_hub.remove_connection(user_id).await;
+    state.ws_hub.remove_connection(user_id, connection_id).await;
 }
 
 fn map_envelope_to_mm(env: &WsEnvelope, seq: i64) -> Option<mm::WebSocketMessage> {

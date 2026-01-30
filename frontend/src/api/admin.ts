@@ -26,6 +26,7 @@ export interface SiteConfig {
     site_description: string;
     site_url: string;
     max_file_size_mb: number;
+    max_simultaneous_connections: number;
     default_locale: string;
     default_timezone: string;
 }

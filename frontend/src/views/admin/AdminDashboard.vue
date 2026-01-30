@@ -15,7 +15,16 @@ const statCards = [
     { key: 'active_users', label: 'Active Users', icon: Activity, color: 'bg-green-500' },
     { key: 'total_teams', label: 'Teams', icon: Server, color: 'bg-purple-500' },
     { key: 'messages_24h', label: 'Messages (24h)', icon: MessageSquare, color: 'bg-indigo-500' },
+    { key: 'active_connections', label: 'Simultaneous Connections', icon: Activity, color: 'bg-teal-500' },
 ];
+
+const getStatValue = (key: string) => {
+    if (key === 'active_connections') {
+        return adminStore.health?.websocket.active_connections ?? 5;
+    }
+
+    return adminStore.stats?.[key as keyof typeof adminStore.stats] ?? '—';
+};
 </script>
 
 <template>
@@ -39,7 +48,7 @@ const statCards = [
                             {{ stat.label }}
                         </p>
                         <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                            {{ adminStore.stats?.[stat.key as keyof typeof adminStore.stats] ?? '—' }}
+                            {{ getStatValue(stat.key) }}
                         </p>
                     </div>
                     <div :class="[stat.color, 'w-12 h-12 rounded-lg flex items-center justify-center']">

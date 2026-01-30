@@ -18,7 +18,7 @@ pub struct ConnectionInfo {
 /// WebSocket Hub manages all active connections
 pub struct WsHub {
     /// Active connections: user_id -> sender
-    connections: RwLock<HashMap<Uuid, broadcast::Sender<String>>>,
+    connections: RwLock<HashMap<Uuid, HashMap<Uuid, broadcast::Sender<String>>>>,
     /// User subscriptions to channels
     channel_subscriptions: RwLock<HashMap<Uuid, Vec<Uuid>>>, // channel_id -> user_ids
     /// User subscriptions to teams
@@ -45,11 +45,15 @@ impl WsHub {
         &self,
         user_id: Uuid,
         username: String,
-    ) -> broadcast::Receiver<String> {
+    ) -> (Uuid, broadcast::Receiver<String>) {
         let (tx, rx) = broadcast::channel(100);
+        let connection_id = Uuid::new_v4();
 
         let mut connections = self.connections.write().await;
-        connections.insert(user_id, tx);
+        connections
+            .entry(user_id)
+            .or_insert_with(HashMap::new)
+            .insert(connection_id, tx);
 
         let mut presence = self.presence.write().await;
         presence.insert(user_id, "online".to_string());
@@ -57,19 +61,31 @@ impl WsHub {
         let mut usernames = self.usernames.write().await;
         usernames.insert(user_id, username);
 
-        rx
+        (connection_id, rx)
     }
 
     /// Remove a connection
-    pub async fn remove_connection(&self, user_id: Uuid) {
+    pub async fn remove_connection(&self, user_id: Uuid, connection_id: Uuid) {
         let mut connections = self.connections.write().await;
-        connections.remove(&user_id);
+        let mut should_clear_presence = false;
 
-        let mut presence = self.presence.write().await;
-        presence.remove(&user_id);
+        if let Some(user_connections) = connections.get_mut(&user_id) {
+            user_connections.remove(&connection_id);
+            if user_connections.is_empty() {
+                connections.remove(&user_id);
+                should_clear_presence = true;
+            }
+        }
 
-        let mut usernames = self.usernames.write().await;
-        usernames.remove(&user_id);
+        drop(connections);
+
+        if should_clear_presence {
+            let mut presence = self.presence.write().await;
+            presence.remove(&user_id);
+
+            let mut usernames = self.usernames.write().await;
+            usernames.remove(&user_id);
+        }
 
         // Note: We don't eagerly remove from subscriptions here as it requires scanning all maps.
         // Lazy cleanup happens if we implement a periodic cleaner or just rely on 'connections' check.
@@ -129,8 +145,10 @@ impl WsHub {
                             }
                         }
 
-                        if let Some(tx) = connections.get(user_id) {
-                            let _ = tx.send(message.clone());
+                        if let Some(user_connections) = connections.get(user_id) {
+                            for tx in user_connections.values() {
+                                let _ = tx.send(message.clone());
+                            }
                         }
                     }
                 }
@@ -146,21 +164,27 @@ impl WsHub {
                             }
                         }
 
-                        if let Some(tx) = connections.get(user_id) {
-                            let _ = tx.send(message.clone());
+                        if let Some(user_connections) = connections.get(user_id) {
+                            for tx in user_connections.values() {
+                                let _ = tx.send(message.clone());
+                            }
                         }
                     }
                 }
             } else if let Some(user_id) = broadcast.user_id {
                 // Direct message to specific user
-                if let Some(tx) = connections.get(&user_id) {
-                    let _ = tx.send(message);
+                if let Some(user_connections) = connections.get(&user_id) {
+                    for tx in user_connections.values() {
+                        let _ = tx.send(message.clone());
+                    }
                 }
             }
         } else {
             // Broadcast to all (rare, mainly for system messages)
-            for tx in connections.values() {
-                let _ = tx.send(message.clone());
+            for user_connections in connections.values() {
+                for tx in user_connections.values() {
+                    let _ = tx.send(message.clone());
+                }
             }
         }
     }
@@ -196,7 +220,13 @@ impl WsHub {
     /// Get number of active connections
     pub async fn count_connections(&self) -> usize {
         let connections = self.connections.read().await;
-        connections.len()
+        connections.values().map(|user_connections| user_connections.len()).sum()
+    }
+
+    /// Get number of active connections for a user
+    pub async fn user_connection_count(&self, user_id: Uuid) -> usize {
+        let connections = self.connections.read().await;
+        connections.get(&user_id).map(|user_connections| user_connections.len()).unwrap_or(0)
     }
 }
 
