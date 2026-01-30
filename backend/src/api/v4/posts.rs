@@ -491,7 +491,9 @@ async fn ack_post(
     // 2. Analytics/delivery tracking
     // For now, we just return success - can be extended to track delivery status
 
-    
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
 #[derive(serde::Deserialize)]
 pub struct CreateScheduledPostRequest {
     pub channel_id: String,
