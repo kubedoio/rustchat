@@ -47,7 +47,10 @@ pub async fn get_client_config(
     .unwrap_or_default();
 
     let diagnostic_id = diagnostic_id(&site);
-    Ok(Json(legacy_config(&site, &diagnostic_id)))
+    Ok((
+        axum::http::StatusCode::OK,
+        Json(legacy_config(&site, &diagnostic_id)),
+    ))
 }
 
 pub async fn get_client_license(
