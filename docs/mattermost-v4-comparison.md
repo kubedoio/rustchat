@@ -5,8 +5,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 389
-- Missing in RustChat: 58
+- Implemented in RustChat (code routes): 390
+- Missing in RustChat: 57
 - RustChat-only endpoints (not in OpenAPI list): 28
 
 ## Status (Mattermost OpenAPI paths)
@@ -166,6 +166,7 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/channels/{channel_id}/posts` | Implemented | channels.rs |
 | `/api/v4/users/{user_id}/channels/{channel_id}/posts/unread` | Implemented | posts.rs |
 | `/api/v4/teams/{team_id}/posts/search` | Implemented | posts.rs |
+| `/api/v4/posts/search` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/pin` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/unpin` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/actions/{action_id}` | Implemented | posts.rs |

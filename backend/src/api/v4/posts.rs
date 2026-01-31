@@ -62,6 +62,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/posts/scheduled/team/{team_id}", get(list_scheduled_posts))
         .route("/users/{user_id}/posts/{post_id}/reminder", post(set_post_reminder))
+        .route("/posts/search", post(search_posts_all_teams))
         .route("/teams/{team_id}/posts/search", post(search_team_posts))
         .route(
             "/users/{user_id}/channels/{channel_id}/posts/unread",
@@ -1501,6 +1502,77 @@ async fn search_team_posts(
         // Simple match highlighting - find term positions
         let match_positions: Vec<String> = vec![];
         matches_map.insert(id.clone(), match_positions);
+        posts_map.insert(id, p.into());
+    }
+
+    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
+    for (post_uuid, post_id) in id_map {
+        if let Some(reactions) = reactions_map.get(&post_uuid) {
+            if !reactions.is_empty() {
+                if let Some(post) = posts_map.get_mut(&post_id) {
+                    post.metadata = Some(json!({ "reactions": reactions }));
+                }
+            }
+        }
+    }
+
+    Ok(Json(mm::PostListWithSearchMatches {
+        order,
+        posts: posts_map,
+        matches: Some(matches_map),
+        next_post_id: String::new(),
+        prev_post_id: String::new(),
+    }))
+}
+
+/// POST /api/v4/posts/search - Search posts across all teams
+async fn search_posts_all_teams(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<mm::PostListWithSearchMatches>> {
+    let input: SearchPostsRequest = parse_body(&headers, &body, "Invalid search body")?;
+
+    let limit = input.per_page.min(200).max(1) as i64;
+    let offset = (input.page.max(0) as i64) * limit;
+    let search_terms = format!("%{}%", input.terms.replace('%', "\\%").replace('_', "\\_"));
+
+    let posts: Vec<crate::models::post::PostResponse> = sqlx::query_as(
+        r#"
+        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+               p.reply_count::int8 as reply_count,
+               p.last_reply_at, p.seq,
+               u.username, u.avatar_url, u.email
+        FROM posts p
+        LEFT JOIN users u ON p.user_id = u.id
+        JOIN channel_members cm ON cm.channel_id = p.channel_id AND cm.user_id = $2
+        WHERE p.message ILIKE $1
+          AND p.deleted_at IS NULL
+        ORDER BY p.created_at DESC
+        LIMIT $3 OFFSET $4
+        "#,
+    )
+    .bind(&search_terms)
+    .bind(auth.user_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut order = Vec::new();
+    let mut posts_map: std::collections::HashMap<String, mm::Post> = std::collections::HashMap::new();
+    let mut matches_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut post_ids = Vec::new();
+    let mut id_map = Vec::new();
+
+    for p in posts {
+        let id = encode_mm_id(p.id);
+        post_ids.push(p.id);
+        id_map.push((p.id, id.clone()));
+        order.push(id.clone());
+        matches_map.insert(id.clone(), Vec::new());
         posts_map.insert(id, p.into());
     }
 
