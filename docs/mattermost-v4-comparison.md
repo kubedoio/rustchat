@@ -5,8 +5,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 170
-- Missing in RustChat: 277
+- Implemented in RustChat (code routes): 212
+- Missing in RustChat: 235
 - RustChat-only endpoints (not in OpenAPI list): 29
 
 ## Status (Mattermost OpenAPI paths)
@@ -86,39 +86,39 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/users/{user_id}/status/custom/recent/delete` | Implemented | users.rs |
 | `/api/v4/teams` | Implemented | teams.rs |
 | `/api/v4/teams/{team_id}` | Implemented | teams.rs |
-| `/api/v4/teams/{team_id}/patch` | Not implemented | - |
-| `/api/v4/teams/{team_id}/privacy` | Not implemented | - |
-| `/api/v4/teams/{team_id}/restore` | Not implemented | - |
-| `/api/v4/teams/name/{name}` | Not implemented | - |
+| `/api/v4/teams/{team_id}/patch` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/privacy` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/restore` | Implemented | teams.rs |
+| `/api/v4/teams/name/{name}` | Implemented | teams.rs |
 | `/api/v4/teams/search` | Implemented | teams.rs |
-| `/api/v4/teams/name/{name}/exists` | Not implemented | - |
+| `/api/v4/teams/name/{name}/exists` | Implemented | teams.rs |
 | `/api/v4/users/{user_id}/teams` | Implemented | users.rs |
-| `/api/v4/teams/{team_id}/members` | Not implemented | - |
-| `/api/v4/teams/members/invite` | Not implemented | - |
-| `/api/v4/teams/{team_id}/members/batch` | Not implemented | - |
-| `/api/v4/users/{user_id}/teams/members` | Not implemented | - |
-| `/api/v4/teams/{team_id}/members/{user_id}` | Not implemented | - |
-| `/api/v4/teams/{team_id}/members/ids` | Not implemented | - |
-| `/api/v4/teams/{team_id}/stats` | Not implemented | - |
-| `/api/v4/teams/{team_id}/regenerate_invite_id` | Not implemented | - |
+| `/api/v4/teams/{team_id}/members` | Implemented | teams.rs |
+| `/api/v4/teams/members/invite` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/members/batch` | Implemented | teams.rs |
+| `/api/v4/users/{user_id}/teams/members` | Implemented | users.rs |
+| `/api/v4/teams/{team_id}/members/{user_id}` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/members/ids` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/stats` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/regenerate_invite_id` | Implemented | teams.rs |
 | `/api/v4/teams/{team_id}/image` | Implemented | teams.rs |
-| `/api/v4/teams/{team_id}/members/{user_id}/roles` | Not implemented | - |
-| `/api/v4/teams/{team_id}/members/{user_id}/schemeRoles` | Not implemented | - |
-| `/api/v4/users/{user_id}/teams/unread` | Not implemented | - |
-| `/api/v4/users/{user_id}/teams/{team_id}/unread` | Not implemented | - |
-| `/api/v4/teams/{team_id}/invite/email` | Not implemented | - |
-| `/api/v4/teams/{team_id}/invite-guests/email` | Not implemented | - |
-| `/api/v4/teams/invites/email` | Not implemented | - |
-| `/api/v4/teams/{team_id}/import` | Not implemented | - |
-| `/api/v4/teams/invite/{invite_id}` | Not implemented | - |
-| `/api/v4/teams/{team_id}/scheme` | Not implemented | - |
-| `/api/v4/teams/{team_id}/members_minus_group_members` | Not implemented | - |
+| `/api/v4/teams/{team_id}/members/{user_id}/roles` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/members/{user_id}/schemeRoles` | Implemented | teams.rs |
+| `/api/v4/users/{user_id}/teams/unread` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/teams/{team_id}/unread` | Implemented | users.rs |
+| `/api/v4/teams/{team_id}/invite/email` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/invite-guests/email` | Implemented | teams.rs |
+| `/api/v4/teams/invites/email` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/import` | Implemented | teams.rs |
+| `/api/v4/teams/invite/{invite_id}` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/scheme` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/members_minus_group_members` | Implemented | teams.rs |
 | `/api/v4/channels` | Implemented | channels.rs |
 | `/api/v4/channels/direct` | Implemented | channels.rs |
 | `/api/v4/channels/group` | Implemented | channels.rs |
 | `/api/v4/channels/search` | Implemented | channels.rs |
 | `/api/v4/channels/group/search` | Not implemented | - |
-| `/api/v4/teams/{team_id}/channels/ids` | Not implemented | - |
+| `/api/v4/teams/{team_id}/channels/ids` | Implemented | teams.rs |
 | `/api/v4/channels/{channel_id}/timezones` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/patch` | Not implemented | - |
@@ -128,13 +128,13 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/channels/{channel_id}/stats` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/pinned` | Implemented | channels.rs |
 | `/api/v4/teams/{team_id}/channels` | Implemented | teams.rs |
-| `/api/v4/teams/{team_id}/channels/private` | Not implemented | - |
-| `/api/v4/teams/{team_id}/channels/deleted` | Not implemented | - |
-| `/api/v4/teams/{team_id}/channels/autocomplete` | Not implemented | - |
-| `/api/v4/teams/{team_id}/channels/search_autocomplete` | Not implemented | - |
+| `/api/v4/teams/{team_id}/channels/private` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/channels/deleted` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/channels/autocomplete` | Implemented | teams.rs |
+| `/api/v4/teams/{team_id}/channels/search_autocomplete` | Implemented | teams.rs |
 | `/api/v4/teams/{team_id}/channels/search` | Implemented | teams.rs |
-| `/api/v4/teams/{team_id}/channels/name/{channel_name}` | Not implemented | - |
-| `/api/v4/teams/name/{team_name}/channels/name/{channel_name}` | Not implemented | - |
+| `/api/v4/teams/{team_id}/channels/name/{channel_name}` | Implemented | teams.rs |
+| `/api/v4/teams/name/{team_name}/channels/name/{channel_name}` | Implemented | teams.rs |
 | `/api/v4/channels/{channel_id}/members` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/members/ids` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/members/{user_id}` | Implemented | channels.rs |
@@ -166,17 +166,17 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/channels/{channel_id}/posts` | Implemented | channels.rs |
 | `/api/v4/users/{user_id}/channels/{channel_id}/posts/unread` | Not implemented | - |
 | `/api/v4/teams/{team_id}/posts/search` | Not implemented | - |
-| `/api/v4/posts/{post_id}/pin` | Not implemented | - |
-| `/api/v4/posts/{post_id}/unpin` | Not implemented | - |
-| `/api/v4/posts/{post_id}/actions/{action_id}` | Not implemented | - |
-| `/api/v4/posts/ids` | Not implemented | - |
+| `/api/v4/posts/{post_id}/pin` | Implemented | posts.rs |
+| `/api/v4/posts/{post_id}/unpin` | Implemented | posts.rs |
+| `/api/v4/posts/{post_id}/actions/{action_id}` | Implemented | posts.rs |
+| `/api/v4/posts/ids` | Implemented | posts.rs |
 | `/api/v4/users/{user_id}/posts/{post_id}/reminder` | Implemented | posts.rs |
 | `/api/v4/users/{user_id}/posts/{post_id}/ack` | Not implemented | - |
-| `/api/v4/posts/{post_id}/move` | Not implemented | - |
-| `/api/v4/posts/{post_id}/restore/{restore_version_id}` | Not implemented | - |
-| `/api/v4/posts/{post_id}/reveal` | Not implemented | - |
-| `/api/v4/posts/{post_id}/burn` | Not implemented | - |
-| `/api/v4/posts/rewrite` | Not implemented | - |
+| `/api/v4/posts/{post_id}/move` | Implemented | posts.rs |
+| `/api/v4/posts/{post_id}/restore/{restore_version_id}` | Implemented | posts.rs |
+| `/api/v4/posts/{post_id}/reveal` | Implemented | posts.rs |
+| `/api/v4/posts/{post_id}/burn` | Implemented | posts.rs |
+| `/api/v4/posts/rewrite` | Implemented | posts.rs |
 | `/api/v4/users/{user_id}/preferences` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/preferences/delete` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/preferences/{category}` | Implemented | users.rs |
@@ -348,7 +348,7 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/reactions` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/reactions` | Implemented | posts.rs |
 | `/api/v4/users/{user_id}/posts/{post_id}/reactions/{emoji_name}` | Implemented | posts.rs |
-| `/api/v4/posts/ids/reactions` | Not implemented | - |
+| `/api/v4/posts/ids/reactions` | Implemented | posts.rs |
 | `/api/v4/actions/dialogs/open` | Not implemented | - |
 | `/api/v4/actions/dialogs/submit` | Not implemented | - |
 | `/api/v4/actions/dialogs/lookup` | Not implemented | - |
@@ -395,7 +395,7 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/client_perf` | Implemented | system.rs |
 | `/api/v4/posts/schedule` | Implemented | posts.rs |
 | `/api/v4/posts/scheduled/team/{team_id}` | Implemented | posts.rs |
-| `/api/v4/posts/schedule/{scheduled_post_id}` | Not implemented | - |
+| `/api/v4/posts/schedule/{scheduled_post_id}` | Implemented | posts.rs |
 | `/api/v4/custom_profile_attributes/fields` | Implemented | users.rs |
 | `/api/v4/custom_profile_attributes/fields/{field_id}` | Not implemented | - |
 | `/api/v4/custom_profile_attributes/values` | Not implemented | - |

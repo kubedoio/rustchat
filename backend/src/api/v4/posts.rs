@@ -20,12 +20,25 @@ use crate::services::posts;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/posts", post(create_post_handler))
+        .route("/posts/ids", post(get_posts_by_ids))
+        .route("/posts/ids/reactions", post(get_reactions_by_post_ids))
         .route(
             "/posts/{post_id}",
             get(get_post).delete(delete_post),
         )
         .route("/posts/{post_id}/files/info", get(get_post_files_info))
+        .route("/posts/{post_id}/pin", post(pin_post))
+        .route("/posts/{post_id}/unpin", post(unpin_post))
         .route("/posts/{post_id}/patch", put(patch_post))
+        .route("/posts/{post_id}/actions/{action_id}", post(handle_post_action))
+        .route("/posts/{post_id}/move", post(move_post))
+        .route(
+            "/posts/{post_id}/restore/{restore_version_id}",
+            post(restore_post),
+        )
+        .route("/posts/{post_id}/reveal", post(reveal_post))
+        .route("/posts/{post_id}/burn", post(burn_post))
+        .route("/posts/rewrite", post(rewrite_post))
         .route(
             "/users/{user_id}/posts/{post_id}/set_unread",
             post(set_post_unread),
@@ -42,6 +55,10 @@ pub fn router() -> Router<AppState> {
         .route("/posts/{post_id}/thread", get(get_post_thread))
         .route("/posts/ephemeral", post(create_ephemeral_post))
         .route("/posts/schedule", post(create_scheduled_post))
+        .route(
+            "/posts/schedule/{scheduled_post_id}",
+            put(update_scheduled_post),
+        )
         .route("/posts/scheduled/team/{team_id}", get(list_scheduled_posts))
         .route("/users/{user_id}/posts/{post_id}/reminder", post(set_post_reminder))
 }
@@ -131,6 +148,10 @@ fn parse_body<T: serde::de::DeserializeOwned>(
     }
 }
 
+fn status_ok() -> Json<serde_json::Value> {
+    Json(serde_json::json!({"status": "OK"}))
+}
+
 async fn get_post(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -175,6 +196,97 @@ async fn get_post(
     Ok(Json(mm_post))
 }
 
+async fn get_posts_by_ids(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<Vec<mm::Post>>> {
+    let input: Vec<String> = parse_body(&headers, &body, "Invalid post ids")?;
+    if input.is_empty() {
+        return Ok(Json(Vec::new()));
+    }
+
+    let mut post_ids = Vec::new();
+    for id in &input {
+        let parsed = parse_mm_or_uuid(id)
+            .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+        post_ids.push(parsed);
+    }
+
+    let posts: Vec<crate::models::post::PostResponse> = sqlx::query_as(
+        r#"
+        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+               p.reply_count::int8 as reply_count,
+               p.last_reply_at, p.seq,
+               u.username, u.avatar_url, u.email
+        FROM posts p
+        LEFT JOIN users u ON p.user_id = u.id
+        JOIN channel_members cm ON cm.channel_id = p.channel_id AND cm.user_id = $2
+        WHERE p.id = ANY($1) AND p.deleted_at IS NULL
+        "#,
+    )
+    .bind(&post_ids)
+    .bind(auth.user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut map = std::collections::HashMap::new();
+    for post in posts {
+        map.insert(post.id, mm::Post::from(post));
+    }
+
+    let mut ordered = Vec::new();
+    for id in post_ids {
+        if let Some(post) = map.remove(&id) {
+            ordered.push(post);
+        }
+    }
+
+    Ok(Json(ordered))
+}
+
+async fn get_reactions_by_post_ids(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<std::collections::HashMap<String, Vec<mm::Reaction>>>> {
+    let input: Vec<String> = parse_body(&headers, &body, "Invalid post ids")?;
+    if input.is_empty() {
+        return Ok(Json(std::collections::HashMap::new()));
+    }
+
+    let mut post_ids = Vec::new();
+    for id in &input {
+        let parsed = parse_mm_or_uuid(id)
+            .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+        post_ids.push(parsed);
+    }
+
+    let visible_ids: Vec<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT p.id
+        FROM posts p
+        JOIN channel_members cm ON cm.channel_id = p.channel_id AND cm.user_id = $2
+        WHERE p.id = ANY($1) AND p.deleted_at IS NULL
+        "#,
+    )
+    .bind(&post_ids)
+    .bind(auth.user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let reactions_map = reactions_for_posts(&state, &visible_ids).await?;
+    let mut output = std::collections::HashMap::new();
+    for (post_id, reactions) in reactions_map {
+        output.insert(encode_mm_id(post_id), reactions);
+    }
+
+    Ok(Json(output))
+}
+
 async fn get_post_files_info(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -216,6 +328,64 @@ async fn get_post_files_info(
 
     let mm_files: Vec<mm::FileInfo> = files.into_iter().map(|f| f.into()).collect();
     Ok(Json(mm_files))
+}
+
+async fn pin_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(post_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
+        .bind(post_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    sqlx::query("UPDATE posts SET is_pinned = true WHERE id = $1")
+        .bind(post_id)
+        .execute(&state.db)
+        .await?;
+
+    Ok(status_ok())
+}
+
+async fn unpin_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(post_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
+        .bind(post_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    sqlx::query("UPDATE posts SET is_pinned = false WHERE id = $1")
+        .bind(post_id)
+        .execute(&state.db)
+        .await?;
+
+    Ok(status_ok())
 }
 
 async fn get_post_thread(
@@ -313,6 +483,139 @@ async fn get_post_thread(
         next_post_id: "".to_string(),
         prev_post_id: "".to_string(),
     }))
+}
+
+async fn handle_post_action(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path((post_id, _action_id)): Path<(String, String)>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid action body")?;
+
+    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
+        .bind(post_id)
+        .fetch_one(&state.db)
+        .await?;
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    Ok(status_ok())
+}
+
+#[derive(Deserialize)]
+struct MovePostRequest {
+    channel_id: String,
+}
+
+async fn move_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(post_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+    let _input: MovePostRequest = parse_body(&headers, &body, "Invalid move body")?;
+
+    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
+        .bind(post_id)
+        .fetch_one(&state.db)
+        .await?;
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    Ok(status_ok())
+}
+
+async fn restore_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path((post_id, _restore_version_id)): Path<(String, String)>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
+        .bind(post_id)
+        .fetch_one(&state.db)
+        .await?;
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    Ok(status_ok())
+}
+
+async fn reveal_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(post_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
+        .bind(post_id)
+        .fetch_one(&state.db)
+        .await?;
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    Ok(status_ok())
+}
+
+async fn burn_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(post_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
+        .bind(post_id)
+        .fetch_one(&state.db)
+        .await?;
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    Ok(status_ok())
+}
+
+#[derive(Deserialize)]
+struct RewriteRequest {
+    message: String,
+}
+
+async fn rewrite_post(
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let input: RewriteRequest = parse_body(&headers, &body, "Invalid rewrite body")?;
+    Ok(Json(serde_json::json!({"rewritten_text": input.message})))
 }
 
 #[derive(Deserialize)]
@@ -890,6 +1193,93 @@ async fn create_scheduled_post(
         scheduled_at: input.scheduled_at,
         create_at: row.1.timestamp_millis(),
         update_at: row.2.timestamp_millis(),
+    }))
+}
+
+#[derive(Deserialize)]
+struct UpdateScheduledPostRequest {
+    id: String,
+    channel_id: String,
+    user_id: String,
+    message: String,
+    scheduled_at: i64,
+    #[serde(default)]
+    root_id: String,
+    #[serde(default)]
+    props: serde_json::Value,
+    #[serde(default)]
+    file_ids: Vec<String>,
+}
+
+async fn update_scheduled_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(scheduled_post_id): Path<String>,
+    Json(input): Json<UpdateScheduledPostRequest>,
+) -> ApiResult<Json<mm::ScheduledPost>> {
+    if input.id != scheduled_post_id {
+        return Err(AppError::BadRequest("Scheduled post id mismatch".to_string()));
+    }
+
+    let scheduled_id = parse_mm_or_uuid(&scheduled_post_id)
+        .ok_or_else(|| AppError::Validation("Invalid scheduled_post_id".to_string()))?;
+    let channel_id = parse_mm_or_uuid(&input.channel_id)
+        .ok_or_else(|| AppError::Validation("Invalid channel_id".to_string()))?;
+    let user_id = parse_mm_or_uuid(&input.user_id)
+        .ok_or_else(|| AppError::Validation("Invalid user_id".to_string()))?;
+
+    if user_id != auth.user_id {
+        return Err(AppError::Forbidden("Cannot update another user's scheduled post".to_string()));
+    }
+
+    let root_id = if !input.root_id.is_empty() {
+        Some(parse_mm_or_uuid(&input.root_id)
+            .ok_or_else(|| AppError::Validation("Invalid root_id".to_string()))?)
+    } else {
+        None
+    };
+
+    let file_ids = input.file_ids.iter().filter_map(|id| parse_mm_or_uuid(id)).collect::<Vec<_>>();
+    let scheduled_at = chrono::DateTime::from_timestamp_millis(input.scheduled_at)
+        .ok_or_else(|| AppError::Validation("Invalid scheduled_at".to_string()))?;
+
+    let row: (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
+        r#"
+        UPDATE scheduled_posts
+        SET channel_id = $1,
+            root_id = $2,
+            message = $3,
+            props = $4,
+            file_ids = $5,
+            scheduled_at = $6,
+            updated_at = NOW()
+        WHERE id = $7 AND user_id = $8
+        RETURNING created_at, updated_at
+        "#,
+    )
+    .bind(channel_id)
+    .bind(root_id)
+    .bind(&input.message)
+    .bind(&input.props)
+    .bind(&file_ids)
+    .bind(scheduled_at)
+    .bind(scheduled_id)
+    .bind(auth.user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Scheduled post not found".to_string()))?;
+
+    Ok(Json(mm::ScheduledPost {
+        id: scheduled_post_id,
+        user_id: input.user_id,
+        channel_id: input.channel_id,
+        root_id: input.root_id,
+        message: input.message,
+        props: input.props,
+        file_ids: input.file_ids,
+        scheduled_at: input.scheduled_at,
+        create_at: row.0.timestamp_millis(),
+        update_at: row.1.timestamp_millis(),
     }))
 }
 

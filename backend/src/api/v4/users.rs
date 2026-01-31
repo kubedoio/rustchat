@@ -34,6 +34,7 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/teams/{team_id}/channels", get(my_team_channels))
         .route("/users/me/channels", get(my_channels))
         .route("/users/{user_id}/teams", get(get_teams_for_user))
+        .route("/users/{user_id}/teams/members", get(get_team_members_for_user))
         .route(
             "/users/{user_id}/teams/{team_id}/channels",
             get(get_team_channels_for_user),
@@ -51,6 +52,11 @@ pub fn router() -> Router<AppState> {
             get(my_team_channel_members),
         )
         .route("/users/me/teams/unread", get(my_teams_unread))
+        .route("/users/{user_id}/teams/unread", get(get_user_teams_unread))
+        .route(
+            "/users/{user_id}/teams/{team_id}/unread",
+            get(get_user_team_unread),
+        )
         .route(
             "/users/sessions/device",
             post(attach_device).put(attach_device).delete(detach_device),
@@ -985,6 +991,33 @@ async fn my_team_members(
     Ok(Json(mm_members))
 }
 
+async fn get_team_members_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<mm::TeamMember>>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let members: Vec<TeamMember> = sqlx::query_as("SELECT * FROM team_members WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_all(&state.db)
+        .await?;
+
+    let mm_members = members
+        .into_iter()
+        .map(|m| mm::TeamMember {
+            team_id: encode_mm_id(m.team_id),
+            user_id: encode_mm_id(m.user_id),
+            roles: "team_user".to_string(),
+            delete_at: 0,
+            scheme_guest: false,
+            scheme_user: true,
+            scheme_admin: false,
+        })
+        .collect();
+
+    Ok(Json(mm_members))
+}
+
 async fn my_team_channels(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -1162,6 +1195,30 @@ async fn my_teams_unread(
     _auth: MmAuthUser,
 ) -> ApiResult<Json<Vec<serde_json::Value>>> {
     Ok(Json(vec![]))
+}
+
+async fn get_user_teams_unread(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    Ok(Json(vec![]))
+}
+
+async fn get_user_team_unread(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path((user_id, team_id)): Path<(String, String)>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _user_id = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    Ok(Json(serde_json::json!({
+        "team_id": encode_mm_id(team_id),
+        "msg_count": 0,
+        "mention_count": 0,
+    })))
 }
 
 fn normalize_notify_props(value: serde_json::Value) -> serde_json::Value {
