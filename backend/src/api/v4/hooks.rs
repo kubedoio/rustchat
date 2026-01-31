@@ -198,59 +198,162 @@ fn map_outgoing_hook(h: OutgoingWebhook) -> mm::OutgoingWebhook {
 }
 
 async fn get_incoming_hook(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(_hook_id): Path<String>,
-) -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(serde_json::json!({})))
+    Path(hook_id): Path<String>,
+) -> ApiResult<Json<mm::IncomingWebhook>> {
+    let id = parse_mm_or_uuid(&hook_id)
+        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    
+    let hook: IncomingWebhook = sqlx::query_as("SELECT * FROM incoming_webhooks WHERE id = $1")
+        .bind(id)
+        .fetch_one(&state.db)
+        .await
+        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    
+    Ok(Json(map_incoming_hook(hook)))
+}
+
+#[derive(serde::Deserialize)]
+pub struct UpdateIncomingRequest {
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub channel_id: Option<String>,
 }
 
 async fn update_incoming_hook(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(_hook_id): Path<String>,
-) -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(serde_json::json!({})))
+    Path(hook_id): Path<String>,
+    Json(input): Json<UpdateIncomingRequest>,
+) -> ApiResult<Json<mm::IncomingWebhook>> {
+    let id = parse_mm_or_uuid(&hook_id)
+        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    
+    let hook: IncomingWebhook = sqlx::query_as(
+        r#"UPDATE incoming_webhooks SET
+            display_name = COALESCE($2, display_name),
+            description = COALESCE($3, description),
+            updated_at = NOW()
+           WHERE id = $1 RETURNING *"#
+    )
+    .bind(id)
+    .bind(&input.display_name)
+    .bind(&input.description)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    
+    Ok(Json(map_incoming_hook(hook)))
 }
 
 async fn delete_incoming_hook(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(_hook_id): Path<String>,
+    Path(hook_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
+    let id = parse_mm_or_uuid(&hook_id)
+        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    
+    sqlx::query("DELETE FROM incoming_webhooks WHERE id = $1")
+        .bind(id)
+        .execute(&state.db)
+        .await?;
+    
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
 
 async fn get_outgoing_hook(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(_hook_id): Path<String>,
-) -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(serde_json::json!({})))
+    Path(hook_id): Path<String>,
+) -> ApiResult<Json<mm::OutgoingWebhook>> {
+    let id = parse_mm_or_uuid(&hook_id)
+        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    
+    let hook: OutgoingWebhook = sqlx::query_as("SELECT * FROM outgoing_webhooks WHERE id = $1")
+        .bind(id)
+        .fetch_one(&state.db)
+        .await
+        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    
+    Ok(Json(map_outgoing_hook(hook)))
+}
+
+#[derive(serde::Deserialize)]
+pub struct UpdateOutgoingRequest {
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub trigger_words: Option<Vec<String>>,
+    pub callback_urls: Option<Vec<String>>,
 }
 
 async fn update_outgoing_hook(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(_hook_id): Path<String>,
-) -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(serde_json::json!({})))
+    Path(hook_id): Path<String>,
+    Json(input): Json<UpdateOutgoingRequest>,
+) -> ApiResult<Json<mm::OutgoingWebhook>> {
+    let id = parse_mm_or_uuid(&hook_id)
+        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    
+    let hook: OutgoingWebhook = sqlx::query_as(
+        r#"UPDATE outgoing_webhooks SET
+            display_name = COALESCE($2, display_name),
+            description = COALESCE($3, description),
+            trigger_words = COALESCE($4, trigger_words),
+            callback_urls = COALESCE($5, callback_urls),
+            updated_at = NOW()
+           WHERE id = $1 RETURNING *"#
+    )
+    .bind(id)
+    .bind(&input.display_name)
+    .bind(&input.description)
+    .bind(&input.trigger_words)
+    .bind(&input.callback_urls)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    
+    Ok(Json(map_outgoing_hook(hook)))
 }
 
 async fn delete_outgoing_hook(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(_hook_id): Path<String>,
+    Path(hook_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
+    let id = parse_mm_or_uuid(&hook_id)
+        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    
+    sqlx::query("DELETE FROM outgoing_webhooks WHERE id = $1")
+        .bind(id)
+        .execute(&state.db)
+        .await?;
+    
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
 
 async fn regen_outgoing_hook_token(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: MmAuthUser,
-    Path(_hook_id): Path<String>,
-) -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(serde_json::json!({"status": "OK"})))
+    Path(hook_id): Path<String>,
+) -> ApiResult<Json<mm::OutgoingWebhook>> {
+    let id = parse_mm_or_uuid(&hook_id)
+        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    
+    let new_token = Uuid::new_v4().to_string().replace("-", "");
+    
+    let hook: OutgoingWebhook = sqlx::query_as(
+        "UPDATE outgoing_webhooks SET token = $2, updated_at = NOW() WHERE id = $1 RETURNING *"
+    )
+    .bind(id)
+    .bind(&new_token)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    
+    Ok(Json(map_outgoing_hook(hook)))
 }
 
 /// Public endpoint for executing incoming webhooks (no auth required)
