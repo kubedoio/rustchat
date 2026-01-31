@@ -155,7 +155,7 @@ pub async fn get_emoji_image(
 
     // Get the emoji's image URL from database
     let image_url: Option<String> = sqlx::query_scalar(
-        "SELECT image_url FROM custom_emojis WHERE id = $1 AND delete_at IS NULL"
+        "SELECT COALESCE(image_url, '') FROM custom_emojis WHERE id = $1 AND delete_at IS NULL"
     )
     .bind(emoji_id)
     .fetch_optional(&state.db)
