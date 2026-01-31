@@ -26,12 +26,22 @@ pub struct EmojiSearchRequest {
     pub term: String,
 }
 
+#[derive(sqlx::FromRow)]
+struct DbEmoji {
+    id: Uuid,
+    name: String,
+    creator_id: Uuid,
+    create_at: i64,
+    update_at: i64,
+    delete_at: i64,
+}
+
 pub async fn list_emoji(
     State(state): State<AppState>,
     _auth: MmAuthUser,
 ) -> ApiResult<Json<Vec<mm::Emoji>>> {
-    let emojis: Vec<mm::Emoji> = sqlx::query_as(
-        "SELECT id::text, name, creator_id::text, 
+    let emojis: Vec<DbEmoji> = sqlx::query_as(
+        "SELECT id, name, creator_id, 
                 (extract(epoch from create_at)*1000)::bigint as create_at, 
                 (extract(epoch from update_at)*1000)::bigint as update_at, 
                 COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
@@ -40,7 +50,8 @@ pub async fn list_emoji(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(Json(emojis))
+    let mm_emojis: Vec<mm::Emoji> = emojis.into_iter().map(map_emoji).collect();
+    Ok(Json(mm_emojis))
 }
 
 pub async fn search_emoji(
@@ -49,8 +60,8 @@ pub async fn search_emoji(
     Json(input): Json<EmojiSearchRequest>,
 ) -> ApiResult<Json<Vec<mm::Emoji>>> {
     let term = format!("%{}%", input.term);
-    let emojis: Vec<mm::Emoji> = sqlx::query_as(
-        "SELECT id::text, name, creator_id::text, 
+    let emojis: Vec<DbEmoji> = sqlx::query_as(
+        "SELECT id, name, creator_id, 
                 (extract(epoch from create_at)*1000)::bigint as create_at, 
                 (extract(epoch from update_at)*1000)::bigint as update_at, 
                 COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
@@ -61,7 +72,8 @@ pub async fn search_emoji(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(Json(emojis))
+    let mm_emojis: Vec<mm::Emoji> = emojis.into_iter().map(map_emoji).collect();
+    Ok(Json(mm_emojis))
 }
 
 pub async fn get_emoji(
@@ -72,8 +84,8 @@ pub async fn get_emoji(
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
 
-    let emoji: Option<mm::Emoji> = sqlx::query_as(
-        "SELECT id::text, name, creator_id::text, 
+    let emoji: Option<DbEmoji> = sqlx::query_as(
+        "SELECT id, name, creator_id, 
                 (extract(epoch from create_at)*1000)::bigint as create_at, 
                 (extract(epoch from update_at)*1000)::bigint as update_at, 
                 COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
@@ -84,7 +96,7 @@ pub async fn get_emoji(
     .await?;
 
     match emoji {
-        Some(emoji) => Ok(Json(emoji)),
+        Some(emoji) => Ok(Json(map_emoji(emoji))),
         None => Err(AppError::NotFound("Emoji not found".to_string())),
     }
 }
@@ -94,8 +106,8 @@ pub async fn get_emoji_by_name(
     _auth: MmAuthUser,
     Path(name): Path<String>,
 ) -> ApiResult<Json<mm::Emoji>> {
-    let emoji: Option<mm::Emoji> = sqlx::query_as(
-        "SELECT id::text, name, creator_id::text, 
+    let emoji: Option<DbEmoji> = sqlx::query_as(
+        "SELECT id, name, creator_id, 
                 (extract(epoch from create_at)*1000)::bigint as create_at, 
                 (extract(epoch from update_at)*1000)::bigint as update_at, 
                 COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
@@ -105,33 +117,9 @@ pub async fn get_emoji_by_name(
     .fetch_optional(&state.db)
     .await?;
 
-    if let Some(emoji) = emoji {
-        return Ok(Json(emoji));
-    }
-
-    if name.chars().any(|ch| !ch.is_ascii()) {
-        let mut hasher = Sha256::new();
-        hasher.update(name.as_bytes());
-        let hash = hasher.finalize();
-        let mut bytes = [0u8; 16];
-        bytes.copy_from_slice(&hash[..16]);
-        let uuid = Uuid::from_bytes(bytes);
-
-        let emoji = mm::Emoji {
-            id: encode_mm_id(uuid),
-            create_at: 0,
-            update_at: 0,
-            delete_at: 0,
-            creator_id: encode_mm_id(Uuid::nil()),
-            name,
-        };
-
-        return Ok(Json(emoji));
-    }
-
     let emoji = emoji.ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
-    Ok(Json(emoji))
+    Ok(Json(map_emoji(emoji)))
 }
 
 pub async fn get_emoji_autocomplete(
@@ -177,12 +165,6 @@ pub async fn get_emoji_image(
     }
 }
 
-/// POST /emoji/names - Get emojis by names (batch)
-#[derive(serde::Deserialize)]
-pub struct GetEmojisByNamesRequest {
-    names: Vec<String>,
-}
-
 pub async fn get_emojis_by_names(
     State(state): State<AppState>,
     _auth: MmAuthUser,
@@ -192,9 +174,9 @@ pub async fn get_emojis_by_names(
         return Ok(Json(vec![]));
     }
 
-    let emojis: Vec<mm::Emoji> = sqlx::query_as(
+    let emojis: Vec<DbEmoji> = sqlx::query_as(
         r#"
-        SELECT id::text, name, creator_id::text, 
+        SELECT id, name, creator_id, 
                (extract(epoch from create_at)*1000)::bigint as create_at, 
                (extract(epoch from update_at)*1000)::bigint as update_at, 
                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
@@ -206,6 +188,18 @@ pub async fn get_emojis_by_names(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(Json(emojis))
+    let mm_emojis: Vec<mm::Emoji> = emojis.into_iter().map(map_emoji).collect();
+    Ok(Json(mm_emojis))
+}
+
+fn map_emoji(emoji: DbEmoji) -> mm::Emoji {
+    mm::Emoji {
+        id: encode_mm_id(emoji.id),
+        create_at: emoji.create_at,
+        update_at: emoji.update_at,
+        delete_at: emoji.delete_at,
+        creator_id: encode_mm_id(emoji.creator_id),
+        name: emoji.name,
+    }
 }
 
