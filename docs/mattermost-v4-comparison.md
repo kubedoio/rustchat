@@ -5,9 +5,9 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 212
-- Missing in RustChat: 235
-- RustChat-only endpoints (not in OpenAPI list): 29
+- Implemented in RustChat (code routes): 225
+- Missing in RustChat: 222
+- RustChat-only endpoints (not in OpenAPI list): 28
 
 ## Status (Mattermost OpenAPI paths)
 
@@ -121,10 +121,10 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/teams/{team_id}/channels/ids` | Implemented | teams.rs |
 | `/api/v4/channels/{channel_id}/timezones` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}` | Implemented | channels.rs |
-| `/api/v4/channels/{channel_id}/patch` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/privacy` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/restore` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/move` | Not implemented | - |
+| `/api/v4/channels/{channel_id}/patch` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/privacy` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/restore` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/move` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/stats` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/pinned` | Implemented | channels.rs |
 | `/api/v4/teams/{team_id}/channels` | Implemented | teams.rs |
@@ -139,13 +139,13 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/channels/{channel_id}/members/ids` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/members/{user_id}` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/members/{user_id}/roles` | Implemented | channels.rs |
-| `/api/v4/channels/{channel_id}/members/{user_id}/schemeRoles` | Not implemented | - |
+| `/api/v4/channels/{channel_id}/members/{user_id}/schemeRoles` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/members/{user_id}/notify_props` | Implemented | channels.rs |
-| `/api/v4/channels/members/{user_id}/view` | Not implemented | - |
-| `/api/v4/users/{user_id}/teams/{team_id}/channels/members` | Not implemented | - |
+| `/api/v4/channels/members/{user_id}/view` | Implemented | channels.rs |
+| `/api/v4/users/{user_id}/teams/{team_id}/channels/members` | Implemented | channels.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/channels` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/channels` | Implemented | users.rs |
-| `/api/v4/users/{user_id}/channels/{channel_id}/unread` | Not implemented | - |
+| `/api/v4/users/{user_id}/channels/{channel_id}/unread` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}/scheme` | Not implemented | - |
 | `/api/v4/channels/{channel_id}/members_minus_group_members` | Not implemented | - |
 | `/api/v4/channels/{channel_id}/member_counts_by_group` | Not implemented | - |
@@ -153,7 +153,7 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/channels/{channel_id}/moderations/patch` | Not implemented | - |
 | `/api/v4/users/{user_id}/teams/{team_id}/channels/categories` | Implemented | categories.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/channels/categories/order` | Implemented | categories.rs |
-| `/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}` | Not implemented | - |
+| `/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}` | Implemented | categories.rs |
 | `/api/v4/channels/{channel_id}/common_teams` | Not implemented | - |
 | `/api/v4/posts` | Implemented | posts.rs |
 | `/api/v4/posts/ephemeral` | Implemented | posts.rs |
@@ -203,7 +203,7 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/jobs/{job_id}/cancel` | Not implemented | - |
 | `/api/v4/jobs/type/{type}` | Not implemented | - |
 | `/api/v4/jobs/{job_id}/status` | Not implemented | - |
-| `/api/v4/system/timezones` | Not implemented | - |
+| `/api/v4/system/timezones` | Implemented | system.rs |
 | `/api/v4/system/ping` | Implemented | system.rs |
 | `/api/v4/system/notices/{teamId}` | Not implemented | - |
 | `/api/v4/system/notices/view` | Not implemented | - |
@@ -239,11 +239,11 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/system/support_packet` | Not implemented | - |
 | `/api/v4/emoji` | Implemented | emoji.rs |
 | `/api/v4/emoji/{emoji_id}` | Implemented | emoji.rs |
-| `/api/v4/emoji/name/{emoji_name}` | Not implemented | - |
-| `/api/v4/emoji/{emoji_id}/image` | Not implemented | - |
+| `/api/v4/emoji/name/{emoji_name}` | Implemented | emoji.rs |
+| `/api/v4/emoji/{emoji_id}/image` | Implemented | emoji.rs |
 | `/api/v4/emoji/search` | Implemented | emoji.rs |
 | `/api/v4/emoji/autocomplete` | Implemented | emoji.rs |
-| `/api/v4/emoji/names` | Not implemented | - |
+| `/api/v4/emoji/names` | Implemented | emoji.rs |
 | `/api/v4/hooks/incoming` | Implemented | hooks.rs |
 | `/api/v4/hooks/incoming/{hook_id}` | Not implemented | - |
 | `/api/v4/hooks/outgoing` | Implemented | hooks.rs |
@@ -441,7 +441,6 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/channels/{channel_id}/posts/{post_id}/pin` | Not found in OpenAPI path list | channels.rs |
 | `/api/v4/channels/{channel_id}/posts/{post_id}/unpin` | Not found in OpenAPI path list | channels.rs |
 | `/api/v4/channels/{channel_id}/unread` | Not found in OpenAPI path list | channels.rs |
-| `/api/v4/emoji/name/{name}` | Not found in OpenAPI path list | emoji.rs |
 | `/api/v4/posts/{post_id}/ack` | Not found in OpenAPI path list | posts.rs |
 | `/api/v4/system/version` | Not found in OpenAPI path list | system.rs |
 | `/api/v4/teams/{team_id}/members/me` | Not found in OpenAPI path list | teams.rs |

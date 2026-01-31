@@ -24,6 +24,10 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/channels/{channel_id}/posts", get(get_posts))
         .route("/channels/{channel_id}", get(get_channel).put(update_channel).delete(delete_channel))
+        .route("/channels/{channel_id}/patch", put(patch_channel))
+        .route("/channels/{channel_id}/privacy", put(update_channel_privacy))
+        .route("/channels/{channel_id}/restore", post(restore_channel))
+        .route("/channels/{channel_id}/move", post(move_channel))
         .route("/channels/{channel_id}/members", get(get_channel_members).post(add_channel_member))
         .route("/channels/{channel_id}/members/me", get(get_channel_member_me))
         .route(
@@ -39,6 +43,10 @@ pub fn router() -> Router<AppState> {
             put(update_channel_member_roles),
         )
         .route(
+            "/channels/{channel_id}/members/{user_id}/schemeRoles",
+            put(update_channel_member_scheme_roles),
+        )
+        .route(
             "/channels/{channel_id}/members/{user_id}/notify_props",
             put(update_channel_member_notify_props),
         )
@@ -49,6 +57,7 @@ pub fn router() -> Router<AppState> {
         .route("/channels/{channel_id}/posts/{post_id}/pin", post(pin_post))
         .route("/channels/{channel_id}/posts/{post_id}/unpin", post(unpin_post))
         .route("/channels/members/me/view", post(view_channel))
+        .route("/channels/members/{user_id}/view", post(view_channel_for_user))
         .route("/channels/direct", post(create_direct_channel))
         .route("/channels/group", post(create_group_channel))
         .route("/channels", post(create_channel))
@@ -1432,3 +1441,277 @@ async fn search_channels_compat(
 
     Ok(Json(channels.into_iter().map(|c| c.into()).collect()))
 }
+
+/// PUT /channels/{channel_id}/patch - Patch channel (partial update)
+#[derive(serde::Deserialize)]
+struct PatchChannelRequest {
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    purpose: Option<String>,
+    #[serde(default)]
+    header: Option<String>,
+}
+
+async fn patch_channel(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(channel_id): Path<String>,
+    Json(input): Json<PatchChannelRequest>,
+) -> ApiResult<Json<mm::Channel>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+
+    // Verify membership
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    let channel: Channel = sqlx::query_as(
+        r#"
+        UPDATE channels SET
+            display_name = COALESCE($2, display_name),
+            name = COALESCE($3, name),
+            purpose = COALESCE($4, purpose),
+            header = COALESCE($5, header),
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+        "#,
+    )
+    .bind(channel_id)
+    .bind(&input.display_name)
+    .bind(&input.name)
+    .bind(&input.purpose)
+    .bind(&input.header)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(channel.into()))
+}
+
+/// PUT /channels/{channel_id}/privacy - Update channel privacy
+#[derive(serde::Deserialize)]
+struct UpdatePrivacyRequest {
+    privacy: String, // "O" for public, "P" for private
+}
+
+async fn update_channel_privacy(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(channel_id): Path<String>,
+    Json(input): Json<UpdatePrivacyRequest>,
+) -> ApiResult<Json<mm::Channel>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+
+    // Verify membership (should be admin)
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    let channel_type = match input.privacy.as_str() {
+        "O" => "public",
+        "P" => "private",
+        _ => return Err(crate::error::AppError::BadRequest("Invalid privacy value".to_string())),
+    };
+
+    let channel: Channel = sqlx::query_as(
+        r#"UPDATE channels SET type = $2, updated_at = NOW() WHERE id = $1 RETURNING *"#,
+    )
+    .bind(channel_id)
+    .bind(channel_type)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(channel.into()))
+}
+
+/// POST /channels/{channel_id}/restore - Restore a deleted channel
+async fn restore_channel(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(channel_id): Path<String>,
+) -> ApiResult<Json<mm::Channel>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+
+    // Verify the user was a member (even if channel is deleted)
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    let channel: Channel = sqlx::query_as(
+        r#"UPDATE channels SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *"#,
+    )
+    .bind(channel_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(channel.into()))
+}
+
+/// POST /channels/{channel_id}/move - Move channel to another team
+#[derive(serde::Deserialize)]
+struct MoveChannelRequest {
+    team_id: String,
+    #[serde(default)]
+    force: bool,
+}
+
+async fn move_channel(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(channel_id): Path<String>,
+    Json(input): Json<MoveChannelRequest>,
+) -> ApiResult<Json<mm::Channel>> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let new_team_id = parse_mm_or_uuid(&input.team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+
+    // Verify membership in original channel
+    let _membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    // Verify membership in new team
+    let is_team_member: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)"
+    )
+    .bind(new_team_id)
+    .bind(auth.user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if !is_team_member {
+        return Err(crate::error::AppError::Forbidden("Not a member of the target team".to_string()));
+    }
+
+    let channel: Channel = sqlx::query_as(
+        r#"UPDATE channels SET team_id = $2, updated_at = NOW() WHERE id = $1 RETURNING *"#,
+    )
+    .bind(channel_id)
+    .bind(new_team_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(channel.into()))
+}
+
+/// PUT /channels/{channel_id}/members/{user_id}/schemeRoles - Update member scheme roles
+#[derive(serde::Deserialize)]
+struct UpdateSchemeRolesRequest {
+    #[serde(default)]
+    scheme_admin: bool,
+    #[serde(default)]
+    scheme_user: bool,
+}
+
+async fn update_channel_member_scheme_roles(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path((channel_id, user_id)): Path<(String, String)>,
+    Json(input): Json<UpdateSchemeRolesRequest>,
+) -> ApiResult<impl IntoResponse> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let target_user_id = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?;
+
+    // Verify the caller is an admin of this channel
+    let _caller_membership: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    // Update the target user's role based on scheme_admin
+    let new_role = if input.scheme_admin { "admin" } else { "member" };
+
+    sqlx::query("UPDATE channel_members SET role = $3 WHERE channel_id = $1 AND user_id = $2")
+        .bind(channel_id)
+        .bind(target_user_id)
+        .bind(new_role)
+        .execute(&state.db)
+        .await?;
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// POST /channels/members/{user_id}/view - View channel for specific user
+async fn view_channel_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<impl IntoResponse> {
+    let resolved_user_id = if user_id == "me" {
+        auth.user_id
+    } else {
+        parse_mm_or_uuid(&user_id)
+            .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?
+    };
+
+    // Only allow viewing for self
+    if resolved_user_id != auth.user_id {
+        return Err(crate::error::AppError::Forbidden("Cannot view channel for other users".to_string()));
+    }
+
+    if body.is_empty() {
+        return Ok(Json(serde_json::json!({"status": "OK"})));
+    }
+
+    let input = match parse_view_channel_request(&headers, &body) {
+        Ok(value) => value,
+        Err(_) => return Ok(Json(serde_json::json!({"status": "OK"}))),
+    };
+
+    if let Some(channel_id) = parse_mm_or_uuid(&input.channel_id) {
+        sqlx::query(
+            "UPDATE channel_members SET last_viewed_at = NOW() WHERE channel_id = $1 AND user_id = $2"
+        )
+        .bind(channel_id)
+        .bind(auth.user_id)
+        .execute(&state.db)
+        .await?;
+
+        let broadcast = crate::realtime::WsEnvelope::event(
+            crate::realtime::EventType::ChannelViewed,
+            serde_json::json!({
+                "channel_id": channel_id,
+            }),
+            Some(channel_id)
+        ).with_broadcast(crate::realtime::WsBroadcast {
+            channel_id: None,
+            team_id: None,
+            user_id: Some(auth.user_id),
+            exclude_user_id: None,
+        });
+        state.ws_hub.broadcast(broadcast).await;
+    }
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+

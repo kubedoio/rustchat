@@ -8,6 +8,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/system/ping", get(ping))
         .route("/system/version", get(version))
+        .route("/system/timezones", get(get_timezones))
         .route("/client_perf", post(client_perf))
         .route("/caches/invalidate", post(invalidate_caches))
         .route("/logs", post(post_logs))
@@ -122,3 +123,36 @@ pub async fn post_logs(
     }
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
+
+/// GET /system/timezones - Returns a list of supported timezones
+async fn get_timezones() -> ApiResult<Json<Vec<String>>> {
+    // Returns a standard list of IANA timezone names
+    let timezones = vec![
+        "Pacific/Midway",
+        "Pacific/Honolulu",
+        "America/Anchorage",
+        "America/Los_Angeles",
+        "America/Denver",
+        "America/Chicago",
+        "America/New_York",
+        "America/Toronto",
+        "America/Sao_Paulo",
+        "Atlantic/Azores",
+        "Europe/London",
+        "Europe/Paris",
+        "Europe/Berlin",
+        "Europe/Moscow",
+        "Asia/Dubai",
+        "Asia/Karachi",
+        "Asia/Dhaka",
+        "Asia/Bangkok",
+        "Asia/Shanghai",
+        "Asia/Tokyo",
+        "Australia/Sydney",
+        "Pacific/Auckland",
+        "UTC",
+    ].into_iter().map(String::from).collect();
+
+    Ok(Json(timezones))
+}
+

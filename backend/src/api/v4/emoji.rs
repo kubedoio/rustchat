@@ -15,7 +15,9 @@ pub fn router() -> Router<AppState> {
         .route("/emoji", get(list_emoji))
         .route("/emoji/search", post(search_emoji))
         .route("/emoji/autocomplete", get(get_emoji_autocomplete))
+        .route("/emoji/names", post(get_emojis_by_names))
         .route("/emoji/{emoji_id}", get(get_emoji))
+        .route("/emoji/{emoji_id}/image", get(get_emoji_image))
         .route("/emoji/name/{name}", get(get_emoji_by_name))
 }
 
@@ -139,3 +141,71 @@ pub async fn get_emoji_autocomplete(
     // For now, just return all emojis as autocomplete
     list_emoji(State(state), _auth).await
 }
+
+/// GET /emoji/{emoji_id}/image - Get emoji image
+pub async fn get_emoji_image(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(emoji_id_str): Path<String>,
+) -> ApiResult<axum::response::Response> {
+    use axum::response::IntoResponse;
+    
+    let emoji_id = parse_mm_or_uuid(&emoji_id_str)
+        .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
+
+    // Get the emoji's image URL from database
+    let image_url: Option<String> = sqlx::query_scalar(
+        "SELECT image_url FROM custom_emojis WHERE id = $1 AND delete_at IS NULL"
+    )
+    .bind(emoji_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    match image_url {
+        Some(url) if !url.is_empty() => {
+            // Redirect to the actual image
+            Ok((
+                axum::http::StatusCode::FOUND,
+                [(axum::http::header::LOCATION, url)],
+                "Redirecting to emoji image",
+            ).into_response())
+        }
+        _ => {
+            // Return a placeholder or 404
+            Err(AppError::NotFound("Emoji image not found".to_string()))
+        }
+    }
+}
+
+/// POST /emoji/names - Get emojis by names (batch)
+#[derive(serde::Deserialize)]
+pub struct GetEmojisByNamesRequest {
+    names: Vec<String>,
+}
+
+pub async fn get_emojis_by_names(
+    State(state): State<AppState>,
+    _auth: MmAuthUser,
+    Json(input): Json<Vec<String>>,
+) -> ApiResult<Json<Vec<mm::Emoji>>> {
+    if input.is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    let emojis: Vec<mm::Emoji> = sqlx::query_as(
+        r#"
+        SELECT id::text, name, creator_id::text, 
+               (extract(epoch from create_at)*1000)::bigint as create_at, 
+               (extract(epoch from update_at)*1000)::bigint as update_at, 
+               COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
+        FROM custom_emojis 
+        WHERE name = ANY($1) AND delete_at IS NULL
+        "#
+    )
+    .bind(&input)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(emojis))
+}
+

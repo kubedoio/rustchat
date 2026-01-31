@@ -100,10 +100,13 @@ async fn test_sidebar_categories() {
         "display_name": "Category Channel",
         "type": "public"
     });
+    let mut channel_data_with_team = channel_data.as_object().unwrap().clone();
+    channel_data_with_team.insert("team_id".to_string(), json!(team_id));
+
     let chan_res = app.api_client
-        .post(&format!("{}/api/v1/teams/{}/channels", &app.address, team_id))
+        .post(&format!("{}/api/v1/channels", &app.address))
         .header("Authorization", format!("Bearer {}", token))
-        .json(&channel_data)
+        .json(&channel_data_with_team)
         .send()
         .await
         .unwrap();

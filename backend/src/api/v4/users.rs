@@ -445,8 +445,8 @@ pub(crate) async fn create_category_internal(
     let category_type = input.category_type.unwrap_or_else(|| "custom".to_string());
     let sorting = input.sorting.unwrap_or_else(|| "alpha".to_string());
 
-    let next_order: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM channel_categories WHERE user_id = $1 AND team_id = $2",
+    let next_order: i32 = sqlx::query_scalar(
+        "SELECT (COALESCE(MAX(sort_order), -1) + 1)::INT FROM channel_categories WHERE user_id = $1 AND team_id = $2",
     )
     .bind(user_id)
     .bind(team_id)
@@ -462,7 +462,7 @@ pub(crate) async fn create_category_internal(
     .bind(&category_type)
     .bind(&input.display_name)
     .bind(&sorting)
-    .bind(next_order as i32)
+    .bind(next_order)
     .bind(now)
     .bind(now)
     .execute(&state.db)
@@ -477,7 +477,7 @@ pub(crate) async fn create_category_internal(
         sorting,
         muted: false,
         collapsed: false,
-        sort_order: next_order as i32,
+        sort_order: next_order,
         channel_ids: vec![],
         create_at: now,
         update_at: now,
