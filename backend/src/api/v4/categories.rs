@@ -4,7 +4,6 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
-use axum::routing::delete;
 
 use super::extractors::MmAuthUser;
 use super::users::{

@@ -98,6 +98,10 @@ pub fn router() -> Router<AppState> {
         .route("/users/stats", get(get_user_stats))
         .route("/users/stats/filtered", post(get_user_stats_filtered))
         .route("/users/group_channels", get(get_user_group_channels))
+        .route(
+            "/users/{user_id}/oauth/apps/authorized",
+            get(get_authorized_oauth_apps),
+        )
         .route("/users/usernames", post(get_users_by_usernames))
         .route("/users/email/{email}", get(get_user_by_email))
         .route("/custom_profile_attributes/fields", get(get_custom_profile_attributes))
@@ -2688,4 +2692,13 @@ async fn delete_recent_custom_status(
     let _ = resolve_user_id(&user_id, &auth)?;
     let _value: serde_json::Value = parse_body(&headers, &body, "Invalid custom status")?;
     Ok(status_ok())
+}
+
+/// GET /api/v4/users/{user_id}/oauth/apps/authorized
+async fn get_authorized_oauth_apps(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    Ok(Json(vec![]))
 }

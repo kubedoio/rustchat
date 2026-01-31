@@ -5,8 +5,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 241
-- Missing in RustChat: 206
+- Implemented in RustChat (code routes): 285
+- Missing in RustChat: 162
 - RustChat-only endpoints (not in OpenAPI list): 28
 
 ## Status (Mattermost OpenAPI paths)
@@ -117,7 +117,7 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/channels/direct` | Implemented | channels.rs |
 | `/api/v4/channels/group` | Implemented | channels.rs |
 | `/api/v4/channels/search` | Implemented | channels.rs |
-| `/api/v4/channels/group/search` | Not implemented | - |
+| `/api/v4/channels/group/search` | Implemented | channels.rs |
 | `/api/v4/teams/{team_id}/channels/ids` | Implemented | teams.rs |
 | `/api/v4/channels/{channel_id}/timezones` | Implemented | channels.rs |
 | `/api/v4/channels/{channel_id}` | Implemented | channels.rs |
@@ -146,15 +146,15 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/users/{user_id}/teams/{team_id}/channels` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/channels` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/channels/{channel_id}/unread` | Implemented | channels.rs |
-| `/api/v4/channels/{channel_id}/scheme` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/members_minus_group_members` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/member_counts_by_group` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/moderations` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/moderations/patch` | Not implemented | - |
+| `/api/v4/channels/{channel_id}/scheme` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/members_minus_group_members` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/member_counts_by_group` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/moderations` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/moderations/patch` | Implemented | channels.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/channels/categories` | Implemented | categories.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/channels/categories/order` | Implemented | categories.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/channels/categories/{category_id}` | Implemented | categories.rs |
-| `/api/v4/channels/{channel_id}/common_teams` | Not implemented | - |
+| `/api/v4/channels/{channel_id}/common_teams` | Implemented | channels.rs |
 | `/api/v4/posts` | Implemented | posts.rs |
 | `/api/v4/posts/ephemeral` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}` | Implemented | posts.rs |
@@ -230,7 +230,7 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/server_busy` | Not implemented | - |
 | `/api/v4/notifications/ack` | Not implemented | - |
 | `/api/v4/redirect_location` | Not implemented | - |
-| `/api/v4/image` | Not implemented | - |
+| `/api/v4/image` | Implemented | image.rs |
 | `/api/v4/upgrade_to_enterprise` | Not implemented | - |
 | `/api/v4/upgrade_to_enterprise/status` | Not implemented | - |
 | `/api/v4/upgrade_to_enterprise/allowed` | Not implemented | - |
@@ -251,13 +251,13 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/hooks/outgoing` | Implemented | hooks.rs |
 | `/api/v4/hooks/outgoing/{hook_id}` | Not implemented | - |
 | `/api/v4/hooks/outgoing/{hook_id}/regen_token` | Not implemented | - |
-| `/api/v4/saml/metadata` | Not implemented | - |
-| `/api/v4/saml/metadatafromidp` | Not implemented | - |
-| `/api/v4/saml/certificate/idp` | Not implemented | - |
-| `/api/v4/saml/certificate/public` | Not implemented | - |
-| `/api/v4/saml/certificate/private` | Not implemented | - |
-| `/api/v4/saml/certificate/status` | Not implemented | - |
-| `/api/v4/saml/reset_auth_data` | Not implemented | - |
+| `/api/v4/saml/metadata` | Implemented | saml.rs |
+| `/api/v4/saml/metadatafromidp` | Implemented | saml.rs |
+| `/api/v4/saml/certificate/idp` | Implemented | saml.rs |
+| `/api/v4/saml/certificate/public` | Implemented | saml.rs |
+| `/api/v4/saml/certificate/private` | Implemented | saml.rs |
+| `/api/v4/saml/certificate/status` | Implemented | saml.rs |
+| `/api/v4/saml/reset_auth_data` | Implemented | saml.rs |
 | `/api/v4/compliance/reports` | Not implemented | - |
 | `/api/v4/compliance/reports/{report_id}` | Not implemented | - |
 | `/api/v4/compliance/reports/{report_id}/download` | Not implemented | - |
@@ -271,25 +271,25 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/ldap/certificate/public` | Not implemented | - |
 | `/api/v4/ldap/certificate/private` | Not implemented | - |
 | `/api/v4/ldap/users/{user_id}/group_sync_memberships` | Not implemented | - |
-| `/api/v4/groups` | Not implemented | - |
-| `/api/v4/groups/{group_id}` | Not implemented | - |
-| `/api/v4/groups/{group_id}/patch` | Not implemented | - |
-| `/api/v4/groups/{group_id}/restore` | Not implemented | - |
-| `/api/v4/groups/{group_id}/teams/{team_id}/link` | Not implemented | - |
-| `/api/v4/groups/{group_id}/channels/{channel_id}/link` | Not implemented | - |
-| `/api/v4/groups/{group_id}/teams/{team_id}` | Not implemented | - |
-| `/api/v4/groups/{group_id}/channels/{channel_id}` | Not implemented | - |
-| `/api/v4/groups/{group_id}/teams` | Not implemented | - |
-| `/api/v4/groups/{group_id}/channels` | Not implemented | - |
-| `/api/v4/groups/{group_id}/teams/{team_id}/patch` | Not implemented | - |
-| `/api/v4/groups/{group_id}/channels/{channel_id}/patch` | Not implemented | - |
-| `/api/v4/groups/{group_id}/members` | Not implemented | - |
-| `/api/v4/groups/{group_id}/stats` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/groups` | Not implemented | - |
+| `/api/v4/groups` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/patch` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/restore` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/teams/{team_id}/link` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/channels/{channel_id}/link` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/teams/{team_id}` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/channels/{channel_id}` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/teams` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/channels` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/teams/{team_id}/patch` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/channels/{channel_id}/patch` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/members` | Implemented | groups.rs |
+| `/api/v4/groups/{group_id}/stats` | Implemented | groups.rs |
+| `/api/v4/channels/{channel_id}/groups` | Implemented | channels.rs |
 | `/api/v4/teams/{team_id}/groups` | Not implemented | - |
 | `/api/v4/teams/{team_id}/groups_by_channels` | Not implemented | - |
 | `/api/v4/users/{user_id}/groups` | Not implemented | - |
-| `/api/v4/groups/names` | Not implemented | - |
+| `/api/v4/groups/names` | Implemented | groups.rs |
 | `/api/v4/cluster/status` | Not implemented | - |
 | `/api/v4/brand/image` | Not implemented | - |
 | `/api/v4/commands` | Implemented | commands.rs |
@@ -299,12 +299,12 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/commands/{command_id}/move` | Not implemented | - |
 | `/api/v4/commands/{command_id}/regen_token` | Not implemented | - |
 | `/api/v4/commands/execute` | Implemented | commands.rs |
-| `/api/v4/oauth/apps` | Not implemented | - |
-| `/api/v4/oauth/apps/{app_id}` | Not implemented | - |
-| `/api/v4/oauth/apps/{app_id}/regen_secret` | Not implemented | - |
-| `/api/v4/oauth/apps/{app_id}/info` | Not implemented | - |
-| `/api/v4/oauth/apps/register` | Not implemented | - |
-| `/api/v4/users/{user_id}/oauth/apps/authorized` | Not implemented | - |
+| `/api/v4/oauth/apps` | Implemented | oauth.rs |
+| `/api/v4/oauth/apps/{app_id}` | Implemented | oauth.rs |
+| `/api/v4/oauth/apps/{app_id}/regen_secret` | Implemented | oauth.rs |
+| `/api/v4/oauth/apps/{app_id}/info` | Implemented | oauth.rs |
+| `/api/v4/oauth/apps/register` | Implemented | oauth.rs |
+| `/api/v4/users/{user_id}/oauth/apps/authorized` | Implemented | users.rs |
 | `/api/v4/elasticsearch/test` | Not implemented | - |
 | `/api/v4/elasticsearch/purge_indexes` | Not implemented | - |
 | `/api/v4/bleve/purge_indexes` | Not implemented | - |
@@ -382,18 +382,18 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/exports/{export_name}` | Not implemented | - |
 | `/api/v4/ip_filtering` | Not implemented | - |
 | `/api/v4/ip_filtering/my_ip` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/bookmarks` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}/sort_order` | Not implemented | - |
+| `/api/v4/channels/{channel_id}/bookmarks` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}` | Implemented | channels.rs |
+| `/api/v4/channels/{channel_id}/bookmarks/{bookmark_id}/sort_order` | Implemented | channels.rs |
 | `/api/v4/reports/users` | Not implemented | - |
 | `/api/v4/reports/users/count` | Not implemented | - |
 | `/api/v4/reports/users/export` | Not implemented | - |
 | `/api/v4/reports/posts` | Not implemented | - |
 | `/api/v4/limits/server` | Not implemented | - |
 | `/api/v4/logs/download` | Not implemented | - |
-| `/api/v4/oauth/outgoing_connections` | Not implemented | - |
-| `/api/v4/oauth/outgoing_connections/{connection_id}` | Not implemented | - |
-| `/api/v4/oauth/outgoing_connections/validate` | Not implemented | - |
+| `/api/v4/oauth/outgoing_connections` | Implemented | oauth.rs |
+| `/api/v4/oauth/outgoing_connections/{connection_id}` | Implemented | oauth.rs |
+| `/api/v4/oauth/outgoing_connections/validate` | Implemented | oauth.rs |
 | `/api/v4/client_perf` | Implemented | system.rs |
 | `/api/v4/posts/schedule` | Implemented | posts.rs |
 | `/api/v4/posts/scheduled/team/{team_id}` | Implemented | posts.rs |
@@ -416,7 +416,7 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/access_control_policies/{policy_id}/unassign` | Not implemented | - |
 | `/api/v4/access_control_policies/{policy_id}/resources/channels` | Not implemented | - |
 | `/api/v4/access_control_policies/{policy_id}/resources/channels/search` | Not implemented | - |
-| `/api/v4/channels/{channel_id}/access_control/attributes` | Not implemented | - |
+| `/api/v4/channels/{channel_id}/access_control/attributes` | Implemented | channels.rs |
 | `/api/v4/access_control_policies/cel/visual_ast` | Not implemented | - |
 | `/api/v4/access_control_policies/activate` | Not implemented | - |
 | `/api/v4/content_flagging/flag/config` | Not implemented | - |
