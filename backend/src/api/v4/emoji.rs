@@ -7,16 +7,18 @@ use crate::api::AppState;
 use crate::api::v4::extractors::MmAuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/emoji", get(list_emoji))
+        .route("/emoji", get(list_emoji).post(create_emoji))
         .route("/emoji/search", post(search_emoji))
         .route("/emoji/autocomplete", get(get_emoji_autocomplete))
         .route("/emoji/names", post(get_emojis_by_names))
-        .route("/emoji/{emoji_id}", get(get_emoji))
+        .route(
+            "/emoji/{emoji_id}",
+            get(get_emoji).delete(delete_emoji),
+        )
         .route("/emoji/{emoji_id}/image", get(get_emoji_image))
         .route("/emoji/name/{name}", get(get_emoji_by_name))
 }
@@ -137,32 +139,181 @@ pub async fn get_emoji_image(
     Path(emoji_id_str): Path<String>,
 ) -> ApiResult<axum::response::Response> {
     use axum::response::IntoResponse;
-    
+
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
 
-    // Get the emoji's image URL from database
+    // Get the emoji's image path from database
     let image_url: Option<String> = sqlx::query_scalar(
-        "SELECT COALESCE(image_url, '') FROM custom_emojis WHERE id = $1 AND delete_at IS NULL"
+        "SELECT image_url FROM custom_emojis WHERE id = $1 AND delete_at IS NULL",
     )
     .bind(emoji_id)
     .fetch_optional(&state.db)
     .await?;
 
-    match image_url {
-        Some(url) if !url.is_empty() => {
-            // Redirect to the actual image
-            Ok((
-                axum::http::StatusCode::FOUND,
-                [(axum::http::header::LOCATION, url)],
-                "Redirecting to emoji image",
-            ).into_response())
-        }
-        _ => {
-            // Return a placeholder or 404
-            Err(AppError::NotFound("Emoji image not found".to_string()))
+    if let Some(key) = image_url {
+        if !key.is_empty() {
+            // Generate presigned URL for S3
+            let url = state.s3_client.presigned_download_url(&key, 3600).await?;
+            return Ok(axum::response::Redirect::temporary(&url).into_response());
         }
     }
+
+    Err(AppError::NotFound("Emoji image not found".to_string()))
+}
+
+/// POST /emoji - Create custom emoji
+pub async fn create_emoji(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    mut multipart: axum::extract::Multipart,
+) -> ApiResult<(axum::http::StatusCode, Json<mm::Emoji>)> {
+    use image::GenericImageView;
+    use std::io::Cursor;
+
+    let mut name = String::new();
+    let mut image_data = Vec::new();
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Multipart error: {}", e)))?
+    {
+        let field_name = field.name().unwrap_or("").to_string();
+        if field_name == "emoji" {
+            let json_str = field
+                .text()
+                .await
+                .map_err(|_| AppError::BadRequest("Invalid emoji JSON".to_string()))?;
+            let emoji_json: serde_json::Value = serde_json::from_str(&json_str)
+                .map_err(|_| AppError::BadRequest("Invalid emoji JSON format".to_string()))?;
+            if let Some(n) = emoji_json.get("name").and_then(|v| v.as_str()) {
+                name = n.to_string();
+            }
+        } else if field_name == "image" {
+            image_data = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
+                .to_vec();
+        }
+    }
+
+    if name.is_empty() {
+        return Err(AppError::BadRequest("Missing emoji name".to_string()));
+    }
+
+    // Validation
+    if !crate::mattermost_compat::emoji_data::is_valid_emoji_name(&name) {
+        return Err(AppError::BadRequest("Invalid emoji name".to_string()));
+    }
+
+    if crate::mattermost_compat::emoji_data::is_system_emoji(&name) {
+        return Err(AppError::BadRequest(
+            "Emoji name already used by system emoji".to_string(),
+        ));
+    }
+
+    // Check for duplicate custom emoji
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM custom_emojis WHERE name = $1 AND delete_at IS NULL)",
+    )
+    .bind(&name)
+    .fetch_one(&state.db)
+    .await?;
+    if exists {
+        return Err(AppError::BadRequest("Emoji name already exists".to_string()));
+    }
+
+    if image_data.is_empty() {
+        return Err(AppError::BadRequest("Missing emoji image".to_string()));
+    }
+
+    // Resize image (128x128 max)
+    let resized_image = tokio::task::spawn_blocking(move || -> ApiResult<Vec<u8>> {
+        let img = image::load_from_memory(&image_data)
+            .map_err(|_| AppError::BadRequest("Invalid image data".to_string()))?;
+        let (w, h) = img.dimensions();
+        if w > 128 || h > 128 {
+            let thumb = img.thumbnail(128, 128);
+            let mut buf = Vec::new();
+            thumb
+                .write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png)
+                .map_err(|_| AppError::Internal("Image processing failed".to_string()))?;
+            Ok(buf)
+        } else {
+            Ok(image_data)
+        }
+    })
+    .await
+    .map_err(|_| AppError::Internal("Task join error".to_string()))??;
+
+    // Upload to S3
+    let emoji_id = Uuid::new_v4();
+    let key = format!("emojis/{}/image.png", emoji_id);
+    state
+        .s3_client
+        .upload(&key, resized_image, "image/png")
+        .await?;
+
+    // DB Insert
+    let db_emoji: DbEmoji = sqlx::query_as(
+        r#"
+         INSERT INTO custom_emojis (id, name, creator_id, image_url)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, name, creator_id, 
+                   (extract(epoch from create_at)*1000)::bigint as create_at, 
+                   (extract(epoch from update_at)*1000)::bigint as update_at, 
+                   COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
+         "#,
+    )
+    .bind(emoji_id)
+    .bind(&name)
+    .bind(auth.user_id)
+    .bind(&key)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok((axum::http::StatusCode::CREATED, Json(map_emoji(db_emoji))))
+}
+
+/// DELETE /emoji/{emoji_id} - Soft delete custom emoji
+pub async fn delete_emoji(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(emoji_id_str): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let emoji_id = parse_mm_or_uuid(&emoji_id_str)
+        .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
+
+    let emoji: DbEmoji = sqlx::query_as(
+        r#"
+        SELECT id, name, creator_id, 
+               (extract(epoch from create_at)*1000)::bigint as create_at, 
+               (extract(epoch from update_at)*1000)::bigint as update_at, 
+               COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
+        FROM custom_emojis WHERE id = $1 AND delete_at IS NULL
+        "#,
+    )
+    .bind(emoji_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
+
+    // Authorization
+    if emoji.creator_id != auth.user_id && auth.role != "system_admin" {
+        return Err(AppError::Forbidden(
+            "Cannot delete emoji created by another user".to_string(),
+        ));
+    }
+
+    // Soft delete
+    sqlx::query("UPDATE custom_emojis SET delete_at = NOW() WHERE id = $1")
+        .bind(emoji_id)
+        .execute(&state.db)
+        .await?;
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
 }
 
 pub async fn get_emojis_by_names(

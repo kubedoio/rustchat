@@ -3194,6 +3194,7 @@ dependencies = [
  "mime_guess",
  "once_cell",
  "redis",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

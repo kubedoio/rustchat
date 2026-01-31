@@ -908,13 +908,32 @@ async fn add_reaction(
     let post_id = parse_mm_or_uuid(&input.post_id)
         .ok_or_else(|| AppError::Validation("Invalid post_id".to_string()))?;
 
+    // Validate emoji name
+    if !crate::mattermost_compat::emoji_data::is_valid_emoji_name(&input.emoji_name) {
+        return Err(AppError::BadRequest("Invalid emoji name".to_string()));
+    }
+
+    // Check if it exists as either a system emoji or custom emoji
+    if !crate::mattermost_compat::emoji_data::is_system_emoji(&input.emoji_name) {
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM custom_emojis WHERE name = $1 AND delete_at IS NULL)",
+        )
+        .bind(&input.emoji_name)
+        .fetch_one(&state.db)
+        .await?;
+
+        if !exists {
+            return Err(AppError::NotFound("Emoji not found".to_string()));
+        }
+    }
+
     let reaction: crate::models::post::Reaction = sqlx::query_as(
         r#"
         INSERT INTO reactions (user_id, post_id, emoji_name)
         VALUES ($1, $2, $3)
         ON CONFLICT (user_id, post_id, emoji_name) DO UPDATE SET emoji_name = $3
         RETURNING *
-        "#
+        "#,
     )
     .bind(auth.user_id)
     .bind(post_id)

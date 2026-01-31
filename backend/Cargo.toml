@@ -45,6 +45,7 @@ chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2.0"
 anyhow = "1.0"
 futures-util = "0.3"
+regex = "1.10"
 
 # S3 Storage
 aws-sdk-s3 = { version = "1.68", features = ["behavior-version-latest"] }

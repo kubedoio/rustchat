@@ -1,3 +1,4 @@
+pub mod emoji_data;
 pub mod id;
 pub mod mappers;
 pub mod models;
