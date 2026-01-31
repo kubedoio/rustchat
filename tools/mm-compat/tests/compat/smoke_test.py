@@ -45,7 +45,16 @@ def main():
         "X-Requested-With": "XMLHttpRequest"
     }
 
-    # 2. Get Me
+    # 2. Client Config (legacy format)
+    print(f"Step 2: GET /api/v4/config/client?format=old ... ", end="")
+    resp = requests.get(f"{base_url}/api/v4/config/client?format=old", headers=headers)
+    if resp.status_code == 200:
+        print("SUCCESS")
+    else:
+        print(f"FAILED ({resp.status_code})")
+        sys.exit(1)
+
+    # 3. Get Me
     print(f"Step 2: GET /api/v4/users/me ... ", end="")
     resp = requests.get(f"{base_url}/api/v4/users/me", headers=headers)
     if resp.status_code == 200:
@@ -57,8 +66,8 @@ def main():
         print(f"FAILED ({resp.status_code})")
         sys.exit(1)
 
-    # 3. Get Teams & Channels
-    print(f"Step 3: Discovering Workspace ... ", end="")
+    # 4. Get Teams & Channels
+    print(f"Step 4: Discovering Workspace ... ", end="")
     resp = requests.get(f"{base_url}/api/v4/users/me/teams", headers=headers)
     if resp.status_code == 200:
         teams = resp.json()
@@ -85,7 +94,9 @@ def main():
         print(f"FAILED (Teams: {resp.status_code})")
         sys.exit(1)
 
-    # 4. Messaging (Phase 3)
+    post_id = None
+
+    # 5. Messaging (Phase 3)
     test_msg = f"In-situ compatibility smoke test {uuid.uuid4().hex[:8]}"
     print(f"Step 4: POST /api/v4/posts (Create Message) ... ", end="")
     payload = {
@@ -111,7 +122,7 @@ def main():
     else:
         print(f"FAILED ({resp.status_code})")
 
-    # 5. Advanced Search (Phase 4)
+    # 6. Advanced Search (Phase 4)
     print(f"Step 5: POST /api/v4/users/search ... ", end="")
     payload = {"term": username}
     resp = requests.post(f"{base_url}/api/v4/users/search", headers=headers, json=payload)
@@ -124,7 +135,7 @@ def main():
     else:
         print(f"FAILED ({resp.status_code})")
 
-    # 6. Preferences (Phase 4)
+    # 7. Preferences (Phase 4)
     print(f"Step 6: GET /api/v4/users/me/preferences ... ", end="")
     resp = requests.get(f"{base_url}/api/v4/users/me/preferences", headers=headers)
     if resp.status_code == 200:
@@ -133,39 +144,42 @@ def main():
     else:
         print(f"FAILED ({resp.status_code})")
 
-    # 7. Threads (Phase 3)
-    print(f"Step 7: GET /api/v4/users/me/threads ... ", end="")
+    # 8. Threads (Phase 3)
+    print(f"Step 8: GET /api/v4/users/me/threads ... ", end="")
     resp = requests.get(f"{base_url}/api/v4/users/me/threads", headers=headers)
     if resp.status_code == 200:
         print("SUCCESS")
     else:
         print(f"FAILED ({resp.status_code})")
 
-    # 8. Reactions (Phase 6)
-    print(f"Step 8: Social Interaction - Reactions ... ", end="")
-    payload = {
-        "user_id": user_id,
-        "post_id": post_id,
-        "emoji_name": "thumbsup"
-    }
-    resp = requests.post(f"{base_url}/api/v4/reactions", headers=headers, json=payload)
-    if resp.status_code == 200:
-        print("ADDED ... ", end="")
-        resp = requests.get(f"{base_url}/api/v4/posts/{post_id}/reactions", headers=headers)
-        if resp.status_code == 200 and any(r['emoji_name'] == 'thumbsup' for r in resp.json()):
-            print("VERIFIED ... ", end="")
-            resp = requests.delete(f"{base_url}/api/v4/users/{user_id}/posts/{post_id}/reactions/thumbsup", headers=headers)
-            if resp.status_code == 200:
-                print("REMOVED SUCCESS")
-            else:
-                print(f"REMOVE FAILED ({resp.status_code})")
-        else:
-            print(f"VERIFY FAILED ({resp.status_code})")
+    # 9. Reactions (Phase 6)
+    if not post_id:
+        print("Step 9: Social Interaction - Reactions ... SKIPPED (no post id)")
     else:
-        print(f"ADD FAILED ({resp.status_code})")
+        print(f"Step 9: Social Interaction - Reactions ... ", end="")
+        payload = {
+            "user_id": user_id,
+            "post_id": post_id,
+            "emoji_name": "thumbsup"
+        }
+        resp = requests.post(f"{base_url}/api/v4/reactions", headers=headers, json=payload)
+        if resp.status_code == 200:
+            print("ADDED ... ", end="")
+            resp = requests.get(f"{base_url}/api/v4/posts/{post_id}/reactions", headers=headers)
+            if resp.status_code == 200 and any(r['emoji_name'] == 'thumbsup' for r in resp.json()):
+                print("VERIFIED ... ", end="")
+                resp = requests.delete(f"{base_url}/api/v4/users/{user_id}/posts/{post_id}/reactions/thumbsup", headers=headers)
+                if resp.status_code == 200:
+                    print("REMOVED SUCCESS")
+                else:
+                    print(f"REMOVE FAILED ({resp.status_code})")
+            else:
+                print(f"VERIFY FAILED ({resp.status_code})")
+        else:
+            print(f"ADD FAILED ({resp.status_code})")
 
-    # 9. Emojis (Phase 6)
-    print(f"Step 9: Social Interaction - Emojis ... ", end="")
+    # 10. Emojis (Phase 6)
+    print(f"Step 10: Social Interaction - Emojis ... ", end="")
     resp = requests.get(f"{base_url}/api/v4/emoji", headers=headers)
     if resp.status_code == 200:
         emojis = resp.json()

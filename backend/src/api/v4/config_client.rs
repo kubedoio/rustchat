@@ -23,6 +23,19 @@ pub async fn get_client_config(
     State(state): State<AppState>,
     Query(query): Query<LicenseQuery>,
 ) -> ApiResult<impl IntoResponse> {
+    if !matches!(query.format.as_deref(), Some("old")) {
+        return Ok((
+            axum::http::StatusCode::NOT_IMPLEMENTED,
+            Json(serde_json::json!({
+                "id": "api.config.client.old_format.app_error",
+                "message": "The new format for client config is not supported yet. Please provide \"format=old\" in the request.",
+                "detailed_error": "",
+                "request_id": "",
+                "status_code": 501
+            })),
+        ));
+    }
+
     let site = sqlx::query_as::<_, (sqlx::types::Json<SiteConfig>,)>(
         "SELECT site FROM server_config WHERE id = 'default'",
     )
@@ -33,20 +46,8 @@ pub async fn get_client_config(
     .map(|row| row.0 .0)
     .unwrap_or_default();
 
-    let body = if matches!(query.format.as_deref(), Some("old")) {
-        let diagnostic_id = diagnostic_id(&site);
-        legacy_config(&site, &diagnostic_id)
-    } else {
-        serde_json::to_value(mm::Config {
-            site_url: site.site_url.clone(),
-            version: MM_VERSION.to_string(),
-            enable_push_notifications: "false".to_string(),
-            diagnostic_id: "00000000-0000-0000-0000-000000000000".to_string(),
-        })
-        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
-    };
-
-    Ok(Json(body))
+    let diagnostic_id = diagnostic_id(&site);
+    Ok(Json(legacy_config(&site, &diagnostic_id)))
 }
 
 pub async fn get_client_license(
