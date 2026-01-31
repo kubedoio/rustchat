@@ -37,6 +37,7 @@ const form = ref({
 });
 
 const saving = ref(false);
+const showAdvanced = ref(false);
 
 onMounted(async () => {
     await adminStore.fetchConfig();
@@ -163,12 +164,21 @@ const saveSettings = async () => {
 
             <!-- Client Configuration (Advanced) -->
             <div class="p-6">
-                <div class="flex items-center mb-4">
-                    <Sliders class="w-5 h-5 text-gray-400 mr-2" />
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Client Configuration (Advanced)</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <Sliders class="w-5 h-5 text-gray-400 mr-2" />
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Client Configuration (Advanced)</h2>
+                    </div>
+                    <button
+                        type="button"
+                        @click="showAdvanced = !showAdvanced"
+                        class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-900"
+                    >
+                        {{ showAdvanced ? 'Hide' : 'Show' }} Advanced
+                    </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div v-if="showAdvanced" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">About Link</label>
                         <input
@@ -270,7 +280,7 @@ const saveSettings = async () => {
                     </div>
                 </div>
 
-                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div v-if="showAdvanced" class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg">
                         <div>
                             <p class="font-medium text-gray-900 dark:text-white">Enable Files</p>
@@ -328,6 +338,9 @@ const saveSettings = async () => {
                         <input type="checkbox" v-model="form.diagnostics_enabled" class="w-5 h-5 text-indigo-600 rounded" />
                     </label>
                 </div>
+                <p v-else class="text-sm text-gray-500 dark:text-gray-400">
+                    These settings control advanced client behavior and legacy config responses.
+                </p>
             </div>
 
             <!-- Localization -->

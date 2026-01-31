@@ -357,4 +357,3 @@ pub struct PluginStatus {
     pub is_active: bool,
     pub state: i32,
 }
-
