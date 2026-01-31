@@ -5,14 +5,16 @@
 //! - GET /users/{id}/teams/{teamId}/threads/{threadId} - Thread detail
 //! - PUT /users/{id}/teams/{teamId}/threads/{threadId}/read/{timestamp} - Mark thread read
 //! - PUT /users/{id}/teams/{teamId}/threads/read - Mark all threads read
+//! - GET /users/{id}/teams/{teamId}/threads/mention_counts - Thread mention counts by channel
+//! - POST /users/{id}/teams/{teamId}/threads/{threadId}/set_unread/{postId} - Mark thread unread
 //! - PUT/DELETE /users/{id}/teams/{teamId}/threads/{threadId}/following - Follow/unfollow
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, put},
+    routing::{get, post, put},
     Json, Router,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize};
 use uuid::Uuid;
 
@@ -32,12 +34,24 @@ pub fn router() -> Router<AppState> {
             get(get_threads_internal).put(mark_all_read_internal),
         )
         .route(
+            "/users/{user_id}/teams/{team_id}/threads/read",
+            put(mark_all_read_explicit),
+        )
+        .route(
+            "/users/{user_id}/teams/{team_id}/threads/mention_counts",
+            get(get_thread_mention_counts),
+        )
+        .route(
             "/users/{user_id}/teams/{team_id}/threads/{thread_id}",
             get(get_thread_internal),
         )
         .route(
             "/users/{user_id}/teams/{team_id}/threads/{thread_id}/read/{timestamp}",
             put(mark_thread_read_internal),
+        )
+        .route(
+            "/users/{user_id}/teams/{team_id}/threads/{thread_id}/set_unread/{post_id}",
+            post(set_thread_unread),
         )
         .route(
             "/users/{user_id}/teams/{team_id}/threads/{thread_id}/following",
@@ -70,6 +84,14 @@ pub struct ThreadReadPath {
     pub team_id: String,
     pub thread_id: String,
     pub timestamp: i64,
+}
+
+#[derive(Deserialize)]
+pub struct ThreadSetUnreadPath {
+    pub user_id: String,
+    pub team_id: String,
+    pub thread_id: String,
+    pub post_id: String,
 }
 
 // Query parameters for thread list
@@ -133,14 +155,7 @@ pub async fn get_threads_internal(
     Path(path): Path<ThreadsPath>,
     Query(query): Query<ThreadsQuery>,
 ) -> ApiResult<Json<mm::ThreadResponse>> {
-    let user_id = parse_mm_or_uuid(&path.user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
-
-    // User can only fetch their own threads (or could be admin logic)
-    if user_id != auth.user_id && path.user_id != "me" {
-        return Err(AppError::Forbidden("Can only access your own threads".to_string()));
-    }
-    let user_id = auth.user_id;
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
 
     let team_id = parse_mm_or_uuid(&path.team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
@@ -153,7 +168,7 @@ pub async fn get_threads_internal(
         // Fetch only unread threads
         sqlx::query_as(r#"
             SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
-                   p.reply_count, p.last_reply_at,
+                   p.reply_count::int8 as reply_count, p.last_reply_at,
                    tm.following, tm.last_read_at, tm.mention_count, tm.unread_replies_count
             FROM posts p
             JOIN thread_memberships tm ON tm.post_id = p.id
@@ -177,7 +192,7 @@ pub async fn get_threads_internal(
         // Fetch all followed threads
         sqlx::query_as(r#"
             SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
-                   p.reply_count, p.last_reply_at,
+                   p.reply_count::int8 as reply_count, p.last_reply_at,
                    tm.following, tm.last_read_at, tm.mention_count, tm.unread_replies_count
             FROM posts p
             JOIN thread_memberships tm ON tm.post_id = p.id
@@ -287,23 +302,14 @@ pub async fn get_all_threads_internal(
     Path(path): Path<ThreadsAllPath>,
     Query(query): Query<ThreadsQuery>,
 ) -> ApiResult<Json<mm::ThreadResponse>> {
-    let user_id = if path.user_id == "me" {
-        auth.user_id
-    } else {
-        let parsed_user_id = parse_mm_or_uuid(&path.user_id)
-            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
-        if parsed_user_id != auth.user_id {
-            return Err(AppError::Forbidden("Can only access your own threads".to_string()));
-        }
-        parsed_user_id
-    };
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
 
     let per_page = query.per_page.min(100);
     let offset = query.page * per_page;
 
     let threads: Vec<ThreadRow> = sqlx::query_as(r#"
         SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
-               p.reply_count, p.last_reply_at,
+               p.reply_count::int8 as reply_count, p.last_reply_at,
                tm.following, tm.last_read_at, tm.mention_count, tm.unread_replies_count
         FROM posts p
         JOIN thread_memberships tm ON tm.post_id = p.id
@@ -367,25 +373,31 @@ pub async fn get_thread_internal(
     auth: MmAuthUser,
     Path(path): Path<ThreadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
+    let team_id = parse_mm_or_uuid(&path.team_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     let thread_id = parse_mm_or_uuid(&path.thread_id)
         .ok_or_else(|| AppError::BadRequest("Invalid thread_id".to_string()))?;
 
     // Fetch thread info
     let thread: Option<ThreadRow> = sqlx::query_as(r#"
         SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
-               p.reply_count, p.last_reply_at,
+               p.reply_count::int8 as reply_count, p.last_reply_at,
                COALESCE(tm.following, false) as following,
                tm.last_read_at,
                COALESCE(tm.mention_count, 0) as mention_count,
                COALESCE(tm.unread_replies_count, 0) as unread_replies_count
         FROM posts p
+        JOIN channels c ON p.channel_id = c.id
         LEFT JOIN thread_memberships tm ON tm.post_id = p.id AND tm.user_id = $2
         WHERE p.id = $1
+          AND c.team_id = $3
           AND p.root_post_id IS NULL
           AND p.deleted_at IS NULL
     "#)
     .bind(thread_id)
-    .bind(auth.user_id)
+    .bind(user_id)
+    .bind(team_id)
     .fetch_optional(&state.db)
     .await?;
 
@@ -416,6 +428,9 @@ pub async fn mark_thread_read_internal(
     auth: MmAuthUser,
     Path(path): Path<ThreadReadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
+    let _team_id = parse_mm_or_uuid(&path.team_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     let thread_id = parse_mm_or_uuid(&path.thread_id)
         .ok_or_else(|| AppError::BadRequest("Invalid thread_id".to_string()))?;
 
@@ -432,7 +447,7 @@ pub async fn mark_thread_read_internal(
             mention_count = 0,
             updated_at = NOW()
     "#)
-    .bind(auth.user_id)
+    .bind(user_id)
     .bind(thread_id)
     .bind(read_at)
     .execute(&state.db)
@@ -457,6 +472,7 @@ pub async fn mark_all_read_internal(
     auth: MmAuthUser,
     Path(path): Path<ThreadsPath>,
 ) -> ApiResult<Json<serde_json::Value>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
     let team_id = parse_mm_or_uuid(&path.team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
 
@@ -473,12 +489,56 @@ pub async fn mark_all_read_internal(
           AND tm.user_id = $1
           AND c.team_id = $2
     "#)
-    .bind(auth.user_id)
+    .bind(user_id)
     .bind(team_id)
     .execute(&state.db)
     .await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+pub async fn mark_all_read_explicit(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(path): Path<ThreadsPath>,
+) -> ApiResult<Json<serde_json::Value>> {
+    mark_all_read_internal(State(state), auth, Path(path)).await
+}
+
+pub async fn get_thread_mention_counts(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(path): Path<ThreadsPath>,
+) -> ApiResult<Json<std::collections::HashMap<String, i64>>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
+    let team_id = parse_mm_or_uuid(&path.team_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+
+    let rows: Vec<(Uuid, i64)> = sqlx::query_as(
+        r#"
+        SELECT c.id, COALESCE(SUM(tm.mention_count), 0)
+        FROM thread_memberships tm
+        JOIN posts p ON tm.post_id = p.id
+        JOIN channels c ON p.channel_id = c.id
+        WHERE tm.user_id = $1
+          AND tm.following = true
+          AND c.team_id = $2
+          AND p.root_post_id IS NULL
+          AND p.deleted_at IS NULL
+        GROUP BY c.id
+        "#,
+    )
+    .bind(user_id)
+    .bind(team_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut counts = std::collections::HashMap::new();
+    for (channel_id, count) in rows {
+        counts.insert(encode_mm_id(channel_id), count);
+    }
+
+    Ok(Json(counts))
 }
 
 /// PUT /users/{user_id}/teams/{team_id}/threads/{thread_id}/following
@@ -487,6 +547,7 @@ pub async fn follow_thread_internal(
     auth: MmAuthUser,
     Path(path): Path<ThreadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
     let thread_id = parse_mm_or_uuid(&path.thread_id)
         .ok_or_else(|| AppError::BadRequest("Invalid thread_id".to_string()))?;
 
@@ -498,7 +559,7 @@ pub async fn follow_thread_internal(
             following = true,
             updated_at = NOW()
     "#)
-    .bind(auth.user_id)
+    .bind(user_id)
     .bind(thread_id)
     .execute(&state.db)
     .await?;
@@ -513,6 +574,7 @@ pub async fn unfollow_thread_internal(
     auth: MmAuthUser,
     Path(path): Path<ThreadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
     let thread_id = parse_mm_or_uuid(&path.thread_id)
         .ok_or_else(|| AppError::BadRequest("Invalid thread_id".to_string()))?;
 
@@ -523,11 +585,62 @@ pub async fn unfollow_thread_internal(
             updated_at = NOW()
         WHERE user_id = $1 AND post_id = $2
     "#)
-    .bind(auth.user_id)
+    .bind(user_id)
     .bind(thread_id)
     .execute(&state.db)
     .await?;
 
     // Return updated thread
     get_thread_internal(State(state), auth, Path(path)).await
+}
+
+pub async fn set_thread_unread(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(path): Path<ThreadSetUnreadPath>,
+) -> ApiResult<Json<mm::Thread>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
+    let _team_id = parse_mm_or_uuid(&path.team_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let thread_id = parse_mm_or_uuid(&path.thread_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid thread_id".to_string()))?;
+    let post_id = parse_mm_or_uuid(&path.post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    let post_created_at: Option<DateTime<Utc>> = sqlx::query_scalar(
+        "SELECT created_at FROM posts WHERE id = $1 AND root_post_id = $2",
+    )
+    .bind(post_id)
+    .bind(thread_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let last_read_at = post_created_at.map(|dt| dt - Duration::milliseconds(1));
+
+    sqlx::query(
+        r#"
+        INSERT INTO thread_memberships (user_id, post_id, last_read_at, unread_replies_count, mention_count)
+        VALUES ($1, $2, $3, 1, 0)
+        ON CONFLICT (user_id, post_id) DO UPDATE SET
+            last_read_at = $3,
+            unread_replies_count = GREATEST(thread_memberships.unread_replies_count, 1),
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(thread_id)
+    .bind(last_read_at)
+    .execute(&state.db)
+    .await?;
+
+    get_thread_internal(
+        State(state),
+        auth,
+        Path(ThreadPath {
+            user_id: path.user_id,
+            team_id: path.team_id,
+            thread_id: path.thread_id,
+        }),
+    )
+    .await
 }

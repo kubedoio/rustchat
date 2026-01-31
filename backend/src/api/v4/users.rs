@@ -18,6 +18,8 @@ use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::{channel::Channel, channel::ChannelMember, Team, TeamMember, User};
 
+const MAX_UPDATE_PREFERENCES: usize = 100;
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/users/login", post(login))
@@ -31,6 +33,12 @@ pub fn router() -> Router<AppState> {
         .route("/users/me/channels/categories", get(get_my_categories))
         .route("/users/me/teams/{team_id}/channels", get(my_team_channels))
         .route("/users/me/channels", get(my_channels))
+        .route("/users/{user_id}/teams", get(get_teams_for_user))
+        .route(
+            "/users/{user_id}/teams/{team_id}/channels",
+            get(get_team_channels_for_user),
+        )
+        .route("/users/{user_id}/channels", get(get_channels_for_user))
         .route(
             "/users/me/teams/{team_id}/channels/not_members",
             get(my_team_channels_not_members),
@@ -53,7 +61,19 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/users/{user_id}/preferences",
-            put(update_preferences_for_user),
+            get(get_preferences_for_user).put(update_preferences_for_user),
+        )
+        .route(
+            "/users/{user_id}/preferences/delete",
+            post(delete_preferences_for_user),
+        )
+        .route(
+            "/users/{user_id}/preferences/{category}",
+            get(get_preferences_by_category),
+        )
+        .route(
+            "/users/{user_id}/preferences/{category}/name/{preference_name}",
+            get(get_preference_by_category_and_name),
         )
         .route("/users/status/ids", post(get_statuses_by_ids))
         .route("/users/ids", post(get_users_by_ids))
@@ -835,16 +855,7 @@ async fn my_teams(
     State(state): State<AppState>,
     auth: MmAuthUser,
 ) -> ApiResult<Json<Vec<mm::Team>>> {
-    let teams: Vec<Team> = sqlx::query_as(
-        r#"
-        SELECT t.* FROM teams t
-        JOIN team_members tm ON t.id = tm.team_id
-        WHERE tm.user_id = $1
-        "#,
-    )
-    .bind(auth.user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let teams = fetch_user_teams(&state, auth.user_id).await?;
 
     if teams.is_empty() {
         return Ok(Json(vec![default_team()]));
@@ -852,6 +863,36 @@ async fn my_teams(
 
     let mm_teams: Vec<mm::Team> = teams.into_iter().map(|t| t.into()).collect();
     Ok(Json(mm_teams))
+}
+
+async fn get_teams_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<mm::Team>>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let teams = fetch_user_teams(&state, user_id).await?;
+
+    if teams.is_empty() {
+        return Ok(Json(vec![default_team()]));
+    }
+
+    let mm_teams: Vec<mm::Team> = teams.into_iter().map(|t| t.into()).collect();
+    Ok(Json(mm_teams))
+}
+
+async fn fetch_user_teams(state: &AppState, user_id: Uuid) -> ApiResult<Vec<Team>> {
+    sqlx::query_as(
+        r#"
+        SELECT t.* FROM teams t
+        JOIN team_members tm ON t.id = tm.team_id
+        WHERE tm.user_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(Into::into)
 }
 
 fn default_team() -> mm::Team {
@@ -921,6 +962,30 @@ async fn my_team_channels(
     Ok(Json(mm_channels))
 }
 
+async fn get_team_channels_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path((user_id, team_id)): Path<(String, String)>,
+) -> ApiResult<Json<Vec<mm::Channel>>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let team_id = parse_mm_or_uuid(&team_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let channels: Vec<Channel> = sqlx::query_as(
+        r#"
+        SELECT c.* FROM channels c
+        JOIN channel_members cm ON c.id = cm.channel_id
+        WHERE c.team_id = $1 AND cm.user_id = $2
+        "#,
+    )
+    .bind(team_id)
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
+    Ok(Json(mm_channels))
+}
+
 async fn my_channels(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -933,6 +998,27 @@ async fn my_channels(
         "#,
     )
     .bind(auth.user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
+    Ok(Json(mm_channels))
+}
+
+async fn get_channels_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<mm::Channel>>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let channels: Vec<Channel> = sqlx::query_as(
+        r#"
+        SELECT c.* FROM channels c
+        JOIN channel_members cm ON c.id = cm.channel_id
+        WHERE cm.user_id = $1
+        "#,
+    )
+    .bind(user_id)
     .fetch_all(&state.db)
     .await?;
 
@@ -1103,25 +1189,53 @@ async fn get_preferences(
     State(state): State<AppState>,
     auth: MmAuthUser,
 ) -> ApiResult<Json<Vec<mm::Preference>>> {
-    let rows = sqlx::query("SELECT user_id, category, name, value FROM mattermost_preferences WHERE user_id = $1")
-        .bind(auth.user_id)
-        .fetch_all(&state.db)
-        .await
-        .unwrap_or_default();
+    fetch_preferences(&state, auth.user_id).await
+}
 
-    let mut prefs = Vec::new();
-    for row in rows {
-        use sqlx::Row;
-        let uid: Uuid = row.try_get("user_id").unwrap_or_default();
-        prefs.push(mm::Preference {
-            user_id: encode_mm_id(uid),
-            category: row.try_get("category").unwrap_or_default(),
-            name: row.try_get("name").unwrap_or_default(),
-            value: row.try_get("value").unwrap_or_default(),
-        });
-    }
+async fn get_preferences_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<mm::Preference>>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    fetch_preferences(&state, user_id).await
+}
 
-    Ok(Json(prefs))
+async fn get_preferences_by_category(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path((user_id, category)): Path<(String, String)>,
+) -> ApiResult<Json<Vec<mm::Preference>>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let rows = sqlx::query(
+        "SELECT user_id, category, name, value FROM mattermost_preferences WHERE user_id = $1 AND category = $2",
+    )
+    .bind(user_id)
+    .bind(&category)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    Ok(Json(map_preference_rows(rows)))
+}
+
+async fn get_preference_by_category_and_name(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path((user_id, category, preference_name)): Path<(String, String, String)>,
+) -> ApiResult<Json<mm::Preference>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let row = sqlx::query(
+        "SELECT user_id, category, name, value FROM mattermost_preferences WHERE user_id = $1 AND category = $2 AND name = $3",
+    )
+    .bind(user_id)
+    .bind(&category)
+    .bind(&preference_name)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let row = row.ok_or_else(|| AppError::NotFound("Preference not found".to_string()))?;
+    Ok(Json(map_preference_row(row)))
 }
 
 async fn update_preferences(
@@ -1131,6 +1245,7 @@ async fn update_preferences(
     body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
     let prefs: Vec<mm::Preference> = parse_body(&headers, &body, "Invalid preferences body")?;
+    validate_preferences_len(&prefs)?;
     update_preferences_internal(&state, auth.user_id, prefs).await
 }
 
@@ -1142,8 +1257,73 @@ async fn update_preferences_for_user(
     body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
     let prefs: Vec<mm::Preference> = parse_body(&headers, &body, "Invalid preferences body")?;
+    validate_preferences_len(&prefs)?;
     let user_id = resolve_user_id(&user_id, &auth)?;
     update_preferences_internal(&state, user_id, prefs).await
+}
+
+async fn delete_preferences_for_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<impl IntoResponse> {
+    let prefs: Vec<mm::Preference> = parse_body(&headers, &body, "Invalid preferences body")?;
+    validate_preferences_len(&prefs)?;
+    let user_id = resolve_user_id(&user_id, &auth)?;
+
+    let mut tx = state.db.begin().await?;
+    for pref in prefs {
+        sqlx::query(
+            "DELETE FROM mattermost_preferences WHERE user_id = $1 AND category = $2 AND name = $3",
+        )
+        .bind(user_id)
+        .bind(pref.category)
+        .bind(pref.name)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn fetch_preferences(
+    state: &AppState,
+    user_id: Uuid,
+) -> ApiResult<Json<Vec<mm::Preference>>> {
+    let rows = sqlx::query(
+        "SELECT user_id, category, name, value FROM mattermost_preferences WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    Ok(Json(map_preference_rows(rows)))
+}
+
+fn map_preference_rows(rows: Vec<sqlx::postgres::PgRow>) -> Vec<mm::Preference> {
+    rows.into_iter().map(map_preference_row).collect()
+}
+
+fn map_preference_row(row: sqlx::postgres::PgRow) -> mm::Preference {
+    use sqlx::Row;
+    let uid: Uuid = row.try_get("user_id").unwrap_or_default();
+    mm::Preference {
+        user_id: encode_mm_id(uid),
+        category: row.try_get("category").unwrap_or_default(),
+        name: row.try_get("name").unwrap_or_default(),
+        value: row.try_get("value").unwrap_or_default(),
+    }
+}
+
+fn validate_preferences_len(prefs: &[mm::Preference]) -> ApiResult<()> {
+    if prefs.is_empty() || prefs.len() > MAX_UPDATE_PREFERENCES {
+        return Err(AppError::BadRequest("Invalid preferences".to_string()));
+    }
+    Ok(())
 }
 
 async fn update_preferences_internal(

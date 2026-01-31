@@ -13,7 +13,7 @@ use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
-use crate::models::CreatePost;
+use crate::models::{CreatePost, FileInfo};
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 use crate::services::posts;
 
@@ -24,7 +24,13 @@ pub fn router() -> Router<AppState> {
             "/posts/{post_id}",
             get(get_post).delete(delete_post),
         )
+        .route("/posts/{post_id}/files/info", get(get_post_files_info))
         .route("/posts/{post_id}/patch", put(patch_post))
+        .route(
+            "/users/{user_id}/posts/{post_id}/set_unread",
+            post(set_post_unread),
+        )
+        .route("/users/{user_id}/posts/flagged", get(get_flagged_posts))
         .route("/posts/{post_id}/ack", post(ack_post))
         .route("/reactions", post(add_reaction))
         .route("/users/me/posts/{post_id}/reactions/{emoji_name}", delete(remove_reaction))
@@ -169,6 +175,49 @@ async fn get_post(
     Ok(Json(mm_post))
 }
 
+async fn get_post_files_info(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(post_id): Path<String>,
+) -> ApiResult<Json<Vec<mm::FileInfo>>> {
+    let post_id = parse_mm_or_uuid(&post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    let post: crate::models::post::Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(post_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    let _: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(post.channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    if post.file_ids.is_empty() {
+        return Ok(Json(Vec::new()));
+    }
+
+    let files: Vec<FileInfo> =
+        sqlx::query_as("SELECT * FROM files WHERE id = ANY($1)")
+            .bind(&post.file_ids)
+            .fetch_all(&state.db)
+            .await?;
+
+    let mm_files: Vec<mm::FileInfo> = files.into_iter().map(|f| f.into()).collect();
+    Ok(Json(mm_files))
+}
+
 async fn get_post_thread(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -263,6 +312,153 @@ async fn get_post_thread(
         posts: posts_map,
         next_post_id: "".to_string(),
         prev_post_id: "".to_string(),
+    }))
+}
+
+#[derive(Deserialize)]
+struct SetUnreadPath {
+    user_id: String,
+    post_id: String,
+}
+
+#[derive(serde::Serialize)]
+struct ChannelUnreadAt {
+    team_id: String,
+    channel_id: String,
+    msg_count: i64,
+    mention_count: i64,
+    last_viewed_at: i64,
+}
+
+async fn set_post_unread(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(path): Path<SetUnreadPath>,
+) -> ApiResult<Json<ChannelUnreadAt>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)
+        .map_err(|_| AppError::Forbidden("Cannot access another user's posts".to_string()))?;
+    let post_id = parse_mm_or_uuid(&path.post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    let (channel_id, team_id, seq): (Uuid, Uuid, i64) = sqlx::query_as(
+        r#"
+        SELECT p.channel_id, c.team_id, p.seq
+        FROM posts p
+        JOIN channels c ON p.channel_id = c.id
+        WHERE p.id = $1 AND p.deleted_at IS NULL
+        "#,
+    )
+    .bind(post_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    let _: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    let last_read_id = if seq > 0 { seq - 1 } else { 0 };
+
+    sqlx::query(
+        r#"
+        INSERT INTO channel_reads (user_id, channel_id, last_read_message_id, last_read_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (user_id, channel_id)
+        DO UPDATE SET last_read_message_id = $3, last_read_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(channel_id)
+    .bind(last_read_id)
+    .execute(&state.db)
+    .await?;
+
+    let last_viewed_at: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+        "SELECT last_viewed_at FROM channel_members WHERE channel_id = $1 AND user_id = $2",
+    )
+    .bind(channel_id)
+    .bind(user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(ChannelUnreadAt {
+        team_id: encode_mm_id(team_id),
+        channel_id: encode_mm_id(channel_id),
+        msg_count: last_read_id,
+        mention_count: 0,
+        last_viewed_at: last_viewed_at
+            .map(|t| t.timestamp_millis())
+            .unwrap_or(0),
+    }))
+}
+
+async fn get_flagged_posts(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<mm::PostList>> {
+    let user_id = if user_id == "me" {
+        auth.user_id
+    } else {
+        let parsed = parse_mm_or_uuid(&user_id)
+            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+        if parsed != auth.user_id && auth.role != "system_admin" && auth.role != "org_admin" {
+            return Err(AppError::Forbidden("Cannot access another user's posts".to_string()));
+        }
+        parsed
+    };
+
+    let posts: Vec<crate::models::post::PostResponse> = sqlx::query_as(
+        r#"
+        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+               p.reply_count::int8 as reply_count,
+               p.last_reply_at, p.seq,
+               u.username, u.avatar_url, u.email
+        FROM saved_posts s
+        JOIN posts p ON s.post_id = p.id
+        LEFT JOIN users u ON p.user_id = u.id
+        WHERE s.user_id = $1 AND p.deleted_at IS NULL
+        ORDER BY s.created_at DESC
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut order = Vec::new();
+    let mut posts_map: std::collections::HashMap<String, mm::Post> =
+        std::collections::HashMap::new();
+    let mut post_ids = Vec::new();
+    let mut id_map = Vec::new();
+
+    for p in posts {
+        let id = encode_mm_id(p.id);
+        post_ids.push(p.id);
+        id_map.push((p.id, id.clone()));
+        order.push(id.clone());
+        posts_map.insert(id, p.into());
+    }
+
+    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
+    for (post_uuid, post_id) in id_map {
+        if let Some(reactions) = reactions_map.get(&post_uuid) {
+            if !reactions.is_empty() {
+                if let Some(post) = posts_map.get_mut(&post_id) {
+                    post.metadata = Some(json!({ "reactions": reactions }));
+                }
+            }
+        }
+    }
+
+    Ok(Json(mm::PostList {
+        order,
+        posts: posts_map,
+        next_post_id: String::new(),
+        prev_post_id: String::new(),
     }))
 }
 
