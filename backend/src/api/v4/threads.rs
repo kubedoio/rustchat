@@ -287,13 +287,16 @@ pub async fn get_all_threads_internal(
     Path(path): Path<ThreadsAllPath>,
     Query(query): Query<ThreadsQuery>,
 ) -> ApiResult<Json<mm::ThreadResponse>> {
-    let user_id = parse_mm_or_uuid(&path.user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
-
-    if user_id != auth.user_id && path.user_id != "me" {
-        return Err(AppError::Forbidden("Can only access your own threads".to_string()));
-    }
-    let user_id = auth.user_id;
+    let user_id = if path.user_id == "me" {
+        auth.user_id
+    } else {
+        let parsed_user_id = parse_mm_or_uuid(&path.user_id)
+            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+        if parsed_user_id != auth.user_id {
+            return Err(AppError::Forbidden("Can only access your own threads".to_string()));
+        }
+        parsed_user_id
+    };
 
     let per_page = query.per_page.min(100);
     let offset = query.page * per_page;

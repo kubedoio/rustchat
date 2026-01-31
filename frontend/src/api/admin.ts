@@ -25,8 +25,28 @@ export interface SiteConfig {
     logo_url?: string;
     site_description: string;
     site_url: string;
+    about_link: string;
+    help_link: string;
+    terms_of_service_link: string;
+    privacy_policy_link: string;
+    report_a_problem_link: string;
+    support_email: string;
+    app_download_link: string;
+    android_app_download_link: string;
+    ios_app_download_link: string;
+    custom_brand_text: string;
+    custom_description_text: string;
+    service_environment: string;
     max_file_size_mb: number;
     max_simultaneous_connections: number;
+    enable_file: boolean;
+    enable_user_statuses: boolean;
+    enable_custom_emoji: boolean;
+    enable_custom_brand: boolean;
+    enable_mobile_file_download: boolean;
+    enable_mobile_file_upload: boolean;
+    allow_download_logs: boolean;
+    diagnostics_enabled: boolean;
     default_locale: string;
     default_timezone: string;
 }
@@ -36,10 +56,26 @@ export interface AuthConfig {
     enable_sso: boolean;
     require_sso: boolean;
     allow_registration: boolean;
+    enable_sign_in_with_email: boolean;
+    enable_sign_in_with_username: boolean;
+    enable_sign_up_with_email: boolean;
+    enable_sign_up_with_gitlab: boolean;
+    enable_sign_up_with_google: boolean;
+    enable_sign_up_with_office365: boolean;
+    enable_sign_up_with_openid: boolean;
+    enable_user_creation: boolean;
+    enable_open_server: boolean;
+    enable_guest_accounts: boolean;
+    enable_multifactor_authentication: boolean;
+    enforce_multifactor_authentication: boolean;
+    enable_saml: boolean;
+    enable_ldap: boolean;
     password_min_length: number;
+    password_require_lowercase: boolean;
     password_require_uppercase: boolean;
     password_require_number: boolean;
     password_require_symbol: boolean;
+    password_enable_forgot_link: boolean;
     session_length_hours: number;
 }
 
