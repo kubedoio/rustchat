@@ -1,7 +1,7 @@
 use axum::{
     body::Bytes,
     extract::{Path, Query, State},
-    routing::{get, post},
+    routing::{get, post, put},
     Json, Router,
 };
 use serde::Deserialize;
@@ -17,6 +17,12 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/commands", get(list_commands))
         .route("/commands/execute", post(execute_command))
+        .route(
+            "/commands/{command_id}",
+            get(get_command).put(update_command).delete(delete_command),
+        )
+        .route("/commands/{command_id}/move", put(move_command))
+        .route("/commands/{command_id}/regen_token", post(regenerate_command_token))
         .route(
             "/teams/{team_id}/commands/autocomplete_suggestions",
             get(autocomplete_suggestions),
@@ -141,4 +147,46 @@ async fn autocomplete_suggestions(
         "suggestions": suggestions,
         "did_succeed": true
     })))
+}
+
+async fn get_command(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_command_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn update_command(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_command_id): Path<String>,
+    Json(_command): Json<serde_json::Value>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn delete_command(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_command_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn move_command(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_command_id): Path<String>,
+    Json(_body): Json<serde_json::Value>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn regenerate_command_token(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_command_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"token": ""})))
 }

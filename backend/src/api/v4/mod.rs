@@ -14,6 +14,9 @@ pub mod bots;
 pub mod admin;
 pub mod oauth;
 pub mod saml;
+pub mod schemes;
+pub mod cluster;
+pub mod brand;
 pub mod websocket;
 pub mod extractors;
 pub mod files;
@@ -38,14 +41,15 @@ pub fn router() -> Router<AppState> {
         .merge(posts::router())
         .merge(files::router())
         .merge(system::router())
-        .merge(image::router())
-        .merge(threads::router())
         .merge(config_client::router())
         .merge(hooks::router())
         .merge(bots::router())
         .merge(admin::router())
         .merge(saml::router())
         .merge(oauth::router())
+        .merge(schemes::router())
+        .merge(cluster::router())
+        .merge(brand::router())
         .merge(uploads::router())
         .route("/websocket", axum::routing::get(websocket::handle_websocket))
         .fallback(not_implemented)

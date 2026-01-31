@@ -73,6 +73,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/teams/{team_id}/channels/search", post(search_channels))
         .route("/teams/search", post(search_teams))
+        .route("/teams/{team_id}/commands/autocomplete", get(autocomplete_team_commands))
 }
 
 async fn get_teams(
@@ -866,4 +867,12 @@ async fn search_teams(
     .await?;
 
     Ok(Json(teams.into_iter().map(|t| t.into()).collect()))
+}
+
+async fn autocomplete_team_commands(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_team_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    Ok(Json(vec![]))
 }

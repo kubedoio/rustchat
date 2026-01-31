@@ -5,8 +5,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 285
-- Missing in RustChat: 162
+- Implemented in RustChat (code routes): 303
+- Missing in RustChat: 144
 - RustChat-only endpoints (not in OpenAPI list): 28
 
 ## Status (Mattermost OpenAPI paths)
@@ -293,11 +293,11 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/cluster/status` | Not implemented | - |
 | `/api/v4/brand/image` | Not implemented | - |
 | `/api/v4/commands` | Implemented | commands.rs |
-| `/api/v4/teams/{team_id}/commands/autocomplete` | Not implemented | - |
+| `/api/v4/teams/{team_id}/commands/autocomplete` | Implemented | teams.rs |
 | `/api/v4/teams/{team_id}/commands/autocomplete_suggestions` | Implemented | commands.rs |
-| `/api/v4/commands/{command_id}` | Not implemented | - |
-| `/api/v4/commands/{command_id}/move` | Not implemented | - |
-| `/api/v4/commands/{command_id}/regen_token` | Not implemented | - |
+| `/api/v4/commands/{command_id}` | Implemented | commands.rs |
+| `/api/v4/commands/{command_id}/move` | Implemented | commands.rs |
+| `/api/v4/commands/{command_id}/regen_token` | Implemented | commands.rs |
 | `/api/v4/commands/execute` | Implemented | commands.rs |
 | `/api/v4/oauth/apps` | Implemented | oauth.rs |
 | `/api/v4/oauth/apps/{app_id}` | Implemented | oauth.rs |
@@ -330,21 +330,21 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/roles/name/{role_name}` | Not implemented | - |
 | `/api/v4/roles/{role_id}/patch` | Not implemented | - |
 | `/api/v4/roles/names` | Implemented | users.rs |
-| `/api/v4/schemes` | Not implemented | - |
-| `/api/v4/schemes/{scheme_id}` | Not implemented | - |
-| `/api/v4/schemes/{scheme_id}/patch` | Not implemented | - |
-| `/api/v4/schemes/{scheme_id}/teams` | Not implemented | - |
-| `/api/v4/schemes/{scheme_id}/channels` | Not implemented | - |
+| `/api/v4/schemes` | Implemented | schemes.rs |
+| `/api/v4/schemes/{scheme_id}` | Implemented | schemes.rs |
+| `/api/v4/schemes/{scheme_id}/patch` | Implemented | schemes.rs |
+| `/api/v4/schemes/{scheme_id}/teams` | Implemented | schemes.rs |
+| `/api/v4/schemes/{scheme_id}/channels` | Implemented | schemes.rs |
 | `/api/v4/terms_of_service` | Not implemented | - |
-| `/api/v4/remotecluster` | Not implemented | - |
-| `/api/v4/remotecluster/{remote_id}` | Not implemented | - |
-| `/api/v4/remotecluster/{remote_id}/generate_invite` | Not implemented | - |
-| `/api/v4/remotecluster/accept_invite` | Not implemented | - |
+| `/api/v4/remotecluster` | Implemented | cluster.rs |
+| `/api/v4/remotecluster/{remote_id}` | Implemented | cluster.rs |
+| `/api/v4/remotecluster/{remote_id}/generate_invite` | Implemented | cluster.rs |
+| `/api/v4/remotecluster/accept_invite` | Implemented | cluster.rs |
 | `/api/v4/sharedchannels/{team_id}` | Not implemented | - |
-| `/api/v4/remotecluster/{remote_id}/sharedchannelremotes` | Not implemented | - |
+| `/api/v4/remotecluster/{remote_id}/sharedchannelremotes` | Implemented | cluster.rs |
 | `/api/v4/sharedchannels/remote_info/{remote_id}` | Not implemented | - |
-| `/api/v4/remotecluster/{remote_id}/channels/{channel_id}/invite` | Not implemented | - |
-| `/api/v4/remotecluster/{remote_id}/channels/{channel_id}/uninvite` | Not implemented | - |
+| `/api/v4/remotecluster/{remote_id}/channels/{channel_id}/invite` | Implemented | cluster.rs |
+| `/api/v4/remotecluster/{remote_id}/channels/{channel_id}/uninvite` | Implemented | cluster.rs |
 | `/api/v4/sharedchannels/{channel_id}/remotes` | Not implemented | - |
 | `/api/v4/sharedchannels/users/{user_id}/can_dm/{other_user_id}` | Not implemented | - |
 | `/api/v4/reactions` | Implemented | posts.rs |
