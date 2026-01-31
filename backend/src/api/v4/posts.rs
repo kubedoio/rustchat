@@ -226,7 +226,7 @@ async fn get_post_thread(
 
     // 4. Construct response
     let mut order = Vec::new();
-    let mut posts_map = HashMap::new();
+    let mut posts_map: HashMap<String, mm::Post> = HashMap::new();
     let mut post_ids = Vec::new();
     let mut id_map = Vec::new();
 

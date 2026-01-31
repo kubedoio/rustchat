@@ -730,7 +730,7 @@ async fn get_pinned_posts(
     .await?;
 
     let mut order = Vec::new();
-    let mut posts_map = HashMap::new();
+    let mut posts_map: HashMap<String, mm::Post> = HashMap::new();
     let mut post_ids = Vec::new();
     let mut id_map = Vec::new();
 
@@ -1077,7 +1077,7 @@ async fn get_posts(
     };
 
     let mut order = Vec::new();
-    let mut posts_map = HashMap::new();
+    let mut posts_map: HashMap<String, mm::Post> = HashMap::new();
     let mut post_ids = Vec::new();
     let mut id_map = Vec::new();
 
