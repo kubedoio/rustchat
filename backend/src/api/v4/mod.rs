@@ -17,6 +17,10 @@ pub mod saml;
 pub mod schemes;
 pub mod cluster;
 pub mod brand;
+pub mod ldap;
+pub mod access_control;
+pub mod content_flagging;
+pub mod usage;
 pub mod websocket;
 pub mod extractors;
 pub mod files;
@@ -50,6 +54,10 @@ pub fn router() -> Router<AppState> {
         .merge(schemes::router())
         .merge(cluster::router())
         .merge(brand::router())
+        .merge(ldap::router())
+        .merge(access_control::router())
+        .merge(content_flagging::router())
+        .merge(usage::router())
         .merge(uploads::router())
         .route("/websocket", axum::routing::get(websocket::handle_websocket))
         .fallback(not_implemented)

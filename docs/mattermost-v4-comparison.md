@@ -5,8 +5,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 303
-- Missing in RustChat: 144
+- Implemented in RustChat (code routes): 340
+- Missing in RustChat: 107
 - RustChat-only endpoints (not in OpenAPI list): 28
 
 ## Status (Mattermost OpenAPI paths)
@@ -261,16 +261,16 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/compliance/reports` | Not implemented | - |
 | `/api/v4/compliance/reports/{report_id}` | Not implemented | - |
 | `/api/v4/compliance/reports/{report_id}/download` | Not implemented | - |
-| `/api/v4/ldap/sync` | Not implemented | - |
-| `/api/v4/ldap/test` | Not implemented | - |
-| `/api/v4/ldap/test_connection` | Not implemented | - |
-| `/api/v4/ldap/test_diagnostics` | Not implemented | - |
-| `/api/v4/ldap/groups` | Not implemented | - |
-| `/api/v4/ldap/groups/{remote_id}/link` | Not implemented | - |
-| `/api/v4/ldap/migrateid` | Not implemented | - |
-| `/api/v4/ldap/certificate/public` | Not implemented | - |
-| `/api/v4/ldap/certificate/private` | Not implemented | - |
-| `/api/v4/ldap/users/{user_id}/group_sync_memberships` | Not implemented | - |
+| `/api/v4/ldap/sync` | Implemented | ldap.rs |
+| `/api/v4/ldap/test` | Implemented | ldap.rs |
+| `/api/v4/ldap/test_connection` | Implemented | ldap.rs |
+| `/api/v4/ldap/test_diagnostics` | Implemented | ldap.rs |
+| `/api/v4/ldap/groups` | Implemented | ldap.rs |
+| `/api/v4/ldap/groups/{remote_id}/link` | Implemented | ldap.rs |
+| `/api/v4/ldap/migrateid` | Implemented | ldap.rs |
+| `/api/v4/ldap/certificate/public` | Implemented | ldap.rs |
+| `/api/v4/ldap/certificate/private` | Implemented | ldap.rs |
+| `/api/v4/ldap/users/{user_id}/group_sync_memberships` | Implemented | ldap.rs |
 | `/api/v4/groups` | Implemented | groups.rs |
 | `/api/v4/groups/{group_id}` | Implemented | groups.rs |
 | `/api/v4/groups/{group_id}/patch` | Implemented | groups.rs |
@@ -373,8 +373,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/cloud/subscription/invoices/{invoice_id}/pdf` | Not implemented | - |
 | `/api/v4/cloud/webhook` | Not implemented | - |
 | `/api/v4/cloud/preview/modal_data` | Not implemented | - |
-| `/api/v4/usage/posts` | Not implemented | - |
-| `/api/v4/usage/storage` | Not implemented | - |
+| `/api/v4/usage/posts` | Implemented | usage.rs |
+| `/api/v4/usage/storage` | Implemented | usage.rs |
 | `/api/v4/permissions/ancillary` | Not implemented | - |
 | `/api/v4/imports` | Not implemented | - |
 | `/api/v4/imports/{import_name}` | Not implemented | - |
@@ -404,32 +404,32 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/custom_profile_attributes/group` | Not implemented | - |
 | `/api/v4/users/{user_id}/custom_profile_attributes` | Implemented | users.rs |
 | `/api/v4/audit_logs/certificate` | Not implemented | - |
-| `/api/v4/access_control_policies` | Not implemented | - |
-| `/api/v4/access_control_policies/cel/check` | Not implemented | - |
-| `/api/v4/access_control_policies/cel/validate_requester` | Not implemented | - |
-| `/api/v4/access_control_policies/cel/test` | Not implemented | - |
-| `/api/v4/access_control_policies/search` | Not implemented | - |
-| `/api/v4/access_control_policies/cel/autocomplete/fields` | Not implemented | - |
-| `/api/v4/access_control_policies/{policy_id}` | Not implemented | - |
-| `/api/v4/access_control_policies/{policy_id}/activate` | Not implemented | - |
-| `/api/v4/access_control_policies/{policy_id}/assign` | Not implemented | - |
-| `/api/v4/access_control_policies/{policy_id}/unassign` | Not implemented | - |
-| `/api/v4/access_control_policies/{policy_id}/resources/channels` | Not implemented | - |
-| `/api/v4/access_control_policies/{policy_id}/resources/channels/search` | Not implemented | - |
+| `/api/v4/access_control_policies` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/cel/check` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/cel/validate_requester` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/cel/test` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/search` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/cel/autocomplete/fields` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/{policy_id}` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/{policy_id}/activate` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/{policy_id}/assign` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/{policy_id}/unassign` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/{policy_id}/resources/channels` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/{policy_id}/resources/channels/search` | Implemented | access_control.rs |
 | `/api/v4/channels/{channel_id}/access_control/attributes` | Implemented | channels.rs |
-| `/api/v4/access_control_policies/cel/visual_ast` | Not implemented | - |
-| `/api/v4/access_control_policies/activate` | Not implemented | - |
-| `/api/v4/content_flagging/flag/config` | Not implemented | - |
-| `/api/v4/content_flagging/team/{team_id}/status` | Not implemented | - |
-| `/api/v4/content_flagging/post/{post_id}/flag` | Not implemented | - |
-| `/api/v4/content_flagging/fields` | Not implemented | - |
-| `/api/v4/content_flagging/post/{post_id}/field_values` | Not implemented | - |
-| `/api/v4/content_flagging/post/{post_id}` | Not implemented | - |
-| `/api/v4/content_flagging/post/{post_id}/remove` | Not implemented | - |
-| `/api/v4/content_flagging/post/{post_id}/keep` | Not implemented | - |
-| `/api/v4/content_flagging/config` | Not implemented | - |
-| `/api/v4/content_flagging/team/{team_id}/reviewers/search` | Not implemented | - |
-| `/api/v4/content_flagging/post/{post_id}/assign/{content_reviewer_id}` | Not implemented | - |
+| `/api/v4/access_control_policies/cel/visual_ast` | Implemented | access_control.rs |
+| `/api/v4/access_control_policies/activate` | Implemented | access_control.rs |
+| `/api/v4/content_flagging/flag/config` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/team/{team_id}/status` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/post/{post_id}/flag` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/fields` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/post/{post_id}/field_values` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/post/{post_id}` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/post/{post_id}/remove` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/post/{post_id}/keep` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/config` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/team/{team_id}/reviewers/search` | Implemented | content_flagging.rs |
+| `/api/v4/content_flagging/post/{post_id}/assign/{content_reviewer_id}` | Implemented | content_flagging.rs |
 | `/api/v4/agents` | Not implemented | - |
 | `/api/v4/agents/status` | Not implemented | - |
 | `/api/v4/llmservices` | Not implemented | - |
