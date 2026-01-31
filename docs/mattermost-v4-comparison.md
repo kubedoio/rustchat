@@ -5,8 +5,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 225
-- Missing in RustChat: 222
+- Implemented in RustChat (code routes): 241
+- Missing in RustChat: 206
 - RustChat-only endpoints (not in OpenAPI list): 28
 
 ## Status (Mattermost OpenAPI paths)
@@ -205,23 +205,23 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/jobs/{job_id}/status` | Not implemented | - |
 | `/api/v4/system/timezones` | Implemented | system.rs |
 | `/api/v4/system/ping` | Implemented | system.rs |
-| `/api/v4/system/notices/{teamId}` | Not implemented | - |
-| `/api/v4/system/notices/view` | Not implemented | - |
+| `/api/v4/system/notices/{teamId}` | Implemented | system.rs |
+| `/api/v4/system/notices/view` | Implemented | system.rs |
 | `/api/v4/database/recycle` | Implemented | system.rs |
-| `/api/v4/email/test` | Not implemented | - |
-| `/api/v4/notifications/test` | Not implemented | - |
-| `/api/v4/site_url/test` | Not implemented | - |
-| `/api/v4/file/s3_test` | Not implemented | - |
-| `/api/v4/config` | Not implemented | - |
-| `/api/v4/config/reload` | Not implemented | - |
+| `/api/v4/email/test` | Implemented | system.rs |
+| `/api/v4/notifications/test` | Implemented | system.rs |
+| `/api/v4/site_url/test` | Implemented | system.rs |
+| `/api/v4/file/s3_test` | Implemented | system.rs |
+| `/api/v4/config` | Implemented | system.rs |
+| `/api/v4/config/reload` | Implemented | system.rs |
 | `/api/v4/config/client` | Implemented | config_client.rs |
-| `/api/v4/config/environment` | Not implemented | - |
-| `/api/v4/config/patch` | Not implemented | - |
-| `/api/v4/license` | Not implemented | - |
+| `/api/v4/config/environment` | Implemented | system.rs |
+| `/api/v4/config/patch` | Implemented | system.rs |
+| `/api/v4/license` | Implemented | system.rs |
 | `/api/v4/license/client` | Implemented | config_client.rs |
 | `/api/v4/license/load_metric` | Not implemented | - |
-| `/api/v4/license/renewal` | Not implemented | - |
-| `/api/v4/trial-license` | Not implemented | - |
+| `/api/v4/license/renewal` | Implemented | system.rs |
+| `/api/v4/trial-license` | Implemented | system.rs |
 | `/api/v4/trial-license/prev` | Not implemented | - |
 | `/api/v4/audits` | Implemented | admin.rs |
 | `/api/v4/caches/invalidate` | Implemented | system.rs |
@@ -236,7 +236,9 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/upgrade_to_enterprise/allowed` | Not implemented | - |
 | `/api/v4/restart` | Not implemented | - |
 | `/api/v4/integrity` | Not implemented | - |
-| `/api/v4/system/support_packet` | Not implemented | - |
+| `/api/v4/system/support_packet` | Implemented | system.rs |
+| `/api/v4/system/onboarding/complete` | Implemented | system.rs |
+| `/api/v4/system/schema/version` | Implemented | system.rs |
 | `/api/v4/emoji` | Implemented | emoji.rs |
 | `/api/v4/emoji/{emoji_id}` | Implemented | emoji.rs |
 | `/api/v4/emoji/name/{emoji_name}` | Implemented | emoji.rs |

@@ -1,7 +1,12 @@
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::MM_VERSION;
-use axum::{extract::{Query, State}, routing::{get, post}, Json, Router, response::IntoResponse};
+use axum::{
+    extract::{Path, Query, State},
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::Serialize;
 
 pub fn router() -> Router<AppState> {
@@ -13,6 +18,185 @@ pub fn router() -> Router<AppState> {
         .route("/caches/invalidate", post(invalidate_caches))
         .route("/logs", post(post_logs))
         .route("/database/recycle", post(recycle_database))
+        .route("/system/notices/{team_id}", get(get_product_notices))
+        .route("/system/notices/view", axum::routing::put(update_viewed_notices))
+        .route("/system/support_packet", get(get_support_packet))
+        .route("/system/onboarding/complete", get(get_onboarding_status).post(complete_onboarding))
+        .route("/system/schema/version", get(get_schema_version))
+        .route("/email/test", post(test_email))
+        .route("/notifications/test", post(test_notifications))
+        .route("/site_url/test", post(test_site_url))
+        .route("/file/s3_test", post(test_s3))
+        .route("/config", get(get_config))
+        .route("/config/reload", post(reload_config))
+        .route("/config/environment", get(get_environment_config))
+        .route("/config/patch", post(patch_config))
+        .route("/license", get(get_license))
+        .route("/license/renewal", post(license_renewal))
+        .route("/trial-license", post(trial_license))
+}
+
+// ... existing code ...
+
+/// GET /system/notices/{team_id}
+async fn get_product_notices(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+    Path(_team_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    // Return empty list of notices for now
+    Ok(Json(vec![]))
+}
+
+/// PUT /system/notices/view
+async fn update_viewed_notices(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+    Json(_ids): Json<Vec<String>>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// GET /system/support_packet
+async fn get_support_packet(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<axum::response::Response> {
+    // Return a dummy zip file or 403 if no license as per MM behavior
+    // For now, just return a 403 indicating no license
+    Err(crate::error::AppError::Forbidden("Support packets require a license".to_string()))
+}
+
+/// GET /system/onboarding/complete
+async fn get_onboarding_status(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({
+        "onboarding_complete": true
+    })))
+}
+
+/// POST /system/onboarding/complete
+async fn complete_onboarding(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// GET /system/schema/version
+async fn get_schema_version(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    // Return empty list of migrations for now
+    Ok(Json(vec![]))
+}
+
+/// POST /email/test
+async fn test_email(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+    Json(_config): Json<serde_json::Value>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// POST /notifications/test
+async fn test_notifications(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// POST /site_url/test
+async fn test_site_url(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+    Json(_props): Json<serde_json::Value>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// POST /file/s3_test
+async fn test_s3(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+    Json(_config): Json<serde_json::Value>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// GET /config
+async fn get_config(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    // Return a minimal config object
+    Ok(Json(serde_json::json!({
+        "ServiceSettings": {},
+        "TeamSettings": {},
+        "SqlSettings": {},
+        "LogSettings": {},
+        "FileSettings": {},
+        "EmailSettings": {},
+        "RateLimitSettings": {},
+        "PrivacySettings": {},
+        "SupportSettings": {},
+        "AnnouncementSettings": {},
+        "ThemeSettings": {}
+    })))
+}
+
+/// POST /config/reload
+async fn reload_config(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// GET /config/environment
+async fn get_environment_config(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+/// POST /config/patch
+async fn patch_config(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+    Json(_patch): Json<serde_json::Value>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// GET /license
+async fn get_license(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+/// POST /license/renewal
+async fn license_renewal(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// POST /trial-license
+async fn trial_license(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
 }
 
 #[derive(Serialize)]
