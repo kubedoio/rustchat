@@ -28,9 +28,9 @@ pub async fn list_emoji(
 ) -> ApiResult<Json<Vec<mm::Emoji>>> {
     let emojis: Vec<mm::Emoji> = sqlx::query_as(
         "SELECT id::text, name, creator_id::text, 
-                extract(epoch from create_at)*1000 as create_at, 
-                extract(epoch from update_at)*1000 as update_at, 
-                extract(epoch from delete_at)*1000 as delete_at 
+                (extract(epoch from create_at)*1000)::bigint as create_at, 
+                (extract(epoch from update_at)*1000)::bigint as update_at, 
+                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
          FROM custom_emojis WHERE delete_at IS NULL"
     )
     .fetch_all(&state.db)
@@ -47,9 +47,9 @@ pub async fn search_emoji(
     let term = format!("%{}%", input.term);
     let emojis: Vec<mm::Emoji> = sqlx::query_as(
         "SELECT id::text, name, creator_id::text, 
-                extract(epoch from create_at)*1000 as create_at, 
-                extract(epoch from update_at)*1000 as update_at, 
-                extract(epoch from delete_at)*1000 as delete_at 
+                (extract(epoch from create_at)*1000)::bigint as create_at, 
+                (extract(epoch from update_at)*1000)::bigint as update_at, 
+                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
          FROM custom_emojis 
          WHERE name ILIKE $1 AND delete_at IS NULL"
     )
@@ -70,9 +70,9 @@ pub async fn get_emoji(
 
     let emoji: Option<mm::Emoji> = sqlx::query_as(
         "SELECT id::text, name, creator_id::text, 
-                extract(epoch from create_at)*1000 as create_at, 
-                extract(epoch from update_at)*1000 as update_at, 
-                extract(epoch from delete_at)*1000 as delete_at 
+                (extract(epoch from create_at)*1000)::bigint as create_at, 
+                (extract(epoch from update_at)*1000)::bigint as update_at, 
+                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
          FROM custom_emojis WHERE id = $1 AND delete_at IS NULL"
     )
     .bind(emoji_id)
@@ -91,9 +91,9 @@ pub async fn get_emoji_by_name(
 ) -> ApiResult<Json<mm::Emoji>> {
     let emoji: Option<mm::Emoji> = sqlx::query_as(
         "SELECT id::text, name, creator_id::text, 
-                extract(epoch from create_at)*1000 as create_at, 
-                extract(epoch from update_at)*1000 as update_at, 
-                extract(epoch from delete_at)*1000 as delete_at 
+                (extract(epoch from create_at)*1000)::bigint as create_at, 
+                (extract(epoch from update_at)*1000)::bigint as update_at, 
+                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
          FROM custom_emojis WHERE name = $1 AND delete_at IS NULL"
     )
     .bind(name)

@@ -198,7 +198,7 @@ async fn mm_files_upload() {
     // Register User
     let org_id = Uuid::new_v4();
     sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)").bind(org_id).bind("OrgFile").execute(&app.db_pool).await.unwrap();
-    let user_data = serde_json::json!({ "username": "fuser", "email": "f@x.com", "password": "P!", "org_id": org_id });
+    let user_data = serde_json::json!({ "username": "fuser", "email": "f@x.com", "password": "Password99", "org_id": org_id });
     let reg_res = app.api_client.post(format!("{}/api/v1/auth/register", &app.address)).json(&user_data).send().await.unwrap();
     let token = reg_res.json::<serde_json::Value>().await.unwrap()["token"].as_str().unwrap().to_string();
 
@@ -222,4 +222,89 @@ async fn mm_files_upload() {
 
     // It redirects to S3.
     assert!(info_res.status().is_redirection() || info_res.status().is_success());
+}
+
+#[tokio::test]
+async fn mm_emoji_smoke() {
+    let app = spawn_app().await;
+
+    let org_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)")
+        .bind(org_id)
+        .bind("OrgEmoji")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+
+    let user_data = serde_json::json!({
+        "username": "euser",
+        "email": "e@x.com",
+        "password": "Password99",
+        "org_id": org_id
+    });
+    let reg_res = app
+        .api_client
+        .post(format!("{}/api/v1/auth/register", &app.address))
+        .json(&user_data)
+        .send()
+        .await
+        .unwrap();
+    let token = reg_res.json::<serde_json::Value>().await.unwrap()["token"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let emoji_name = "emoji_smoke";
+    let emoji_id: Uuid = sqlx::query_scalar(
+        "INSERT INTO custom_emojis (name, creator_id) VALUES ($1, (SELECT id FROM users WHERE email = $2)) RETURNING id",
+    )
+    .bind(emoji_name)
+    .bind("e@x.com")
+    .fetch_one(&app.db_pool)
+    .await
+    .unwrap();
+
+    let list_res = app
+        .api_client
+        .get(format!("{}/api/v4/emoji", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, list_res.status().as_u16());
+
+    let by_name_res = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/emoji/name/{}",
+            &app.address, emoji_name
+        ))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, by_name_res.status().as_u16());
+    let by_name_body: serde_json::Value = by_name_res.json().await.unwrap();
+    assert_eq!(by_name_body["name"], emoji_name);
+
+    let by_id_res = app
+        .api_client
+        .get(format!("{}/api/v4/emoji/{}", &app.address, emoji_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, by_id_res.status().as_u16());
+    let by_id_body: serde_json::Value = by_id_res.json().await.unwrap();
+    assert_eq!(by_id_body["id"], emoji_id.to_string());
+
+    let search_res = app
+        .api_client
+        .post(format!("{}/api/v4/emoji/search", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "term": "emoji" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, search_res.status().as_u16());
 }

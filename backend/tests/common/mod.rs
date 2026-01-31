@@ -47,6 +47,11 @@ pub async fn spawn_app() -> TestApp {
         "us-east-1".to_string(),
     );
 
+    s3_client
+        .ensure_bucket()
+        .await
+        .expect("Failed to create test bucket");
+
     let jwt_secret = Uuid::new_v4().to_string();
     let jwt_expiry_hours = 1;
 

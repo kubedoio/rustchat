@@ -1,10 +1,10 @@
 use super::{id::encode_mm_id, models as mm};
 use crate::models::{
     channel::{Channel, ChannelMember, ChannelType},
+    file::FileInfo,
     post::{Post, PostResponse},
     team::{Team, TeamMember},
     user::User,
-    file::FileInfo,
 };
 use serde_json::json;
 
@@ -223,7 +223,6 @@ mod tests {
             last_login_at: None,
             created_at: now,
             updated_at: now,
-            password_updated_at: now,
         };
 
         let mm_u: mm::User = u.into();

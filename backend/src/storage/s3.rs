@@ -7,6 +7,8 @@ use aws_sdk_s3::{
     primitives::ByteStream,
     Client, Config,
 };
+use aws_sdk_s3::error::ProvideErrorMetadata;
+use aws_sdk_s3::error::SdkError;
 use std::time::Duration;
 use tracing::error;
 
@@ -108,6 +110,39 @@ impl S3Client {
             })?;
 
         Ok(())
+    }
+
+    /// Ensure bucket exists (create if missing)
+    pub async fn ensure_bucket(&self) -> Result<(), AppError> {
+        let result = self
+            .client
+            .create_bucket()
+            .bucket(&self.bucket)
+            .send()
+            .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(SdkError::ServiceError(service_error)) => {
+                let code = service_error.err().code().unwrap_or_default();
+                if code == "BucketAlreadyOwnedByYou" || code == "BucketAlreadyExists" {
+                    Ok(())
+                } else {
+                    error!(error = ?service_error, bucket = %self.bucket, "S3 create bucket failed");
+                    Err(AppError::Internal(format!(
+                        "S3 create bucket error: {:?}",
+                        service_error
+                    )))
+                }
+            }
+            Err(e) => {
+                error!(error = ?e, bucket = %self.bucket, "S3 create bucket failed");
+                Err(AppError::Internal(format!(
+                    "S3 create bucket error: {}",
+                    e
+                )))
+            }
+        }
     }
 
     /// Download a file from S3
