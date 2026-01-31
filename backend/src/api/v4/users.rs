@@ -163,6 +163,7 @@ pub fn router() -> Router<AppState> {
             "/users/{user_id}/sidebar/categories/order",
             put(update_category_order),
         )
+        .route("/users/{user_id}/groups", get(get_user_groups))
 }
 
 #[derive(Deserialize)]
@@ -2728,4 +2729,18 @@ async fn get_user_channel_retention_policies(
     Path(_user_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
     Ok(Json(json!({"policies": [], "total_count": 0})))
+}
+
+async fn get_user_groups(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _user_uuid = if user_id == "me" {
+        uuid::Uuid::new_v4() 
+     } else {
+        parse_mm_or_uuid(&user_id)
+            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?
+    };
+    Ok(Json(vec![]))
 }

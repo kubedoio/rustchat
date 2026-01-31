@@ -1,13 +1,20 @@
 use axum::{
     extract::{Query, State},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/bots", get(list_bots).post(create_bot))
+        .route("/bots/{bot_user_id}", get(get_bot).put(update_bot))
+        .route("/bots/{bot_user_id}/disable", post(disable_bot))
+        .route("/bots/{bot_user_id}/enable", post(enable_bot))
+        .route("/bots/{bot_user_id}/assign/{user_id}", post(assign_bot))
+        .route("/bots/{bot_user_id}/icon", get(get_bot_icon).post(set_bot_icon).delete(delete_bot_icon))
+        .route("/bots/{bot_user_id}/convert_to_user", post(convert_bot_to_user))
 }
+use axum::extract::Path;
 use crate::api::AppState;
 use crate::api::v4::extractors::MmAuthUser;
 use crate::error::{ApiResult};
@@ -121,5 +128,77 @@ fn map_bot(bot: Bot, username: String) -> mm::Bot {
         update_at: bot.updated_at.timestamp_millis(),
         delete_at: 0,
     }
+}
+
+async fn get_bot(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_bot_user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn update_bot(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_bot_user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn disable_bot(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_bot_user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn enable_bot(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_bot_user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn assign_bot(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path((_bot_user_id, _user_id)): Path<(String, String)>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn get_bot_icon(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_bot_user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn set_bot_icon(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_bot_user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn delete_bot_icon(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_bot_user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn convert_bot_to_user(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_bot_user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
 }
 

@@ -74,6 +74,8 @@ pub fn router() -> Router<AppState> {
         .route("/teams/{team_id}/channels/search", post(search_channels))
         .route("/teams/search", post(search_teams))
         .route("/teams/{team_id}/commands/autocomplete", get(autocomplete_team_commands))
+        .route("/teams/{team_id}/groups", get(get_team_groups))
+        .route("/teams/{team_id}/groups_by_channels", get(get_team_groups_by_channels))
 }
 
 async fn get_teams(
@@ -874,5 +876,25 @@ async fn autocomplete_team_commands(
     _auth: MmAuthUser,
     Path(_team_id): Path<String>,
 ) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    Ok(Json(vec![]))
+}
+
+async fn get_team_groups(
+    State(_state): State<AppState>,
+    Path(team_id): Path<String>,
+    Query(_query): Query<serde_json::Value>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _team_id = parse_mm_or_uuid(&team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+    Ok(Json(vec![]))
+}
+
+async fn get_team_groups_by_channels(
+    State(_state): State<AppState>,
+    Path(team_id): Path<String>,
+    Query(_query): Query<serde_json::Value>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _team_id = parse_mm_or_uuid(&team_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
     Ok(Json(vec![]))
 }

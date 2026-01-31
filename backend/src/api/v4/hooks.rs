@@ -1,14 +1,18 @@
 use axum::{
     extract::{State, Query},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/hooks/incoming", get(list_incoming_hooks).post(create_incoming_hook))
+        .route("/hooks/incoming/{hook_id}", get(get_incoming_hook).put(update_incoming_hook).delete(delete_incoming_hook))
         .route("/hooks/outgoing", get(list_outgoing_hooks).post(create_outgoing_hook))
+        .route("/hooks/outgoing/{hook_id}", get(get_outgoing_hook).put(update_outgoing_hook).delete(delete_outgoing_hook))
+        .route("/hooks/outgoing/{hook_id}/regen_token", post(regen_outgoing_hook_token))
 }
+use axum::extract::Path;
 use crate::api::AppState;
 use crate::api::v4::extractors::MmAuthUser;
 use crate::error::{ApiResult, AppError};
@@ -189,4 +193,60 @@ fn map_outgoing_hook(h: OutgoingWebhook) -> mm::OutgoingWebhook {
         description: h.description.unwrap_or_default(),
         content_type: h.content_type.unwrap_or_default(),
     }
+}
+
+async fn get_incoming_hook(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_hook_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn update_incoming_hook(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_hook_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn delete_incoming_hook(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_hook_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn get_outgoing_hook(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_hook_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn update_outgoing_hook(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_hook_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn delete_outgoing_hook(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_hook_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn regen_outgoing_hook_token(
+    State(_state): State<AppState>,
+    _auth: MmAuthUser,
+    Path(_hook_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
 }

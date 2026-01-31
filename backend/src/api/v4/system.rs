@@ -34,6 +34,17 @@ pub fn router() -> Router<AppState> {
         .route("/license", get(get_license))
         .route("/license/renewal", post(license_renewal))
         .route("/trial-license", post(trial_license))
+        .route("/trial-license/prev", get(get_prev_trial_license))
+        .route("/license/load_metric", get(get_client_license_load_metric))
+        .route("/analytics/old", get(get_analytics_old))
+        .route("/server_busy", get(get_server_busy).post(set_server_busy).delete(clear_server_busy))
+        .route("/notifications/ack", post(ack_notification))
+        .route("/redirect_location", get(get_redirect_location))
+        .route("/upgrade_to_enterprise", post(upgrade_to_enterprise))
+        .route("/upgrade_to_enterprise/status", get(get_upgrade_to_enterprise_status))
+        .route("/upgrade_to_enterprise/allowed", get(get_upgrade_to_enterprise_allowed))
+        .route("/restart", post(restart_server))
+        .route("/integrity", post(check_integrity))
 }
 
 // ... existing code ...
@@ -338,5 +349,96 @@ async fn get_timezones() -> ApiResult<Json<Vec<String>>> {
     ].into_iter().map(String::from).collect();
 
     Ok(Json(timezones))
+}
+
+async fn get_prev_trial_license(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn get_client_license_load_metric(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn get_analytics_old(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn get_server_busy(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn set_server_busy(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn clear_server_busy(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn ack_notification(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn get_redirect_location(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"location": ""})))
+}
+
+async fn upgrade_to_enterprise(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn get_upgrade_to_enterprise_status(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn get_upgrade_to_enterprise_allowed(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"allowed": false})))
+}
+
+async fn restart_server(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+async fn check_integrity(
+    State(_state): State<AppState>,
+    _auth: crate::api::v4::extractors::MmAuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
 }
 

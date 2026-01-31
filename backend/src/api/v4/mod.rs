@@ -26,6 +26,14 @@ pub mod roles;
 pub mod cloud;
 pub mod jobs;
 pub mod recaps;
+pub mod compliance;
+pub mod shared_channels;
+pub mod ai;
+pub mod reports;
+pub mod ip_filtering;
+pub mod imports_exports;
+pub mod terms_of_service;
+pub mod dialogs;
 pub mod websocket;
 pub mod extractors;
 pub mod files;
@@ -68,6 +76,14 @@ pub fn router() -> Router<AppState> {
         .merge(cloud::router())
         .merge(jobs::router())
         .merge(recaps::router())
+        .merge(compliance::router())
+        .merge(shared_channels::router())
+        .merge(ai::router())
+        .merge(reports::router())
+        .merge(ip_filtering::router())
+        .merge(imports_exports::router())
+        .merge(terms_of_service::router())
+        .merge(dialogs::router())
         .merge(uploads::router())
         .route("/websocket", axum::routing::get(websocket::handle_websocket))
         .fallback(not_implemented)
