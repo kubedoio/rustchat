@@ -349,6 +349,47 @@ pub static SYSTEM_EMOJIS: LazyLock<HashMap<&'static str, &'static str>> = LazyLo
     m.insert("policeman", "1f46e-200d-2642-fe0f");
     m.insert("policewoman", "1f46e-200d-2640-fe0f");
     m.insert("detective", "1f575-fe0f");
+    // Common reaction emojis - CRITICAL for mobile client
+    m.insert("thumbsup", "1f44d");
+    m.insert("thumbsdown", "1f44e");
+    m.insert("+1", "1f44d");
+    m.insert("-1", "1f44e");
+    m.insert("like", "1f44d");
+    m.insert("dislike", "1f44e");
+    m.insert("white_check_mark", "2705");
+    m.insert("x", "274c");
+    m.insert("heavy_check_mark", "2714-fe0f");
+    m.insert("heavy_multiplication_x", "2716-fe0f");
+    m.insert("question", "2753");
+    m.insert("grey_question", "2754");
+    m.insert("exclamation", "2757");
+    m.insert("grey_exclamation", "2755");
+    m.insert("fire", "1f525");
+    m.insert("tada", "1f389");
+    m.insert("party_popper", "1f389");
+    m.insert("eyes", "1f440");
+    m.insert("thinking", "1f914");
+    m.insert("rocket", "1f680");
+    m.insert("star", "2b50");
+    m.insert("star2", "1f31f");
+    m.insert("bulb", "1f4a1");
+    m.insert("mega", "1f4e3");
+    m.insert("loudspeaker", "1f4e2");
+    m.insert("bell", "1f514");
+    m.insert("no_bell", "1f515");
+    m.insert("bookmark", "1f516");
+    m.insert("pushpin", "1f4cc");
+    m.insert("round_pushpin", "1f4cd");
+    m.insert("link", "1f517");
+    m.insert("calendar", "1f4c6");
+    m.insert("date", "1f4c5");
+    m.insert("clock", "1f550");
+    m.insert("hourglass", "23f3");
+    m.insert("stopwatch", "23f1-fe0f");
+    m.insert("timer", "23f2-fe0f");
+    m.insert("alarm_clock", "23f0");
+    m.insert("checkered_flag", "1f3c1");
+    m.insert("triangular_flag_on_post", "1f6a9");
     m
 });
 

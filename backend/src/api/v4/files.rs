@@ -57,23 +57,27 @@ async fn upload_file(
         } else if name == "client_ids" {
              let txt = field.text().await.unwrap_or_default();
              client_ids.push(txt);
-        } else if name == "files" {
-            let filename = field.file_name().unwrap_or("unknown").to_string();
-            let content_type = field
-                .content_type()
-                .unwrap_or("application/octet-stream")
-                .to_string();
-            let data = field
-                .bytes()
-                .await
-                .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
-                .to_vec();
+        } else if name == "files" || name == "file" || name == "attachment" || name.is_empty() {
+            // Accept multiple field names: "files", "file", "attachment", or unnamed
+            // React Native network client may use different field names
+            if field.file_name().is_some() || field.content_type().is_some() {
+                let filename = field.file_name().unwrap_or("unknown").to_string();
+                let content_type = field
+                    .content_type()
+                    .unwrap_or("application/octet-stream")
+                    .to_string();
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
+                    .to_vec();
 
-            pending_files.push(PendingFile {
-                filename,
-                content_type,
-                data,
-            });
+                pending_files.push(PendingFile {
+                    filename,
+                    content_type,
+                    data,
+                });
+            }
         }
     }
 
