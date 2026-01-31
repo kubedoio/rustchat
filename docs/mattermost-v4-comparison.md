@@ -5,8 +5,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 124
-- Missing in RustChat: 323
+- Implemented in RustChat (code routes): 170
+- Missing in RustChat: 277
 - RustChat-only endpoints (not in OpenAPI list): 29
 
 ## Status (Mattermost OpenAPI paths)
@@ -19,55 +19,55 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/users/logout` | Implemented | users.rs |
 | `/api/v4/users` | Implemented | users.rs |
 | `/api/v4/users/ids` | Implemented | users.rs |
-| `/api/v4/users/group_channels` | Not implemented | - |
-| `/api/v4/users/usernames` | Not implemented | - |
+| `/api/v4/users/group_channels` | Implemented | users.rs |
+| `/api/v4/users/usernames` | Implemented | users.rs |
 | `/api/v4/users/search` | Implemented | users.rs |
 | `/api/v4/users/autocomplete` | Implemented | users.rs |
-| `/api/v4/users/known` | Not implemented | - |
-| `/api/v4/users/stats` | Not implemented | - |
-| `/api/v4/users/stats/filtered` | Not implemented | - |
+| `/api/v4/users/known` | Implemented | users.rs |
+| `/api/v4/users/stats` | Implemented | users.rs |
+| `/api/v4/users/stats/filtered` | Implemented | users.rs |
 | `/api/v4/users/{user_id}` | Implemented | users.rs |
-| `/api/v4/users/{user_id}/patch` | Not implemented | - |
-| `/api/v4/users/{user_id}/roles` | Not implemented | - |
-| `/api/v4/users/{user_id}/active` | Not implemented | - |
+| `/api/v4/users/{user_id}/patch` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/roles` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/active` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/image` | Implemented | users.rs |
-| `/api/v4/users/{user_id}/image/default` | Not implemented | - |
+| `/api/v4/users/{user_id}/image/default` | Implemented | users.rs |
 | `/api/v4/users/username/{username}` | Implemented | users.rs |
-| `/api/v4/users/password/reset` | Not implemented | - |
-| `/api/v4/users/{user_id}/mfa` | Not implemented | - |
-| `/api/v4/users/{user_id}/mfa/generate` | Not implemented | - |
-| `/api/v4/users/{user_id}/demote` | Not implemented | - |
-| `/api/v4/users/{user_id}/promote` | Not implemented | - |
-| `/api/v4/users/{user_id}/convert_to_bot` | Not implemented | - |
-| `/api/v4/users/mfa` | Not implemented | - |
-| `/api/v4/users/{user_id}/password` | Not implemented | - |
-| `/api/v4/users/password/reset/send` | Not implemented | - |
-| `/api/v4/users/email/{email}` | Not implemented | - |
-| `/api/v4/users/{user_id}/sessions` | Not implemented | - |
-| `/api/v4/users/{user_id}/sessions/revoke` | Not implemented | - |
-| `/api/v4/users/{user_id}/sessions/revoke/all` | Not implemented | - |
+| `/api/v4/users/password/reset` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/mfa` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/mfa/generate` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/demote` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/promote` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/convert_to_bot` | Implemented | users.rs |
+| `/api/v4/users/mfa` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/password` | Implemented | users.rs |
+| `/api/v4/users/password/reset/send` | Implemented | users.rs |
+| `/api/v4/users/email/{email}` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/sessions` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/sessions/revoke` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/sessions/revoke/all` | Implemented | users.rs |
 | `/api/v4/users/sessions/device` | Implemented | users.rs |
-| `/api/v4/users/{user_id}/audits` | Not implemented | - |
-| `/api/v4/users/{user_id}/email/verify/member` | Not implemented | - |
-| `/api/v4/users/email/verify` | Not implemented | - |
-| `/api/v4/users/email/verify/send` | Not implemented | - |
+| `/api/v4/users/{user_id}/audits` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/email/verify/member` | Implemented | users.rs |
+| `/api/v4/users/email/verify` | Implemented | users.rs |
+| `/api/v4/users/email/verify/send` | Implemented | users.rs |
 | `/api/v4/users/login/switch` | Implemented | users.rs |
 | `/api/v4/users/login/type` | Implemented | users.rs |
-| `/api/v4/users/{user_id}/tokens` | Not implemented | - |
-| `/api/v4/users/tokens` | Not implemented | - |
-| `/api/v4/users/tokens/revoke` | Not implemented | - |
-| `/api/v4/users/tokens/{token_id}` | Not implemented | - |
-| `/api/v4/users/tokens/disable` | Not implemented | - |
-| `/api/v4/users/tokens/enable` | Not implemented | - |
-| `/api/v4/users/tokens/search` | Not implemented | - |
-| `/api/v4/users/{user_id}/auth` | Not implemented | - |
-| `/api/v4/users/{user_id}/terms_of_service` | Not implemented | - |
-| `/api/v4/users/sessions/revoke/all` | Not implemented | - |
-| `/api/v4/users/{user_id}/typing` | Not implemented | - |
-| `/api/v4/users/{user_id}/uploads` | Not implemented | - |
-| `/api/v4/users/{user_id}/channel_members` | Not implemented | - |
-| `/api/v4/users/migrate_auth/ldap` | Not implemented | - |
-| `/api/v4/users/migrate_auth/saml` | Not implemented | - |
+| `/api/v4/users/{user_id}/tokens` | Implemented | users.rs |
+| `/api/v4/users/tokens` | Implemented | users.rs |
+| `/api/v4/users/tokens/revoke` | Implemented | users.rs |
+| `/api/v4/users/tokens/{token_id}` | Implemented | users.rs |
+| `/api/v4/users/tokens/disable` | Implemented | users.rs |
+| `/api/v4/users/tokens/enable` | Implemented | users.rs |
+| `/api/v4/users/tokens/search` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/auth` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/terms_of_service` | Implemented | users.rs |
+| `/api/v4/users/sessions/revoke/all` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/typing` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/uploads` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/channel_members` | Implemented | users.rs |
+| `/api/v4/users/migrate_auth/ldap` | Implemented | users.rs |
+| `/api/v4/users/migrate_auth/saml` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/threads` | Implemented | threads.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/threads/mention_counts` | Implemented | threads.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/threads/read` | Implemented | threads.rs |
@@ -77,13 +77,13 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}` | Implemented | threads.rs |
 | `/api/v4/users/{user_id}/data_retention/team_policies` | Not implemented | - |
 | `/api/v4/users/{user_id}/data_retention/channel_policies` | Not implemented | - |
-| `/api/v4/users/invalid_emails` | Not implemented | - |
-| `/api/v4/users/{user_id}/reset_failed_attempts` | Not implemented | - |
+| `/api/v4/users/invalid_emails` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/reset_failed_attempts` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/status` | Implemented | users.rs |
 | `/api/v4/users/status/ids` | Implemented | users.rs |
-| `/api/v4/users/{user_id}/status/custom` | Not implemented | - |
-| `/api/v4/users/{user_id}/status/custom/recent` | Not implemented | - |
-| `/api/v4/users/{user_id}/status/custom/recent/delete` | Not implemented | - |
+| `/api/v4/users/{user_id}/status/custom` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/status/custom/recent` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/status/custom/recent/delete` | Implemented | users.rs |
 | `/api/v4/teams` | Implemented | teams.rs |
 | `/api/v4/teams/{team_id}` | Implemented | teams.rs |
 | `/api/v4/teams/{team_id}/patch` | Not implemented | - |

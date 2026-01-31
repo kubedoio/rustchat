@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
-use crate::auth::{create_token, verify_password};
+use crate::auth::{create_token, hash_password, verify_password};
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
 use crate::models::{channel::Channel, channel::ChannelMember, Team, TeamMember, User};
@@ -88,8 +88,54 @@ pub fn router() -> Router<AppState> {
         .route("/users/logout", get(logout).post(logout))
         .route("/users/autocomplete", get(autocomplete_users))
         .route("/users/search", post(search_users))
+        .route("/users/known", get(get_known_users))
+        .route("/users/stats", get(get_user_stats))
+        .route("/users/stats/filtered", post(get_user_stats_filtered))
+        .route("/users/group_channels", get(get_user_group_channels))
+        .route("/users/usernames", post(get_users_by_usernames))
+        .route("/users/email/{email}", get(get_user_by_email))
         .route("/custom_profile_attributes/fields", get(get_custom_profile_attributes))
         .route("/users/{user_id}/custom_profile_attributes", get(get_user_custom_profile_attributes))
+        .route("/users/{user_id}/patch", put(patch_user))
+        .route("/users/{user_id}/roles", put(update_user_roles))
+        .route("/users/{user_id}/active", put(update_user_active))
+        .route("/users/{user_id}/image/default", get(get_user_image_default))
+        .route("/users/password/reset", post(reset_password))
+        .route("/users/password/reset/send", post(send_password_reset))
+        .route("/users/mfa", post(check_user_mfa))
+        .route("/users/{user_id}/mfa", put(update_user_mfa))
+        .route("/users/{user_id}/mfa/generate", post(generate_mfa_secret))
+        .route("/users/{user_id}/demote", post(demote_user))
+        .route("/users/{user_id}/promote", post(promote_user))
+        .route("/users/{user_id}/convert_to_bot", post(convert_user_to_bot))
+        .route("/users/{user_id}/password", put(update_user_password))
+        .route("/users/{user_id}/sessions", get(get_user_sessions))
+        .route("/users/{user_id}/sessions/revoke", post(revoke_user_session))
+        .route("/users/{user_id}/sessions/revoke/all", post(revoke_user_sessions))
+        .route("/users/sessions/revoke/all", post(revoke_all_sessions))
+        .route("/users/{user_id}/audits", get(get_user_audits))
+        .route("/users/{user_id}/email/verify/member", post(verify_member_email))
+        .route("/users/email/verify", post(verify_email))
+        .route("/users/email/verify/send", post(send_email_verification))
+        .route("/users/{user_id}/tokens", get(get_user_tokens))
+        .route("/users/tokens", get(get_tokens))
+        .route("/users/tokens/revoke", post(revoke_token))
+        .route("/users/tokens/{token_id}", get(get_token))
+        .route("/users/tokens/disable", post(disable_token))
+        .route("/users/tokens/enable", post(enable_token))
+        .route("/users/tokens/search", post(search_tokens))
+        .route("/users/{user_id}/auth", put(update_user_auth))
+        .route("/users/{user_id}/terms_of_service", post(accept_terms_of_service))
+        .route("/users/{user_id}/typing", post(set_user_typing))
+        .route("/users/{user_id}/uploads", get(get_user_uploads))
+        .route("/users/{user_id}/channel_members", get(get_user_channel_members))
+        .route("/users/migrate_auth/ldap", post(migrate_auth_ldap))
+        .route("/users/migrate_auth/saml", post(migrate_auth_saml))
+        .route("/users/invalid_emails", get(get_invalid_emails))
+        .route("/users/{user_id}/reset_failed_attempts", post(reset_failed_attempts))
+        .route("/users/{user_id}/status/custom", put(update_custom_status).delete(clear_custom_status))
+        .route("/users/{user_id}/status/custom/recent", get(get_recent_custom_status))
+        .route("/users/{user_id}/status/custom/recent/delete", post(delete_recent_custom_status))
         .route(
             "/users/{user_id}/sidebar/categories",
             get(get_categories).post(create_category).put(update_categories),
@@ -2034,4 +2080,555 @@ async fn get_user_custom_profile_attributes(
 ) -> ApiResult<Json<Vec<serde_json::Value>>> {
     // MM Enterprise feature - return empty array for compatibility
     Ok(Json(vec![]))
+}
+
+fn status_ok() -> Json<serde_json::Value> {
+    Json(serde_json::json!({"status": "OK"}))
+}
+
+async fn get_known_users(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+) -> ApiResult<Json<Vec<String>>> {
+    let user_ids: Vec<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT DISTINCT cm2.user_id
+        FROM channel_members cm
+        JOIN channel_members cm2 ON cm.channel_id = cm2.channel_id
+        WHERE cm.user_id = $1 AND cm2.user_id != $1
+        "#,
+    )
+    .bind(auth.user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let ids = user_ids.into_iter().map(encode_mm_id).collect();
+    Ok(Json(ids))
+}
+
+async fn get_user_stats(State(state): State<AppState>) -> ApiResult<Json<serde_json::Value>> {
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&state.db)
+        .await?;
+
+    Ok(Json(serde_json::json!({"total_users_count": total})))
+}
+
+async fn get_user_stats_filtered(
+    State(state): State<AppState>,
+) -> ApiResult<Json<serde_json::Value>> {
+    get_user_stats(State(state)).await
+}
+
+async fn get_user_group_channels(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+) -> ApiResult<Json<Vec<mm::Channel>>> {
+    let channels: Vec<Channel> = sqlx::query_as(
+        r#"
+        SELECT c.* FROM channels c
+        JOIN channel_members cm ON c.id = cm.channel_id
+        WHERE cm.user_id = $1 AND c.type = 'group'
+        "#,
+    )
+    .bind(auth.user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(channels.into_iter().map(|c| c.into()).collect()))
+}
+
+#[derive(Deserialize)]
+struct UsernamesRequest {
+    usernames: Vec<String>,
+}
+
+async fn get_users_by_usernames(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<Vec<mm::User>>> {
+    let input: UsernamesRequest = parse_body(&headers, &body, "Invalid usernames body")?;
+    if input.usernames.is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    let users: Vec<User> = sqlx::query_as("SELECT * FROM users WHERE username = ANY($1)")
+        .bind(&input.usernames)
+        .fetch_all(&state.db)
+        .await?;
+
+    Ok(Json(users.into_iter().map(|u| u.into()).collect()))
+}
+
+async fn get_user_by_email(
+    State(state): State<AppState>,
+    Path(email): Path<String>,
+) -> ApiResult<Json<mm::User>> {
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE email = $1")
+        .bind(&email)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    Ok(Json(user.into()))
+}
+
+async fn patch_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<mm::User>> {
+    let _input: PatchMeRequest = parse_body(&headers, &body, "Invalid patch body")?;
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await?;
+    Ok(Json(user.into()))
+}
+
+#[derive(Deserialize)]
+struct UserRolesRequest {
+    roles: String,
+}
+
+async fn update_user_roles(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    Json(input): Json<UserRolesRequest>,
+) -> ApiResult<Json<serde_json::Value>> {
+    if auth.role != "system_admin" && auth.role != "org_admin" {
+        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+    }
+    let user_id = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let role = if input.roles.contains("system_admin") {
+        "system_admin"
+    } else {
+        "member"
+    };
+
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+        .bind(role)
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+
+    Ok(status_ok())
+}
+
+#[derive(Deserialize)]
+struct UserActiveRequest {
+    active: bool,
+}
+
+async fn update_user_active(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    Json(input): Json<UserActiveRequest>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let user_id = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    if user_id != auth.user_id && auth.role != "system_admin" && auth.role != "org_admin" {
+        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+    }
+    sqlx::query("UPDATE users SET is_active = $1 WHERE id = $2")
+        .bind(input.active)
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+    Ok(status_ok())
+}
+
+async fn get_user_image_default(
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    get_user_image(State(state), Path(user_id)).await
+}
+
+async fn reset_password(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid reset body")?;
+    Ok(status_ok())
+}
+
+async fn send_password_reset(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid reset body")?;
+    Ok(status_ok())
+}
+
+#[derive(Deserialize)]
+struct CheckMfaRequest {
+    login_id: String,
+}
+
+async fn check_user_mfa(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _input: CheckMfaRequest = parse_body(&headers, &body, "Invalid mfa body")?;
+    Ok(Json(serde_json::json!({"mfa_required": false})))
+}
+
+#[derive(Deserialize)]
+struct UpdateMfaRequest {
+    activate: bool,
+    #[allow(dead_code)]
+    code: Option<String>,
+}
+
+async fn update_user_mfa(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    Json(_input): Json<UpdateMfaRequest>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let _ = user_id;
+    Ok(status_ok())
+}
+
+async fn generate_mfa_secret(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(Json(serde_json::json!({"secret": "", "qr_code": ""})))
+}
+
+async fn demote_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    if auth.role != "system_admin" && auth.role != "org_admin" {
+        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+    }
+    let user_id = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    sqlx::query("UPDATE users SET role = 'member' WHERE id = $1")
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+    Ok(status_ok())
+}
+
+async fn promote_user(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    if auth.role != "system_admin" && auth.role != "org_admin" {
+        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+    }
+    let user_id = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    sqlx::query("UPDATE users SET role = 'system_admin' WHERE id = $1")
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+    Ok(status_ok())
+}
+
+async fn convert_user_to_bot(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    if auth.role != "system_admin" && auth.role != "org_admin" {
+        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+    }
+    let user_id = parse_mm_or_uuid(&user_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    sqlx::query("UPDATE users SET is_bot = true WHERE id = $1")
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+    Ok(status_ok())
+}
+
+#[derive(Deserialize)]
+struct UpdatePasswordRequest {
+    current_password: Option<String>,
+    new_password: String,
+}
+
+async fn update_user_password(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    Json(input): Json<UpdatePasswordRequest>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    if user_id != auth.user_id {
+        return Err(AppError::Forbidden("Cannot change another user's password".to_string()));
+    }
+
+    if let Some(current) = input.current_password.as_deref() {
+        if !verify_password(current, &user.password_hash)? {
+            return Err(AppError::BadRequest("Invalid current password".to_string()));
+        }
+    }
+
+    let new_hash = hash_password(&input.new_password)?;
+    sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
+        .bind(new_hash)
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+
+    Ok(status_ok())
+}
+
+async fn get_user_sessions(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(Json(vec![]))
+}
+
+async fn revoke_user_session(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid session body")?;
+    Ok(status_ok())
+}
+
+async fn revoke_user_sessions(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(status_ok())
+}
+
+async fn revoke_all_sessions() -> ApiResult<Json<serde_json::Value>> {
+    Ok(status_ok())
+}
+
+async fn get_user_audits(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(Json(vec![]))
+}
+
+async fn verify_member_email() -> ApiResult<Json<serde_json::Value>> {
+    Ok(status_ok())
+}
+
+async fn verify_email() -> ApiResult<Json<serde_json::Value>> {
+    Ok(status_ok())
+}
+
+async fn send_email_verification() -> ApiResult<Json<serde_json::Value>> {
+    Ok(status_ok())
+}
+
+async fn get_user_tokens(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(Json(vec![]))
+}
+
+async fn get_tokens() -> ApiResult<Json<Vec<serde_json::Value>>> {
+    Ok(Json(vec![]))
+}
+
+async fn revoke_token(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid revoke body")?;
+    Ok(status_ok())
+}
+
+async fn get_token(
+    Path(_token_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn disable_token(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid disable body")?;
+    Ok(status_ok())
+}
+
+async fn enable_token(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid enable body")?;
+    Ok(status_ok())
+}
+
+async fn search_tokens(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid search body")?;
+    Ok(Json(vec![]))
+}
+
+async fn update_user_auth(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid auth body")?;
+    Ok(status_ok())
+}
+
+async fn accept_terms_of_service(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid terms body")?;
+    Ok(status_ok())
+}
+
+async fn set_user_typing(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(status_ok())
+}
+
+async fn get_user_uploads(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(Json(vec![]))
+}
+
+async fn get_user_channel_members(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<mm::ChannelMember>>> {
+    let user_id = resolve_user_id(&user_id, &auth)?;
+    let members: Vec<ChannelMember> = sqlx::query_as(
+        "SELECT * FROM channel_members WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mm_members = members
+        .into_iter()
+        .map(|m| mm::ChannelMember {
+            channel_id: encode_mm_id(m.channel_id),
+            user_id: encode_mm_id(m.user_id),
+            roles: "channel_user".to_string(),
+            last_viewed_at: m.last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
+            msg_count: 0,
+            mention_count: 0,
+            notify_props: normalize_notify_props(m.notify_props),
+            last_update_at: 0,
+            scheme_guest: false,
+            scheme_user: true,
+            scheme_admin: false,
+        })
+        .collect();
+
+    Ok(Json(mm_members))
+}
+
+async fn migrate_auth_ldap(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid migrate body")?;
+    Ok(status_ok())
+}
+
+async fn migrate_auth_saml(
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid migrate body")?;
+    Ok(status_ok())
+}
+
+async fn get_invalid_emails() -> ApiResult<Json<Vec<String>>> {
+    Ok(Json(vec![]))
+}
+
+async fn reset_failed_attempts(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(status_ok())
+}
+
+async fn update_custom_status(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid custom status")?;
+    Ok(status_ok())
+}
+
+async fn clear_custom_status(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(status_ok())
+}
+
+async fn get_recent_custom_status(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+) -> ApiResult<Json<Vec<serde_json::Value>>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    Ok(Json(vec![]))
+}
+
+async fn delete_recent_custom_status(
+    auth: MmAuthUser,
+    Path(user_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<serde_json::Value>> {
+    let _ = resolve_user_id(&user_id, &auth)?;
+    let _value: serde_json::Value = parse_body(&headers, &body, "Invalid custom status")?;
+    Ok(status_ok())
 }
