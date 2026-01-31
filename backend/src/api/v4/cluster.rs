@@ -7,6 +7,18 @@ use axum::{
 };
 use serde_json::json;
 
+use serde::Serialize;
+
+#[derive(Serialize)]
+pub struct ClusterInfo {
+    pub id: String,
+    pub version: String,
+    pub schema_version: String,
+    pub config_hash: String,
+    pub ipaddress: String,
+    pub hostname: String,
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/cluster/status", get(get_cluster_status))
@@ -35,8 +47,15 @@ pub fn router() -> Router<AppState> {
 async fn get_cluster_status(
     State(_state): State<AppState>,
     _auth: crate::api::v4::extractors::MmAuthUser,
-) -> ApiResult<Json<Vec<serde_json::Value>>> {
-    Ok(Json(vec![]))
+) -> ApiResult<Json<Vec<ClusterInfo>>> {
+    Ok(Json(vec![ClusterInfo {
+        id: "rustchat-node-1".to_string(),
+        version: "0.0.1".to_string(),
+        schema_version: "1.0.0".to_string(),
+        config_hash: "mock-config-hash".to_string(),
+        ipaddress: "127.0.0.1".to_string(),
+        hostname: "localhost".to_string(),
+    }]))
 }
 
 /// GET /api/v4/remotecluster
