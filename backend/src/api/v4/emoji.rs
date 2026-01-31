@@ -81,7 +81,10 @@ pub async fn get_emoji(
     .fetch_optional(&state.db)
     .await?;
 
-    Err(AppError::NotFound("Emoji not found".to_string()))
+    match emoji {
+        Some(emoji) => Ok(Json(emoji)),
+        None => Err(AppError::NotFound("Emoji not found".to_string())),
+    }
 }
 
 pub async fn get_emoji_by_name(
@@ -96,7 +99,7 @@ pub async fn get_emoji_by_name(
                 COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
          FROM custom_emojis WHERE name = $1 AND delete_at IS NULL"
     )
-    .bind(name)
+    .bind(&name)
     .fetch_optional(&state.db)
     .await?;
 
