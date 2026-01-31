@@ -88,10 +88,9 @@ async fn view_channel(
 
         // Broadcast channel_viewed
         let broadcast = crate::realtime::WsEnvelope::event(
-            crate::realtime::EventType::ChannelUpdated, // Closest match, usually handled by client logic
+            crate::realtime::EventType::ChannelViewed,
             serde_json::json!({
                 "channel_id": channel_id,
-                "user_id": auth.user_id
             }),
             Some(channel_id)
         );
@@ -874,6 +873,28 @@ async fn add_channel_member(
             .fetch_one(&state.db)
             .await?;
 
+    let team_id: Option<Uuid> = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
+        .bind(channel_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+    let broadcast = crate::realtime::WsEnvelope::event(
+        crate::realtime::EventType::MemberAdded,
+        serde_json::json!({
+            "user_id": user_id,
+            "channel_id": channel_id,
+            "team_id": team_id,
+        }),
+        Some(channel_id),
+    )
+    .with_broadcast(crate::realtime::WsBroadcast {
+        channel_id: Some(channel_id),
+        team_id,
+        user_id: Some(user_id),
+        exclude_user_id: None,
+    });
+    state.ws_hub.broadcast(broadcast).await;
+
     Ok(Json(mm::ChannelMember {
         channel_id: encode_mm_id(member.channel_id),
         user_id: encode_mm_id(member.user_id),
@@ -918,12 +939,35 @@ async fn remove_channel_member(
                 .ok_or_else(|| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
     }
 
+    let team_id: Option<Uuid> = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
+        .bind(channel_id)
+        .fetch_optional(&state.db)
+        .await?;
+
     // Remove the user
     sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
         .bind(channel_id)
         .bind(user_id)
         .execute(&state.db)
         .await?;
+
+    let broadcast = crate::realtime::WsEnvelope::event(
+        crate::realtime::EventType::MemberRemoved,
+        serde_json::json!({
+            "user_id": user_id,
+            "channel_id": channel_id,
+            "team_id": team_id,
+            "remover_id": auth.user_id,
+        }),
+        Some(channel_id),
+    )
+    .with_broadcast(crate::realtime::WsBroadcast {
+        channel_id: Some(channel_id),
+        team_id,
+        user_id: Some(user_id),
+        exclude_user_id: None,
+    });
+    state.ws_hub.broadcast(broadcast).await;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }

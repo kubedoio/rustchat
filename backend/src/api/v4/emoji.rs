@@ -6,7 +6,9 @@ use axum::{
 use crate::api::AppState;
 use crate::api::v4::extractors::MmAuthUser;
 use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::{id::parse_mm_or_uuid, models as mm};
+use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
+use sha2::{Digest, Sha256};
+use uuid::Uuid;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -79,9 +81,7 @@ pub async fn get_emoji(
     .fetch_optional(&state.db)
     .await?;
 
-    let emoji = emoji.ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
-
-    Ok(Json(emoji))
+    Err(AppError::NotFound("Emoji not found".to_string()))
 }
 
 pub async fn get_emoji_by_name(
@@ -99,6 +99,30 @@ pub async fn get_emoji_by_name(
     .bind(name)
     .fetch_optional(&state.db)
     .await?;
+
+    if let Some(emoji) = emoji {
+        return Ok(Json(emoji));
+    }
+
+    if name.chars().any(|ch| !ch.is_ascii()) {
+        let mut hasher = Sha256::new();
+        hasher.update(name.as_bytes());
+        let hash = hasher.finalize();
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&hash[..16]);
+        let uuid = Uuid::from_bytes(bytes);
+
+        let emoji = mm::Emoji {
+            id: encode_mm_id(uuid),
+            create_at: 0,
+            update_at: 0,
+            delete_at: 0,
+            creator_id: encode_mm_id(Uuid::nil()),
+            name,
+        };
+
+        return Ok(Json(emoji));
+    }
 
     let emoji = emoji.ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
