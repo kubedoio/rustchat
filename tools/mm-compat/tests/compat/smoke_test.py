@@ -144,6 +144,25 @@ def main():
     else:
         print(f"FAILED ({resp.status_code})")
 
+    print(f"        PUT /api/v4/users/{user_id}/preferences ... ", end="")
+    prefs_payload = [
+        {
+            "user_id": user_id,
+            "category": "test",
+            "name": "smoke",
+            "value": "true",
+        }
+    ]
+    resp = requests.put(
+        f"{base_url}/api/v4/users/{user_id}/preferences",
+        headers=headers,
+        json=prefs_payload,
+    )
+    if resp.status_code == 200:
+        print("SUCCESS")
+    else:
+        print(f"FAILED ({resp.status_code})")
+
     # 8. Threads (Phase 3)
     print(f"Step 8: GET /api/v4/users/me/threads ... ", end="")
     resp = requests.get(f"{base_url}/api/v4/users/me/threads", headers=headers)

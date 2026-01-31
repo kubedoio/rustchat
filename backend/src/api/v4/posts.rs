@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
+use serde_json::json;
 use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
@@ -157,7 +158,15 @@ async fn get_post(
                 crate::error::AppError::Forbidden("Not a member of this channel".to_string())
             })?;
 
-    Ok(Json(post.into()))
+    let mut mm_post: mm::Post = post.into();
+    let reactions_map = reactions_for_posts(&state, &[post_id]).await?;
+    if let Some(reactions) = reactions_map.get(&post_id) {
+        if !reactions.is_empty() {
+            mm_post.metadata = Some(json!({ "reactions": reactions }));
+        }
+    }
+
+    Ok(Json(mm_post))
 }
 
 async fn get_post_thread(
@@ -218,17 +227,35 @@ async fn get_post_thread(
     // 4. Construct response
     let mut order = Vec::new();
     let mut posts_map = HashMap::new();
+    let mut post_ids = Vec::new();
+    let mut id_map = Vec::new();
 
     // Add root post
     let root_id = encode_mm_id(root_post.id);
     order.push(root_id.clone());
+    let root_uuid = root_post.id;
+    post_ids.push(root_uuid);
+    id_map.push((root_uuid, root_id.clone()));
     posts_map.insert(root_id, root_post.into());
 
     // Add replies
     for r in replies {
         let id = encode_mm_id(r.id);
+        post_ids.push(r.id);
+        id_map.push((r.id, id.clone()));
         order.push(id.clone());
         posts_map.insert(id, r.into());
+    }
+
+    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
+    for (post_uuid, post_id) in id_map {
+        if let Some(reactions) = reactions_map.get(&post_uuid) {
+            if !reactions.is_empty() {
+                if let Some(post) = posts_map.get_mut(&post_id) {
+                    post.metadata = Some(json!({ "reactions": reactions }));
+                }
+            }
+        }
     }
 
     Ok(Json(mm::PostList {
@@ -359,8 +386,10 @@ struct ReactionRequest {
 async fn add_reaction(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(input): Json<ReactionRequest>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Json<mm::Reaction>> {
+    let input: ReactionRequest = parse_body(&headers, &body, "Invalid reaction body")?;
     let input_user_id = parse_mm_or_uuid(&input.user_id)
         .ok_or_else(|| AppError::Validation("Invalid user_id".to_string()))?;
     if input_user_id != auth.user_id {
@@ -408,6 +437,38 @@ async fn add_reaction(
         emoji_name: reaction.emoji_name,
         create_at: reaction.created_at.timestamp_millis(),
     }))
+}
+
+pub(crate) async fn reactions_for_posts(
+    state: &AppState,
+    post_ids: &[Uuid],
+) -> ApiResult<std::collections::HashMap<Uuid, Vec<mm::Reaction>>> {
+    use std::collections::HashMap;
+
+    if post_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let reactions: Vec<crate::models::post::Reaction> = sqlx::query_as(
+        "SELECT post_id, user_id, emoji_name, created_at FROM reactions WHERE post_id = ANY($1)",
+    )
+    .bind(post_ids)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut map: HashMap<Uuid, Vec<mm::Reaction>> = HashMap::new();
+    for r in reactions {
+        map.entry(r.post_id)
+            .or_default()
+            .push(mm::Reaction {
+                user_id: encode_mm_id(r.user_id),
+                post_id: encode_mm_id(r.post_id),
+                emoji_name: r.emoji_name,
+                create_at: r.created_at.timestamp_millis(),
+            });
+    }
+
+    Ok(map)
 }
 
 async fn remove_reaction(

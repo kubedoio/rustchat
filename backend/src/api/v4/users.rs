@@ -1127,8 +1127,10 @@ async fn get_preferences(
 async fn update_preferences(
     State(state): State<AppState>,
     auth: MmAuthUser,
-    Json(prefs): Json<Vec<mm::Preference>>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
+    let prefs: Vec<mm::Preference> = parse_body(&headers, &body, "Invalid preferences body")?;
     update_preferences_internal(&state, auth.user_id, prefs).await
 }
 
@@ -1136,8 +1138,10 @@ async fn update_preferences_for_user(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(user_id): Path<String>,
-    Json(prefs): Json<Vec<mm::Preference>>,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
+    let prefs: Vec<mm::Preference> = parse_body(&headers, &body, "Invalid preferences body")?;
     let user_id = resolve_user_id(&user_id, &auth)?;
     update_preferences_internal(&state, user_id, prefs).await
 }
@@ -1851,4 +1855,3 @@ async fn get_user_custom_profile_attributes(
     // MM Enterprise feature - return empty array for compatibility
     Ok(Json(vec![]))
 }
-

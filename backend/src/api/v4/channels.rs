@@ -15,6 +15,8 @@ use super::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::ApiResult;
 use crate::mattermost_compat::{id::{encode_mm_id, parse_mm_or_uuid}, models as mm};
+use crate::api::v4::posts::reactions_for_posts;
+use serde_json::json;
 use crate::models::post::PostResponse;
 use crate::models::Channel;
 
@@ -729,11 +731,26 @@ async fn get_pinned_posts(
 
     let mut order = Vec::new();
     let mut posts_map = HashMap::new();
+    let mut post_ids = Vec::new();
+    let mut id_map = Vec::new();
 
     for p in posts {
         let id = encode_mm_id(p.id);
+        post_ids.push(p.id);
+        id_map.push((p.id, id.clone()));
         order.push(id.clone());
         posts_map.insert(id, p.into());
+    }
+
+    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
+    for (post_uuid, post_id) in id_map {
+        if let Some(reactions) = reactions_map.get(&post_uuid) {
+            if !reactions.is_empty() {
+                if let Some(post) = posts_map.get_mut(&post_id) {
+                    post.metadata = Some(json!({ "reactions": reactions }));
+                }
+            }
+        }
     }
 
     Ok(Json(mm::PostList {
@@ -1061,6 +1078,8 @@ async fn get_posts(
 
     let mut order = Vec::new();
     let mut posts_map = HashMap::new();
+    let mut post_ids = Vec::new();
+    let mut id_map = Vec::new();
 
     // Determine prev/next post IDs for pagination hints
     let (prev_post_id, next_post_id) = if !posts.is_empty() {
@@ -1080,8 +1099,21 @@ async fn get_posts(
 
     for p in posts {
         let id = encode_mm_id(p.id);
+        post_ids.push(p.id);
+        id_map.push((p.id, id.clone()));
         order.push(id.clone());
         posts_map.insert(id, p.into());
+    }
+
+    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
+    for (post_uuid, post_id) in id_map {
+        if let Some(reactions) = reactions_map.get(&post_uuid) {
+            if !reactions.is_empty() {
+                if let Some(post) = posts_map.get_mut(&post_id) {
+                    post.metadata = Some(json!({ "reactions": reactions }));
+                }
+            }
+        }
     }
 
     Ok(Json(mm::PostList {
