@@ -1,6 +1,6 @@
 use axum::{
     body::Bytes,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::IntoResponse,
     routing::{delete, get, post, put},
     Json, Router,
@@ -61,6 +61,15 @@ pub fn router() -> Router<AppState> {
         )
         .route("/posts/scheduled/team/{team_id}", get(list_scheduled_posts))
         .route("/users/{user_id}/posts/{post_id}/reminder", post(set_post_reminder))
+        .route("/teams/{team_id}/posts/search", post(search_team_posts))
+        .route(
+            "/users/{user_id}/channels/{channel_id}/posts/unread",
+            get(get_posts_around_unread),
+        )
+        .route(
+            "/users/{user_id}/posts/{post_id}/ack",
+            post(save_acknowledgement_for_post).delete(delete_acknowledgement_for_post),
+        )
 }
 
 #[derive(Debug, Deserialize)]
@@ -1380,4 +1389,354 @@ async fn set_post_reminder(
     .await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+// ============================================================================
+// Team Posts Search
+// ============================================================================
+
+#[derive(Deserialize)]
+struct SearchPostsRequest {
+    terms: String,
+    is_or_search: bool,
+    #[serde(default)]
+    time_zone_offset: i32,
+    #[serde(default)]
+    include_deleted_channels: bool,
+    #[serde(default)]
+    page: i32,
+    #[serde(default = "default_per_page")]
+    per_page: i32,
+}
+
+fn default_per_page() -> i32 {
+    60
+}
+
+/// POST /api/v4/teams/{team_id}/posts/search - Search posts in team
+async fn search_team_posts(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(team_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<mm::PostListWithSearchMatches>> {
+    let team_id = parse_mm_or_uuid(&team_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+
+    let input: SearchPostsRequest = parse_body(&headers, &body, "Invalid search body")?;
+
+    // Verify user is member of team
+    let _: crate::models::TeamMember =
+        sqlx::query_as("SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2")
+            .bind(team_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this team".to_string()))?;
+
+    let limit = input.per_page.min(200).max(1) as i64;
+    let offset = (input.page.max(0) as i64) * limit;
+
+    // Build search query using ILIKE for simple text search
+    let search_terms = format!("%{}%", input.terms.replace('%', "\\%").replace('_', "\\_"));
+
+    let posts: Vec<crate::models::post::PostResponse> = sqlx::query_as(
+        r#"
+        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+               p.reply_count::int8 as reply_count,
+               p.last_reply_at, p.seq,
+               u.username, u.avatar_url, u.email
+        FROM posts p
+        LEFT JOIN users u ON p.user_id = u.id
+        JOIN channels c ON p.channel_id = c.id
+        JOIN channel_members cm ON cm.channel_id = c.id AND cm.user_id = $4
+        WHERE c.team_id = $1
+          AND p.message ILIKE $2
+          AND p.deleted_at IS NULL
+        ORDER BY p.created_at DESC
+        LIMIT $3 OFFSET $5
+        "#,
+    )
+    .bind(team_id)
+    .bind(&search_terms)
+    .bind(limit)
+    .bind(auth.user_id)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut order = Vec::new();
+    let mut posts_map: std::collections::HashMap<String, mm::Post> = std::collections::HashMap::new();
+    let mut matches_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut post_ids = Vec::new();
+    let mut id_map = Vec::new();
+
+    for p in posts {
+        let id = encode_mm_id(p.id);
+        post_ids.push(p.id);
+        id_map.push((p.id, id.clone()));
+        order.push(id.clone());
+        // Simple match highlighting - find term positions
+        let match_positions: Vec<String> = vec![];
+        matches_map.insert(id.clone(), match_positions);
+        posts_map.insert(id, p.into());
+    }
+
+    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
+    for (post_uuid, post_id) in id_map {
+        if let Some(reactions) = reactions_map.get(&post_uuid) {
+            if !reactions.is_empty() {
+                if let Some(post) = posts_map.get_mut(&post_id) {
+                    post.metadata = Some(json!({ "reactions": reactions }));
+                }
+            }
+        }
+    }
+
+    Ok(Json(mm::PostListWithSearchMatches {
+        order,
+        posts: posts_map,
+        matches: Some(matches_map),
+        next_post_id: String::new(),
+        prev_post_id: String::new(),
+    }))
+}
+
+// ============================================================================
+// Posts Around Unread
+// ============================================================================
+
+#[derive(Deserialize)]
+struct PostsUnreadQuery {
+    #[serde(default = "default_limit")]
+    limit_before: i32,
+    #[serde(default = "default_limit")]
+    limit_after: i32,
+    #[serde(rename = "skipFetchThreads", default)]
+    skip_fetch_threads: bool,
+    #[serde(rename = "collapsedThreads", default)]
+    collapsed_threads: bool,
+    #[serde(rename = "collapsedThreadsExtended", default)]
+    collapsed_threads_extended: bool,
+}
+
+fn default_limit() -> i32 {
+    60
+}
+
+#[derive(Deserialize)]
+struct PostsUnreadPath {
+    user_id: String,
+    channel_id: String,
+}
+
+/// GET /api/v4/users/{user_id}/channels/{channel_id}/posts/unread
+async fn get_posts_around_unread(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(path): Path<PostsUnreadPath>,
+    Query(query): Query<PostsUnreadQuery>,
+) -> ApiResult<Json<mm::PostList>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)
+        .map_err(|_| AppError::Forbidden("Cannot access another user's posts".to_string()))?;
+
+    let channel_id = parse_mm_or_uuid(&path.channel_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
+
+    // Verify membership
+    let _: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    let limit_before = query.limit_before.min(200).max(0) as i64;
+    let limit_after = query.limit_after.min(200).max(1) as i64;
+
+    // Find the oldest unread post using channel_reads
+    let last_read_seq: Option<i64> = sqlx::query_scalar(
+        "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
+    )
+    .bind(user_id)
+    .bind(channel_id)
+    .fetch_optional(&state.db)
+    .await?
+    .flatten();
+
+    let last_read_seq = last_read_seq.unwrap_or(0);
+
+    // Get posts around the unread point
+    let posts: Vec<crate::models::post::PostResponse> = sqlx::query_as(
+        r#"
+        (
+            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                   p.reply_count::int8 as reply_count,
+                   p.last_reply_at, p.seq,
+                   u.username, u.avatar_url, u.email
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.channel_id = $1 AND p.seq <= $2 AND p.deleted_at IS NULL
+            ORDER BY p.seq DESC
+            LIMIT $3
+        )
+        UNION ALL
+        (
+            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                   p.reply_count::int8 as reply_count,
+                   p.last_reply_at, p.seq,
+                   u.username, u.avatar_url, u.email
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.channel_id = $1 AND p.seq > $2 AND p.deleted_at IS NULL
+            ORDER BY p.seq ASC
+            LIMIT $4
+        )
+        ORDER BY seq DESC
+        "#,
+    )
+    .bind(channel_id)
+    .bind(last_read_seq)
+    .bind(limit_before)
+    .bind(limit_after)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut order = Vec::new();
+    let mut posts_map: std::collections::HashMap<String, mm::Post> = std::collections::HashMap::new();
+    let mut post_ids = Vec::new();
+    let mut id_map = Vec::new();
+
+    for p in posts {
+        let id = encode_mm_id(p.id);
+        post_ids.push(p.id);
+        id_map.push((p.id, id.clone()));
+        order.push(id.clone());
+        posts_map.insert(id, p.into());
+    }
+
+    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
+    for (post_uuid, post_id) in id_map {
+        if let Some(reactions) = reactions_map.get(&post_uuid) {
+            if !reactions.is_empty() {
+                if let Some(post) = posts_map.get_mut(&post_id) {
+                    post.metadata = Some(json!({ "reactions": reactions }));
+                }
+            }
+        }
+    }
+
+    Ok(Json(mm::PostList {
+        order,
+        posts: posts_map,
+        next_post_id: String::new(),
+        prev_post_id: String::new(),
+    }))
+}
+
+// ============================================================================
+// Post Acknowledgements
+// ============================================================================
+
+#[derive(Deserialize)]
+struct AckPath {
+    user_id: String,
+    post_id: String,
+}
+
+/// POST /api/v4/users/{user_id}/posts/{post_id}/ack - Acknowledge a post
+async fn save_acknowledgement_for_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(path): Path<AckPath>,
+) -> ApiResult<Json<mm::PostAcknowledgement>> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)
+        .map_err(|_| AppError::Forbidden("Cannot acknowledge for another user".to_string()))?;
+
+    let post_id = parse_mm_or_uuid(&path.post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    // Verify user can access the post
+    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1 AND deleted_at IS NULL")
+        .bind(post_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+
+    let _: crate::models::ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    let now = chrono::Utc::now();
+
+    sqlx::query(
+        r#"
+        INSERT INTO post_acknowledgements (user_id, post_id, acknowledged_at)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (user_id, post_id) DO UPDATE SET acknowledged_at = $3
+        "#,
+    )
+    .bind(user_id)
+    .bind(post_id)
+    .bind(now)
+    .execute(&state.db)
+    .await?;
+
+    Ok(Json(mm::PostAcknowledgement {
+        user_id: encode_mm_id(user_id),
+        post_id: encode_mm_id(post_id),
+        acknowledged_at: now.timestamp_millis(),
+    }))
+}
+
+/// DELETE /api/v4/users/{user_id}/posts/{post_id}/ack - Delete a post acknowledgement
+async fn delete_acknowledgement_for_post(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(path): Path<AckPath>,
+) -> ApiResult<impl IntoResponse> {
+    let user_id = super::users::resolve_user_id(&path.user_id, &auth)
+        .map_err(|_| AppError::Forbidden("Cannot delete acknowledgement for another user".to_string()))?;
+
+    let post_id = parse_mm_or_uuid(&path.post_id)
+        .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
+
+    // Check if acknowledgement exists and was made within 5 minutes
+    let ack_time: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+        "SELECT acknowledged_at FROM post_acknowledgements WHERE user_id = $1 AND post_id = $2",
+    )
+    .bind(user_id)
+    .bind(post_id)
+    .fetch_optional(&state.db)
+    .await?
+    .flatten();
+
+    if let Some(ack_time) = ack_time {
+        let now = chrono::Utc::now();
+        let five_minutes = chrono::Duration::minutes(5);
+        if now - ack_time > five_minutes {
+            return Err(AppError::Forbidden(
+                "Cannot delete acknowledgement after 5 minutes".to_string(),
+            ));
+        }
+    } else {
+        return Err(AppError::NotFound("Acknowledgement not found".to_string()));
+    }
+
+    sqlx::query("DELETE FROM post_acknowledgements WHERE user_id = $1 AND post_id = $2")
+        .bind(user_id)
+        .bind(post_id)
+        .execute(&state.db)
+        .await?;
+
+    Ok(status_ok())
 }

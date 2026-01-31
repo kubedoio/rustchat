@@ -357,3 +357,31 @@ pub struct PluginStatus {
     pub is_active: bool,
     pub state: i32,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UploadSession {
+    pub id: String,
+    pub user_id: String,
+    pub channel_id: String,
+    pub filename: String,
+    pub file_size: i64,
+    pub file_offset: i64,
+    pub create_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostAcknowledgement {
+    pub user_id: String,
+    pub post_id: String,
+    pub acknowledged_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostListWithSearchMatches {
+    pub order: Vec<String>,
+    pub posts: std::collections::HashMap<String, Post>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matches: Option<std::collections::HashMap<String, Vec<String>>>,
+    pub next_post_id: String,
+    pub prev_post_id: String,
+}

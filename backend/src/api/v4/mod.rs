@@ -18,6 +18,7 @@ pub mod posts;
 pub mod system;
 pub mod teams;
 pub mod threads;
+pub mod uploads;
 pub mod users;
 
 pub fn router() -> Router<AppState> {
@@ -37,6 +38,7 @@ pub fn router() -> Router<AppState> {
         .merge(hooks::router())
         .merge(bots::router())
         .merge(admin::router())
+        .merge(uploads::router())
         .route("/websocket", axum::routing::get(websocket::handle_websocket))
         .fallback(not_implemented)
         .layer(SetResponseHeaderLayer::overriding(
