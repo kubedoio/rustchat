@@ -5,8 +5,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 ## Summary
 
 - Mattermost v4 endpoints (OpenAPI): 418
-- Implemented in RustChat (code routes): 340
-- Missing in RustChat: 107
+- Implemented in RustChat (code routes): 389
+- Missing in RustChat: 58
 - RustChat-only endpoints (not in OpenAPI list): 28
 
 ## Status (Mattermost OpenAPI paths)
@@ -75,8 +75,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/set_unread/{post_id}` | Implemented | threads.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}/following` | Implemented | threads.rs |
 | `/api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}` | Implemented | threads.rs |
-| `/api/v4/users/{user_id}/data_retention/team_policies` | Not implemented | - |
-| `/api/v4/users/{user_id}/data_retention/channel_policies` | Not implemented | - |
+| `/api/v4/users/{user_id}/data_retention/team_policies` | Implemented | users.rs |
+| `/api/v4/users/{user_id}/data_retention/channel_policies` | Implemented | users.rs |
 | `/api/v4/users/invalid_emails` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/reset_failed_attempts` | Implemented | users.rs |
 | `/api/v4/users/{user_id}/status` | Implemented | users.rs |
@@ -189,20 +189,20 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/files/{file_id}/info` | Implemented | files.rs |
 | `/api/v4/teams/{team_id}/files/search` | Not implemented | - |
 | `/api/v4/files/search` | Not implemented | - |
-| `/api/v4/recaps` | Not implemented | - |
-| `/api/v4/recaps/{recap_id}` | Not implemented | - |
-| `/api/v4/recaps/{recap_id}/read` | Not implemented | - |
-| `/api/v4/recaps/{recap_id}/regenerate` | Not implemented | - |
+| `/api/v4/recaps` | Implemented | recaps.rs |
+| `/api/v4/recaps/{recap_id}` | Implemented | recaps.rs |
+| `/api/v4/recaps/{recap_id}/read` | Implemented | recaps.rs |
+| `/api/v4/recaps/{recap_id}/regenerate` | Implemented | recaps.rs |
 | `/api/v4/ai/agents` | Not implemented | - |
 | `/api/v4/ai/services` | Not implemented | - |
 | `/api/v4/uploads` | Implemented | uploads.rs |
 | `/api/v4/uploads/{upload_id}` | Implemented | uploads.rs |
-| `/api/v4/jobs` | Not implemented | - |
-| `/api/v4/jobs/{job_id}` | Not implemented | - |
-| `/api/v4/jobs/{job_id}/download` | Not implemented | - |
-| `/api/v4/jobs/{job_id}/cancel` | Not implemented | - |
-| `/api/v4/jobs/type/{type}` | Not implemented | - |
-| `/api/v4/jobs/{job_id}/status` | Not implemented | - |
+| `/api/v4/jobs` | Implemented | jobs.rs |
+| `/api/v4/jobs/{job_id}` | Implemented | jobs.rs |
+| `/api/v4/jobs/{job_id}/download` | Implemented | jobs.rs |
+| `/api/v4/jobs/{job_id}/cancel` | Implemented | jobs.rs |
+| `/api/v4/jobs/type/{type}` | Implemented | jobs.rs |
+| `/api/v4/jobs/{job_status_id}/status` | Implemented | jobs.rs |
 | `/api/v4/system/timezones` | Implemented | system.rs |
 | `/api/v4/system/ping` | Implemented | system.rs |
 | `/api/v4/system/notices/{teamId}` | Implemented | system.rs |
@@ -308,27 +308,27 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/elasticsearch/test` | Not implemented | - |
 | `/api/v4/elasticsearch/purge_indexes` | Not implemented | - |
 | `/api/v4/bleve/purge_indexes` | Not implemented | - |
-| `/api/v4/data_retention/policy` | Not implemented | - |
-| `/api/v4/data_retention/policies_count` | Not implemented | - |
-| `/api/v4/data_retention/policies` | Not implemented | - |
-| `/api/v4/data_retention/policies/{policy_id}` | Not implemented | - |
-| `/api/v4/data_retention/policies/{policy_id}/teams` | Not implemented | - |
-| `/api/v4/data_retention/policies/{policy_id}/teams/search` | Not implemented | - |
-| `/api/v4/data_retention/policies/{policy_id}/channels` | Not implemented | - |
-| `/api/v4/data_retention/policies/{policy_id}/channels/search` | Not implemented | - |
-| `/api/v4/plugins` | Not implemented | - |
-| `/api/v4/plugins/install_from_url` | Not implemented | - |
-| `/api/v4/plugins/{plugin_id}` | Not implemented | - |
-| `/api/v4/plugins/{plugin_id}/enable` | Not implemented | - |
-| `/api/v4/plugins/{plugin_id}/disable` | Not implemented | - |
+| `/api/v4/data_retention/policy` | Implemented | data_retention.rs |
+| `/api/v4/data_retention/policies_count` | Implemented | data_retention.rs |
+| `/api/v4/data_retention/policies` | Implemented | data_retention.rs |
+| `/api/v4/data_retention/policies/{policy_id}` | Implemented | data_retention.rs |
+| `/api/v4/data_retention/policies/{policy_id}/teams` | Implemented | data_retention.rs |
+| `/api/v4/data_retention/policies/{policy_id}/teams/search` | Implemented | data_retention.rs |
+| `/api/v4/data_retention/policies/{policy_id}/channels` | Implemented | data_retention.rs |
+| `/api/v4/data_retention/policies/{policy_id}/channels/search` | Implemented | data_retention.rs |
+| `/api/v4/plugins` | Implemented | plugins.rs |
+| `/api/v4/plugins/install_from_url` | Implemented | plugins.rs |
+| `/api/v4/plugins/{plugin_id}` | Implemented | plugins.rs |
+| `/api/v4/plugins/{plugin_id}/enable` | Implemented | plugins.rs |
+| `/api/v4/plugins/{plugin_id}/disable` | Implemented | plugins.rs |
 | `/api/v4/plugins/webapp` | Implemented | plugins.rs |
 | `/api/v4/plugins/statuses` | Implemented | plugins.rs |
-| `/api/v4/plugins/marketplace` | Not implemented | - |
-| `/api/v4/plugins/marketplace/first_admin_visit` | Not implemented | - |
-| `/api/v4/roles` | Not implemented | - |
-| `/api/v4/roles/{role_id}` | Not implemented | - |
-| `/api/v4/roles/name/{role_name}` | Not implemented | - |
-| `/api/v4/roles/{role_id}/patch` | Not implemented | - |
+| `/api/v4/plugins/marketplace` | Implemented | plugins.rs |
+| `/api/v4/plugins/marketplace/first_admin_visit` | Implemented | plugins.rs |
+| `/api/v4/roles` | Implemented | roles.rs |
+| `/api/v4/roles/{role_id}` | Implemented | roles.rs |
+| `/api/v4/roles/name/{role_name}` | Implemented | roles.rs |
+| `/api/v4/roles/{role_id}/patch` | Implemented | roles.rs |
 | `/api/v4/roles/names` | Implemented | users.rs |
 | `/api/v4/schemes` | Implemented | schemes.rs |
 | `/api/v4/schemes/{scheme_id}` | Implemented | schemes.rs |
@@ -361,18 +361,18 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/bots/{bot_user_id}/assign/{user_id}` | Not implemented | - |
 | `/api/v4/bots/{bot_user_id}/icon` | Not implemented | - |
 | `/api/v4/bots/{bot_user_id}/convert_to_user` | Not implemented | - |
-| `/api/v4/cloud/limits` | Not implemented | - |
-| `/api/v4/cloud/products` | Not implemented | - |
-| `/api/v4/cloud/payment` | Not implemented | - |
-| `/api/v4/cloud/payment/confirm` | Not implemented | - |
-| `/api/v4/cloud/customer` | Not implemented | - |
-| `/api/v4/cloud/customer/address` | Not implemented | - |
-| `/api/v4/cloud/subscription` | Not implemented | - |
-| `/api/v4/cloud/installation` | Not implemented | - |
-| `/api/v4/cloud/subscription/invoices` | Not implemented | - |
-| `/api/v4/cloud/subscription/invoices/{invoice_id}/pdf` | Not implemented | - |
-| `/api/v4/cloud/webhook` | Not implemented | - |
-| `/api/v4/cloud/preview/modal_data` | Not implemented | - |
+| `/api/v4/cloud/limits` | Implemented | cloud.rs |
+| `/api/v4/cloud/products` | Implemented | cloud.rs |
+| `/api/v4/cloud/payment` | Implemented | cloud.rs |
+| `/api/v4/cloud/payment/confirm` | Implemented | cloud.rs |
+| `/api/v4/cloud/customer` | Implemented | cloud.rs |
+| `/api/v4/cloud/customer/address` | Implemented | cloud.rs |
+| `/api/v4/cloud/subscription` | Implemented | cloud.rs |
+| `/api/v4/cloud/installation` | Implemented | cloud.rs |
+| `/api/v4/cloud/subscription/invoices` | Implemented | cloud.rs |
+| `/api/v4/cloud/subscription/invoices/{invoice_id}/pdf` | Implemented | cloud.rs |
+| `/api/v4/cloud/webhook` | Implemented | cloud.rs |
+| `/api/v4/cloud/preview/modal_data` | Implemented | cloud.rs |
 | `/api/v4/usage/posts` | Implemented | usage.rs |
 | `/api/v4/usage/storage` | Implemented | usage.rs |
 | `/api/v4/permissions/ancillary` | Not implemented | - |

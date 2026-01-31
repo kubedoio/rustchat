@@ -21,6 +21,11 @@ pub mod ldap;
 pub mod access_control;
 pub mod content_flagging;
 pub mod usage;
+pub mod data_retention;
+pub mod roles;
+pub mod cloud;
+pub mod jobs;
+pub mod recaps;
 pub mod websocket;
 pub mod extractors;
 pub mod files;
@@ -58,6 +63,11 @@ pub fn router() -> Router<AppState> {
         .merge(access_control::router())
         .merge(content_flagging::router())
         .merge(usage::router())
+        .merge(data_retention::router())
+        .merge(roles::router())
+        .merge(cloud::router())
+        .merge(jobs::router())
+        .merge(recaps::router())
         .merge(uploads::router())
         .route("/websocket", axum::routing::get(websocket::handle_websocket))
         .fallback(not_implemented)
