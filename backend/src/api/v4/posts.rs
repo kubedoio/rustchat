@@ -1,6 +1,7 @@
 use axum::{
     body::Bytes,
     extract::{Path, Query, State},
+    http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post, put},
     Json, Router,
@@ -896,7 +897,7 @@ async fn add_reaction(
     auth: MmAuthUser,
     headers: axum::http::HeaderMap,
     body: Bytes,
-) -> ApiResult<Json<mm::Reaction>> {
+) -> ApiResult<(StatusCode, Json<mm::Reaction>)> {
     let input: ReactionRequest = parse_body(&headers, &body, "Invalid reaction body")?;
     let input_user_id = parse_mm_or_uuid(&input.user_id)
         .ok_or_else(|| AppError::Validation("Invalid user_id".to_string()))?;
@@ -939,12 +940,12 @@ async fn add_reaction(
     });
     state.ws_hub.broadcast(broadcast).await;
 
-    Ok(Json(mm::Reaction {
+    Ok((StatusCode::CREATED, Json(mm::Reaction {
         user_id: encode_mm_id(reaction.user_id),
         post_id: encode_mm_id(reaction.post_id),
         emoji_name: reaction.emoji_name,
         create_at: reaction.created_at.timestamp_millis(),
-    }))
+    })))
 }
 
 pub(crate) async fn reactions_for_posts(

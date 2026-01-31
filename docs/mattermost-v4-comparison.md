@@ -164,14 +164,14 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/users/{user_id}/posts/flagged` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/files/info` | Implemented | posts.rs |
 | `/api/v4/channels/{channel_id}/posts` | Implemented | channels.rs |
-| `/api/v4/users/{user_id}/channels/{channel_id}/posts/unread` | Not implemented | - |
-| `/api/v4/teams/{team_id}/posts/search` | Not implemented | - |
+| `/api/v4/users/{user_id}/channels/{channel_id}/posts/unread` | Implemented | posts.rs |
+| `/api/v4/teams/{team_id}/posts/search` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/pin` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/unpin` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/actions/{action_id}` | Implemented | posts.rs |
 | `/api/v4/posts/ids` | Implemented | posts.rs |
 | `/api/v4/users/{user_id}/posts/{post_id}/reminder` | Implemented | posts.rs |
-| `/api/v4/users/{user_id}/posts/{post_id}/ack` | Not implemented | - |
+| `/api/v4/users/{user_id}/posts/{post_id}/ack` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/move` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/restore/{restore_version_id}` | Implemented | posts.rs |
 | `/api/v4/posts/{post_id}/reveal` | Implemented | posts.rs |
@@ -195,8 +195,8 @@ This compares RustChat v4 routes implemented in code against the upstream Matter
 | `/api/v4/recaps/{recap_id}/regenerate` | Not implemented | - |
 | `/api/v4/ai/agents` | Not implemented | - |
 | `/api/v4/ai/services` | Not implemented | - |
-| `/api/v4/uploads` | Not implemented | - |
-| `/api/v4/uploads/{upload_id}` | Not implemented | - |
+| `/api/v4/uploads` | Implemented | uploads.rs |
+| `/api/v4/uploads/{upload_id}` | Implemented | uploads.rs |
 | `/api/v4/jobs` | Not implemented | - |
 | `/api/v4/jobs/{job_id}` | Not implemented | - |
 | `/api/v4/jobs/{job_id}/download` | Not implemented | - |

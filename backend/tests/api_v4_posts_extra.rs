@@ -160,7 +160,7 @@ async fn mm_posts_extra_routes() {
         .send()
         .await
         .unwrap();
-    assert_eq!(200, reaction_res.status().as_u16());
+    assert!(reaction_res.status().as_u16() == 200 || reaction_res.status().as_u16() == 201);
 
     let bulk_reactions = ctx
         .app

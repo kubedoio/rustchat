@@ -163,7 +163,7 @@ async fn mm_login_and_features() {
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "user_id": user_id, "post_id": post_id, "emoji_name": "smile" }))
         .send().await.unwrap();
-    assert_eq!(200, react_res.status().as_u16());
+    assert!(react_res.status().as_u16() == 200 || react_res.status().as_u16() == 201);
 
     // Get Reactions
     let get_react_res = app.api_client.get(format!("{}/api/v4/posts/{}/reactions", &app.address, post_id))
