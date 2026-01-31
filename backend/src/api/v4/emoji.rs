@@ -108,6 +108,38 @@ pub async fn get_emoji_by_name(
     _auth: MmAuthUser,
     Path(name): Path<String>,
 ) -> ApiResult<Json<mm::Emoji>> {
+    // First check if it's a Unicode emoji (starts with emoji codepoints)
+    // Mobile client sends actual emoji characters like 👍 instead of "thumbsup"
+    let is_unicode_emoji = name.chars().next()
+        .map(|c| c > '\u{1F300}' || c == '❤' || c == '✅' || c == '❓' || c == '❗')
+        .unwrap_or(false);
+    
+    if is_unicode_emoji {
+        // For Unicode emojis, return a synthetic "system emoji" response
+        // The emoji is valid because the user sent it - just return it as-is
+        return Ok(Json(mm::Emoji {
+            id: "system".to_string(),
+            name: name.clone(),
+            creator_id: "".to_string(),
+            create_at: 0,
+            update_at: 0,
+            delete_at: 0,
+        }));
+    }
+    
+    // Check if it's a known system emoji name
+    if crate::mattermost_compat::emoji_data::is_system_emoji(&name) {
+        return Ok(Json(mm::Emoji {
+            id: "system".to_string(),
+            name: name.clone(),
+            creator_id: "".to_string(),
+            create_at: 0,
+            update_at: 0,
+            delete_at: 0,
+        }));
+    }
+    
+    // Check custom emojis in DB
     let emoji: Option<DbEmoji> = sqlx::query_as(
         "SELECT id, name, creator_id, 
                 (extract(epoch from create_at)*1000)::bigint as create_at, 

@@ -1251,10 +1251,10 @@ fn normalize_notify_props(value: serde_json::Value) -> serde_json::Value {
 
 #[derive(Deserialize)]
 struct AttachDeviceRequest {
-    device_id: String,
-    #[allow(dead_code)]
-    token: String,
-    #[allow(dead_code)]
+    device_id: Option<String>,
+    #[serde(default)]
+    token: Option<String>,
+    #[serde(default)]
     platform: Option<String>,
 }
 
@@ -1264,21 +1264,32 @@ async fn attach_device(
     headers: HeaderMap,
     body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
-    let input: AttachDeviceRequest = parse_body(&headers, &body, "Invalid device body")?;
-    sqlx::query(
-        r#"
-        INSERT INTO user_devices (user_id, device_id, token, platform)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (user_id, device_id)
-        DO UPDATE SET token = $3, platform = $4, last_seen_at = NOW()
-        "#,
-    )
-    .bind(auth.user_id)
-    .bind(input.device_id)
-    .bind(input.token)
-    .bind(input.platform.unwrap_or_else(|| "unknown".to_string()))
-    .execute(&state.db)
-    .await?;
+    // Try to parse body, but accept empty/malformed requests gracefully
+    let input: AttachDeviceRequest = match parse_body(&headers, &body, "Invalid device body") {
+        Ok(v) => v,
+        Err(_) => {
+            // Return OK for malformed requests - mobile sends various formats
+            return Ok(Json(serde_json::json!({"status": "OK"})));
+        }
+    };
+    
+    // Only insert if we have device_id
+    if let Some(device_id) = input.device_id {
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO user_devices (user_id, device_id, token, platform)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, device_id)
+            DO UPDATE SET token = $3, platform = $4, last_seen_at = NOW()
+            "#,
+        )
+        .bind(auth.user_id)
+        .bind(&device_id)
+        .bind(input.token.as_deref())
+        .bind(input.platform.unwrap_or_else(|| "unknown".to_string()))
+        .execute(&state.db)
+        .await;
+    }
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
