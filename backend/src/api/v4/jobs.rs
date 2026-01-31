@@ -19,10 +19,30 @@ pub fn router() -> Router<AppState> {
 
 /// GET /api/v4/jobs
 async fn get_jobs(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: crate::api::v4::extractors::MmAuthUser,
 ) -> ApiResult<Json<Vec<serde_json::Value>>> {
-    Ok(Json(vec![]))
+    // Fetch jobs from DB
+    let jobs: Vec<(uuid::Uuid, String, String, i32, serde_json::Value, Option<i32>, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
+        "SELECT id, type, status, priority, data, progress, created_at FROM jobs ORDER BY created_at DESC LIMIT 100"
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+    
+    let jobs_json: Vec<serde_json::Value> = jobs.into_iter().map(|(id, job_type, status, priority, data, progress, created_at)| {
+        json!({
+            "id": crate::mattermost_compat::id::encode_mm_id(id),
+            "type": job_type,
+            "status": status,
+            "priority": priority,
+            "data": data,
+            "progress": progress.unwrap_or(0),
+            "create_at": created_at.timestamp_millis(),
+        })
+    }).collect();
+    
+    Ok(Json(jobs_json))
 }
 
 /// GET /api/v4/jobs/{job_id}

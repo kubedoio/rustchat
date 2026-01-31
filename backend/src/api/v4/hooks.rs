@@ -11,6 +11,8 @@ pub fn router() -> Router<AppState> {
         .route("/hooks/outgoing", get(list_outgoing_hooks).post(create_outgoing_hook))
         .route("/hooks/outgoing/{hook_id}", get(get_outgoing_hook).put(update_outgoing_hook).delete(delete_outgoing_hook))
         .route("/hooks/outgoing/{hook_id}/regen_token", post(regen_outgoing_hook_token))
+        // Public incoming webhook endpoint (no auth required)
+        .route("/hooks/{token}", post(execute_incoming_hook))
 }
 use axum::extract::Path;
 use crate::api::AppState;
@@ -248,5 +250,15 @@ async fn regen_outgoing_hook_token(
     _auth: MmAuthUser,
     Path(_hook_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
+/// Public endpoint for executing incoming webhooks (no auth required)
+async fn execute_incoming_hook(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+    Json(payload): Json<crate::models::WebhookPayload>,
+) -> ApiResult<Json<serde_json::Value>> {
+    crate::services::webhooks::execute_incoming_webhook(&state, &token, payload).await?;
     Ok(Json(serde_json::json!({"status": "OK"})))
 }

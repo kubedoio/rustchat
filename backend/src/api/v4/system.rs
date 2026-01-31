@@ -142,23 +142,139 @@ async fn test_s3(
 
 /// GET /config
 async fn get_config(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _auth: crate::api::v4::extractors::MmAuthUser,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // Return a minimal config object
-    Ok(Json(serde_json::json!({
-        "ServiceSettings": {},
-        "TeamSettings": {},
-        "SqlSettings": {},
-        "LogSettings": {},
-        "FileSettings": {},
-        "EmailSettings": {},
-        "RateLimitSettings": {},
-        "PrivacySettings": {},
-        "SupportSettings": {},
-        "AnnouncementSettings": {},
-        "ThemeSettings": {}
-    })))
+    // Fetch config from DB
+    let config: crate::models::ServerConfig = sqlx::query_as(
+        "SELECT * FROM server_config WHERE id = 'default'"
+    )
+    .fetch_one(&state.db)
+    .await
+    .map_err(|_| crate::error::AppError::NotFound("Config not found".to_string()))?;
+
+    // Convert to Mattermost-compatible format
+    let response = serde_json::json!({
+        "ServiceSettings": {
+            "SiteURL": config.site.0.site_url,
+            "MaximumLoginAttempts": 10,
+            "EnableDeveloper": false,
+            "EnableTesting": false,
+            "AllowedUntrustedInternalConnections": "",
+        },
+        "TeamSettings": {
+            "SiteName": config.site.0.site_name,
+            "MaxUsersPerTeam": 50,
+            "EnableTeamCreation": true,
+            "EnableUserCreation": config.authentication.0.enable_user_creation,
+            "EnableOpenServer": config.authentication.0.enable_open_server,
+            "RestrictTeamInvite": "all",
+        },
+        "SqlSettings": {
+            "DriverName": "postgres",
+            "DataSourceReplicas": [],
+            "MaxIdleConns": 10,
+            "MaxOpenConns": 100,
+        },
+        "LogSettings": {
+            "EnableConsole": true,
+            "ConsoleLevel": "INFO",
+            "EnableFile": true,
+            "FileLevel": "INFO",
+            "FileLocation": "",
+        },
+        "FileSettings": {
+            "EnableFileAttachments": config.site.0.enable_file,
+            "MaxFileSize": config.site.0.max_file_size_mb * 1024 * 1024,
+            "MaxImageDecodingSize": 38_400_000,
+            "DriverName": "local",
+        },
+        "EmailSettings": {
+            "EnableSignUpWithEmail": config.authentication.0.enable_sign_up_with_email,
+            "EnableSignInWithEmail": config.authentication.0.enable_sign_in_with_email,
+            "EnableSignInWithUsername": config.authentication.0.enable_sign_in_with_username,
+            "SendEmailNotifications": !config.email.0.smtp_host.is_empty(),
+            "RequireEmailVerification": false,
+            "FeedbackName": config.email.0.from_name,
+            "FeedbackEmail": config.email.0.from_address,
+            "SMTPServer": config.email.0.smtp_host,
+            "SMTPPort": config.email.0.smtp_port.to_string(),
+            "SMTPUsername": config.email.0.smtp_username,
+            "ConnectionSecurity": if config.email.0.smtp_tls { "TLS" } else { "" },
+            "PasswordResetSalt": "",
+            "EnablePasswordReset": config.authentication.0.password_enable_forgot_link,
+        },
+        "RateLimitSettings": {
+            "Enable": false,
+            "PerSec": 10,
+            "MaxBurst": 100,
+        },
+        "PrivacySettings": {
+            "ShowEmailAddress": true,
+            "ShowFullName": true,
+        },
+        "SupportSettings": {
+            "TermsOfServiceLink": config.site.0.terms_of_service_link,
+            "PrivacyPolicyLink": config.site.0.privacy_policy_link,
+            "AboutLink": config.site.0.about_link,
+            "HelpLink": config.site.0.help_link,
+            "ReportAProblemLink": config.site.0.report_a_problem_link,
+            "SupportEmail": config.site.0.support_email,
+        },
+        "AnnouncementSettings": {
+            "EnableBanner": false,
+            "BannerText": "",
+            "BannerColor": "#f2a93b",
+            "BannerTextColor": "#333333",
+        },
+        "ThemeSettings": {
+            "EnableThemeSelection": true,
+            "DefaultTheme": "default",
+            "AllowCustomThemes": true,
+        },
+        "PasswordSettings": {
+            "MinimumLength": config.authentication.0.password_min_length,
+            "Lowercase": config.authentication.0.password_require_lowercase,
+            "Number": config.authentication.0.password_require_number,
+            "Uppercase": config.authentication.0.password_require_uppercase,
+            "Symbol": config.authentication.0.password_require_symbol,
+        },
+        "LocalizationSettings": {
+            "DefaultServerLocale": config.site.0.default_locale,
+            "DefaultClientLocale": config.site.0.default_locale,
+            "AvailableLocales": "",
+        },
+        "SamlSettings": {
+            "Enable": config.authentication.0.enable_saml,
+        },
+        "LdapSettings": {
+            "Enable": config.authentication.0.enable_ldap,
+        },
+        "GuestAccountsSettings": {
+            "Enable": config.authentication.0.enable_guest_accounts,
+        },
+        "IntegrationSettings": {
+            "EnableIncomingWebhooks": config.integrations.0.enable_webhooks,
+            "EnableOutgoingWebhooks": config.integrations.0.enable_webhooks,
+            "EnableCommands": config.integrations.0.enable_slash_commands,
+            "EnableBotAccountCreation": config.integrations.0.enable_bots,
+            "EnableCustomEmoji": config.site.0.enable_custom_emoji,
+        },
+        "ComplianceSettings": {
+            "Enable": false,
+            "Directory": "./compliance",
+            "EnableDaily": false,
+        },
+        "DataRetentionSettings": {
+            "EnableMessageDeletion": config.compliance.0.message_retention_days > 0,
+            "MessageRetentionDays": config.compliance.0.message_retention_days,
+            "EnableFileDeletion": config.compliance.0.file_retention_days > 0,
+            "FileRetentionDays": config.compliance.0.file_retention_days,
+        },
+        "FeatureFlags": config.experimental.0,
+    });
+
+    Ok(Json(response))
 }
 
 /// POST /config/reload
@@ -179,11 +295,98 @@ async fn get_environment_config(
 
 /// POST /config/patch
 async fn patch_config(
-    State(_state): State<AppState>,
-    _auth: crate::api::v4::extractors::MmAuthUser,
-    Json(_patch): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    auth: crate::api::v4::extractors::MmAuthUser,
+    Json(patch): Json<serde_json::Value>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(serde_json::json!({"status": "OK"})))
+    // Parse and apply patches to the relevant config sections
+    // The patch format is { "SectionName": { "key": "value" } }
+    
+    // Handle TeamSettings -> site.site_name
+    if let Some(team_settings) = patch.get("TeamSettings").and_then(|v| v.as_object()) {
+        if let Some(site_name) = team_settings.get("SiteName").and_then(|v| v.as_str()) {
+            sqlx::query(
+                "UPDATE server_config SET site = jsonb_set(site, '{site_name}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
+            )
+            .bind(serde_json::json!(site_name))
+            .bind(auth.user_id)
+            .execute(&state.db)
+            .await?;
+        }
+    }
+    
+    // Handle EmailSettings
+    if let Some(email_settings) = patch.get("EmailSettings").and_then(|v| v.as_object()) {
+        let mut updates = vec![];
+        
+        if let Some(host) = email_settings.get("SMTPServer").and_then(|v| v.as_str()) {
+            updates.push(format!("email = jsonb_set(email, '{{smtp_host}}', '\"{}\"', true)", host));
+        }
+        if let Some(port) = email_settings.get("SMTPPort").and_then(|v| v.as_str()) {
+            updates.push(format!("email = jsonb_set(email, '{{smtp_port}}', '{}', true)", port));
+        }
+        if let Some(from) = email_settings.get("FeedbackEmail").and_then(|v| v.as_str()) {
+            updates.push(format!("email = jsonb_set(email, '{{from_address}}', '\"{}\"', true)", from));
+        }
+        
+        if !updates.is_empty() {
+            let query = format!(
+                "UPDATE server_config SET {}, updated_at = NOW(), updated_by = $1 WHERE id = 'default'",
+                updates.join(", ")
+            );
+            sqlx::query(&query)
+                .bind(auth.user_id)
+                .execute(&state.db)
+                .await?;
+        }
+    }
+    
+    // Handle IntegrationSettings -> integrations
+    if let Some(int_settings) = patch.get("IntegrationSettings").and_then(|v| v.as_object()) {
+        if let Some(enable_webhooks) = int_settings.get("EnableIncomingWebhooks").and_then(|v| v.as_bool()) {
+            sqlx::query(
+                "UPDATE server_config SET integrations = jsonb_set(integrations, '{enable_webhooks}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
+            )
+            .bind(serde_json::json!(enable_webhooks))
+            .bind(auth.user_id)
+            .execute(&state.db)
+            .await?;
+        }
+        if let Some(enable_commands) = int_settings.get("EnableCommands").and_then(|v| v.as_bool()) {
+            sqlx::query(
+                "UPDATE server_config SET integrations = jsonb_set(integrations, '{enable_slash_commands}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
+            )
+            .bind(serde_json::json!(enable_commands))
+            .bind(auth.user_id)
+            .execute(&state.db)
+            .await?;
+        }
+    }
+    
+    // Handle DataRetentionSettings -> compliance
+    if let Some(retention) = patch.get("DataRetentionSettings").and_then(|v| v.as_object()) {
+        if let Some(days) = retention.get("MessageRetentionDays").and_then(|v| v.as_i64()) {
+            sqlx::query(
+                "UPDATE server_config SET compliance = jsonb_set(compliance, '{message_retention_days}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
+            )
+            .bind(serde_json::json!(days))
+            .bind(auth.user_id)
+            .execute(&state.db)
+            .await?;
+        }
+        if let Some(days) = retention.get("FileRetentionDays").and_then(|v| v.as_i64()) {
+            sqlx::query(
+                "UPDATE server_config SET compliance = jsonb_set(compliance, '{file_retention_days}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
+            )
+            .bind(serde_json::json!(days))
+            .bind(auth.user_id)
+            .execute(&state.db)
+            .await?;
+        }
+    }
+    
+    // Return updated config
+    get_config(State(state), auth).await
 }
 
 /// GET /license

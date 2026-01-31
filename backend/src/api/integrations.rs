@@ -651,6 +651,183 @@ pub async fn execute_command_internal(
                 attachments: None,
             });
         }
+        "join" => {
+            // Join a channel by name
+            if args.is_empty() {
+                return Ok(CommandResponse {
+                    response_type: "ephemeral".to_string(),
+                    text: "Usage: /join ~channel-name".to_string(),
+                    username: None,
+                    icon_url: None,
+                    goto_location: None,
+                    attachments: None,
+                });
+            }
+            
+            let channel_name = args.trim().trim_start_matches('~');
+            
+            // Get team_id from current channel
+            let current_team_id: Uuid = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
+                .bind(payload.channel_id)
+                .fetch_one(&state.db)
+                .await?;
+            
+            // Find channel
+            let target_channel: Option<crate::models::Channel> = sqlx::query_as(
+                "SELECT * FROM channels WHERE team_id = $1 AND name = $2"
+            )
+            .bind(current_team_id)
+            .bind(channel_name)
+            .fetch_optional(&state.db)
+            .await?;
+            
+            if let Some(ch) = target_channel {
+                // Add user to channel
+                sqlx::query(
+                    "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING"
+                )
+                .bind(ch.id)
+                .bind(auth.user_id)
+                .execute(&state.db)
+                .await?;
+                
+                return Ok(CommandResponse {
+                    response_type: "ephemeral".to_string(),
+                    text: format!("You have joined ~{}", ch.name),
+                    username: None,
+                    icon_url: None,
+                    goto_location: Some(format!("/channels/{}", ch.id)),
+                    attachments: None,
+                });
+            } else {
+                return Ok(CommandResponse {
+                    response_type: "ephemeral".to_string(),
+                    text: format!("Channel ~{} not found", channel_name),
+                    username: None,
+                    icon_url: None,
+                    goto_location: None,
+                    attachments: None,
+                });
+            }
+        }
+        "leave" => {
+            // Leave current channel
+            let channel = sqlx::query_as::<_, crate::models::Channel>(
+                "SELECT * FROM channels WHERE id = $1"
+            )
+            .bind(payload.channel_id)
+            .fetch_optional(&state.db)
+            .await?;
+            
+            if let Some(ch) = channel {
+                if ch.channel_type == crate::models::ChannelType::Direct {
+                    return Ok(CommandResponse {
+                        response_type: "ephemeral".to_string(),
+                        text: "You cannot leave a direct message channel".to_string(),
+                        username: None,
+                        icon_url: None,
+                        goto_location: None,
+                        attachments: None,
+                    });
+                }
+                
+                sqlx::query(
+                    "DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2"
+                )
+                .bind(payload.channel_id)
+                .bind(auth.user_id)
+                .execute(&state.db)
+                .await?;
+                
+                // Broadcast member left
+                let event = crate::realtime::WsEnvelope::event(
+                    crate::realtime::EventType::MemberRemoved,
+                    serde_json::json!({
+                        "channel_id": payload.channel_id,
+                        "user_id": auth.user_id
+                    }),
+                    Some(payload.channel_id),
+                )
+                .with_broadcast(crate::realtime::WsBroadcast {
+                    channel_id: Some(payload.channel_id),
+                    team_id: None,
+                    user_id: None,
+                    exclude_user_id: None,
+                });
+                state.ws_hub.broadcast(event).await;
+                
+                return Ok(CommandResponse {
+                    response_type: "ephemeral".to_string(),
+                    text: format!("You have left ~{}", ch.name),
+                    username: None,
+                    icon_url: None,
+                    goto_location: Some("/".to_string()),
+                    attachments: None,
+                });
+            }
+            
+            return Ok(CommandResponse {
+                response_type: "ephemeral".to_string(),
+                text: "Channel not found".to_string(),
+                username: None,
+                icon_url: None,
+                goto_location: None,
+                attachments: None,
+            });
+        }
+        "me" => {
+            // /me action - creates an italic-style action message
+            let user_name = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+                .bind(auth.user_id)
+                .fetch_one(&state.db)
+                .await
+                .unwrap_or_else(|_| "someone".to_string());
+            
+            let message = format!("*{} {}*", user_name, args);
+            
+            let create_post_input = crate::models::CreatePost {
+                message,
+                file_ids: vec![],
+                props: Some(serde_json::json!({"from_command": "/me"})),
+                root_post_id: None,
+            };
+            
+            let _ = crate::services::posts::create_post(
+                state,
+                auth.user_id,
+                payload.channel_id,
+                create_post_input,
+                None,
+            )
+            .await?;
+            
+            return Ok(CommandResponse {
+                response_type: "ephemeral".to_string(),
+                text: String::new(),
+                username: None,
+                icon_url: None,
+                goto_location: None,
+                attachments: None,
+            });
+        }
+        "help" => {
+            let help_text = r#"**Available Commands:**
+• `/call [end]` - Start or end a video call
+• `/join ~channel` - Join a channel
+• `/leave` - Leave current channel
+• `/me [action]` - Post an action message
+• `/shrug [message]` - Add ¯\_(ツ)_/¯ to your message
+• `/echo [text]` - Echo text back to you"#;
+
+            return Ok(CommandResponse {
+                response_type: "ephemeral".to_string(),
+                text: help_text.to_string(),
+                username: None,
+                icon_url: None,
+                goto_location: None,
+                attachments: None,
+            });
+        }
         _ => {}
     }
 

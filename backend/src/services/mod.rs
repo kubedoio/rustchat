@@ -5,3 +5,4 @@ pub mod email;
 pub mod mirotalk;
 pub mod posts;
 pub mod unreads;
+pub mod webhooks;

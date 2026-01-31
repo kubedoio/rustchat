@@ -176,6 +176,34 @@ pub async fn create_post(
         let _ = check_playbook_triggers(state, channel_id, &response.message).await;
     }
 
+    // Check for outgoing webhook triggers
+    if root_post_id.is_none() {
+        // Get team_id for the channel
+        if let Ok(team_id) = sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM channels WHERE id = $1")
+            .bind(channel_id)
+            .fetch_one(&state.db)
+            .await
+        {
+            // Get channel name and username
+            let channel_name: String = sqlx::query_scalar("SELECT name FROM channels WHERE id = $1")
+                .bind(channel_id)
+                .fetch_one(&state.db)
+                .await
+                .unwrap_or_default();
+            let username = response.username.clone().unwrap_or_default();
+            
+            let _ = crate::services::webhooks::check_outgoing_triggers(
+                state,
+                channel_id,
+                team_id,
+                user_id,
+                &username,
+                &channel_name,
+                &response.message,
+            ).await;
+        }
+    }
+
     // Ensure DM membership for recipient if they left
     let _ = ensure_dm_membership(state, channel_id).await;
 
