@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS upload_sessions (
     expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '24 hours'
 );
 
-CREATE INDEX idx_upload_sessions_user_id ON upload_sessions(user_id);
-CREATE INDEX idx_upload_sessions_expires_at ON upload_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_upload_sessions_user_id ON upload_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_upload_sessions_expires_at ON upload_sessions(expires_at);
