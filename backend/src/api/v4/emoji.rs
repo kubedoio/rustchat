@@ -172,8 +172,14 @@ pub async fn get_emoji_image(
 ) -> ApiResult<axum::response::Response> {
     use axum::response::IntoResponse;
 
+    // Handle special "system" emoji ID - system emojis don't have server-stored images
+    // The client renders them from its own emoji font/assets
+    if emoji_id_str == "system" {
+        return Err(AppError::NotFound("System emojis use client-side rendering".to_string()));
+    }
+
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
-        .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
+        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
     // Get the emoji's image path from database
     let image_url: Option<String> = sqlx::query_scalar(
