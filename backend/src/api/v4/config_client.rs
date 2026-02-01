@@ -105,6 +105,8 @@ fn legacy_config(site: &SiteConfig, auth: &AuthConfig, diagnostic_id: &str) -> s
     insert(&mut map, "DiagnosticId", diagnostic_id);
     insert(&mut map, "EnableCustomBrand", bool_str(site.enable_custom_brand));
     insert(&mut map, "EnableCustomEmoji", bool_str(site.enable_custom_emoji));
+    insert(&mut map, "EnableEmojiPicker", "true");  // Required for mobile reactions
+    insert(&mut map, "EnableGifPicker", "true");    // Required for GIF picker in mobile
     insert(&mut map, "EnableFile", bool_str(site.enable_file));
     insert(&mut map, "EnableUserStatuses", bool_str(site.enable_user_statuses));
     insert(&mut map, "EnableAskCommunityLink", "true");
