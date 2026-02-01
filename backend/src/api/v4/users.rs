@@ -2081,13 +2081,20 @@ async fn upload_user_image(
         .map_err(|e| AppError::BadRequest(format!("Multipart error: {}", e)))?
     {
         let name = field.name().unwrap_or("").to_string();
+        let filename = field.file_name().map(|s| s.to_string());
         let content_type = field
             .content_type()
             .unwrap_or("application/octet-stream")
             .to_string();
         
-        // Accept field named "image" or any field with image content type
-        if name == "image" || content_type.starts_with("image/") {
+        // Accept field named "image", "file", "picture", "avatar", or any field with:
+        // - image content type
+        // - a filename present (indicates it's a file upload)
+        let is_image_field = name == "image" || name == "file" || name == "picture" || name == "avatar" || name.is_empty();
+        let is_image_type = content_type.starts_with("image/");
+        let has_filename = filename.is_some();
+        
+        if is_image_field && (is_image_type || has_filename) {
             let data = field
                 .bytes()
                 .await
@@ -2098,9 +2105,27 @@ async fn upload_user_image(
                 continue;
             }
 
+            // Determine content type from data if not provided
+            let final_content_type = if is_image_type {
+                content_type.clone()
+            } else {
+                // Try to detect from magic bytes
+                if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+                    "image/png".to_string()
+                } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+                    "image/jpeg".to_string()
+                } else if data.starts_with(b"GIF") {
+                    "image/gif".to_string()
+                } else if data.starts_with(b"RIFF") && data.len() > 12 && &data[8..12] == b"WEBP" {
+                    "image/webp".to_string()
+                } else {
+                    "image/png".to_string() // default to PNG
+                }
+            };
+
             // Upload to S3
             let key = format!("avatars/{}.png", user_uuid);
-            state.s3_client.upload(&key, data, &content_type).await?;
+            state.s3_client.upload(&key, data, &final_content_type).await?;
 
             // Update user avatar_url
             let avatar_url = format!("/api/v4/users/{}/image", encode_mm_id(user_uuid));
