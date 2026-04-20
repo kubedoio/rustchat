@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "docs-rustchat-io",
+  "compatibility_date": "2026-04-20",
+  "assets": {
+    "directory": ".vitepress/dist"
+  }
+}
