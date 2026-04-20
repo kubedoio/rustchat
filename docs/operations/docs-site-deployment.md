@@ -26,8 +26,14 @@ In the Pages project:
 2. Connect the `kubedoio/rustchat` repository
 3. Configure build:
    - Root directory: `docs`
-   - Build command: `npm ci --ignore-scripts && npm run ci`
+   - Build command: `npm run docs:build`
    - Build output directory: `.vitepress/dist`
+   - Deploy command (if required by your Cloudflare mode): `npx wrangler versions upload`
+
+The repository includes `docs/wrangler.jsonc` so `wrangler versions upload` can resolve:
+- Worker name (`docs-rustchat-io`)
+- Compatibility date
+- Assets directory (`.vitepress/dist`)
 
 ## 3. Workflow Behavior
 
