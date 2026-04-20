@@ -854,7 +854,7 @@ pub async fn get_unread_overview(state: &AppState, user_id: Uuid) -> ApiResult<U
             unread_count,
         })
         .collect();
-    team_overviews.sort_by(|a, b| a.team_id.cmp(&b.team_id));
+    team_overviews.sort_by_key(|a| a.team_id);
 
     Ok(UnreadOverview {
         channels: channel_overviews,
