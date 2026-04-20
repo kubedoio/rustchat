@@ -162,15 +162,13 @@ impl CircuitBreaker {
         *self.last_failure.lock().await = Some(Instant::now());
 
         match *state {
-            CircuitState::Closed => {
-                if *failures >= self.config.failure_threshold {
-                    warn!(
-                        circuit = %self.name,
-                        failures = *failures,
-                        "Circuit breaker opened due to failures"
-                    );
-                    *state = CircuitState::Open;
-                }
+            CircuitState::Closed if *failures >= self.config.failure_threshold => {
+                warn!(
+                    circuit = %self.name,
+                    failures = *failures,
+                    "Circuit breaker opened due to failures"
+                );
+                *state = CircuitState::Open;
             }
             CircuitState::HalfOpen => {
                 // Failed in half-open, go back to open

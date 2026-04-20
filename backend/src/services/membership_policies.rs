@@ -664,7 +664,7 @@ impl<'a> PolicyRepository<'a> {
         }
 
         // Sort by priority (highest first)
-        applicable.sort_by(|a, b| b.policy.priority.cmp(&a.policy.priority));
+        applicable.sort_by_key(|a| std::cmp::Reverse(a.policy.priority));
 
         Ok(applicable)
     }
