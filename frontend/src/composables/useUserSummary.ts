@@ -76,12 +76,11 @@ function scheduleExpiry(userId: string, expiresAt: unknown) {
 
 function upsertHydratedUser(userId: string, partial: Partial<HydratedUserRecord>) {
   const existing = hydratedUsers.value[userId]
-  const next: HydratedUserRecord = {
-    id: existing?.id || userId,
-    username: existing?.username || '',
-    ...existing,
-    ...partial,
-  }
+  const next: HydratedUserRecord = Object.assign(
+    { id: userId, username: '' },
+    existing,
+    partial,
+  )
 
   hydratedUsers.value = {
     ...hydratedUsers.value,
