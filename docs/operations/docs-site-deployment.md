@@ -1,13 +1,13 @@
 # Docs Site Deployment (`docs.rustchat.io`)
 
-This guide describes how to deploy the documentation site automatically from GitHub Actions to Cloudflare Pages.
+This guide describes how to deploy the documentation site from GitHub to Cloudflare Pages using Cloudflare's native Git integration.
 
 ## Overview
 
 - Source of truth: `docs/` directory in this repository
 - Static site generator: VitePress
-- CI/CD workflow: `.github/workflows/docs-ci-cd.yml`
-- Deployment method: Cloudflare Pages Direct Upload via Wrangler in GitHub Actions
+- CI quality checks: `.github/workflows/docs-ci-cd.yml`
+- Deployment method: Cloudflare Pages Git integration (no GitHub deployment secrets)
 
 ## 1. Create a Cloudflare Pages Project
 
@@ -15,29 +15,33 @@ In Cloudflare Dashboard:
 
 1. Go to `Workers & Pages`
 2. Create a new `Pages` project
-3. Use any temporary source (the workflow deploys artifacts directly)
+3. Connect it to your repository for automatic deploys from `main`
 4. Note the project name (for example `rustchat-docs`)
 
-## 2. Create API Token
+## 2. Connect GitHub Repository
 
-Create a Cloudflare API token with Pages edit permissions for your account/project.
+In the Pages project:
 
-You also need your Cloudflare Account ID.
+1. Open `Settings` -> `Build & deployments`
+2. Connect the `kubedoio/rustchat` repository
+3. Configure build:
+   - Root directory: `docs`
+   - Build command: `npm ci --ignore-scripts && npm run docs:build`
+   - Build output directory: `.vitepress/dist`
+   - Deploy command (if required by your Cloudflare mode): `npx wrangler versions upload`
 
-## 3. Configure GitHub Secrets
+The repository includes `docs/wrangler.jsonc` so `wrangler versions upload` can resolve:
+- Worker name (`docs-rustchat-io`)
+- Compatibility date
+- Assets directory (`.vitepress/dist`)
 
-Set these repository secrets:
-
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `CLOUDFLARE_PAGES_PROJECT_NAME` (for example `rustchat-docs`)
-
-## 4. Workflow Behavior
+## 3. Workflow Behavior
 
 - On pull requests: runs docs link checks and builds the VitePress site.
-- On push to `main`: runs the same checks, then deploys to the Cloudflare Pages project.
+- On push to `main`: Cloudflare Pages deploys from the connected repository.
+- GitHub Actions stays as an independent quality gate.
 
-## 5. Configure Custom Domain
+## 4. Configure Custom Domain
 
 In the Pages project:
 
@@ -47,7 +51,7 @@ In the Pages project:
 
 Cloudflare manages TLS automatically once the domain is attached.
 
-## 6. Manual Validation
+## 5. Manual Validation
 
 ```bash
 cd docs
@@ -56,4 +60,4 @@ npm run docs:check-links
 npm run docs:build
 ```
 
-If CI succeeds and secrets are configured, `docs.rustchat.io` updates automatically after merge to `main`.
+If CI succeeds and Cloudflare Git integration is active, `docs.rustchat.io` updates automatically after merge to `main`.

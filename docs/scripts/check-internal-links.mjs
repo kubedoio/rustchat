@@ -95,7 +95,8 @@ function resolveLinkPath(sourceFile, linkTarget) {
 
   if (relativeTarget.startsWith("/")) {
     return {
-      absPath: path.resolve(repoRoot, relativeTarget.slice(1)),
+      // VitePress absolute links are rooted at docs/
+      absPath: path.resolve(docsRoot, relativeTarget.slice(1)),
       treatAsDirectoryHint,
     };
   }
