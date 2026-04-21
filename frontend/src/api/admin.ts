@@ -188,6 +188,8 @@ export interface HealthStatus {
     status: 'healthy' | 'degraded' | 'unhealthy';
     database: { connected: boolean; latency_ms: number };
     storage: { connected: boolean; type: string };
+    redis: { connected: boolean; latency_ms: number };
+    disk: { connected: boolean; used_percent: number; available_mb: number };
     websocket: { active_connections: number };
     version: string;
     uptime_seconds: number;

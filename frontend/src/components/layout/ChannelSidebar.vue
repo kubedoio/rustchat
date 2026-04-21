@@ -496,6 +496,9 @@ async function handleLeaveTeam() {
             <div 
               v-for="channel in cat.channels" 
               :key="channel.id"
+              :data-testid="channel.type === 'dm' ? 'dm-sidebar-row' : 'channel-sidebar-row'"
+              :data-channel-id="channel.id"
+              :data-user-id="channel.userId"
               @click="selectChannel(channel.id)"
               @contextmenu.prevent="openContextMenu(channel, $event)"
               class="group/item relative flex cursor-pointer items-center justify-between rounded-r-2 border px-2.5 py-2 transition-standard"
@@ -547,6 +550,7 @@ async function handleLeaveTeam() {
                   </span>
                   <span
                     v-if="channel.type === 'dm'"
+                    data-testid="dm-sidebar-status"
                     class="mt-0.5 block truncate text-[11px]"
                     :class="channelStore.currentChannelId === channel.id ? 'text-text-2' : 'text-text-3'"
                   >

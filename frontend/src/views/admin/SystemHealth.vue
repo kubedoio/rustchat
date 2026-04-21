@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useAdminStore } from '../../stores/admin';
-import { Activity, Database, HardDrive, Wifi, Server, CheckCircle, AlertCircle, Clock } from 'lucide-vue-next';
+import { Activity, Database, HardDrive, Wifi, Server, CheckCircle, AlertCircle, Clock, MemoryStick, FolderOpen } from 'lucide-vue-next';
 
 const adminStore = useAdminStore();
 
@@ -83,6 +83,21 @@ const formatUptime = (seconds: number | undefined) => {
                 </p>
             </div>
 
+            <!-- Redis -->
+            <div class="bg-white rounded-xl p-6 border border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <MemoryStick class="w-5 h-5 text-pink-500 mr-2" />
+                        <h3 class="font-semibold text-gray-900">Redis</h3>
+                    </div>
+                    <CheckCircle v-if="adminStore.health.redis.connected" class="w-5 h-5 text-green-500" />
+                    <AlertCircle v-else class="w-5 h-5 text-red-500" />
+                </div>
+                <p class="text-sm text-gray-500">
+                    Latency: <span class="font-medium text-gray-900">{{ adminStore.health.redis.latency_ms }}ms</span>
+                </p>
+            </div>
+
             <!-- Storage -->
             <div class="bg-white rounded-xl p-6 border border-gray-200">
                 <div class="flex items-center justify-between mb-4">
@@ -95,6 +110,24 @@ const formatUptime = (seconds: number | undefined) => {
                 </div>
                 <p class="text-sm text-gray-500">
                     Type: <span class="font-medium text-gray-900">{{ adminStore.health.storage.type }}</span>
+                </p>
+            </div>
+
+            <!-- Disk -->
+            <div class="bg-white rounded-xl p-6 border border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <FolderOpen class="w-5 h-5 text-teal-500 mr-2" />
+                        <h3 class="font-semibold text-gray-900">Disk</h3>
+                    </div>
+                    <CheckCircle v-if="adminStore.health.disk.connected" class="w-5 h-5 text-green-500" />
+                    <AlertCircle v-else class="w-5 h-5 text-red-500" />
+                </div>
+                <p class="text-sm text-gray-500">
+                    Used: <span class="font-medium text-gray-900">{{ adminStore.health.disk.used_percent }}%</span>
+                </p>
+                <p class="text-sm text-gray-500">
+                    Available: <span class="font-medium text-gray-900">{{ adminStore.health.disk.available_mb }} MB</span>
                 </p>
             </div>
         </div>

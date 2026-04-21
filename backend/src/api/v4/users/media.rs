@@ -31,12 +31,20 @@ pub async fn get_user_image(
                 .await?
                 .flatten();
 
-        if let Some(legacy_key) = legacy_avatar_url
+        let legacy_key = legacy_avatar_url
             .as_deref()
-            .and_then(|url| legacy_avatar_key_from_url(user_uuid, url))
-        {
-            data = state.s3_client.download_optional(&legacy_key).await?;
+            .and_then(|url| legacy_avatar_key_from_url(user_uuid, url));
+
+        if let Some(ref key) = legacy_key {
+            data = state.s3_client.download_optional(key).await?;
         }
+
+        tracing::info!(
+            user_id = %user_uuid,
+            has_legacy_key = legacy_key.is_some(),
+            legacy_hit = data.is_some(),
+            "Avatar resolution: canonical miss, tried legacy fallback"
+        );
     }
 
     match data {
@@ -64,6 +72,10 @@ pub async fn get_user_image(
                 .into_response())
         }
         None => {
+            tracing::info!(
+                user_id = %user_uuid,
+                "Avatar resolution: returning default image"
+            );
             // Return default 1x1 transparent PNG if no image uploaded
             const PNG_1X1: &[u8] = &[
                 137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0,

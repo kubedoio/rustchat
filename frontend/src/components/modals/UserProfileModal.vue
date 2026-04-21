@@ -101,12 +101,12 @@ function handleClose() {
             </p>
             
             <!-- Presence Badge -->
-            <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <span class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium" :class="presenceMeta.badgeClass">
+            <div data-testid="profile-modal-status" class="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <span data-testid="profile-modal-presence" class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium" :class="presenceMeta.badgeClass">
                 <component :is="presenceMeta.icon" class="h-3.5 w-3.5" />
                 {{ presenceMeta.label }}
               </span>
-              <span v-if="user.statusText" class="inline-flex max-w-full items-center gap-1 rounded-full border border-border-1 bg-bg-surface-2 px-3 py-1 text-sm text-text-2">
+              <span v-if="user.statusText" data-testid="profile-modal-custom-status" class="inline-flex max-w-full items-center gap-1 rounded-full border border-border-1 bg-bg-surface-2 px-3 py-1 text-sm text-text-2">
                 <span v-if="user.statusEmoji">{{ user.statusEmoji }}</span>
                 <span class="truncate">{{ user.statusText }}</span>
               </span>

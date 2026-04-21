@@ -208,6 +208,17 @@ pub fn normalize_avatar_url(user_id: Uuid, avatar_url: Option<&str>) -> Option<S
         return Some(stable_avatar_path(user_id));
     }
 
+    // Structured logging to catch any remaining presigned URL leaks
+    let looks_presigned =
+        trimmed.contains("X-Amz-") || trimmed.contains("x-id=") || trimmed.contains("presigned");
+    if looks_presigned {
+        tracing::warn!(
+            user_id = %user_id,
+            avatar_url = %trimmed,
+            "Avatar URL contains presigned indicators but was not normalized"
+        );
+    }
+
     Some(trimmed.to_string())
 }
 

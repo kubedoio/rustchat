@@ -228,6 +228,7 @@ const handleLeave = async () => {
       <!-- More Options Menu -->
       <div class="relative">
         <button 
+          data-testid="channel-header-menu"
           @click="showMenu = !showMenu"
           class="flex items-center justify-center w-11 h-11 rounded-r-2 hover:bg-bg-surface-2 text-text-2 transition-standard focus-ring"
           :class="{ 'bg-bg-surface-2': showMenu }"
@@ -251,6 +252,7 @@ const handleLeave = async () => {
             class="absolute right-0 top-full mt-2 w-48 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2xl py-1 z-20 origin-top-right"
           >
             <button 
+              data-testid="channel-details-button"
               @click="uiStore.toggleRhs('info'); showMenu = false"
               class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-text-2 hover:bg-bg-surface-2 transition-standard"
             >

@@ -180,12 +180,12 @@
 - Regression coverage is still missing for summary batching, reconnect hydration, token-expiry cleanup, and cross-surface UI consistency.
 
 ### Implementation Checklist
-- [ ] Extend websocket reconnect snapshots so visible user status includes `text`, `emoji`, and `expires_at`, not only plain presence.
-- [ ] Batch shared-summary prefetch for visible DM users through `/api/v4/users/ids`, while keeping single-user fallback for profile/detail surfaces.
-- [ ] Move auth-self expiry and shared-summary expiry onto one shared frontend helper.
-- [ ] Normalize `frontend/src/components/layout/ChannelSidebar.vue` onto the shared summary path for DM identity/status rendering.
-- [ ] Add frontend regression tests for summary batching, reconnect hydration, shared expiry handling, and token-expiry-driven cleanup.
-- [ ] Add one focused Playwright flow for DM sidebar + channel info + profile modal consistency, including live update and reconnect recovery.
+- [x] Extend websocket reconnect snapshots so visible user status includes `text`, `emoji`, and `expires_at`, not only plain presence.
+- [x] Batch shared-summary prefetch for visible DM users through `/api/v4/users/ids`, while keeping single-user fallback for profile/detail surfaces.
+- [x] Move auth-self expiry and shared-summary expiry onto one shared frontend helper.
+- [x] Normalize `frontend/src/components/layout/ChannelSidebar.vue` onto the shared summary path for DM identity/status rendering.
+- [x] Add frontend regression tests for summary batching, reconnect hydration, shared expiry handling, and token-expiry-driven cleanup.
+- [x] Add one focused Playwright flow for DM sidebar + channel info + profile modal consistency, including live update and reconnect recovery.
 
 ### Design Decisions Locked In
 1. **Cross-surface hierarchy**

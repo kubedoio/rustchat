@@ -237,13 +237,14 @@ watch(() => props.channelId, async () => {
         </div>
       </div>
 
-      <div v-if="showDirectMessageProfile" class="mt-3 flex flex-wrap items-center gap-2">
-        <span class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium" :class="directContactPresenceMeta.badgeClass">
+      <div v-if="showDirectMessageProfile" data-testid="channel-info-dm-status" class="mt-3 flex flex-wrap items-center gap-2">
+        <span data-testid="channel-info-presence" class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium" :class="directContactPresenceMeta.badgeClass">
           <component :is="directContactPresenceMeta.icon" class="h-3.5 w-3.5" />
           {{ directContactPresenceMeta.label }}
         </span>
         <span
           v-if="directContact?.statusText"
+          data-testid="channel-info-custom-status"
           class="inline-flex max-w-full items-center gap-1 rounded-full border border-border-1 bg-bg-surface-1 px-3 py-1 text-sm text-text-2"
         >
           <span v-if="directContact?.statusEmoji">{{ directContact.statusEmoji }}</span>
