@@ -366,7 +366,7 @@ async function toggleReaction(emoji: string) {
     @mouseleave="handleMessageMouseLeave"
   >
     <!-- Avatar -->
-    <div class="shrink-0 select-none mr-2 sm:mr-3 mt-0.5 cursor-pointer" @click="openUserProfile">
+    <div data-testid="message-avatar" class="shrink-0 select-none mr-2 sm:mr-3 mt-0.5 cursor-pointer" @click="openUserProfile">
       <RcAvatar 
         :userId="message.userId"
         :src="message.avatarUrl" 

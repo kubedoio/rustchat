@@ -80,4 +80,7 @@ async fn test_admin_health_check() {
     assert_eq!(body["websocket"]["active_connections"], 0);
     assert_eq!(body["storage"]["connected"], true);
     assert!(body["database"]["connected"].as_bool().unwrap());
+    assert!(body["redis"]["connected"].as_bool().unwrap());
+    assert!(body["disk"]["connected"].as_bool().unwrap());
+    assert!(body["disk"]["used_percent"].as_u64().unwrap() <= 100);
 }

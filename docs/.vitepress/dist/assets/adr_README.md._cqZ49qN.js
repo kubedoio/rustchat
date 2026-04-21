@@ -1,0 +1,14 @@
+import{_ as e,o as n,c as s,ag as t}from"./chunks/framework.DXGyWiRo.js";const u=JSON.parse('{"title":"Architecture Decision Records (ADRs)","description":"","frontmatter":{},"headers":[],"relativePath":"adr/README.md","filePath":"adr/README.md","lastUpdated":1775910991000}'),i={name:"adr/README.md"};function r(c,a,o,p,d,l){return n(),s("div",null,[...a[0]||(a[0]=[t(`<h1 id="architecture-decision-records-adrs" tabindex="-1">Architecture Decision Records (ADRs) <a class="header-anchor" href="#architecture-decision-records-adrs" aria-label="Permalink to &quot;Architecture Decision Records (ADRs)&quot;">​</a></h1><p>This directory contains Architecture Decision Records for rustchat.</p><p>An ADR documents a significant architectural decision: the context, the options considered, the decision made, and the consequences.</p><h2 id="when-to-create-an-adr" tabindex="-1">When to create an ADR <a class="header-anchor" href="#when-to-create-an-adr" aria-label="Permalink to &quot;When to create an ADR&quot;">​</a></h2><p>Per <code>.governance/risk-tiers.yml</code>, an ADR is required for <code>architectural</code> tier changes, and for specific elevated changes involving:</p><ul><li>Auth or permission model changes</li><li>API contract changes</li><li>Storage model changes</li></ul><h2 id="format" tabindex="-1">Format <a class="header-anchor" href="#format" aria-label="Permalink to &quot;Format&quot;">​</a></h2><div class="language- vp-adaptive-theme"><button title="Copy Code" class="copy"></button><span class="lang"></span><pre class="shiki shiki-themes github-light github-dark vp-code" tabindex="0"><code><span class="line"><span># ADR-NNN: Title</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>**Date:** YYYY-MM-DD</span></span>
+<span class="line"><span>**Status:** Proposed | Accepted | Deprecated | Superseded by ADR-NNN</span></span>
+<span class="line"><span>**Risk tier:** architectural</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>## Context</span></span>
+<span class="line"><span>[What is the problem and why does it matter?]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>## Decision</span></span>
+<span class="line"><span>[What was decided?]</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>## Consequences</span></span>
+<span class="line"><span>[What are the trade-offs and implications?]</span></span></code></pre></div><h2 id="index" tabindex="-1">Index <a class="header-anchor" href="#index" aria-label="Permalink to &quot;Index&quot;">​</a></h2><ul><li><a href="./ADR-frontend-supply-chain-security">ADR: Frontend Supply-Chain Security Model</a> - npm normalization, hardened CI installs, dependency governance, and override/patch policy for the Vue frontend.</li></ul>`,10)])])}const m=e(i,[["render",r]]);export{u as __pageData,m as default};
