@@ -198,7 +198,7 @@ async fn stats(State(state): State<AppState>) -> Json<MetricsResponse> {
 }
 
 /// Check Redis connectivity
-async fn check_redis(redis: &deadpool_redis::Pool) -> bool {
+pub async fn check_redis(redis: &deadpool_redis::Pool) -> bool {
     match redis.get().await {
         Ok(mut conn) => deadpool_redis::redis::cmd("PING")
             .query_async::<Option<String>>(&mut conn)
