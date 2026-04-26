@@ -156,6 +156,7 @@ pub async fn add_team_member_by_invite(
             user_id: auth.user_id,
             role: "member".to_string(),
             created_at: chrono::Utc::now(),
+            presence: "offline".to_string(),
         })),
     ))
 }

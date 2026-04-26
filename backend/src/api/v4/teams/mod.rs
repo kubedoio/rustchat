@@ -106,25 +106,7 @@ pub fn map_team_member(member: TeamMember) -> mm::TeamMember {
             && member.role != "admin"
             && member.role != "team_admin",
         scheme_admin: member.role == "admin" || member.role == "team_admin",
-        presence: None,
-    }
-}
-
-pub fn map_team_member_with_presence(
-    member: TeamMember,
-    presence: Option<String>,
-) -> mm::TeamMember {
-    mm::TeamMember {
-        team_id: encode_mm_id(member.team_id),
-        user_id: encode_mm_id(member.user_id),
-        roles: crate::mattermost_compat::mappers::map_team_role(&member.role),
-        delete_at: 0,
-        scheme_guest: member.role == "guest",
-        scheme_user: member.role != "guest"
-            && member.role != "admin"
-            && member.role != "team_admin",
-        scheme_admin: member.role == "admin" || member.role == "team_admin",
-        presence: presence.filter(|p| !p.is_empty()),
+        presence: Some(member.presence).filter(|p| !p.is_empty()),
     }
 }
 

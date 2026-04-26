@@ -25,14 +25,8 @@ pub struct Post {
     pub last_reply_at: Option<DateTime<Utc>>,
     #[sqlx(default)]
     pub seq: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Reaction {
-    pub post_id: Uuid,
-    pub user_id: Uuid,
-    pub emoji_name: String,
-    pub created_at: DateTime<Utc>,
+    #[sqlx(default)]
+    pub has_reactions: bool,
 }
 
 /// Aggregated reaction for responses

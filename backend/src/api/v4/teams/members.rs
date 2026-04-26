@@ -5,10 +5,7 @@ use axum::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use super::{
-    ensure_team_admin_or_system_manage, ensure_team_member, map_team_member,
-    map_team_member_with_presence,
-};
+use super::{ensure_team_admin_or_system_manage, ensure_team_member, map_team_member};
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
@@ -52,15 +49,13 @@ pub async fn get_team_members(
         .into_iter()
         .map(
             |(team_id, user_id, role, _username, _display_name, presence)| {
-                map_team_member_with_presence(
-                    TeamMember {
-                        team_id,
-                        user_id,
-                        role,
-                        created_at: chrono::Utc::now(),
-                    },
-                    presence,
-                )
+                map_team_member(TeamMember {
+                    team_id,
+                    user_id,
+                    role,
+                    created_at: chrono::Utc::now(),
+                    presence: presence.unwrap_or_else(|| "offline".to_string()),
+                })
             },
         )
         .collect();
@@ -119,6 +114,7 @@ pub async fn add_team_member(
         user_id,
         role: "member".to_string(),
         created_at: chrono::Utc::now(),
+        presence: "offline".to_string(),
     })))
 }
 
@@ -193,16 +189,7 @@ pub async fn get_team_member_me(
             .await?
             .ok_or_else(|| AppError::Forbidden("Not a member of this team".to_string()))?;
 
-    Ok(Json(mm::TeamMember {
-        team_id: encode_mm_id(member.team_id),
-        user_id: encode_mm_id(member.user_id),
-        roles: crate::mattermost_compat::mappers::map_team_role(&member.role),
-        delete_at: 0,
-        scheme_guest: false,
-        scheme_user: true,
-        scheme_admin: member.role == "admin" || member.role == "team_admin",
-        presence: None,
-    }))
+    Ok(Json(map_team_member(member)))
 }
 
 #[derive(Deserialize)]

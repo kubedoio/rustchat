@@ -14,9 +14,9 @@ use super::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
+use crate::models::reaction::Reaction;
 use crate::models::{
-    ChannelMember, CreatePost, CreateReaction, Post, PostResponse, Reaction, ThreadResponse,
-    UpdatePost,
+    ChannelMember, CreatePost, CreateReaction, Post, PostResponse, ThreadResponse, UpdatePost,
 };
 
 /// Build posts routes
@@ -478,7 +478,7 @@ async fn add_reaction(
         r#"
         INSERT INTO reactions (post_id, user_id, emoji_name)
         VALUES ($1, $2, $3)
-        ON CONFLICT (post_id, user_id, emoji_name) DO UPDATE SET created_at = NOW()
+        ON CONFLICT (post_id, user_id, emoji_name) DO UPDATE SET create_at = extract(epoch from now()) * 1000
         RETURNING *
         "#,
     )
@@ -804,7 +804,7 @@ async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> Api
     let post_ids: Vec<Uuid> = posts.iter().map(|p| p.id).collect();
 
     let reactions: Vec<Reaction> =
-        sqlx::query_as("SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY created_at")
+        sqlx::query_as("SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY create_at")
             .bind(&post_ids)
             .fetch_all(&state.db)
             .await?;
