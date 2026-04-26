@@ -63,6 +63,7 @@ pub async fn add_team_members_batch(
             user_id,
             role: "member".to_string(),
             created_at: chrono::Utc::now(),
+            presence: "offline".to_string(),
         }));
     }
     Ok(Json(members))

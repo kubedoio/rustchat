@@ -34,6 +34,8 @@ pub struct TeamMember {
     pub user_id: Uuid,
     pub role: String,
     pub created_at: DateTime<Utc>,
+    #[sqlx(default)]
+    pub presence: String,
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]

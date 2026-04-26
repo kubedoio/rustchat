@@ -281,7 +281,7 @@ impl From<TeamMember> for mm::TeamMember {
             scheme_guest: false,
             scheme_user: true,
             scheme_admin: m.role == "admin" || m.role == "system_admin",
-            presence: None,
+            presence: Some(m.presence).filter(|p| !p.is_empty()),
         }
     }
 }
