@@ -1559,8 +1559,8 @@ fn check_disk(path: &str) -> DiskHealth {
         };
         if libc::statvfs(c_path.as_ptr(), &mut stat) == 0 {
             let block_size = stat.f_frsize;
-            let total = (stat.f_blocks as u64) * block_size;
-            let available = (stat.f_bavail as u64) * block_size;
+            let total = stat.f_blocks * block_size;
+            let available = stat.f_bavail * block_size;
             let used = total.saturating_sub(available);
             let used_percent = if total > 0 {
                 ((used as f64 / total as f64) * 100.0) as u64
