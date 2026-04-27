@@ -1382,7 +1382,7 @@ pub fn map_envelope_to_mm(env: &WsEnvelope) -> Option<mm::WebSocketMessage> {
         }
         "reaction_added" => {
             if let Ok(reaction) =
-                serde_json::from_value::<crate::models::reaction::Reaction>(env.data.clone())
+                serde_json::from_value::<crate::models::post::Reaction>(env.data.clone())
             {
                 let mm_reaction = mm::Reaction {
                     user_id: encode_mm_id(reaction.user_id),
@@ -1390,8 +1390,8 @@ pub fn map_envelope_to_mm(env: &WsEnvelope) -> Option<mm::WebSocketMessage> {
                     emoji_name: crate::mattermost_compat::emoji_data::get_short_name_for_emoji(
                         &reaction.emoji_name,
                     ),
-                    create_at: reaction.create_at,
-                    update_at: reaction.create_at,
+                    create_at: reaction.created_at.timestamp_millis(),
+                    update_at: reaction.created_at.timestamp_millis(),
                     delete_at: 0,
                     channel_id: env.channel_id.map(encode_mm_id).unwrap_or_default(),
                     remote_id: "".to_string(),
@@ -1409,7 +1409,7 @@ pub fn map_envelope_to_mm(env: &WsEnvelope) -> Option<mm::WebSocketMessage> {
         }
         "reaction_removed" => {
             if let Ok(reaction) =
-                serde_json::from_value::<crate::models::reaction::Reaction>(env.data.clone())
+                serde_json::from_value::<crate::models::post::Reaction>(env.data.clone())
             {
                 let mm_reaction = mm::Reaction {
                     user_id: encode_mm_id(reaction.user_id),
@@ -1417,8 +1417,8 @@ pub fn map_envelope_to_mm(env: &WsEnvelope) -> Option<mm::WebSocketMessage> {
                     emoji_name: crate::mattermost_compat::emoji_data::get_short_name_for_emoji(
                         &reaction.emoji_name,
                     ),
-                    create_at: reaction.create_at,
-                    update_at: reaction.create_at,
+                    create_at: reaction.created_at.timestamp_millis(),
+                    update_at: reaction.created_at.timestamp_millis(),
                     delete_at: 0,
                     channel_id: env.channel_id.map(encode_mm_id).unwrap_or_default(),
                     remote_id: "".to_string(),
