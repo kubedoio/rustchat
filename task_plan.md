@@ -1,5 +1,114 @@
 # Task Plan
 
+## 2026-04-26 Backend Model-Schema Mismatch Fix
+
+### Task
+Fix three identified model-schema mismatches in the rustchat backend:
+1. `TeamMember` missing `presence` column from `team_members` table
+2. `Post` missing `has_reactions` column from `posts` table
+3. `models::post::Reaction` struct does not match `reactions` table schema; canonical `models::reaction::Reaction` should be used everywhere
+
+### Prerequisites
+- Branch from `main` (e.g., `git checkout -b fix/backend-model-schema-mismatches`)
+- PostgreSQL accessible for SQLx compile-time query checks (or valid offline query cache)
+- `cargo` toolchain available
+
+### Implementation Checklist
+
+#### Task 1: Add `presence` to `TeamMember` struct
+- [x] **Modify** `backend/src/models/team.rs`
+  - Add `#[sqlx(default)] pub presence: String` to `TeamMember` (after `created_at`)
+  - Expected outcome: `TeamMember` struct matches `team_members` table columns
+  - **Verification:** `cd backend && cargo check` compiles
+
+#### Task 2: Update `TeamMember` mappers and all struct literal sites
+- [x] **Modify** `backend/src/api/v4/teams/mod.rs`
+  - In `map_team_member`, change `presence: None` → `presence: Some(member.presence).filter(|p| !p.is_empty())`
+  - Remove `map_team_member_with_presence` function entirely
+  - Expected outcome: single mapper function propagates presence
+- [ ] **Modify** `backend/src/mattermost_compat/mappers.rs`
+  - In `impl From<TeamMember> for mm::TeamMember`, change `presence: None` → `presence: Some(m.presence).filter(|p| !p.is_empty())`
+  - Expected outcome: `From` trait propagates presence
+- [x] **Modify** `backend/src/api/v4/teams/members.rs`
+  - Remove import of `map_team_member_with_presence`
+  - In `get_team_members_for_mm`, change query to select `tm.presence` instead of `u.presence`
+  - Replace `map_team_member_with_presence(TeamMember { ... }, presence)` with `map_team_member(TeamMember { presence: presence.unwrap_or_else(|| "offline".to_string()), ... })`
+  - In `add_team_member`, update the `TeamMember` literal to include `presence: "offline".to_string()`
+  - In `get_team_member_me`, change `presence: None` → `presence: Some(member.presence).filter(|p| !p.is_empty())`
+  - Expected outcome: v4 team member endpoints compile and propagate presence
+- [x] **Modify** `backend/src/api/v4/teams/invites.rs`
+  - Update the `TeamMember` literal to include `presence: "offline".to_string()`
+- [x] **Modify** `backend/src/api/v4/teams/batch.rs`
+  - Update the `TeamMember` literal to include `presence: "offline".to_string()`
+- [ ] **Verification:** `cd backend && cargo check` compiles
+
+#### Task 3: Add `has_reactions` to `Post` struct
+- [x] **Modify** `backend/src/models/post.rs`
+  - Add `#[sqlx(default)] pub has_reactions: bool` to `Post` (after `seq`)
+  - Expected outcome: `Post` struct matches `posts` table schema
+  - **Verification:** `cd backend && cargo check` compiles
+
+#### Task 4: Replace `post::Reaction` with `reaction::Reaction` in API handlers
+- [x] **Modify** `backend/src/api/v4/posts/reactions.rs`
+  - In `add_reaction`, change `crate::models::post::Reaction` → `crate::models::reaction::Reaction`
+  - In `remove_reaction_internal`, change `crate::models::post::Reaction` → `crate::models::reaction::Reaction`
+  - Update `mm::Reaction` construction: `reaction.created_at.timestamp_millis()` → `reaction.create_at`
+  - Expected outcome: v4 reactions API uses the canonical model
+- [x] **Modify** `backend/src/api/posts.rs`
+  - Change `use crate::models::{..., Reaction, ...}` to remove `Reaction` from that list
+  - Add `use crate::models::reaction::Reaction;`
+  - In `add_reaction` query, fix pre-existing column name bug: `ON CONFLICT ... DO UPDATE SET created_at = NOW()` → `ON CONFLICT ... DO UPDATE SET create_at = extract(epoch from now()) * 1000`
+  - In `populate_reactions`, fix pre-existing column name bug: `ORDER BY created_at` → `ORDER BY create_at`
+  - Expected outcome: native reactions API uses the canonical model and valid SQL
+- [ ] **Verification:** `cd backend && cargo check` compiles
+
+#### Task 5: Update websocket reaction event mapper
+- [x] **Modify** `backend/src/api/v4/websocket.rs`
+  - In the `"reaction_added"` and `"reaction_removed"` arms of `map_envelope_to_mm`, replace the single `serde_json::from_value::<crate::models::post::Reaction>` attempt with a cascading handler:
+    1. Try `serde_json::from_value::<crate::models::reaction::Reaction>(env.data.clone())` for native full-model events; map fields using `reaction.create_at`
+    2. Else if `env.data.get("reaction").and_then(|v| v.as_str())` exists, pass through the v4 stringified payload directly
+    3. Else try to extract `post_id`/`user_id`/`emoji_name` from `env.data` for native partial payloads
+  - Remove all references to `crate::models::post::Reaction`
+  - Expected outcome: websocket mapper compiles without `post::Reaction` and handles all broadcast shapes
+- [ ] **Verification:** `cd backend && cargo check` compiles
+
+#### Task 6: Remove `Reaction` from `models::post`
+- [x] **Modify** `backend/src/models/post.rs`
+  - Delete the `Reaction` struct definition (lines 30–36)
+  - Keep `ReactionResponse`, `CreateReaction`, and all other post-related types unchanged
+  - Expected outcome: `models::post::Reaction` no longer exists
+- [ ] **Verification:** `cd backend && cargo check` compiles with zero errors
+
+### Rollback Steps
+If any task causes unexpected compilation or test failures, revert in reverse order:
+1. **Task 6 rollback:** Restore the `Reaction` struct in `backend/src/models/post.rs`
+2. **Task 5 rollback:** Restore `backend/src/api/v4/websocket.rs` to use `crate::models::post::Reaction`
+3. **Task 4 rollback:** Revert `backend/src/api/v4/posts/reactions.rs` and `backend/src/api/posts.rs`
+4. **Task 3 rollback:** Remove `has_reactions` from `Post` in `backend/src/models/post.rs`
+5. **Task 2 rollback:** Revert `backend/src/api/v4/teams/mod.rs`, `backend/src/mattermost_compat/mappers.rs`, `backend/src/api/v4/teams/members.rs`, `backend/src/api/v4/teams/invites.rs`, `backend/src/api/v4/teams/batch.rs`
+6. **Task 1 rollback:** Remove `presence` from `TeamMember` in `backend/src/models/team.rs`
+
+### Post-Implementation Verification
+Run the full verification suite in order:
+1. `cd /Users/scolak/Projects/rustchat/backend && cargo fmt --all`
+2. `cd /Users/scolak/Projects/rustchat/backend && cargo check`
+3. `cd /Users/scolak/Projects/rustchat/backend && cargo clippy --all-targets --all-features -- -D warnings`
+4. `cd /Users/scolak/Projects/rustchat/backend && cargo test --no-fail-fast -- --nocapture`
+5. `cd /Users/scolak/Projects/rustchat && BASE=http://127.0.0.1:3000 ./scripts/mm_compat_smoke.sh` (requires running backend)
+6. `cd /Users/scolak/Projects/rustchat && BASE=http://127.0.0.1:3000 ./scripts/mm_mobile_smoke.sh` (requires running backend)
+
+### Expected vs Actual
+- Expected:
+  - `TeamMember` includes `presence` and all `SELECT * FROM team_members` queries compile
+  - `Post` includes `has_reactions`
+  - `models::post::Reaction` is removed; all reaction DB traffic goes through `models::reaction::Reaction`
+  - `cargo check` and `cargo clippy` pass cleanly
+- Actual: All tasks implemented. `cargo check`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo test --lib` pass. Integration tests require DB (unavailable in this environment).
+
+### Readiness
+- Plan is ready for execution; no external dependencies beyond the standard backend toolchain.
+- Note: `backend/src/api/posts.rs` contains pre-existing SQL references to `created_at` on the `reactions` table (column is actually `create_at`). The plan includes fixing these as part of Task 4 because they block compilation once the correct model is adopted.
+
 ## 2026-04-11 Frontend Supply-Chain Hardening
 
 ### Task
