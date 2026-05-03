@@ -10,7 +10,7 @@
 ### Prerequisites
 
 - **Rust** 1.80+ with `cargo`
-- **Node.js** 24+ with `npm` for frontend development. Node.js 20 or older will fail the frontend install/build because `frontend/package.json` requires `>=24.0.0`; upgrade via the [Node.js downloads](https://nodejs.org/en/download) page or a version manager such as [nvm](https://github.com/nvm-sh/nvm).
+- **Node.js** 24+ with `npm` for frontend development. Any Node.js version below 24 will fail the frontend install/build because `frontend/package.json` requires `>=24.0.0`; upgrade via the [Node.js downloads](https://nodejs.org/en/download) page or a version manager such as [nvm](https://github.com/nvm-sh/nvm).
 - **PostgreSQL** 16+
 - **Redis** 7+
 - **S3-compatible storage** (RustFS/MinIO for local dev)
