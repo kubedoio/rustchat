@@ -2,6 +2,10 @@
 
 Vue 3 + TypeScript + Vite SPA for RustChat.
 
+## Requirements
+
+- Node.js 24+ with `npm`. Any Node.js version below 24 will fail install/build because this workspace requires `>=24.0.0`; upgrade via the [Node.js downloads](https://nodejs.org/en/download) page or [nvm](https://github.com/nvm-sh/nvm).
+
 ## Commands
 
 ```bash

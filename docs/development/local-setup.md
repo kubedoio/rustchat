@@ -54,9 +54,11 @@ You can run the backend locally while keeping infrastructure services (DB, Redis
 
 ### Frontend Development
 1.  Stop the `frontend` container if running: `docker compose stop frontend`
-2.  Run npm locally:
+2.  Use Node.js 24 or newer. Any Node.js version below 24 will fail the frontend install/build because `frontend/package.json` requires `>=24.0.0`; upgrade via the [Node.js downloads](https://nodejs.org/en/download) page or [nvm](https://github.com/nvm-sh/nvm).
+3.  Run npm locally:
     ```bash
     cd frontend
+    npm ci
     npm run dev
     ```
     *Access at [http://localhost:5173](http://localhost:5173).*
