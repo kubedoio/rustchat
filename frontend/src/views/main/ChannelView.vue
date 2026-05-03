@@ -266,11 +266,20 @@ function handleKeydown(e: KeyboardEvent) {
             class="relative flex flex-col flex-1 min-w-0 z-10 bg-transparent transition-all duration-300"
             :class="{ 'mr-0': !uiStore.isRhsOpen }"
           >
-              <!-- No Channel Selected -->
+              <!-- No Channel Selected / No Channels Exist -->
               <div v-if="!currentChannel" class="flex-1 flex items-center justify-center text-slate-500">
-                  <div class="text-center">
-                      <p class="text-lg">Select a channel to start messaging</p>
-                      <p class="text-sm mt-2">Choose a channel from the sidebar</p>
+                  <div class="text-center max-w-sm px-4">
+                    <template v-if="channelStore.channels.length === 0">
+                      <p class="text-lg font-medium text-slate-600">No channels yet</p>
+                      <p class="text-sm mt-2">
+                        Get started by creating a channel or browsing existing ones —
+                        use the <span class="font-semibold">+</span> button in the sidebar.
+                      </p>
+                    </template>
+                    <template v-else>
+                      <p class="text-lg font-medium text-slate-600">No channel selected</p>
+                      <p class="text-sm mt-2">Choose a channel from the sidebar to start messaging.</p>
+                    </template>
                   </div>
               </div>
               

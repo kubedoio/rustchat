@@ -639,7 +639,7 @@ async function handleLeaveTeam() {
             
             <!-- Empty Category State -->
             <div v-if="cat.channels.length === 0" class="px-8 py-3 text-xs text-text-3 italic">
-              No channels
+              No channels in this category yet
             </div>
           </div>
         </div>
