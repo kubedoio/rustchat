@@ -332,8 +332,63 @@ function createChatStore() {
         return post
     }
 
+    function addMessage(channelId: string, post: SvelteChatPost): void {
+        update((state) => ({
+            ...state,
+            messagesByChannel: {
+                ...state.messagesByChannel,
+                [channelId]: [...(state.messagesByChannel[channelId] ?? []), post],
+            },
+        }))
+    }
+
+    function updateMessage(channelId: string, post: Partial<SvelteChatPost> & { id: string }): void {
+        update((state) => {
+            const messages = state.messagesByChannel[channelId] ?? []
+            const updated = messages.map((msg) =>
+                msg.id === post.id ? { ...msg, ...post } : msg,
+            )
+            return {
+                ...state,
+                messagesByChannel: { ...state.messagesByChannel, [channelId]: updated },
+            }
+        })
+    }
+
+    function deleteMessage(channelId: string, postId: string): void {
+        update((state) => {
+            const messages = state.messagesByChannel[channelId] ?? []
+            const filtered = messages.filter((msg) => msg.id !== postId)
+            return {
+                ...state,
+                messagesByChannel: { ...state.messagesByChannel, [channelId]: filtered },
+            }
+        })
+    }
+
+    function updateMemberPresence(userId: string, presence: string): void {
+        update((state) => {
+            const nextMembersByTeam: Record<string, SvelteChatMember[]> = {}
+            for (const [teamId, members] of Object.entries(state.membersByTeam)) {
+                nextMembersByTeam[teamId] = members.map((member) =>
+                    member.user_id === userId
+                        ? {
+                              ...member,
+                              presence:
+                                  presence === 'online' || presence === 'away' || presence === 'dnd' || presence === 'offline'
+                                      ? presence
+                                      : member.presence,
+                          }
+                        : member,
+                )
+            }
+            return { ...state, membersByTeam: nextMembersByTeam }
+        })
+    }
+
     return {
         subscribe,
+        update,
         bootstrap,
         selectChannel,
         fetchTeams,
@@ -342,6 +397,10 @@ function createChatStore() {
         sendMessage,
         fetchMembers,
         addLocalFileMessage,
+        addMessage,
+        updateMessage,
+        deleteMessage,
+        updateMemberPresence,
         reset: () => set(initialState),
     }
 }

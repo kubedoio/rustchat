@@ -9,6 +9,7 @@
     { id: 'member', username: 'member', displayName: 'Member' }
   ]
   export let placeholder = 'Write a message...'
+  export let disabled = false
   export let onSend: ((message: ComposerSubmit) => void) | undefined = undefined
 
   const dispatch = createEventDispatcher<{
@@ -26,6 +27,7 @@
   let previousChannelId = channelId
 
   $: canSend = draft.trim().length > 0 || attachments.length > 0
+  $: isSendDisabled = !canSend || disabled
   $: emojiMatch = draft.includes(':smi') ? 'smi' : findToken(':')
   $: mentionMatch = draft.includes('@ad') ? 'ad' : findToken('@')
   $: availableMembers = members.length > 0
@@ -245,6 +247,7 @@
 
   <div class="rounded-xl border border-gray-300 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
     <textarea
+      data-testid="message-input"
       bind:this={textarea}
       bind:value={draft}
       aria-label="Message composer"
@@ -281,10 +284,12 @@
       <div class="flex items-center gap-3">
         <span class="text-xs text-gray-500">Enter to send, Shift+Enter for newline</span>
         <button
+          data-testid="send-button"
           type="button"
           class="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Send message"
-          disabled={!canSend}
+          disabled={isSendDisabled}
+          title={disabled ? 'Reconnecting...' : ''}
           on:click={sendMessage}
         >
           Send

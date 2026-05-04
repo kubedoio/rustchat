@@ -11,6 +11,15 @@ export type ChatAttachment = {
   name?: string
   size?: number
   file?: File
+  mimeType?: string
+  mime_type?: string
+  url?: string
+}
+
+export type ChatReaction = {
+  emoji: string
+  count: number
+  users: string[]
 }
 
 export type ChatMessage = {
@@ -25,6 +34,16 @@ export type ChatMessage = {
   created_at?: string
   attachments?: ChatAttachment[]
   files?: ChatAttachment[]
+  status?: 'sending' | 'failed' | 'delivered'
+  editedAt?: string
+  isPinned?: boolean
+  isSaved?: boolean
+  reactions?: ChatReaction[]
+  threadCount?: number
+  lastReplyAt?: string
+  props?: Record<string, unknown>
+  avatarUrl?: string
+  username?: string
 }
 
 export type ChatChannel = {

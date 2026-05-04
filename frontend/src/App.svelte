@@ -3,10 +3,10 @@
   import Router from './svelte/Router.svelte'
   import { authStore } from './svelte/stores/auth'
   import { configStore } from './svelte/stores/config'
-  import { initAuthExpiryWebSocket } from './svelte/stores/websocket'
+  import { registerWebSocketHandlers } from './svelte/stores/websocket'
 
   onMount(() => {
-    const stopAuthExpirySocket = initAuthExpiryWebSocket()
+    const stopAuthExpirySocket = registerWebSocketHandlers()
 
     void configStore.fetchPublicConfig()
     void authStore.fetchMe()
