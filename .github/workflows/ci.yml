@@ -322,3 +322,86 @@ EOF
       - name: Build backend release
         working-directory: ./backend
         run: cargo build --release
+
+  # ============ Required Status Check Aggregators ============
+  # These jobs always run to satisfy branch protection rules that expect
+  # the legacy status check names from the old workflow structure.
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [detect-changes, backend-check, frontend-check, push-proxy-check]
+    if: always()
+    steps:
+      - name: Fail if change detection failed
+        if: needs.detect-changes.result == 'failure'
+        run: echo "Change detection failed" >&2 && exit 1
+
+      - name: Report skipped tests
+        if: needs.detect-changes.outputs.backend != 'true' && needs.detect-changes.outputs.frontend != 'true' && needs.detect-changes.outputs.push-proxy != 'true'
+        run: echo "No code changes detected; tests skipped."
+
+      - name: Require test success
+        if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.push-proxy == 'true'
+        run: |
+          for job in backend-check frontend-check push-proxy-check; do
+            result="${{ needs[job].result }}"
+            echo "$job result: $result"
+            if [ "$result" = "failure" ]; then
+              echo "$job failed" >&2
+              exit 1
+            fi
+          done
+          echo "All tests passed."
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [detect-changes, backend-check, build-release]
+    if: always()
+    steps:
+      - name: Fail if change detection failed
+        if: needs.detect-changes.result == 'failure'
+        run: echo "Change detection failed" >&2 && exit 1
+
+      - name: Report skipped build
+        if: needs.detect-changes.outputs.backend != 'true' && needs.detect-changes.outputs.scripts != 'true'
+        run: echo "No backend changes detected; build skipped."
+
+      - name: Require build success
+        if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true'
+        run: |
+          backend_result="${{ needs['backend-check'].result }}"
+          build_result="${{ needs['build-release'].result }}"
+          echo "backend-check result: $backend_result"
+          echo "build-release result: $build_result"
+          if [ "$backend_result" = "failure" ] || [ "$build_result" = "failure" ]; then
+            echo "Build pipeline failed" >&2
+            exit 1
+          fi
+          echo "Build passed."
+
+  cargo-check-test:
+    name: cargo check + test
+    runs-on: ubuntu-latest
+    needs: [detect-changes, backend-check]
+    if: always()
+    steps:
+      - name: Fail if change detection failed
+        if: needs.detect-changes.result == 'failure'
+        run: echo "Change detection failed" >&2 && exit 1
+
+      - name: Report skipped backend check
+        if: needs.detect-changes.outputs.backend != 'true' && needs.detect-changes.outputs.scripts != 'true'
+        run: echo "No backend changes detected; cargo check + test skipped."
+
+      - name: Require backend check success
+        if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true'
+        run: |
+          result="${{ needs['backend-check'].result }}"
+          echo "backend-check result: $result"
+          if [ "$result" = "failure" ]; then
+            echo "Backend check failed" >&2
+            exit 1
+          fi
+          echo "cargo check + test passed."
