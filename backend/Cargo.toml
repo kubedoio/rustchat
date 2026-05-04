@@ -10,7 +10,7 @@ repository = "https://github.com/rustchat/rustchat"
 
 [dependencies]
 # Async runtime
-tokio = { version = "1.43", features = ["full"] }
+tokio = { version = "1.52", features = ["full"] }
 async-channel = "2.3"
 
 # Web framework
