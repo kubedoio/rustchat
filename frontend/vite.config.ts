@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -6,10 +7,11 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '$svelte': fileURLToPath(new URL('./src/svelte', import.meta.url)),
     }
   },
-  plugins: [vue()],
+  plugins: [svelte(), vue()],
   build: {
     rollupOptions: {
       output: {
@@ -23,9 +25,10 @@ export default defineConfig({
               id.includes('/vue/') ||
               id.includes('/pinia/') ||
               id.includes('/vue-router/') ||
+              id.includes('/svelte/') ||
               id.includes('/@vue/')
             ) {
-              return 'vendor-vue'
+              return 'vendor-framework'
             }
 
             if (

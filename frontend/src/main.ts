@@ -1,16 +1,11 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
 import './style.css'
 import 'highlight.js/styles/github-dark.css'
-import App from './App.vue'
-import router from './router'
-import { useThemeStore } from './stores/theme'
+import App from './App.svelte'
+import { mount } from 'svelte'
+import { themeStore } from './svelte/stores/theme'
 
-const app = createApp(App)
-const pinia = createPinia()
-app.use(pinia)
-app.use(router)
+themeStore.applyAppearance()
 
-useThemeStore(pinia).applyAppearance()
-
-app.mount('#app')
+mount(App, {
+  target: document.getElementById('app')!,
+})
