@@ -666,8 +666,16 @@ async fn update_run_task(
             status = COALESCE($3, status),
             assignee_id = COALESCE($4, assignee_id),
             notes = COALESCE($5, notes),
-            completed_at = COALESCE($6, completed_at),
-            completed_by = COALESCE($7, completed_by),
+            completed_at = CASE
+                WHEN $3 = 'done' THEN $6
+                WHEN $3 IS NOT NULL AND $3 != 'done' THEN NULL
+                ELSE completed_at
+            END,
+            completed_by = CASE
+                WHEN $3 = 'done' THEN $7
+                WHEN $3 IS NOT NULL AND $3 != 'done' THEN NULL
+                ELSE completed_by
+            END,
             updated_at = NOW()
         WHERE run_id = $1 AND task_id = $2
         RETURNING *

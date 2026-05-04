@@ -99,8 +99,15 @@ async function toggleTask(task: RunTask) {
             status: newStatus
         })
     } catch (e) {
-        // Revert
+        // Revert task status and progress counters
         task.status = oldStatus
+        if (newStatus === 'done') {
+            run.value.progress.completed--
+            run.value.progress.pending++
+        } else {
+            run.value.progress.completed++
+            run.value.progress.pending--
+        }
         toast.error('Error', 'Failed to update task')
     }
 }

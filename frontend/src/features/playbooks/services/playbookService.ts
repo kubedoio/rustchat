@@ -124,9 +124,9 @@ class PlaybookService {
     }
   }
 
-  async updateTask(taskId: string, status: string): Promise<void> {
+  async updateRunTask(runId: string, taskId: string, status: string): Promise<void> {
     try {
-      await playbookRepository.updateTask(taskId, status)
+      await playbookRepository.updateRunTask(runId, taskId, status)
       // State will be updated via API response or refresh
     } catch (error) {
       this.store.setError(
