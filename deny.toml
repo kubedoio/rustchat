@@ -10,6 +10,13 @@ targets = [
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+    # RUSTSEC-2023-0071: Marvin Attack in rsa crate (timing sidechannel).
+    # jsonwebtoken depends on rsa 0.9; no fixed upgrade is available upstream.
+    # Severity: medium (5.9). JWT verification with trusted OIDC keys is not
+    # exposed to network timing observation.
+    "RUSTSEC-2023-0071",
+]
 
 [licenses]
 version = 2
@@ -24,6 +31,7 @@ allow = [
     "OpenSSL",
     "Zlib",
     "0BSD",
+    "CC0-1.0",
     "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8

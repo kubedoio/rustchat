@@ -1,6 +1,6 @@
 # Contributor Workflow
 
-This document describes the GitHub-based contribution workflow for RustChat. For development setup, coding guidelines, and code quality requirements, see [CONTRIBUTING.md](../CONTRIBUTING.md).
+This document describes the GitHub-based contribution workflow for RustChat. For development setup, coding guidelines, and code quality requirements, see `CONTRIBUTING.md`.
 
 ## Fork and Branch
 
@@ -17,7 +17,7 @@ This document describes the GitHub-based contribution workflow for RustChat. For
 
 ## Commits
 
-All commits must be signed off per the [DCO](../DCO.md):
+All commits must be signed off per the `DCO.md`:
 
 ```bash
 git commit -s -m "feat: add user search endpoint"
@@ -72,5 +72,5 @@ Look for issues labeled [`good-first-issue`](https://github.com/rustchatio/rustc
 
 - **Architecture questions**: [Architecture Guide](architecture.md)
 - **Development setup**: [Development Guide](development.md)
-- **Compatibility**: [Compatibility Scope](compatibility.md)
+- **Compatibility**: [Compatibility Scope](development/compatibility.md)
 - **General questions**: GitHub Discussions

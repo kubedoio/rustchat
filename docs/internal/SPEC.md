@@ -6,7 +6,7 @@ The frontend supply chain is only partially hardened today:
 1. frontend CI installs with `npm ci`, but lifecycle scripts are still enabled.
 2. There is no dependency-review gate, vulnerability gate, or release-time dependency inventory artifact for frontend changes.
 3. The repo has had mixed package-manager signals (`frontend/package-lock.json` is active in CI, while `frontend/pnpm-lock.yaml` existed in git history until the current branch removed it), which weakens contributor clarity.
-4. The frontend already contains an internal fetch-based transport layer in [frontend/src/api/http/HttpClient.ts](/Users/scolak/Projects/rustchat/frontend/src/api/http/HttpClient.ts), but raw `fetch()` calls still exist in theme preference code, leaving the HTTP boundary inconsistent.
+4. The frontend already contains an internal fetch-based transport layer in `frontend/src/api/http/HttpClient.ts`, but raw `fetch()` calls still exist in theme preference code, leaving the HTTP boundary inconsistent.
 5. Several direct dependencies appear to be unnecessary or no longer used in the current source tree, increasing review and remediation burden without clear payoff.
 
 The goal of this task is to harden the existing Vue frontend delivery path without rewriting the framework or expanding the dependency surface to solve dependency problems.
@@ -16,12 +16,12 @@ The goal of this task is to harden the existing Vue frontend delivery path witho
 ### Package Management / Install Surface
 
 1. Frontend CI already assumes npm and `frontend/package-lock.json`:
-   - [frontend/package-lock.json](/Users/scolak/Projects/rustchat/frontend/package-lock.json)
-   - [.github/workflows/ci.yml](/Users/scolak/Projects/rustchat/.github/workflows/ci.yml)
+   - `frontend/package-lock.json`
+   - [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
 2. The current branch also deletes `frontend/pnpm-lock.yaml`, confirming package-manager normalization is already in motion:
-   - [frontend/pnpm-lock.yaml](/Users/scolak/Projects/rustchat/frontend/pnpm-lock.yaml)
+   - `frontend/pnpm-lock.yaml`
 3. The frontend Docker build still falls back to `npm install` if a lockfile is missing, which violates strict lockfile-only intent:
-   - [docker/frontend.Dockerfile](/Users/scolak/Projects/rustchat/docker/frontend.Dockerfile)
+   - `docker/frontend.Dockerfile`
 
 ### CI / Review Gaps
 
@@ -36,12 +36,12 @@ The goal of this task is to harden the existing Vue frontend delivery path witho
 ### HTTP Boundary
 
 1. The project already has a centralized internal fetch client:
-   - [frontend/src/api/client.ts](/Users/scolak/Projects/rustchat/frontend/src/api/client.ts)
-   - [frontend/src/api/http/HttpClient.ts](/Users/scolak/Projects/rustchat/frontend/src/api/http/HttpClient.ts)
+   - `frontend/src/api/client.ts`
+   - `frontend/src/api/http/HttpClient.ts`
 2. Raw `fetch()` remains in theme preference code:
-   - [frontend/src/features/theme/repositories/themeRepository.ts](/Users/scolak/Projects/rustchat/frontend/src/features/theme/repositories/themeRepository.ts)
-   - [frontend/src/stores/theme.ts](/Users/scolak/Projects/rustchat/frontend/src/stores/theme.ts)
-3. The legacy store in [frontend/src/stores/theme.ts](/Users/scolak/Projects/rustchat/frontend/src/stores/theme.ts) duplicates behavior that already exists in the feature-layer theme service/repository path.
+   - `frontend/src/features/theme/repositories/themeRepository.ts`
+   - `frontend/src/stores/theme.ts`
+3. The legacy store in `frontend/src/stores/theme.ts` duplicates behavior that already exists in the feature-layer theme service/repository path.
 
 ### Initial Dependency Audit
 
@@ -144,7 +144,7 @@ The current Codex shell environment does not expose `node`, `npm`, `pnpm`, or `c
 
 ### Phase 2: Dependency Surface Reduction
 
-1. Remove confirmed-unused direct dependencies from [frontend/package.json](/Users/scolak/Projects/rustchat/frontend/package.json).
+1. Remove confirmed-unused direct dependencies from `frontend/package.json`.
 2. Remove redundant type packages when upstream bundled types are sufficient.
 3. Preserve only dependencies with clear functional or tooling justification in the policy document.
 
@@ -278,8 +278,8 @@ The repository already contains the correct long-term pattern on the Mattermost-
 ### In Scope
 
 1. Frontend avatar upload flows:
-   - [frontend/src/views/settings/ProfileView.vue](/Users/scolak/Projects/rustchat/frontend/src/views/settings/ProfileView.vue)
-   - [frontend/src/components/settings/profile/ProfileTab.vue](/Users/scolak/Projects/rustchat/frontend/src/components/settings/profile/ProfileTab.vue)
+   - `frontend/src/views/settings/ProfileView.vue`
+   - `frontend/src/components/settings/profile/ProfileTab.vue`
 2. Backend avatar response normalization for native authenticated APIs that currently emit raw `users.avatar_url`.
 3. Backward-compatible serving of legacy avatar uploads that were stored under `files/{user}/{file}` and persisted as expiring presigned URLs.
 4. Regression coverage for stable avatar URL emission and legacy fallback handling.
@@ -299,18 +299,18 @@ The repository already contains the correct long-term pattern on the Mattermost-
 ## Current Findings
 
 1. `/api/v1/files` currently returns a presigned download URL:
-   - [backend/src/api/files.rs](/Users/scolak/Projects/rustchat/backend/src/api/files.rs)
+   - `backend/src/api/files.rs`
 2. Both profile UIs persist that returned URL directly into `users.avatar_url`:
-   - [frontend/src/views/settings/ProfileView.vue](/Users/scolak/Projects/rustchat/frontend/src/views/settings/ProfileView.vue)
-   - [frontend/src/components/settings/profile/ProfileTab.vue](/Users/scolak/Projects/rustchat/frontend/src/components/settings/profile/ProfileTab.vue)
+   - `frontend/src/views/settings/ProfileView.vue`
+   - `frontend/src/components/settings/profile/ProfileTab.vue`
 3. `UserResponse::from(User)` currently returns `user.avatar_url` verbatim:
-   - [backend/src/models/user.rs](/Users/scolak/Projects/rustchat/backend/src/models/user.rs)
+   - `backend/src/models/user.rs`
 4. Native auth, posts, teams, and related joins also expose `u.avatar_url` directly:
-   - [backend/src/api/auth.rs](/Users/scolak/Projects/rustchat/backend/src/api/auth.rs)
-   - [backend/src/api/posts.rs](/Users/scolak/Projects/rustchat/backend/src/api/posts.rs)
-   - [backend/src/api/teams.rs](/Users/scolak/Projects/rustchat/backend/src/api/teams.rs)
+   - `backend/src/api/auth.rs`
+   - `backend/src/api/posts.rs`
+   - `backend/src/api/teams.rs`
 5. The stable avatar implementation already exists on the v4 upload/read path:
-   - [backend/src/api/v4/users.rs](/Users/scolak/Projects/rustchat/backend/src/api/v4/users.rs)
+   - `backend/src/api/v4/users.rs`
 
 ## Implementation Outline
 
@@ -345,10 +345,10 @@ The repository already contains the correct long-term pattern on the Mattermost-
 ## Verification Plan
 
 Automated:
-1. `cd /Users/scolak/Projects/rustchat/backend && cargo test avatar -- --nocapture`
-2. `cd /Users/scolak/Projects/rustchat/backend && cargo test --no-fail-fast -- --nocapture`
-3. `cd /Users/scolak/Projects/rustchat/backend && cargo check`
-4. `cd /Users/scolak/Projects/rustchat/frontend && npm run build`
+1. `cd ../../backend && cargo test avatar -- --nocapture`
+2. `cd ../../backend && cargo test --no-fail-fast -- --nocapture`
+3. `cd ../../backend && cargo check`
+4. `cd ../../frontend && npm run build`
 
 Manual:
 1. Log in at `https://app.rustchat.io` and confirm avatars render without `403 AccessDenied` console errors.
@@ -366,8 +366,8 @@ Manual:
 ## Problem Statement
 
 `backend/tests/api_categories.rs` fails before any sidebar-category logic runs because the test setup tries to create a team through `POST /api/v1/teams` as a normal `member` user:
-- [backend/tests/api_categories.rs:69](/Users/scolak/Projects/rustchat/backend/tests/api_categories.rs:69)
-- [backend/tests/api_categories.rs:257](/Users/scolak/Projects/rustchat/backend/tests/api_categories.rs:257)
+- `backend/tests/api_categories.rs:69`
+- `backend/tests/api_categories.rs:257`
 
 But the product rule is that regular `member` users should **not** be allowed to create teams. Team creation is intentionally restricted.
 
@@ -391,10 +391,10 @@ So the correct fix is not to relax backend permissions. The correct fix is to ch
 ### In Scope
 
 1. Revert the local permission relaxation in:
-   - [backend/src/api/teams.rs](/Users/scolak/Projects/rustchat/backend/src/api/teams.rs)
-   - [backend/src/auth/policy.rs](/Users/scolak/Projects/rustchat/backend/src/auth/policy.rs)
-2. Update [backend/tests/api_categories.rs](/Users/scolak/Projects/rustchat/backend/tests/api_categories.rs) to create teams via an allowed path.
-3. Update [backend/tests/api_permissions.rs](/Users/scolak/Projects/rustchat/backend/tests/api_permissions.rs) so it asserts that members are blocked from team creation.
+   - `backend/src/api/teams.rs`
+   - `backend/src/auth/policy.rs`
+2. Update `backend/tests/api_categories.rs` to create teams via an allowed path.
+3. Update `backend/tests/api_permissions.rs` so it asserts that members are blocked from team creation.
 
 ### Contract Impact
 
@@ -417,10 +417,10 @@ So the correct fix is not to relax backend permissions. The correct fix is to ch
 ## Verification Plan
 
 Automated:
-1. `cd /Users/scolak/Projects/rustchat/backend && cargo test --test api_categories -- --nocapture`
-2. `cd /Users/scolak/Projects/rustchat/backend && cargo test --test api_permissions -- --nocapture`
-3. `cd /Users/scolak/Projects/rustchat/backend && cargo check`
-4. `cd /Users/scolak/Projects/rustchat/backend && cargo clippy --all-targets --all-features -- -D warnings`
+1. `cd ../../backend && cargo test --test api_categories -- --nocapture`
+2. `cd ../../backend && cargo test --test api_permissions -- --nocapture`
+3. `cd ../../backend && cargo check`
+4. `cd ../../backend && cargo clippy --all-targets --all-features -- -D warnings`
 
 Manual:
 1. Attempt `POST /api/v1/teams` with a `member` token and confirm `403 Forbidden`.
@@ -439,13 +439,13 @@ Manual:
 We already closed the first permission drift around team creation and channel-management affordances, but two adjacent areas still have the same failure mode:
 
 1. Team settings are not consistently permission-gated.
-   - [frontend/src/components/layout/ChannelSidebar.vue](/Users/scolak/Projects/rustchat/frontend/src/components/layout/ChannelSidebar.vue) shows `Team Settings` unconditionally from the team menu.
-   - [frontend/src/components/modals/TeamSettingsModal.vue](/Users/scolak/Projects/rustchat/frontend/src/components/modals/TeamSettingsModal.vue) assumes full edit/delete/member-management access.
-   - [backend/src/api/teams.rs](/Users/scolak/Projects/rustchat/backend/src/api/teams.rs) protects `PUT /teams/{id}` with team-admin or `TEAM_MANAGE`, but `DELETE /teams/{id}` currently has no permission check at all.
+   - `frontend/src/components/layout/ChannelSidebar.vue` shows `Team Settings` unconditionally from the team menu.
+   - `frontend/src/components/modals/TeamSettingsModal.vue` assumes full edit/delete/member-management access.
+   - `backend/src/api/teams.rs` protects `PUT /teams/{id}` with team-admin or `TEAM_MANAGE`, but `DELETE /teams/{id}` currently has no permission check at all.
 2. Create-channel flows are not aligned to the explicit permission model.
-   - [frontend/src/components/layout/ChannelSidebar.vue](/Users/scolak/Projects/rustchat/frontend/src/components/layout/ChannelSidebar.vue) exposes `Create channel` from category headers and the footer without a shared capability gate.
-   - [frontend/src/components/modals/CreateChannelModal.vue](/Users/scolak/Projects/rustchat/frontend/src/components/modals/CreateChannelModal.vue) assumes the action is available if a team is selected.
-   - [backend/src/api/channels.rs](/Users/scolak/Projects/rustchat/backend/src/api/channels.rs) currently allows standard channel creation for any team member, even though the policy model already defines `CHANNEL_CREATE`.
+   - `frontend/src/components/layout/ChannelSidebar.vue` exposes `Create channel` from category headers and the footer without a shared capability gate.
+   - `frontend/src/components/modals/CreateChannelModal.vue` assumes the action is available if a team is selected.
+   - `backend/src/api/channels.rs` currently allows standard channel creation for any team member, even though the policy model already defines `CHANNEL_CREATE`.
 
 That means we still have permission drift:
 - some actions are visible when they should not be
@@ -542,7 +542,7 @@ Proposed rule for this pass:
 
 ### Phase 1: Shared Capability Expansion
 
-Extend [frontend/src/features/permissions/capabilities.ts](/Users/scolak/Projects/rustchat/frontend/src/features/permissions/capabilities.ts) with:
+Extend `frontend/src/features/permissions/capabilities.ts` with:
 
 1. Team capability helpers:
    - `canManageTeam(...)`
@@ -559,9 +559,9 @@ Data sources:
 ### Phase 2: Frontend Affordance Guardrails
 
 Update:
-- [frontend/src/components/layout/ChannelSidebar.vue](/Users/scolak/Projects/rustchat/frontend/src/components/layout/ChannelSidebar.vue)
-- [frontend/src/components/modals/TeamSettingsModal.vue](/Users/scolak/Projects/rustchat/frontend/src/components/modals/TeamSettingsModal.vue)
-- [frontend/src/components/modals/CreateChannelModal.vue](/Users/scolak/Projects/rustchat/frontend/src/components/modals/CreateChannelModal.vue)
+- `frontend/src/components/layout/ChannelSidebar.vue`
+- `frontend/src/components/modals/TeamSettingsModal.vue`
+- `frontend/src/components/modals/CreateChannelModal.vue`
 
 Behavior:
 - hide `Team Settings` unless the user can manage the current team
@@ -571,10 +571,10 @@ Behavior:
 
 ### Phase 3: Backend Enforcement
 
-Update [backend/src/api/teams.rs](/Users/scolak/Projects/rustchat/backend/src/api/teams.rs):
+Update `backend/src/api/teams.rs`:
 - add the same team-admin / `TEAM_MANAGE` check to `delete_team`
 
-Update [backend/src/api/channels.rs](/Users/scolak/Projects/rustchat/backend/src/api/channels.rs):
+Update `backend/src/api/channels.rs`:
 - add explicit `CHANNEL_CREATE` enforcement for standard public/private channel creation
 - keep the existing team-membership check
 - leave direct-message creation unchanged unless a concrete mismatch is found during implementation
@@ -582,15 +582,15 @@ Update [backend/src/api/channels.rs](/Users/scolak/Projects/rustchat/backend/src
 ### Phase 4: Regression Harness Expansion
 
 Backend:
-- extend [backend/tests/api_permissions.rs](/Users/scolak/Projects/rustchat/backend/tests/api_permissions.rs) with:
+- extend `backend/tests/api_permissions.rs` with:
   - unauthorized team delete returns `403`
   - authorized team admin delete succeeds
   - guest or non-privileged user cannot create a standard channel
   - member with `CHANNEL_CREATE` can still create a standard channel
 
 Frontend:
-- extend [frontend/src/features/permissions/capabilities.test.ts](/Users/scolak/Projects/rustchat/frontend/src/features/permissions/capabilities.test.ts)
-- extend [frontend/src/features/permissions/permissionsUi.test.ts](/Users/scolak/Projects/rustchat/frontend/src/features/permissions/permissionsUi.test.ts)
+- extend `frontend/src/features/permissions/capabilities.test.ts`
+- extend `frontend/src/features/permissions/permissionsUi.test.ts`
 
 UI cases to pin:
 - `Team Settings` hidden for unauthorized users
@@ -601,9 +601,9 @@ UI cases to pin:
 ## Verification Plan
 
 Automated:
-1. `cd /Users/scolak/Projects/rustchat/frontend && npm run test:unit`
-2. `cd /Users/scolak/Projects/rustchat/frontend && npm run build`
-3. `cd /Users/scolak/Projects/rustchat/backend && cargo test --test api_permissions -- --nocapture`
+1. `cd ../../frontend && npm run test:unit`
+2. `cd ../../frontend && npm run build`
+3. `cd ../../backend && cargo test --test api_permissions -- --nocapture`
 
 Manual:
 1. Log in as a low-privilege user and verify the sidebar no longer shows:

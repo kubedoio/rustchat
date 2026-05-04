@@ -44,7 +44,7 @@ Permissions are checked at the API handler layer before reaching services.
 
 **Do not open public issues for security vulnerabilities.**
 
-Report privately via GitHub Security Advisories or contact maintainers directly. See [SECURITY.md](../SECURITY.md) for full instructions.
+Report privately via GitHub Security Advisories or contact maintainers directly. See `SECURITY.md` for full instructions.
 
 ## Supported Versions
 
@@ -56,7 +56,7 @@ RustChat is currently pre-1.0 and under active development.
 | Latest tagged release | Yes |
 | Older releases | No |
 
-Before 1.0, minor version bumps may include breaking changes. Review [CHANGELOG.md](../CHANGELOG.md) before upgrading.
+Before 1.0, minor version bumps may include breaking changes. Review `CHANGELOG.md` before upgrading.
 
 ## Nightly Stability Disclaimer
 

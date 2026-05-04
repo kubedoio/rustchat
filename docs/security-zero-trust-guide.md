@@ -223,7 +223,7 @@ Use correlation rules to detect multi-stage attacks (e.g., login failure followe
 
 - Notify affected users if personal data was accessed.
 - Follow your jurisdiction's breach notification laws (GDPR, CCPA, etc.).
-- For vulnerabilities in RustChat itself, report privately per [`SECURITY.md`](../SECURITY.md).
+- For vulnerabilities in RustChat itself, report privately per `SECURITY.md`.
 
 ---
 

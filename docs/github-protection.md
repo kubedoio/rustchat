@@ -10,7 +10,7 @@ For the `main` branch, enable:
   - [ ] Require approvals: minimum 1
   - [ ] Dismiss stale PR approvals when new commits are pushed
   - [ ] Require review from CODEOWNERS for affected paths
-  - Note: Architectural changes (as defined in [GOVERNANCE.md](../GOVERNANCE.md)) require 2 approvals in practice, enforced by CODEOWNERS rules and maintainer discretion
+  - Note: Architectural changes (as defined in `GOVERNANCE.md`) require 2 approvals in practice, enforced by CODEOWNERS rules and maintainer discretion
 
 - [ ] **Require status checks to pass before merging**
   - [ ] Require branches to be up to date before merging
@@ -54,7 +54,7 @@ Protect version tags to prevent accidental deletion or overwrite:
 
 ## CODEOWNERS
 
-[CODEOWNERS](../.github/CODEOWNERS) is already in place. Ensure the file is accurate and reviewers are active.
+`CODEOWNERS` is already in place. Ensure the file is accurate and reviewers are active.
 
 ## DCO Requirement
 

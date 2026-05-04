@@ -14,7 +14,7 @@ RustChat follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html
 
 ### Pre-1.0 Compatibility
 
-Before `1.0.0`, minor version bumps **may include breaking changes**. Patch versions are safe to upgrade within the same minor line. Always review [CHANGELOG.md](../CHANGELOG.md) before upgrading.
+Before `1.0.0`, minor version bumps **may include breaking changes**. Patch versions are safe to upgrade within the same minor line. Always review `CHANGELOG.md` before upgrading.
 
 After `1.0.0`, SemVer guarantees strict backward compatibility within major versions.
 
@@ -76,7 +76,7 @@ This validates formatting, clippy, version consistency, and working tree cleanli
 Then follow this checklist:
 
 - [ ] All CI checks pass on `main`
-- [ ] [CHANGELOG.md](../CHANGELOG.md) is updated with release notes
+- [ ] `CHANGELOG.md` is updated with release notes
 - [ ] `[Unreleased]` section is empty (all items moved to the versioned section)
 - [ ] Version bumped in:
   - [ ] `VERSION`

@@ -90,10 +90,10 @@ If any task causes unexpected compilation or test failures, revert in reverse or
 
 ### Post-Implementation Verification
 Run the full verification suite in order:
-1. `cd /Users/scolak/Projects/rustchat/backend && cargo fmt --all`
-2. `cd /Users/scolak/Projects/rustchat/backend && cargo check`
-3. `cd /Users/scolak/Projects/rustchat/backend && cargo clippy --all-targets --all-features -- -D warnings`
-4. `cd /Users/scolak/Projects/rustchat/backend && cargo test --no-fail-fast -- --nocapture`
+1. `cd ../../backend && cargo fmt --all`
+2. `cd ../../backend && cargo check`
+3. `cd ../../backend && cargo clippy --all-targets --all-features -- -D warnings`
+4. `cd ../../backend && cargo test --no-fail-fast -- --nocapture`
 5. `cd /Users/scolak/Projects/rustchat && BASE=http://127.0.0.1:3000 ./scripts/mm_compat_smoke.sh` (requires running backend)
 6. `cd /Users/scolak/Projects/rustchat && BASE=http://127.0.0.1:3000 ./scripts/mm_mobile_smoke.sh` (requires running backend)
 
@@ -119,24 +119,24 @@ Run the full verification suite in order:
 - Move remaining theme preference HTTP flows onto the internal fetch-based client boundary.
 
 ### Implementation Checklist
-- [x] Added a task-specific spec in [SPEC.md](/Users/scolak/Projects/rustchat/SPEC.md) and received user approval before implementation.
-- [x] Added ADR [docs/adr/ADR-frontend-supply-chain-security.md](/Users/scolak/Projects/rustchat/docs/adr/ADR-frontend-supply-chain-security.md).
-- [x] Added contributor-facing policy [docs/frontend-dependency-policy.md](/Users/scolak/Projects/rustchat/docs/frontend-dependency-policy.md).
-- [x] Added contract/verification mapping in [docs/frontend-supply-chain-contracts.md](/Users/scolak/Projects/rustchat/docs/frontend-supply-chain-contracts.md).
-- [x] Added machine-readable dependency metadata in [frontend/dependency-policy.json](/Users/scolak/Projects/rustchat/frontend/dependency-policy.json).
-- [x] Added repo-managed patch support via [frontend/dependency-patches.json](/Users/scolak/Projects/rustchat/frontend/dependency-patches.json), [frontend/patches/README.md](/Users/scolak/Projects/rustchat/frontend/patches/README.md), and [frontend/scripts/apply-dependency-patches.mjs](/Users/scolak/Projects/rustchat/frontend/scripts/apply-dependency-patches.mjs).
-- [x] Added repo-owned dependency policy enforcement in [frontend/scripts/check-dependency-policy.mjs](/Users/scolak/Projects/rustchat/frontend/scripts/check-dependency-policy.mjs).
-- [x] Reduced direct dependency surface by removing `@tiptap/extension-mention`, `clsx`, and `tailwind-merge` from [frontend/package.json](/Users/scolak/Projects/rustchat/frontend/package.json).
-- [x] Moved remaining theme preference raw `fetch()` usage behind the internal client boundary through [frontend/src/api/preferences.ts](/Users/scolak/Projects/rustchat/frontend/src/api/preferences.ts), [frontend/src/stores/theme.ts](/Users/scolak/Projects/rustchat/frontend/src/stores/theme.ts), and [frontend/src/features/theme/repositories/themeRepository.ts](/Users/scolak/Projects/rustchat/frontend/src/features/theme/repositories/themeRepository.ts).
-- [x] Hardened frontend CI in [ci.yml](/Users/scolak/Projects/rustchat/.github/workflows/ci.yml) and added dependency governance checks to [security.yml](/Users/scolak/Projects/rustchat/.github/workflows/security.yml).
-- [x] Hardened frontend Docker builds in [docker/frontend.Dockerfile](/Users/scolak/Projects/rustchat/docker/frontend.Dockerfile).
-- [x] Added PR/update workflow guidance via [.github/dependabot.yml](/Users/scolak/Projects/rustchat/.github/dependabot.yml), [CONTRIBUTING.md](/Users/scolak/Projects/rustchat/CONTRIBUTING.md), [README.md](/Users/scolak/Projects/rustchat/README.md), and [frontend/README.md](/Users/scolak/Projects/rustchat/frontend/README.md).
+- [x] Added a task-specific spec in [SPEC.md](./SPEC.md) and received user approval before implementation.
+- [x] Added ADR [docs/adr/ADR-frontend-supply-chain-security.md](../../docs/adr/ADR-frontend-supply-chain-security.md).
+- [x] Added contributor-facing policy [docs/frontend-dependency-policy.md](../../docs/frontend-dependency-policy.md).
+- [x] Added contract/verification mapping in [docs/frontend-supply-chain-contracts.md](../../docs/frontend-supply-chain-contracts.md).
+- [x] Added machine-readable dependency metadata in `frontend/dependency-policy.json`.
+- [x] Added repo-managed patch support via `frontend/dependency-patches.json`, `frontend/patches/README.md`, and `frontend/scripts/apply-dependency-patches.mjs`.
+- [x] Added repo-owned dependency policy enforcement in `frontend/scripts/check-dependency-policy.mjs`.
+- [x] Reduced direct dependency surface by removing `@tiptap/extension-mention`, `clsx`, and `tailwind-merge` from `frontend/package.json`.
+- [x] Moved remaining theme preference raw `fetch()` usage behind the internal client boundary through `frontend/src/api/preferences.ts`, `frontend/src/stores/theme.ts`, and `frontend/src/features/theme/repositories/themeRepository.ts`.
+- [x] Hardened frontend CI in [ci.yml](../../.github/workflows/ci.yml) and added dependency governance checks to [security.yml](../../.github/workflows/security.yml).
+- [x] Hardened frontend Docker builds in `docker/frontend.Dockerfile`.
+- [x] Added PR/update workflow guidance via [.github/dependabot.yml](../../.github/dependabot.yml), `CONTRIBUTING.md`, `README.md`, and `frontend/README.md`.
 
 ### Manual Verification Commands
-1. `cd /Users/scolak/Projects/rustchat/frontend && npm run check:dependency-policy`
-2. `cd /Users/scolak/Projects/rustchat/frontend && npm ci --ignore-scripts`
-3. `cd /Users/scolak/Projects/rustchat/frontend && npm run apply:dependency-patches`
-4. `cd /Users/scolak/Projects/rustchat/frontend && npm run build`
+1. `cd ../../frontend && npm run check:dependency-policy`
+2. `cd ../../frontend && npm ci --ignore-scripts`
+3. `cd ../../frontend && npm run apply:dependency-patches`
+4. `cd ../../frontend && npm run build`
 5. Open a pull request that changes `frontend/package.json` or `frontend/package-lock.json` and confirm:
    - `Frontend Dependency Governance / GitHub dependency review` runs
    - `Frontend Dependency Governance / Policy + audit` runs
@@ -175,9 +175,9 @@ Run the full verification suite in order:
 - [ ] Re-verify the live login path that previously showed expired-avatar `403` console errors.
 
 ### Manual Verification Commands
-1. `cd /Users/scolak/Projects/rustchat/backend && cargo test avatar -- --nocapture`
-2. `cd /Users/scolak/Projects/rustchat/backend && cargo check`
-3. `cd /Users/scolak/Projects/rustchat/frontend && npm run build`
+1. `cd ../../backend && cargo test avatar -- --nocapture`
+2. `cd ../../backend && cargo check`
+3. `cd ../../frontend && npm run build`
 4. Log in to `https://app.rustchat.io`, open the main workspace and admin pages, and confirm the browser console no longer shows `403 AccessDenied` avatar loads from stale `s3.rustchat.io` presigned URLs.
 
 ### Readiness
@@ -192,20 +192,20 @@ Run the full verification suite in order:
 - Unblock the failing category integration tests that create a team before exercising sidebar category behavior.
 
 ### Implementation Status
-- [x] Updated [backend/src/api/teams.rs](/Users/scolak/Projects/rustchat/backend/src/api/teams.rs) so team creation checks `TEAM_CREATE` instead of `TEAM_MANAGE`.
-- [x] Updated [backend/src/auth/policy.rs](/Users/scolak/Projects/rustchat/backend/src/auth/policy.rs) so `member`, `team_admin`, and `org_admin` include `TEAM_CREATE`.
-- [x] Updated policy unit coverage in [backend/src/auth/policy.rs](/Users/scolak/Projects/rustchat/backend/src/auth/policy.rs) for the new permission expectation.
-- [x] Updated [backend/tests/api_permissions.rs](/Users/scolak/Projects/rustchat/backend/tests/api_permissions.rs) so members can create teams and guests remain blocked.
-- [x] Verified [backend/tests/api_categories.rs](/Users/scolak/Projects/rustchat/backend/tests/api_categories.rs) now passes again.
+- [x] Updated `backend/src/api/teams.rs` so team creation checks `TEAM_CREATE` instead of `TEAM_MANAGE`.
+- [x] Updated `backend/src/auth/policy.rs` so `member`, `team_admin`, and `org_admin` include `TEAM_CREATE`.
+- [x] Updated policy unit coverage in `backend/src/auth/policy.rs` for the new permission expectation.
+- [x] Updated `backend/tests/api_permissions.rs` so members can create teams and guests remain blocked.
+- [x] Verified `backend/tests/api_categories.rs` now passes again.
 
 ### Verification Status
-1. `cd /Users/scolak/Projects/rustchat/backend && cargo test --test api_categories -- --nocapture`
+1. `cd ../../backend && cargo test --test api_categories -- --nocapture`
 - Result: PASS, `2 passed`
-2. `cd /Users/scolak/Projects/rustchat/backend && cargo test --test api_permissions -- --nocapture`
+2. `cd ../../backend && cargo test --test api_permissions -- --nocapture`
 - Result: PASS, `9 passed`
-3. `cd /Users/scolak/Projects/rustchat/backend && cargo check`
+3. `cd ../../backend && cargo check`
 - Result: PASS
-4. `cd /Users/scolak/Projects/rustchat/backend && cargo clippy --all-targets --all-features -- -D warnings`
+4. `cd ../../backend && cargo clippy --all-targets --all-features -- -D warnings`
 - Result: PASS
 
 ### Manual Verification Command
@@ -381,7 +381,7 @@ secondary identity text
 - Broader shell redesign beyond the 3 person-status surfaces touched here.
 
 ### Manual Verification Commands
-1. `cd /Users/scolak/Projects/rustchat/frontend && npm run dev`
+1. `cd ../../frontend && npm run dev`
 2. In one session, open a DM with another user. In a second session, change that other user’s custom status text/emoji. Verify the DM sidebar row, channel info panel, and user profile modal all update without a full reload.
 3. Force a websocket reconnect while the DM is visible and verify identity remains stable while rich custom status is restored without stale text.
 4. Check a narrow mobile viewport and verify the sidebar row, info panel sheet, and profile sheet preserve the same hierarchy and accessible status labels.
@@ -401,25 +401,25 @@ secondary identity text
 - Add a repeatable regression harness so permission leaks become test failures instead of QA surprises.
 
 ### Implementation Status
-- [x] Added backend enforcement for team creation in [backend/src/api/teams.rs](/Users/scolak/Projects/rustchat/backend/src/api/teams.rs) using the existing `TEAM_MANAGE` permission path.
-- [x] Added a shared frontend capability layer in [frontend/src/features/permissions/capabilities.ts](/Users/scolak/Projects/rustchat/frontend/src/features/permissions/capabilities.ts) for team creation and channel-management affordances.
-- [x] Hid unauthorized team/channel-management affordances in [frontend/src/components/layout/TeamRail.vue](/Users/scolak/Projects/rustchat/frontend/src/components/layout/TeamRail.vue), [frontend/src/components/modals/CreateTeamModal.vue](/Users/scolak/Projects/rustchat/frontend/src/components/modals/CreateTeamModal.vue), [frontend/src/components/channel/ChannelInfoPanel.vue](/Users/scolak/Projects/rustchat/frontend/src/components/channel/ChannelInfoPanel.vue), [frontend/src/components/modals/ChannelSettingsModal.vue](/Users/scolak/Projects/rustchat/frontend/src/components/modals/ChannelSettingsModal.vue), and [frontend/src/components/channels/ChannelContextMenu.vue](/Users/scolak/Projects/rustchat/frontend/src/components/channels/ChannelContextMenu.vue).
-- [x] Cleared cached channel capability state on logout/session reset in [frontend/src/stores/auth.ts](/Users/scolak/Projects/rustchat/frontend/src/stores/auth.ts).
-- [x] Added backend permission regression tests in [backend/tests/api_permissions.rs](/Users/scolak/Projects/rustchat/backend/tests/api_permissions.rs).
-- [x] Added frontend permission helper and UI affordance tests in [frontend/src/features/permissions/capabilities.test.ts](/Users/scolak/Projects/rustchat/frontend/src/features/permissions/capabilities.test.ts) and [frontend/src/features/permissions/permissionsUi.test.ts](/Users/scolak/Projects/rustchat/frontend/src/features/permissions/permissionsUi.test.ts).
+- [x] Added backend enforcement for team creation in `backend/src/api/teams.rs` using the existing `TEAM_MANAGE` permission path.
+- [x] Added a shared frontend capability layer in `frontend/src/features/permissions/capabilities.ts` for team creation and channel-management affordances.
+- [x] Hid unauthorized team/channel-management affordances in `frontend/src/components/layout/TeamRail.vue`, `frontend/src/components/modals/CreateTeamModal.vue`, `frontend/src/components/channel/ChannelInfoPanel.vue`, `frontend/src/components/modals/ChannelSettingsModal.vue`, and `frontend/src/components/channels/ChannelContextMenu.vue`.
+- [x] Cleared cached channel capability state on logout/session reset in `frontend/src/stores/auth.ts`.
+- [x] Added backend permission regression tests in `backend/tests/api_permissions.rs`.
+- [x] Added frontend permission helper and UI affordance tests in `frontend/src/features/permissions/capabilities.test.ts` and `frontend/src/features/permissions/permissionsUi.test.ts`.
 
 ### Verification Status
-1. `cd /Users/scolak/Projects/rustchat/frontend && npm run test:unit`
+1. `cd ../../frontend && npm run test:unit`
 - Result: PASS, `23 passed`
-2. `cd /Users/scolak/Projects/rustchat/frontend && npm run build`
+2. `cd ../../frontend && npm run build`
 - Result: PASS
 - Note: existing Vite warning about `frontend/src/stores/calls.ts` being both dynamically and statically imported still appears, but the build completes successfully.
-3. `cd /Users/scolak/Projects/rustchat/backend && cargo test --test api_permissions -- --nocapture`
+3. `cd ../../backend && cargo test --test api_permissions -- --nocapture`
 - Result: PASS, `4 passed`
 - Note: local test bootstrap still logs the known S3 credential warning noise.
 
 ### Manual Verification Commands
-1. `cd /Users/scolak/Projects/rustchat/frontend && npm run dev`
+1. `cd ../../frontend && npm run dev`
 2. Log in as a regular member and verify the team rail no longer shows `Create Team`.
 3. Open a channel info panel as a regular member and verify there is no `Edit` action; if the settings modal is opened indirectly, it should show a locked message instead of editable controls.
 4. Open a channel context menu as a regular member and verify `Add Members` is not offered.
@@ -451,19 +451,19 @@ secondary identity text
   - create-channel visibility / lock state
 
 ### Expanded Verification Status
-1. `cd /Users/scolak/Projects/rustchat/frontend && npm exec vitest run src/features/permissions/capabilities.test.ts src/features/permissions/permissionsUi.test.ts`
+1. `cd ../../frontend && npm exec vitest run src/features/permissions/capabilities.test.ts src/features/permissions/permissionsUi.test.ts`
 - Result: PASS, `16 passed`
-2. `cd /Users/scolak/Projects/rustchat/frontend && npm run test:unit`
+2. `cd ../../frontend && npm run test:unit`
 - Result: PASS, `31 passed`
-3. `cd /Users/scolak/Projects/rustchat/frontend && npm run build`
+3. `cd ../../frontend && npm run build`
 - Result: PASS
 - Note: existing Vite warning about `frontend/src/stores/calls.ts` being both dynamically and statically imported still appears, but the build completes successfully.
-4. `cd /Users/scolak/Projects/rustchat/backend && cargo test --test api_permissions -- --nocapture`
+4. `cd ../../backend && cargo test --test api_permissions -- --nocapture`
 - Result: PASS, `8 passed`
 - Note: local test bootstrap still logs the known S3 credential warning noise.
 
 ### Expanded Manual Verification Commands
-1. `cd /Users/scolak/Projects/rustchat/frontend && npm run dev`
+1. `cd ../../frontend && npm run dev`
 2. Log in as a regular member or guest and verify the current-team menu does not show `Team Settings`, and the sidebar does not show standard-channel create affordances.
 3. Open the team settings modal indirectly as an unauthorized user and verify it shows a locked/access-denied state instead of editable controls.
 4. Open the create-channel modal indirectly as an unauthorized user and verify it shows a locked/access-denied state instead of the creation form.
@@ -483,7 +483,7 @@ secondary identity text
 - Preserve full backend validation when backend-related files actually change.
 
 ### Implementation Status
-- [x] Consolidated backend and frontend CI into unified [ci.yml](/Users/scolak/Projects/rustchat/.github/workflows/ci.yml) with intelligent path filtering.
+- [x] Consolidated backend and frontend CI into unified [ci.yml](../../.github/workflows/ci.yml) with intelligent path filtering.
 - [x] Added an internal backend-change detection job that compares the current ref against the PR base or push predecessor SHA.
 - [x] Split heavy backend validation into a separate conditional job that only runs when backend-related files change.
 - [x] Added a lightweight always-reporting gate job named `cargo check + test` that passes with a clear skip message for frontend-only changes and fails if backend validation fails when required.
@@ -737,7 +737,7 @@ Small compatibility-aligned messaging fixes:
 - Note: existing Vite warning remains for `frontend/src/stores/calls.ts` being both dynamically and statically imported.
 
 ### Manual Verification Commands
-1. `cd /Users/scolak/Projects/rustchat/frontend && npm run dev`
+1. `cd ../../frontend && npm run dev`
 2. Open a message with existing reactions, add `👍`, and confirm the same visible emoji does not render twice when websocket updates land.
 3. Open a thread reply and repeat the same reaction toggle check there.
 4. Review the authenticated shell header and confirm:
