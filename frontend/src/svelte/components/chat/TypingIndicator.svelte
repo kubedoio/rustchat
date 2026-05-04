@@ -1,0 +1,65 @@
+<script lang="ts">
+  import { typingUsers } from '../../stores/presence'
+
+  let { channelId, threadId }: { channelId: string; threadId?: string } = $props()
+
+  let localTypingUsers = $state<{ userId: string; username: string }[]>([])
+
+  typingUsers.subscribe((map) => {
+    const users: { userId: string; username: string }[] = []
+    for (const user of map.values()) {
+      if (user.channelId === channelId) {
+        if (threadId) {
+          if (user.threadRootId === threadId) {
+            users.push({ userId: user.userId, username: user.username })
+          }
+        } else {
+          if (!user.threadRootId) {
+            users.push({ userId: user.userId, username: user.username })
+          }
+        }
+      }
+    }
+    localTypingUsers = users
+  })
+
+  let typingText = $derived.by(() => {
+    const names = localTypingUsers.map((u) => u.username)
+    if (names.length === 0) return ''
+    if (names.length === 1) return `${names[0]} is typing...`
+    if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`
+    if (names.length === 3) return `${names[0]}, ${names[1]}, and ${names[2]} are typing...`
+    return `${names[0]} and ${names.length - 1} others are typing...`
+  })
+</script>
+
+{#if localTypingUsers.length > 0}
+  <div
+    data-testid="typing-indicator"
+    class="px-5 py-2 text-xs font-medium text-gray-500 flex items-center space-x-2 bg-transparent transition-opacity duration-200"
+  >
+    <!-- Typing dots animation -->
+    <div class="flex space-x-1">
+      <div class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+      <div class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+      <div class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+    </div>
+    <span class="animate-pulse">{typingText}</span>
+  </div>
+{/if}
+
+<style>
+  @keyframes bounce {
+    0%,
+    80%,
+    100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-4px);
+    }
+  }
+  .animate-bounce {
+    animation: bounce 1s infinite;
+  }
+</style>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import { Hash, Lock } from 'lucide-svelte'
+  import { Hash, Lock, Plus, Globe, MessageCircle } from 'lucide-svelte'
   import type { ChatMember, ChatTeam } from './types'
   import type { SvelteChatChannel } from '../../stores/chat'
   import UserMenu from '../ui/UserMenu.svelte'
@@ -32,6 +32,10 @@
 
   const dispatch = createEventDispatcher<{
     selectChannel: SidebarChannel
+    createChannel: void
+    browseChannels: void
+    directMessage: void
+    setStatus: void
   }>()
 
   $: selectedChannelId = currentChannelId ?? activeChannelId
@@ -110,7 +114,38 @@
   <nav class="flex-1 overflow-y-auto p-3" aria-label="Channels">
     {#each teams as team (team.id)}
       <section class="mb-5" aria-label={teamName(team)}>
-        <h3 class="px-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{teamName(team)}</h3>
+        <div class="flex items-center justify-between px-2">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{teamName(team)}</h3>
+          <div class="flex items-center gap-0.5">
+            <button
+              type="button"
+              class="rounded p-1 text-slate-400 hover:text-white hover:bg-white/10 transition"
+              title="Create channel"
+              aria-label="Create channel"
+              on:click={() => dispatch('createChannel')}
+            >
+              <Plus class="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              class="rounded p-1 text-slate-400 hover:text-white hover:bg-white/10 transition"
+              title="Browse channels"
+              aria-label="Browse channels"
+              on:click={() => dispatch('browseChannels')}
+            >
+              <Globe class="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              class="rounded p-1 text-slate-400 hover:text-white hover:bg-white/10 transition"
+              title="Direct message"
+              aria-label="Direct message"
+              on:click={() => dispatch('directMessage')}
+            >
+              <MessageCircle class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
         <div class="mt-2 space-y-1">
           <!-- Regular Channels -->
           {#each regularChannelsForTeam(team) as channel (channel.id)}
@@ -202,6 +237,6 @@
   </section>
 
   <div class="border-t border-white/10 p-3">
-    <UserMenu />
+    <UserMenu on:setStatus={() => dispatch('setStatus')} />
   </div>
 </aside>

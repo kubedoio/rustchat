@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Router from './svelte/Router.svelte'
+  import ToastManager from './svelte/components/ui/ToastManager.svelte'
   import { authStore } from './svelte/stores/auth'
   import { configStore } from './svelte/stores/config'
   import { registerWebSocketHandlers } from './svelte/stores/websocket'
@@ -18,3 +19,4 @@
 </script>
 
 <Router />
+<ToastManager />

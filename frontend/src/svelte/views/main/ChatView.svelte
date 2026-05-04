@@ -17,6 +17,11 @@
   import ActiveCall from '../../components/calls/ActiveCall.svelte'
   import PinnedMessagesPanel from '../../components/chat/PinnedMessagesPanel.svelte'
   import SavedMessagesPanel from '../../components/chat/SavedMessagesPanel.svelte'
+  import TypingIndicator from '../../components/chat/TypingIndicator.svelte'
+  import CreateChannelModal from '../../components/modals/CreateChannelModal.svelte'
+  import BrowseChannelsModal from '../../components/modals/BrowseChannelsModal.svelte'
+  import DirectMessageModal from '../../components/modals/DirectMessageModal.svelte'
+  import SetStatusModal from '../../components/modals/SetStatusModal.svelte'
   import { chatStore } from '../../stores/chat'
   import { uiStore } from '../../stores/ui'
   import { quickSwitcherStore } from '../../stores/quickSwitcher'
@@ -54,6 +59,10 @@
   let threadPanelOpen = $state(false)
   let activeThreadId = $state<string | null>(null)
   let searchOpen = $state(false)
+  let createChannelOpen = $state(false)
+  let browseChannelsOpen = $state(false)
+  let dmOpen = $state(false)
+  let setStatusOpen = $state(false)
 
   onMount(() => {
     void chatStore.bootstrap()
@@ -98,6 +107,10 @@
     channels={$chatStore.channels}
     currentChannelId={$chatStore.currentChannelId}
     onSelectChannel={(channelId) => chatStore.selectChannel(channelId)}
+    on:createChannel={() => (createChannelOpen = true)}
+    on:browseChannels={() => (browseChannelsOpen = true)}
+    on:directMessage={() => (dmOpen = true)}
+    on:setStatus={() => (setStatusOpen = true)}
   />
 
   <section class="flex min-w-0 flex-1 flex-col bg-bg-surface-1">
@@ -124,6 +137,7 @@
       <MessageList messages={currentMessages} on:openProfile={(e) => { profileUserId = e.detail }} on:thread={handleThread} />
 
       {#if currentChannel}
+        <TypingIndicator channelId={currentChannel.id} />
         <MessageComposer
           channelId={currentChannel.id}
           channelName={currentChannel.display_name || currentChannel.name}
@@ -198,4 +212,9 @@
 
   <IncomingCallModal />
   <ActiveCall />
+
+  <CreateChannelModal open={createChannelOpen} on:close={() => (createChannelOpen = false)} />
+  <BrowseChannelsModal open={browseChannelsOpen} on:close={() => (browseChannelsOpen = false)} />
+  <DirectMessageModal open={dmOpen} on:close={() => (dmOpen = false)} on:select={(e) => { chatStore.selectChannel(e.detail); dmOpen = false }} />
+  <SetStatusModal open={setStatusOpen} on:close={() => (setStatusOpen = false)} />
 </main>

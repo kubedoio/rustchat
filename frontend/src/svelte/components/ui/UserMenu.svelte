@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte'
   import { LogOut, User, Smile } from 'lucide-svelte'
   import { authStore } from '../../stores/auth'
   import { uiStore } from '../../stores/ui'
+
+  const dispatch = createEventDispatcher<{ setStatus: void }>()
 
   let open = false
   let menuEl: HTMLDivElement | null = null
@@ -88,7 +91,7 @@
           type="button"
           class="flex w-full items-center gap-2.5 rounded-r-2 px-2.5 py-2 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-2 hover:text-text-1"
           role="menuitem"
-          on:click={() => { closeMenu() }}
+          on:click={() => { closeMenu(); dispatch('setStatus') }}
         >
           <Smile class="h-4 w-4 shrink-0" />
           Set status
