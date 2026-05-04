@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from 'svelte'
+  import { chatStore } from '../../stores/chat'
   import type { ChatAttachment, ChatMember, ComposerSubmit } from './types'
 
   export let channelId = 'general'
@@ -26,7 +27,9 @@
   let hydrated = false
   let previousChannelId = channelId
 
-  $: canSend = draft.trim().length > 0 || attachments.length > 0
+  $: hasUploadedFiles = attachments.some((a) => a.fileId && !a.uploading)
+  $: hasUploadInProgress = attachments.some((a) => a.uploading)
+  $: canSend = (draft.trim().length > 0 || hasUploadedFiles) && !hasUploadInProgress
   $: isSendDisabled = !canSend || disabled
   $: emojiMatch = draft.includes(':smi') ? 'smi' : findToken(':')
   $: mentionMatch = draft.includes('@ad') ? 'ad' : findToken('@')
@@ -111,14 +114,43 @@
   }
 
   function attachFiles(fileList: FileList | File[]) {
-    const nextAttachments = Array.from(fileList).map((file) => ({
+    const nextAttachments: ChatAttachment[] = Array.from(fileList).map((file) => ({
       id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name: file.name,
       size: file.size,
-      file
+      file,
+      mimeType: file.type,
+      uploading: true,
+      progress: 0,
     }))
 
     attachments = [...attachments, ...nextAttachments]
+
+    nextAttachments.forEach((attachment) => {
+      if (!attachment.file) return
+      chatStore
+        .uploadFile(attachment.file)
+        .then((uploadedFile) => {
+          attachments = attachments.map((a) =>
+            a.id === attachment.id
+              ? {
+                  ...a,
+                  uploading: false,
+                  uploadError: false,
+                  fileId: uploadedFile.id,
+                  url: uploadedFile.url,
+                  mimeType: uploadedFile.mimeType ?? uploadedFile.mime_type,
+                  mime_type: uploadedFile.mime_type ?? uploadedFile.mimeType,
+                }
+              : a,
+          )
+        })
+        .catch(() => {
+          attachments = attachments.map((a) =>
+            a.id === attachment.id ? { ...a, uploading: false, uploadError: true } : a,
+          )
+        })
+    })
   }
 
   function handleFileInput(event: Event) {
@@ -142,12 +174,16 @@
   function sendMessage() {
     if (!canSend) return
 
+    const file_ids = attachments
+      .filter((attachment) => attachment.fileId && !attachment.uploading)
+      .map((attachment) => attachment.fileId!)
+
     const message: ComposerSubmit = {
       channelId,
       content: draft.trim(),
       body: draft.trim(),
       attachments,
-      file_ids: attachments.map((attachment) => attachment.id)
+      file_ids,
     }
 
     onSend?.(message)
@@ -208,9 +244,26 @@
   {#if attachments.length > 0}
     <div class="mb-3 flex flex-wrap gap-2" aria-label="Attached files">
       {#each attachments as attachment (attachment.id)}
-        <span class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-700">
-          {attachment.name}
-          <button type="button" class="text-gray-500 hover:text-gray-900" aria-label={`Remove ${attachment.name}`} on:click={() => removeAttachment(attachment.id)}>
+        <span
+          data-testid="file-attachment"
+          class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm {attachment.uploadError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-700'}"
+        >
+          {#if attachment.uploading}
+            <span data-testid="upload-progress" class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600"></span>
+          {:else if attachment.uploadError}
+            <span class="text-red-500" aria-label="Upload failed">!</span>
+          {/if}
+          <span class="truncate max-w-[12rem]">{attachment.name}</span>
+          {#if attachment.size && !attachment.uploading}
+            <span class="text-xs text-gray-400">({Math.round(attachment.size / 1024)}KB)</span>
+          {/if}
+          <button
+            type="button"
+            class="text-gray-500 hover:text-gray-900 disabled:opacity-40"
+            aria-label={`Remove ${attachment.name}`}
+            disabled={attachment.uploading}
+            on:click={() => removeAttachment(attachment.id)}
+          >
             x
           </button>
         </span>

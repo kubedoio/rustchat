@@ -1,14 +1,15 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import { Hash, Lock, MoreVertical, Info, Users } from 'lucide-svelte'
+  import { Hash, Lock, MoreVertical, Info, Users, Search, ClipboardList } from 'lucide-svelte'
   import ConnectionIndicator from '../ui/ConnectionIndicator.svelte'
+  import NotificationsDropdown from '../ui/NotificationsDropdown.svelte'
   import type { SvelteChatChannel, SvelteChatMember } from '../../stores/chat'
 
   export let channel: SvelteChatChannel | null = null
   export let members: SvelteChatMember[] = []
   export let onToggleInfo: (() => void) | undefined = undefined
 
-  const dispatch = createEventDispatcher<{ toggleInfo: void }>()
+  const dispatch = createEventDispatcher<{ toggleInfo: void; search: void; toggleActivity: void }>()
 
   let showMenu = false
 
@@ -33,6 +34,10 @@
     onToggleInfo?.()
     dispatch('toggleInfo')
     showMenu = false
+  }
+
+  function handleToggleActivity() {
+    dispatch('toggleActivity')
   }
 </script>
 
@@ -94,7 +99,28 @@
 
   <!-- Right: Actions -->
   <div class="flex shrink-0 items-center gap-0.5 rounded-r-3 border border-border-1 bg-bg-surface-2/70 p-1 sm:gap-1">
+    <button
+      data-testid="search-button"
+      on:click={() => dispatch('search')}
+      class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
+      aria-label="Search"
+      title="Search"
+    >
+      <Search class="h-4 w-4" />
+    </button>
+
     <ConnectionIndicator />
+
+    <NotificationsDropdown />
+
+    <button
+      on:click={handleToggleActivity}
+      class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
+      aria-label="Activity feed"
+      title="Activity feed"
+    >
+      <ClipboardList class="h-4 w-4" />
+    </button>
 
     <!-- More Options Menu -->
     <div class="relative">

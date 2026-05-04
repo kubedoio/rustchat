@@ -257,7 +257,7 @@
           <div class="mt-2 flex flex-wrap gap-2">
             {#each files as file (file.id)}
               {#if file.mimeType?.startsWith('image/') || file.mime_type?.startsWith('image/')}
-                <div class="rounded-r-1 overflow-hidden border border-border-1 w-20 h-20 bg-bg-surface-2">
+                <div data-testid="file-attachment" class="rounded-r-1 overflow-hidden border border-border-1 w-20 h-20 bg-bg-surface-2">
                   <img
                     src={file.url ?? ''}
                     alt={file.name ?? 'Image'}
@@ -266,7 +266,7 @@
                   />
                 </div>
               {:else}
-                <div class="rounded-full border border-border-1 bg-bg-surface-2 px-3 py-1 text-xs text-text-2 flex items-center gap-1.5">
+                <div data-testid="file-attachment" class="rounded-full border border-border-1 bg-bg-surface-2 px-3 py-1 text-xs text-text-2 flex items-center gap-1.5">
                   <span class="truncate max-w-[12rem]">{file.name ?? 'Attached file'}</span>
                   {#if file.size}
                     <span class="text-text-4">({Math.round(file.size / 1024)}KB)</span>

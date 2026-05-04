@@ -12,9 +12,11 @@
   import ThreadPanel from '../../components/thread/ThreadPanel.svelte'
   import SearchModal from '../../components/search/SearchModal.svelte'
   import QuickSwitcherModal from '../../components/search/QuickSwitcherModal.svelte'
+  import ActivityFeed from '../../components/activity/ActivityFeed.svelte'
   import { chatStore } from '../../stores/chat'
   import { uiStore } from '../../stores/ui'
   import { quickSwitcherStore } from '../../stores/quickSwitcher'
+  import { activityStore } from '../../stores/activity'
   import { connectionStatus, registerWebSocketHandlers, retryConnection } from '../../stores/websocket'
 
   const currentChannel = $derived(
@@ -99,6 +101,8 @@
       channel={currentChannel}
       members={currentMembers}
       onToggleInfo={toggleInfoPanel}
+      on:search={() => (searchOpen = true)}
+      on:toggleActivity={() => activityStore.toggleFeed()}
     />
 
     {#if $chatStore.error}
@@ -164,6 +168,8 @@
   {#if searchOpen}
     <SearchModal open={true} on:close={handleSearchClose} />
   {/if}
+
+  <ActivityFeed />
 
   {#if $quickSwitcherStore.open}
     <QuickSwitcherModal

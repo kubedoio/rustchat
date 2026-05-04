@@ -88,10 +88,45 @@ export async function svelteHttp<T>(
     }
 }
 
+export async function svelteHttpFormData<T>(
+    path: string,
+    formData: FormData,
+    options: SvelteHttpOptions = {},
+): Promise<SvelteHttpResponse<T>> {
+    const headers = new Headers(options.headers)
+    const token = options.authenticated === false ? '' : readLocalStorage(AUTH_TOKEN_KEY, '')
+
+    if (token) {
+        headers.set('Authorization', `Bearer ${token}`)
+    }
+
+    const init: RequestInit = {
+        method: 'POST',
+        headers,
+        body: formData,
+    }
+
+    const response = await fetch(buildUrl(path, options.baseURL), init)
+    const data = await parseBody<T>(response)
+
+    if (!response.ok) {
+        throw new SvelteHttpError(response.status, data)
+    }
+
+    return {
+        data,
+        headers: response.headers,
+        status: response.status,
+        statusText: response.statusText,
+    }
+}
+
 export const svelteApi = {
     get: <T>(path: string, options?: SvelteHttpOptions) => svelteHttp<T>('GET', path, undefined, options),
     post: <T>(path: string, body?: unknown, options?: SvelteHttpOptions) =>
         svelteHttp<T>('POST', path, body, options),
+    postFormData: <T>(path: string, formData: FormData, options?: SvelteHttpOptions) =>
+        svelteHttpFormData<T>(path, formData, options),
     put: <T>(path: string, body?: unknown, options?: SvelteHttpOptions) =>
         svelteHttp<T>('PUT', path, body, options),
     delete: <T>(path: string, options?: SvelteHttpOptions) =>

@@ -14,6 +14,10 @@ export type ChatAttachment = {
   mimeType?: string
   mime_type?: string
   url?: string
+  fileId?: string
+  uploading?: boolean
+  uploadError?: boolean
+  progress?: number
 }
 
 export type ChatReaction = {

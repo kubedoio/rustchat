@@ -507,6 +507,29 @@ function createChatStore() {
         }
     }
 
+    async function uploadFile(file: File): Promise<SvelteChatFile> {
+        const formData = new FormData()
+        formData.append('file', file)
+        const state = get(chatStore)
+        if (state.currentChannelId) {
+            formData.append('channel_id', state.currentChannelId)
+        }
+
+        const { data } = await svelteApi.postFormData<unknown>('/files', formData)
+        const fileRecord = isRecord(data) ? data : {}
+
+        return {
+            id: stringField(fileRecord, 'id'),
+            name: optionalStringField(fileRecord, 'name') ?? file.name,
+            url: optionalStringField(fileRecord, 'url'),
+            size: typeof fileRecord.size === 'number' ? fileRecord.size : file.size,
+            mime_type: optionalStringField(fileRecord, 'mime_type') ?? file.type,
+            mimeType: optionalStringField(fileRecord, 'mimeType') ?? file.type,
+            width: typeof fileRecord.width === 'number' ? fileRecord.width : undefined,
+            height: typeof fileRecord.height === 'number' ? fileRecord.height : undefined,
+        }
+    }
+
     return {
         subscribe,
         update,
@@ -525,6 +548,7 @@ function createChatStore() {
         updateMemberPresence,
         fetchThreadReplies,
         sendThreadReply,
+        uploadFile,
         reset: () => set(initialState),
     }
 }
