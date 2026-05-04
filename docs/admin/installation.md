@@ -31,7 +31,7 @@ RustChat follows a modern, decoupled architecture designed for speed and horizon
 - **WebSocket Hub:** A real-time subsystem that manages persistent active connections for instant message delivery, typing indicators, and presence updates.
 - **PostgreSQL:** The primary relational database for message history, user profiles, and channel metadata.
 - **Redis (Optional/Recommended):** Used for caching frequently accessed data and providing pub/sub capabilities for real-time events across multiple backend instances.
-- **File Storage:** Flexible storage for user-uploaded files. Supports Local File Systems and S3-compatible backends like MinIO, Ceph RGW, or AWS S3.
+- **File Storage:** Flexible storage for user-uploaded files. Supports Local File Systems and S3-compatible backends like RustFS, Ceph RGW, or AWS S3.
 - **Load Balancer:** Required for TLS termination and routing WebSocket traffic with sticky sessions (if scaling multiple backend pods).
 
 ---
@@ -52,7 +52,7 @@ For a quick local or small-scale setup:
    ```bash
    docker compose up -d
    ```
-   This starts the backend, frontend, PostgreSQL, Redis, and MinIO.
+   This starts the backend, frontend, PostgreSQL, Redis, and RustFS.
 
 ### Deployment Targets
 
@@ -155,7 +155,7 @@ server {
 Schedule daily `pg_dump` tasks for the PostgreSQL service. Store these backups off-site.
 
 ### File Storage Backups
-If using MinIO or Ceph, leverage their built-in replication tools. For AWS S3, enable bucket versioning.
+If using RustFS or Ceph, leverage their built-in replication tools. For AWS S3, enable bucket versioning.
 
 ### Logs & Monitoring
 RustChat outputs structured JSON logs. We recommend piping these into ELK (Elasticsearch, Logstash, Kibana) or Prometheus/Grafana for monitoring system health.

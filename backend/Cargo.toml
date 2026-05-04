@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.92"
 authors = ["rustchat contributors"]
 description = "Self-hosted, enterprise-ready team collaboration platform"
-license = "MIT"
+license = "Apache-2.0"
 repository = "https://github.com/rustchat/rustchat"
 
 [dependencies]

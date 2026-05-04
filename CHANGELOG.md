@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Typing indicators now appear when other users are typing (fixed v1 WebSocket message format conversion)
 - Real-time message deletion now works correctly (standardized WebSocket payload)
 
+### Changed
+- **License**: Changed from MIT to Apache-2.0 across all project metadata.
+- **Governance**: Added GOVERNANCE.md, CODE_OF_CONDUCT.md, SUPPORT.md, MAINTAINERS.md, DCO.md, and CONTRIBUTING.md for community-driven development.
+- **README**: Added product screenshots, improved quickstart guide, and honest capability disclosures.
+- **Security**: Removed hardcoded TURN server defaults and S3 domain references from codebase and migrations.
+- **Cleanup**: Removed internal AI tooling files (`.agents/`, `.kimi/skills/`, `.specify/`) from tracked files.
+- **CI/CD**: Added OpenSSF Scorecard, security scanning, DCO check, and integration test workflows.
+
 ## [0.3.5] - 2026-03-09
 
 ### Added
@@ -99,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-time messaging via WebSockets.
 - Thread support.
 - Unread messages system.
-- S3/MinIO file uploads.
+- S3-compatible file uploads (RustFS).
 - User presence and status.
 - Organization and Team structures.
 

@@ -22,7 +22,7 @@ rustchat is a self-hosted team collaboration platform composed of 3 runtime serv
 |---|---|---|
 | PostgreSQL 16+ | Primary data store | Yes |
 | Redis 7+ | Pub/sub for cross-instance events, rate limiting, sessions | Yes |
-| S3-compatible (RustFS/MinIO) | File storage | Yes |
+| S3-compatible (RustFS) | File storage | Yes |
 | FCM / APNS | Mobile push notifications (via push-proxy) | Optional |
 | SMTP | Email notifications, password reset | Optional |
 | OAuth providers | SSO login (configurable) | Optional |

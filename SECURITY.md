@@ -8,7 +8,7 @@ If you find a vulnerability, please report it privately so a fix can be prepared
 
 ## Supported Versions
 
-Rustchat is currently pre-1.0 and under active development.
+RustChat is currently pre-1.0 and under active development.
 
 | Version | Supported |
 | ------- | --------- |
@@ -16,16 +16,29 @@ Rustchat is currently pre-1.0 and under active development.
 | Latest tagged release | :white_check_mark: |
 | Older tags/releases | :x: |
 
+Before 1.0, minor version bumps may include breaking changes. Always review [CHANGELOG.md](CHANGELOG.md) before upgrading.
+
+## Dependency Security Process
+
+- Dependencies are monitored by Dependabot for automated update PRs
+- `cargo audit` runs in CI to detect known vulnerable Rust crates
+- `npm audit` runs in CI for frontend dependencies
+- Security-related dependency updates are prioritized and released as patch versions when applicable
+
+## Nightly Stability Disclaimer
+
+Nightly builds (`nightly` container tags) are built automatically from `main` and are not guaranteed to be stable. They are intended for testing and feedback only.
+
 ## Reporting a Vulnerability
 
 **Do not open public GitHub issues for security vulnerabilities.**
 
 Use GitHub Private Vulnerability Reporting:
 
-1. [Open a private advisory](https://github.com/kubedoio/rustchat/security/advisories/new)
+1. [Open a private advisory](https://github.com/rustchatio/rustchat/security/advisories/new)
 2. Include enough detail for reproduction and impact assessment
 
-If private advisory submission is unavailable for you, contact maintainers through a private channel on GitHub and include `SECURITY:` in the subject/title.
+If private advisory submission is unavailable for you, contact the maintainers listed in [MAINTAINERS.md](MAINTAINERS.md) through a private channel on GitHub and include `SECURITY:` in the subject/title.
 
 ### What to Include
 

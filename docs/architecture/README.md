@@ -9,7 +9,7 @@ RustChat is a self-hosted team collaboration platform built with:
 - **Frontend:** Vue 3 + TypeScript + Pinia
 - **Database:** PostgreSQL 16+
 - **Cache/Events:** Redis 7+
-- **Storage:** S3-compatible (RustFS/MinIO)
+- **Storage:** S3-compatible (RustFS)
 
 ## Documentation Sections
 

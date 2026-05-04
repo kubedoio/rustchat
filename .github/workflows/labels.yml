@@ -1,0 +1,61 @@
+name: Labels Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/labels.yml"
+      - ".github/workflows/labels.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Sync labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Read labels.yml and sync each label
+          python3 << 'PYEOF'
+          import yaml, subprocess, sys
+
+          with open('.github/labels.yml') as f:
+              labels = yaml.safe_load(f)
+
+          if not labels:
+              print("No labels defined")
+              sys.exit(0)
+
+          for label in labels:
+              name = label['name']
+              color = label['color'].lstrip('#')
+              desc = label.get('description', '')
+
+              # Try to update existing label, create if missing
+              result = subprocess.run(
+                  ['gh', 'label', 'edit', name, '--color', color, '--description', desc],
+                  capture_output=True, text=True
+              )
+              if result.returncode != 0:
+                  result = subprocess.run(
+                      ['gh', 'label', 'create', name, '--color', color, '--description', desc],
+                      capture_output=True, text=True
+                  )
+                  if result.returncode != 0:
+                      print(f"Failed to sync label {name}: {result.stderr}")
+                      sys.exit(1)
+                  print(f"Created: {name}")
+              else:
+                  print(f"Updated: {name}")
+
+          print("Label sync complete")
+          PYEOF

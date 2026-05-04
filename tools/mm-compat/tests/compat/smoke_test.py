@@ -7,7 +7,7 @@ import uuid
 
 def main():
     parser = argparse.ArgumentParser(description="Live compatibility smoke test")
-    parser.add_argument("--url", default="https://app.rustchat.io", help="Target server URL")
+    parser.add_argument("--url", default="http://localhost:3000", help="Target server URL")
     parser.add_argument("--username", required=True, help="Username/Email")
     parser.add_argument("--password", required=True, help="Password")
     args = parser.parse_args()

@@ -1,0 +1,115 @@
+name: Integration Tests
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # Nightly at 03:00 UTC (after nightly image build at 02:00)
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  backend-integration:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Start test infrastructure
+        run: |
+          docker compose -f docker-compose.integration.yml up -d
+
+      - name: Wait for infrastructure
+        run: |
+          echo "Waiting for PostgreSQL..."
+          for i in {1..60}; do
+            if docker compose -f docker-compose.integration.yml exec -T test-postgres pg_isready -U rustchat -d rustchat >/dev/null 2>&1; then
+              echo "PostgreSQL ready"
+              break
+            fi
+            if [[ $i -eq 60 ]]; then
+              echo "PostgreSQL did not become ready"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Waiting for Redis..."
+          for i in {1..60}; do
+            if docker compose -f docker-compose.integration.yml exec -T test-redis redis-cli ping | grep -q PONG; then
+              echo "Redis ready"
+              break
+            fi
+            if [[ $i -eq 60 ]]; then
+              echo "Redis did not become ready"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Waiting for S3 (RustFS)..."
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:59000/health >/dev/null 2>&1; then
+              echo "S3 ready"
+              break
+            fi
+            if [[ $i -eq 60 ]]; then
+              echo "S3 did not become ready"
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
+
+      - name: Cache cargo registry
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('backend/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('backend/Cargo.lock') }}
+
+      - name: Cache cargo build target
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: backend/target
+          key: ${{ runner.os }}-cargo-integration-target-${{ hashFiles('backend/Cargo.lock') }}
+
+      - name: Run integration tests
+        working-directory: ./backend
+        env:
+          RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@127.0.0.1:55432/rustchat
+          RUSTCHAT_TEST_REDIS_URL: redis://127.0.0.1:56379/
+          RUSTCHAT_TEST_S3_ENDPOINT: http://127.0.0.1:59000
+          RUSTCHAT_TEST_S3_ACCESS_KEY: testaccesskey
+          RUSTCHAT_TEST_S3_SECRET_KEY: testsecretkey
+          RUSTCHAT_TEST_S3_BUCKET: test-bucket
+          DATABASE_URL: postgres://rustchat:rustchat@127.0.0.1:55432/rustchat
+        run: cargo test --no-fail-fast -- --nocapture
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: integration-test-results
+          path: backend/target/test-results/
+          if-no-files-found: ignore
+
+      - name: Stop test infrastructure
+        if: always()
+        run: docker compose -f docker-compose.integration.yml down -v

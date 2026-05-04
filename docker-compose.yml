@@ -23,7 +23,7 @@ services:
       - RUSTCHAT_JWT_AUDIENCE=${RUSTCHAT_JWT_AUDIENCE:?set RUSTCHAT_JWT_AUDIENCE in .env}
       - RUSTCHAT_ENCRYPTION_KEY=${RUSTCHAT_ENCRYPTION_KEY:?set RUSTCHAT_ENCRYPTION_KEY in .env}
       - RUSTCHAT_S3_ENDPOINT=http://rustfs:9000
-      - RUSTCHAT_S3_PUBLIC_ENDPOINT=https://s3.rustchat.io
+      - RUSTCHAT_S3_PUBLIC_ENDPOINT=${RUSTCHAT_S3_PUBLIC_ENDPOINT:-http://localhost:9000}
       - RUSTCHAT_S3_BUCKET=rustchat-uploads
       - RUSTCHAT_S3_ACCESS_KEY=${RUSTCHAT_S3_ACCESS_KEY:?set RUSTCHAT_S3_ACCESS_KEY in .env}
       - RUSTCHAT_S3_SECRET_KEY=${RUSTCHAT_S3_SECRET_KEY:?set RUSTCHAT_S3_SECRET_KEY in .env}
@@ -37,7 +37,7 @@ services:
       - RUSTCHAT_CALLS_STATE_BACKEND=${RUSTCHAT_CALLS_STATE_BACKEND:-auto}
       # TURN Server Configuration
       - TURN_SERVER_ENABLED=${TURN_SERVER_ENABLED:-false}
-      - TURN_SERVER_URL=${TURN_SERVER_URL:-turn:turn.kubedo.io:3478}
+      - TURN_SERVER_URL=${TURN_SERVER_URL:-}
       - TURN_SERVER_USERNAME=${TURN_SERVER_USERNAME:-}
       - TURN_SERVER_CREDENTIAL=${TURN_SERVER_CREDENTIAL:-}
       # Push Notification Proxy
@@ -109,7 +109,9 @@ services:
       retries: 5
 
   rustfs:
-    image: rustfs/rustfs:latest
+    # TODO: Pin to a version tag when rustfs publishes semver tags.
+    # Current digest: sha256:103dd40b84d5aa3d5ab02f3a693797eb1d14cb842554b222dfbb589f364aa47f
+    image: rustfs/rustfs@sha256:103dd40b84d5aa3d5ab02f3a693797eb1d14cb842554b222dfbb589f364aa47f
     container_name: rustchat-rustfs
     environment:
       - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY in .env}
@@ -125,17 +127,8 @@ services:
       timeout: 5s
       retries: 5
 
-  createbuckets:
-    image: minio/mc
-    container_name: rustchat-createbuckets
-    depends_on:
-      rustfs:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c " /usr/bin/mc alias set rustchat http://rustfs:9000 ${RUSTFS_ACCESS_KEY} ${RUSTFS_SECRET_KEY}; /usr/bin/mc mb --ignore-existing rustchat/rustchat-uploads; /usr/bin/mc anonymous set public rustchat/rustchat-uploads; exit 0; "
-
   meilisearch:
-    image: getmeili/meilisearch:latest
+    image: getmeili/meilisearch:v1.42.1
     container_name: rustchat-meilisearch
     environment:
       MEILI_ENV: development

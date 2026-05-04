@@ -1,6 +1,0 @@
-- Rustchat target path: `/Users/scolak/Projects/rustchat/frontend/src/stores/calls.ts`
-- Required behavior: Screen-share toggles should reuse a stable sender/transceiver and avoid SDP growth/SSRC churn across repeated start-stop cycles.
-- Current gap: Previous flow removed and re-added tracks on each toggle, creating additional senders/transceivers and triggering unstable renegotiation behavior.
-- Planned change: Track and reuse a persistent `screenSender`; use `replaceTrack(videoTrack)` when starting and `replaceTrack(null)` when stopping; keep renegotiation calls unchanged.
-- Verification test: `npm run build` (frontend typecheck + production build) passes; manual desktop call test should show stable repeated screen-share toggles without SFU unhandled RTP/simulcast errors.
-- Status: Implemented (code updated, build validated).

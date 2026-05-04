@@ -2,11 +2,41 @@
 
 > **Self-hosted team collaboration that just works.**
 > 
-> RustChat is a fast, reliable team messaging platform built for organizations that want control of their data without sacrificing user experience.
+> RustChat is a self-hosted collaboration platform with a Rust backend and Vue web client. It is under active development and moving toward a supported self-hosted product.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org/)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.92%2B-orange.svg)](https://www.rust-lang.org/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3.5%2B-green.svg)](https://vuejs.org/)
+
+---
+
+## 🖥️ Screenshots
+
+<p align="center">
+  <img src="images/rustchat-hero-desktop-main.png" alt="RustChat desktop interface showing a channel conversation with threaded replies, file attachments, and a rich message composer" width="85%">
+  <br><br>
+  <em>Real-time team messaging — channels, threads, file sharing, and reactions</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="images/rustchat-product-proof-collaboration.png" alt="Team collaboration in a release-readiness channel with file sharing and emoji reactions" width="46%">
+  &nbsp;&nbsp;
+  <img src="images/rustchat-mobile-continuity.jpeg" alt="Mobile view of the same conversation showing responsive design and full feature parity" width="22%">
+  <br><br>
+  <em>Desktop collaboration with file sharing · Seamless mobile continuity</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="images/rustchat-admin2.png" alt="Admin system overview dashboard with real-time health metrics and instance information" width="45%">
+  &nbsp;&nbsp;
+  <img src="images/rustchat-admin1.png" alt="Granular membership policy editor with SSO and role-based access control" width="45%">
+  <br><br>
+  <em>System health at a glance · Granular access policies &amp; SSO</em>
+</p>
 
 ---
 
@@ -93,60 +123,51 @@ RustChat is designed as three focused services working together:
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- A server with 2GB RAM minimum
 
-### 1. Get the Code
+- Docker and Docker Compose
+- 2 GB RAM minimum
+
+### One-Command Start
 
 ```bash
+# 1. Clone
 git clone https://github.com/rustchatio/rustchat.git
 cd rustchat
-```
 
-### 2. Configure
+# 2. Configure (creates .env from template)
+./scripts/dev-setup.sh
+# Edit .env and set the secrets marked "replace-me-..."
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set the required secrets:
-
-```bash
-# Required: Cryptographic secrets
-RUSTCHAT_JWT_SECRET=$(openssl rand -hex 32)
-RUSTCHAT_ENCRYPTION_KEY=$(openssl rand -hex 32)
-
-# Required: S3 credentials for file storage
-RUSTCHAT_S3_ACCESS_KEY=your-access-key
-RUSTCHAT_S3_SECRET_KEY=your-secret-key
-RUSTFS_ACCESS_KEY=your-access-key
-RUSTFS_SECRET_KEY=your-secret-key
-
-# Optional: SSO (GitHub, Google, OIDC)
-# GITHUB_CLIENT_ID=...
-# GITHUB_CLIENT_SECRET=...
-```
-
-### 3. Launch
-
-```bash
+# 3. Launch
 docker compose up -d --build
 ```
 
-The services will be available at:
-- **Web UI**: http://localhost:8080
-- **API**: http://localhost:3000
+### Access
 
-### 4. Create First User
+| Service | URL |
+|---------|-----|
+| **Web UI** | http://localhost:8080 |
+| **API** | http://localhost:3000 |
+| **API Health** | http://localhost:3000/api/v1/health/live |
 
-On first startup, set these environment variables to create an admin user:
+### First Login
+
+The admin user is created automatically on first startup. Log in with:
+
+- **Email:** The value you set for `RUSTCHAT_ADMIN_USER` (default: `admin@rustchat.local`)
+- **Password:** The value you set for `RUSTCHAT_ADMIN_PASSWORD`
+
+### Stop / Reset
 
 ```bash
-RUSTCHAT_ADMIN_USER=admin
-RUSTCHAT_ADMIN_PASSWORD=secure-password-here
+# Stop (keeps data)
+docker compose down
+
+# Full reset (removes all data)
+docker compose down -v
 ```
 
-Then restart: `docker compose restart backend`
+For the full quickstart guide with troubleshooting, see [docs/quickstart.md](docs/quickstart.md).
 
 ---
 
@@ -169,7 +190,7 @@ Use with appropriate caution for production workloads. Always test in a staging 
 | 2026-02 | VoIP Push Notifications — Mobile call ringing for Android and iOS |
 | 2026-01 | V4 API Coverage — Broad Mattermost compatibility for mobile clients |
 
-See [CHANGELOG.md](CHANGELOG.md) for detailed release history.
+See [CHANGELOG.md](CHANGELOG.md) for detailed release history and [ROADMAP.md](ROADMAP.md) for upcoming direction.
 
 ---
 
@@ -193,28 +214,18 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed release history.
 
 ## Development
 
-Want to contribute? Here's how to get the dev environment running:
-
 ```bash
-# Backend
-cd backend
-cargo check
-cargo test --lib
+# Automated setup (starts dependencies, installs tools)
+./scripts/dev-setup.sh
 
-# Frontend
-cd frontend
-npm ci
-npm run build
+# Terminal 1 — Backend
+cd backend && cargo run
 
-# Frontend dependency policy
-# npm only, package-lock committed, CI blocks install scripts by default
-# see docs/frontend-dependency-policy.md
-
-# Full stack with Docker
-docker compose up -d postgres redis rustfs
+# Terminal 2 — Frontend
+cd frontend && npm run dev
 ```
 
-See [docs/development/local-setup.md](docs/development/local-setup.md) for detailed setup.
+See [Development Guide](docs/development.md) for the full setup, testing, and troubleshooting guide.
 
 ---
 
@@ -272,9 +283,23 @@ We believe in honest communication about capabilities:
 
 ---
 
+## Release Channels
+
+| Channel | Stability | Use For |
+|---------|-----------|---------|
+| **Stable** (`vX.Y.Z`) | Tagged releases | Evaluation and cautious production use |
+| **Latest** (`latest` container tag) | Points to latest stable | Convenience only — pin to a version for reproducibility |
+| **Nightly** (`nightly`, `nightly-YYYYMMDD-SHA`) | Built from `main` | Testing new features before stable |
+
+Before 1.0, minor version bumps may include breaking changes. Always review [CHANGELOG.md](CHANGELOG.md) before upgrading.
+
+## Security
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md). Do not open public issues for security problems.
+
 ## License
 
-MIT — See [LICENSE](LICENSE) for details.
+Apache-2.0 — See [LICENSE](LICENSE) for details.
 
 ---
 
