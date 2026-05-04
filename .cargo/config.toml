@@ -1,15 +1,17 @@
 [build]
-# Use sccache for caching
-rustc-wrapper = "sccache"
+# sccache can be enabled locally or in CI via CARGO_BUILD_RUSTC_WRAPPER=sccache
+# Do NOT hardcode it here — jobs that need it install it explicitly.
 
-# Use fast linker - mold on Linux, lld on macOS
-[target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-
-[target.aarch64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+# Fast linkers are optional local optimizations.
+# mold/lld are NOT required — the system default linker works everywhere.
+# To use mold locally on Linux: install it, then uncomment the rustflags below.
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+#
+# [target.aarch64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
 [target.x86_64-apple-darwin]
 # lld from LLVM (brew install lld)

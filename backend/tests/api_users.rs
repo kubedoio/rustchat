@@ -135,7 +135,7 @@ async fn test_auth_me_normalizes_internal_presigned_avatar_urls() {
         .to_string();
 
     let stale_url = format!(
-        "https://s3.rustchat.io/rustchat-uploads/files/{}/legacy-avatar.jpg?x-id=GetObject&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260401T232501Z&X-Amz-Expires=3600",
+        "https://s3.example.com/rustchat-uploads/files/{}/legacy-avatar.jpg?x-id=GetObject&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260401T232501Z&X-Amz-Expires=3600",
         user_id
     );
 

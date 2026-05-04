@@ -1,6 +1,0 @@
-- Rustchat target path: `/Users/scolak/Projects/rustchat/frontend/src/stores/calls.ts`
-- Required behavior: Offer SDP sent by web client must respect server simulcast policy (`EnableSimulcast` false by default) to avoid browser-specific one-way screen share failures.
-- Current gap: Web client previously forwarded raw browser offer SDP (including potential simulcast/RID lines) to `/offer`, with no policy normalization.
-- Planned change: Add offer preparation path that strips simulcast/RID-related SDP lines when simulcast is disabled, and use that SDP for both `setLocalDescription` and `/offer` requests.
-- Verification test: `npm run build` passes; manual Brave->Firefox screen-share test should now render for Firefox recipients.
-- Status: Implemented and build-validated.

@@ -1,7 +1,7 @@
 # Agent Operating Model
 
 **Last updated:** 2026-03-22
-**Canonical agent guide:** [`AGENTS.md`](https://github.com/rustchatio/rustchat/blob/main/AGENTS.md) (root) — read that first for full workflow details
+**Canonical agent guide:** [`AGENTS.md`](https://github.com/rustchatio/rustchat/blob/main/docs/internal/AGENTS.md) (`docs/internal/`) — read that first for full workflow details
 
 ---
 
@@ -62,7 +62,9 @@ Three agents are defined for rustchat:
 
 ## 2. Skills System
 
-7 capability skills are defined in `.agents/skills/`:
+The following capability skills are used by the maintainer agent workflow. Skill definitions are maintained as internal tooling and are not kept in the public repository tree.
+
+Skills:
 
 | Skill | Domain |
 |---|---|
@@ -130,7 +132,7 @@ When in doubt whether a change touches the compat surface, treat it as if it doe
 
 ## 6. Cross-References
 
-- Full agent workflow guide: [`AGENTS.md`](https://github.com/rustchatio/rustchat/blob/main/AGENTS.md)
+- Full agent workflow guide: [`AGENTS.md`](https://github.com/rustchatio/rustchat/blob/main/docs/internal/AGENTS.md)
 - Machine-readable contracts: [`.governance/agent-contracts.yml`](https://github.com/rustchatio/rustchat/blob/main/.governance/agent-contracts.yml)
 - Risk tier definitions: [`.governance/risk-tiers.yml`](https://github.com/rustchatio/rustchat/blob/main/.governance/risk-tiers.yml)
 - Protected paths: [`.governance/protected-paths.yml`](https://github.com/rustchatio/rustchat/blob/main/.governance/protected-paths.yml)

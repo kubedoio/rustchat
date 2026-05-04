@@ -42,6 +42,10 @@
 
 <!-- 3–5 lines: what was decided and why. -->
 
+## DCO Sign-off
+
+- [ ] I signed off my commits with `git commit -s`
+
 ## Agent-generated
 
 - [ ] Yes — `Generated-by: <agent-name>`, `Skill used: <skill-name>`

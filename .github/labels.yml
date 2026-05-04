@@ -1,0 +1,99 @@
+# RustChat Label Taxonomy
+#
+# This file defines all labels used in the repository.
+# To sync labels to GitHub, run the "Labels Sync" workflow manually,
+# or use the GitHub CLI:
+#   gh label create good-first-issue --color "2E9F4E" --description "Small, well-defined tasks for new contributors"
+#
+# See CONTRIBUTING.md for label usage guidelines.
+
+# Contributor onboarding
+- name: good-first-issue
+  color: "2E9F4E"
+  description: "Small, well-defined tasks for new contributors"
+
+- name: help-wanted
+  color: "7057FF"
+  description: "Valid issues where maintainer bandwidth is limited"
+
+# Type
+- name: type/bug
+  color: "D73A4A"
+  description: "Something is broken"
+
+- name: type/feature
+  color: "A2EEEF"
+  description: "New functionality request"
+
+- name: type/docs
+  color: "0075CA"
+  description: "Documentation improvement"
+
+- name: type/refactor
+  color: "C5DEF5"
+  description: "Code improvement or tech debt"
+
+- name: type/security
+  color: "D93F0B"
+  description: "Security hardening or vulnerability"
+
+# Area
+- name: area/backend
+  color: "0E8A16"
+  description: "Rust backend code"
+
+- name: area/frontend
+  color: "1D76DB"
+  description: "Vue/TypeScript frontend code"
+
+- name: area/ci
+  color: "F9D0C4"
+  description: "CI/CD, workflows, automation"
+
+- name: area/docs
+  color: "FEF2C0"
+  description: "Documentation content"
+
+- name: area/compat
+  color: "BFD4F2"
+  description: "Mattermost API compatibility"
+
+- name: area/push-proxy
+  color: "D4C5F9"
+  description: "Mobile push notification gateway"
+
+# Risk
+- name: risk/low
+  color: "8BC34A"
+  description: "Safe change with limited blast radius"
+
+- name: risk/medium
+  color: "FFC107"
+  description: "Moderate risk; review carefully"
+
+- name: risk/high
+  color: "FF5722"
+  description: "High risk; requires extra scrutiny and testing"
+
+# Release
+- name: release-blocker
+  color: "B60205"
+  description: "Must be resolved before the next release"
+
+# Dependencies
+- name: dependencies
+  color: "0366D6"
+  description: "Dependency update"
+
+# Triage
+- name: duplicate
+  color: "CCCCCC"
+  description: "Duplicate of another issue"
+
+- name: invalid
+  color: "CCCCCC"
+  description: "Not a valid issue"
+
+- name: wontfix
+  color: "CCCCCC"
+  description: "Won't be fixed"

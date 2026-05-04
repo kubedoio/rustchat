@@ -2,17 +2,57 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-Dwarnings"
 
 jobs:
-  test:
-    name: Test
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker }}
+      push-proxy: ${{ steps.filter.outputs.push-proxy }}
+      scripts: ${{ steps.filter.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+              - 'docker/backend.Dockerfile'
+              - 'docker/backend.Dockerfile.*'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+              - 'docker/frontend.Dockerfile'
+            docker:
+              - 'docker/**'
+              - 'docker-compose.yml'
+              - 'push-proxy/Dockerfile'
+              - '.github/workflows/ci.yml'
+            push-proxy:
+              - 'push-proxy/**'
+              - '.github/workflows/ci.yml'
+            scripts:
+              - 'scripts/**'
+
+  backend-check:
+    name: Backend Check
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
     runs-on: ubuntu-latest
 
     services:
@@ -43,13 +83,25 @@ jobs:
       rustfs:
         image: rustfs/rustfs:latest
         env:
-          RUSTFS_ACCESS_KEY: minioadmin
-          RUSTFS_SECRET_KEY: minioadmin
+          RUSTFS_ACCESS_KEY: testaccesskey
+          RUSTFS_SECRET_KEY: testsecretkey
         ports:
           - 9000:9000
 
+    env:
+      DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
+      RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
+      RUSTCHAT_TEST_REDIS_URL: redis://localhost:6379/
+      RUSTCHAT_S3_ENDPOINT: http://localhost:9000
+      RUSTCHAT_S3_BUCKET: test-bucket
+      RUSTCHAT_S3_ACCESS_KEY: testaccesskey
+      RUSTCHAT_S3_SECRET_KEY: testsecretkey
+      RUSTCHAT_S3_REGION: us-east-1
+      RUSTCHAT_JWT_SECRET: test-jwt-secret-min-32-chars-long
+      CARGO_TERM_COLOR: always
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -57,34 +109,48 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
 
-      - name: Install mold linker
-        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
-
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-v2-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Cache cargo index
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-v2-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('backend/Cargo.lock') }}
 
-      - name: Cache cargo build
-        uses: actions/cache@v4
+      - name: Cache cargo build target
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-v2-${{ hashFiles('**/Cargo.lock') }}
+          path: backend/target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('backend/Cargo.lock') }}
+
+      - name: Cache sqlx-cli
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cargo/bin/sqlx
+          key: ${{ runner.os }}-sqlx-cli-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Install SQLx CLI
-        run: cargo install sqlx-cli --no-default-features --features postgres
+        run: |
+          if ! command -v sqlx &> /dev/null; then
+            cargo install sqlx-cli --no-default-features --features postgres
+          fi
+
+      - name: Wait for RustFS
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:9000/health >/dev/null 2>&1; then
+              echo "RustFS is ready"
+              break
+            fi
+            sleep 1
+          done
 
       - name: Run migrations
         working-directory: ./backend
-        env:
-          DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
         run: sqlx migrate run
 
       - name: Check formatting
@@ -93,39 +159,71 @@ jobs:
 
       - name: Run clippy
         working-directory: ./backend
-        run: cargo clippy --all-targets --all-features
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Wait for RustFS (S3)
-        run: |
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:9000/health >/dev/null 2>&1; then
-              echo "RustFS ready"; break
-            fi
-            sleep 1
-          done
-
-      - name: Run tests
+      - name: Run unit tests
         working-directory: ./backend
-        env:
-          DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
-          REDIS_URL: redis://localhost:6379/
-          RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
-          RUSTCHAT_TEST_REDIS_URL: redis://localhost:6379/
-          RUSTCHAT_S3_ENDPOINT: "http://localhost:9000"
-          RUSTCHAT_S3_BUCKET: "test-bucket"
-          RUSTCHAT_S3_ACCESS_KEY: "minioadmin"
-          RUSTCHAT_S3_SECRET_KEY: "minioadmin"
-          RUSTCHAT_S3_REGION: "us-east-1"
-        run: |
-          # Run only unit tests - skip integration tests that overload CI database
-          cargo test --lib
+        run: cargo test --lib --no-fail-fast -- --nocapture
 
-  build:
-    name: Build
+  frontend-check:
+    name: Frontend Check
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Validate dependency policy
+        run: npm run check:dependency-policy
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Apply dependency patches
+        run: npm run apply:dependency-patches
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Generate dependency inventory
+        run: npm run deps:inventory > dependency-inventory.json
+
+      - name: Upload dependency inventory
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: frontend-dependency-inventory
+          path: frontend/dependency-inventory.json
+          if-no-files-found: ignore
+
+  push-proxy-check:
+    name: Push Proxy Check
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: push-proxy
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -133,9 +231,177 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
 
-      - name: Install mold linker
-        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+      - name: Cache cargo registry
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('push-proxy/Cargo.lock') }}
 
-      - name: Build
+      - name: Cache cargo index
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('push-proxy/Cargo.lock') }}
+
+      - name: Cache cargo build target
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: push-proxy/target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('push-proxy/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --no-fail-fast -- --nocapture
+
+      - name: Build release
+        run: cargo build --release
+
+  docker-validate:
+    name: Docker Validate
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.docker == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Create dummy .env for docker compose validation
+        run: |
+          cat > .env <<'EOF'
+RUSTCHAT_JWT_SECRET=dummy-jwt-secret-min-32-chars-long
+RUSTCHAT_JWT_ISSUER=dummy-issuer
+RUSTCHAT_JWT_AUDIENCE=dummy-audience
+RUSTCHAT_ENCRYPTION_KEY=dummy-encryption-key-32-bytes-long
+RUSTCHAT_S3_ACCESS_KEY=dummy-s3-access-key
+RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key
+RUSTFS_ACCESS_KEY=dummy-rustfs-access-key
+RUSTFS_SECRET_KEY=dummy-rustfs-secret-key
+EOF
+
+      - name: Validate docker-compose.yml
+        run: docker compose config
+
+      - name: Dry-run backend Docker build
+        run: docker build -f docker/backend.Dockerfile --target builder backend/
+
+      - name: Dry-run frontend Docker build
+        run: docker build -f docker/frontend.Dockerfile frontend/
+
+      - name: Dry-run push-proxy Docker build
+        run: docker build -f push-proxy/Dockerfile push-proxy/
+
+  build-release:
+    name: Build Release
+    needs: backend-check
+    if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
+    runs-on: ubuntu-latest
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
+
+      - name: Cache cargo build target
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: backend/target
+          key: ${{ runner.os }}-cargo-release-target-${{ hashFiles('backend/Cargo.lock') }}
+
+      - name: Build backend release
         working-directory: ./backend
         run: cargo build --release
+
+  # ============ Required Status Check Aggregators ============
+  # These jobs always run to satisfy branch protection rules that expect
+  # the legacy status check names from the old workflow structure.
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [detect-changes, backend-check, frontend-check, push-proxy-check]
+    if: always()
+    steps:
+      - name: Fail if change detection failed
+        if: needs.detect-changes.result == 'failure'
+        run: echo "Change detection failed" >&2 && exit 1
+
+      - name: Report skipped tests
+        if: needs.detect-changes.outputs.backend != 'true' && needs.detect-changes.outputs.frontend != 'true' && needs.detect-changes.outputs.push-proxy != 'true'
+        run: echo "No code changes detected; tests skipped."
+
+      - name: Require test success
+        if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.push-proxy == 'true'
+        run: |
+          for job in backend-check frontend-check push-proxy-check; do
+            result="${{ needs[job].result }}"
+            echo "$job result: $result"
+            if [ "$result" = "failure" ]; then
+              echo "$job failed" >&2
+              exit 1
+            fi
+          done
+          echo "All tests passed."
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [detect-changes, backend-check, build-release]
+    if: always()
+    steps:
+      - name: Fail if change detection failed
+        if: needs.detect-changes.result == 'failure'
+        run: echo "Change detection failed" >&2 && exit 1
+
+      - name: Report skipped build
+        if: needs.detect-changes.outputs.backend != 'true' && needs.detect-changes.outputs.scripts != 'true'
+        run: echo "No backend changes detected; build skipped."
+
+      - name: Require build success
+        if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true'
+        run: |
+          backend_result="${{ needs['backend-check'].result }}"
+          build_result="${{ needs['build-release'].result }}"
+          echo "backend-check result: $backend_result"
+          echo "build-release result: $build_result"
+          if [ "$backend_result" = "failure" ] || [ "$build_result" = "failure" ]; then
+            echo "Build pipeline failed" >&2
+            exit 1
+          fi
+          echo "Build passed."
+
+  cargo-check-test:
+    name: cargo check + test
+    runs-on: ubuntu-latest
+    needs: [detect-changes, backend-check]
+    if: always()
+    steps:
+      - name: Fail if change detection failed
+        if: needs.detect-changes.result == 'failure'
+        run: echo "Change detection failed" >&2 && exit 1
+
+      - name: Report skipped backend check
+        if: needs.detect-changes.outputs.backend != 'true' && needs.detect-changes.outputs.scripts != 'true'
+        run: echo "No backend changes detected; cargo check + test skipped."
+
+      - name: Require backend check success
+        if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true'
+        run: |
+          result="${{ needs['backend-check'].result }}"
+          echo "backend-check result: $result"
+          if [ "$result" = "failure" ]; then
+            echo "Backend check failed" >&2
+            exit 1
+          fi
+          echo "cargo check + test passed."

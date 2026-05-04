@@ -28,9 +28,11 @@ These tests start real HTTP servers against a real database and assert on full r
 **Required environment:**
 ```bash
 export RUSTCHAT_TEST_DATABASE_URL=postgres://user:pass@localhost/rustchat_test
-export REDIS_URL=redis://localhost:6379
-export S3_ENDPOINT=http://localhost:9000
-export S3_BUCKET=rustchat-test
+export RUSTCHAT_TEST_REDIS_URL=redis://localhost:6379
+export RUSTCHAT_TEST_S3_ENDPOINT=http://localhost:9000
+export RUSTCHAT_TEST_S3_ACCESS_KEY=testaccesskey
+export RUSTCHAT_TEST_S3_SECRET_KEY=testsecretkey
+export RUSTCHAT_TEST_S3_BUCKET=rustchat-test
 ```
 
 **Run all integration tests:**
@@ -100,7 +102,7 @@ After updating snapshots, commit the new baseline files in `frontend/e2e/`.
 
 ## 4. Frontend Build Check
 
-The frontend CI (`frontend-ci.yml`) runs `npm run build` as a build-time type check. There is no separate unit/component test framework configured.
+The frontend CI (`ci.yml`) runs `npm run build` as a build-time type check. There is no separate unit/component test framework configured.
 
 ```bash
 cd frontend
@@ -113,14 +115,17 @@ Expected: exits 0 with no TypeScript errors.
 
 ## 5. CI Gates
 
-| Workflow | What it runs | Required to merge |
-|---|---|---|
-| `backend-ci.yml` | `cargo check`, `cargo clippy`, `cargo test --lib`, `cargo build` | Yes |
-| `ci.yml` | `cargo fmt`, `cargo clippy --all-targets`, `cargo test`, `cargo build` | Yes |
-| `compat.yml` | OpenAPI diff report against Mattermost v4 spec | Informational (not blocking) |
-| `frontend-ci.yml` | `npm run build`, Playwright snapshot tests | Yes |
-| `docker-publish.yml` | Multi-arch Docker build + push to GHCR | On tag push only |
-| `release.yml` | Changelog generation + GitHub Release | On `v*` tag push only |
+| Workflow | What it runs | Required to merge | Triggers |
+|---|---|---|---|
+| `ci.yml` | `cargo fmt`, `cargo clippy`, `cargo test --lib`, `cargo build`, frontend install/build/test, Docker validation | Yes | PR + push to `main` |
+| `security.yml` | CodeQL, cargo audit, cargo deny, npm audit, dependency review | Yes | PR + push to `main` + weekly |
+| `compat.yml` | OpenAPI diff report against Mattermost v4 spec | Informational (not blocking) | PR + push to `main` |
+| `dco.yml` | DCO sign-off verification | Yes | PR + push to `main` |
+| `integration.yml` | Full backend integration tests (~170 tests) with live DB/Redis/S3 | No (post-merge + nightly) | Push to `main` + nightly schedule + manual |
+| `docker-publish.yml` | Multi-arch Docker build + push to GHCR | N/A | Push to `main` and tag push |
+| `release.yml` | Changelog generation + GitHub Release + container images | N/A | `v*` tag push only |
+
+**Why integration tests are not required on PRs:** The full integration test suite takes several minutes and requires live infrastructure. PRs run `cargo test --lib` (unit tests) for fast feedback. Integration tests run automatically after merge to `main` and on the nightly schedule to catch regressions without slowing down the contribution flow.
 
 ---
 
@@ -140,23 +145,52 @@ For elevated changes to the compat surface: compat contract tests must pass. For
 
 ## 7. Running the Full Test Suite Locally
 
-```bash
-# 1. Start infrastructure (requires Docker)
-docker compose up -d postgres redis minio
+### Fast checks (no infrastructure needed)
 
-# 2. Backend integration tests
+```bash
+# Backend unit tests
+cd backend && cargo test --lib
+
+# Backend formatting + linting
+cd backend && cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings
+
+# Frontend build check
+cd frontend && npm ci --ignore-scripts && npm run apply:dependency-patches && npm run build
+```
+
+### Integration tests (requires Docker)
+
+```bash
+# 1. Start test infrastructure
+docker compose -f docker-compose.integration.yml up -d
+
+# 2. Wait for services (or use your own wait tool)
+# PostgreSQL on localhost:55432
+# Redis on localhost:56379
+# S3 (RustFS) on localhost:59000
+
+# 3. Run backend integration tests
 cd backend
-RUSTCHAT_TEST_DATABASE_URL=postgres://rustchat:rustchat@localhost/rustchat_test \
-REDIS_URL=redis://localhost:6379 \
+export RUSTCHAT_TEST_DATABASE_URL=postgres://rustchat:rustchat@127.0.0.1:55432/rustchat
+export RUSTCHAT_TEST_REDIS_URL=redis://127.0.0.1:56379/
+export RUSTCHAT_TEST_S3_ENDPOINT=http://127.0.0.1:59000
+export RUSTCHAT_TEST_S3_ACCESS_KEY=testaccesskey
+export RUSTCHAT_TEST_S3_SECRET_KEY=testsecretkey
+export RUSTCHAT_TEST_S3_BUCKET=test-bucket
 cargo test --no-fail-fast
 
-# 3. Frontend build check
-cd frontend
-npm run build
+# 4. Clean up
+docker compose -f docker-compose.integration.yml down -v
+```
 
-# 4. E2E tests (requires full stack running)
+### E2E tests (requires full stack running)
+
+```bash
+# Start the full application first:
+#   docker compose up -d --build
+# Then run Playwright:
 cd frontend
 npx playwright test
 ```
 
-For environment setup details see `docs/running_environment.md`.
+For environment setup details see `docs/development/development.md`.

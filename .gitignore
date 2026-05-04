@@ -1,69 +1,164 @@
+# =============================================================================
+# RustChat .gitignore
+# =============================================================================
+
+# -----------------------------------------------------------------------------
 # Build artifacts
+# -----------------------------------------------------------------------------
+
+# Rust
 target/
 debug/
 release/
+*.rlib
+*.rmeta
+*.d
 
-# Claude Code
+# Node.js / Frontend
+node_modules/
+.pnpm-store/
+.yarn/cache
+.pnp.*
+frontend/dist/
+frontend/coverage/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# -----------------------------------------------------------------------------
+# AI and internal tooling
+# -----------------------------------------------------------------------------
+
 .claude/
-
-#AI
-previous-analyses/
-skills-lock.json
 .codex/
-.agents/*
-!.agents/skills/
-.agents/skills/*
-!.agents/skills/mm-endpoint-contract-parity/
-!.agents/skills/mm-websocket-calls-parity/
-!.agents/skills/mm-mobile-journey-parity/
-!.agents/skills/production-readiness-gate/
-.agents/skills/*/*
-!.agents/skills/mm-endpoint-contract-parity/SKILL.md
-!.agents/skills/mm-websocket-calls-parity/SKILL.md
-!.agents/skills/mm-mobile-journey-parity/SKILL.md
-!.agents/skills/production-readiness-gate/SKILL.md
+.kimi/
+.specify/
+.agents/
 .agent.workflows/
 .agent.history/
 .agent.cache/
 
-# IDE
+previous-analyses/*
+!previous-analyses/_TEMPLATE/
+!previous-analyses/_TEMPLATE/**
+
+skills-lock.json
+
+# -----------------------------------------------------------------------------
+# Internal QA artifacts and archives (not for public repo)
+# -----------------------------------------------------------------------------
+
+checklists/
+archive/
+
+# -----------------------------------------------------------------------------
+# IDE and editors
+# -----------------------------------------------------------------------------
+
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+*.sublime-*
+*.code-workspace
+.cursor/
+.history/
+.nova/
+*.iml
 
-# Environment
+# -----------------------------------------------------------------------------
+# Environment and secrets
+# -----------------------------------------------------------------------------
+
 .env
 .env.local
 .env.*.local
 .env-old-*
 
-# OS
+secrets/
+
+# -----------------------------------------------------------------------------
+# OS files
+# -----------------------------------------------------------------------------
+
 .DS_Store
 Thumbs.db
+desktop.ini
 
+# -----------------------------------------------------------------------------
 # Logs
+# -----------------------------------------------------------------------------
+
 *.log
 logs/
 
-# mattermost
-mattermost-mobile
+# -----------------------------------------------------------------------------
+# Test and coverage artifacts
+# -----------------------------------------------------------------------------
 
-# secrets
-secrets/
-
-# Test coverage
 *.gcno
 *.gcda
 coverage/
-
-# Playwright (at root level)
 test-results/
 playwright-report/
 blob-report/
+frontend/test-results/
+frontend/playwright-report/
 
+# -----------------------------------------------------------------------------
+# Package manager and build caches
+# -----------------------------------------------------------------------------
+
+.eslintcache
+.stylelintcache
+.prettiercache
+*.tsbuildinfo
+.turbo/
+.cache/
+
+# -----------------------------------------------------------------------------
+# Docker and deployment
+# -----------------------------------------------------------------------------
+
+docker/*.Dockerfile.local
+docker-compose.override.yml
+
+# -----------------------------------------------------------------------------
+# Mattermost (local compatibility checkout)
+# -----------------------------------------------------------------------------
+
+mattermost-mobile
+
+# -----------------------------------------------------------------------------
+# Process IDs and temporary files
+# -----------------------------------------------------------------------------
+
+*.pid
+*.pid.lock
+*.tmp
+*.temp
+
+# -----------------------------------------------------------------------------
+# Cargo worktrees and sccache
+# -----------------------------------------------------------------------------
+
+.worktrees/
+.sccache/
+.gstack/
+
+# -----------------------------------------------------------------------------
+# Patch and diff files
+# -----------------------------------------------------------------------------
+
+*.orig
+*.rej
+*.patch
+*.diff
+
+# -----------------------------------------------------------------------------
 # Python
+# -----------------------------------------------------------------------------
+
 __pycache__/
 *.py[cod]
 *$py.class
@@ -71,33 +166,3 @@ __pycache__/
 venv/
 ENV/
 env/
-
-# Package managers
-node_modules/
-.pnpm-store/
-.yarn/cache
-.pnp.*
-docs/.vitepress/dist/
-docs/.vitepress/cache/
-
-# Cache files
-.eslintcache
-.stylelintcache
-.prettiercache
-*.tsbuildinfo
-
-# Process IDs
-*.pid
-*.pid.lock
-
-# Temporary files
-*.tmp
-*.temp
-.cache/
-
-# Cargo
-.worktrees/
-
-# sccache directory
-.sccache/
-.gstack/

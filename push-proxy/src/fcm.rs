@@ -56,7 +56,9 @@ pub struct FcmClient {
     client: reqwest::Client,
     project_id: String,
     authenticator: yup_oauth2::authenticator::Authenticator<
-        yup_oauth2::hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
+        yup_oauth2::hyper_rustls::HttpsConnector<
+            hyper_util::client::legacy::connect::HttpConnector,
+        >,
     >,
 }
 
@@ -78,13 +80,13 @@ impl FcmClient {
     /// Send a push notification via FCM
     pub async fn send(&self, payload: PushPayload) -> Result<(), FcmError> {
         info!(token_prefix = %&payload.token[..20.min(payload.token.len())], "Getting OAuth token for FCM");
-        
+
         let token = self
             .authenticator
             .token(&["https://www.googleapis.com/auth/cloud-platform"])
             .await
             .map_err(|e| FcmError::Internal(format!("Failed to get OAuth token: {}", e)))?;
-        
+
         info!("OAuth token obtained, building FCM message");
 
         let url = format!(
@@ -93,10 +95,12 @@ impl FcmClient {
         );
 
         let fcm_message = self.build_fcm_message(payload);
-        
+
         info!("FCM message built, sending to FCM API");
 
-        let response = self.client.post(&url)
+        let response = self
+            .client
+            .post(&url)
             .bearer_auth(token.token().unwrap_or_default())
             .json(&fcm_message)
             .send()
@@ -104,7 +108,7 @@ impl FcmClient {
 
         let status = response.status();
         info!(status = %status, "Received FCM API response");
-        
+
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             warn!(status = %status, body = %body, "FCM API error");
@@ -145,13 +149,20 @@ impl FcmClient {
 
         // Build APNS config for iOS (used as fallback when APNS client is not configured)
         let mut apns_headers = serde_json::Map::new();
-        apns_headers.insert("apns-priority".to_string(), if is_call { 
-            serde_json::json!("10") 
-        } else { 
-            serde_json::json!("5") 
-        });
+        apns_headers.insert(
+            "apns-priority".to_string(),
+            if is_call {
+                serde_json::json!("10")
+            } else {
+                serde_json::json!("5")
+            },
+        );
 
-        let apns_sound = if is_call { "calls_ringtone.caf" } else { "default" };
+        let apns_sound = if is_call {
+            "calls_ringtone.caf"
+        } else {
+            "default"
+        };
         let apns_config = serde_json::json!({
             "headers": apns_headers,
             "payload": {

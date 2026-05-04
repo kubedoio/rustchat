@@ -1,0 +1,48 @@
+# Minimal cargo-deny configuration for RustChat backend
+# Run: cargo deny check
+
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+]
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+    # RUSTSEC-2023-0071: Marvin Attack in rsa crate (timing sidechannel).
+    # jsonwebtoken depends on rsa 0.9; no fixed upgrade is available upstream.
+    # Severity: medium (5.9). JWT verification with trusted OIDC keys is not
+    # exposed to network timing observation.
+    "RUSTSEC-2023-0071",
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "OpenSSL",
+    "Zlib",
+    "0BSD",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

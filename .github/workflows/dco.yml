@@ -1,0 +1,50 @@
+name: DCO
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dco-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Check DCO sign-off
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          if [[ -z "${base}" || "${base}" == "0000000000000000000000000000000000000000" ]]; then
+            echo "No comparable base SHA found; skipping DCO check."
+            exit 0
+          fi
+
+          commits_missing_signoff=0
+          while IFS= read -r commit; do
+            if ! git log -1 --format="%B" "${commit}" | grep -q "^Signed-off-by:"; then
+              echo "::error::Commit ${commit} is missing DCO sign-off."
+              git log -1 --oneline "${commit}"
+              commits_missing_signoff=$((commits_missing_signoff + 1))
+            fi
+          done < <(git rev-list "${base}..${head}")
+
+          if [[ "${commits_missing_signoff}" -gt 0 ]]; then
+            echo "::error::${commits_missing_signoff} commit(s) missing DCO sign-off. Run: git rebase --signoff ${base}"
+            exit 1
+          fi
+
+          echo "All commits have DCO sign-off."

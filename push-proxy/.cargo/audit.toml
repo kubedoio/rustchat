@@ -1,0 +1,6 @@
+[advisories]
+# RUSTSEC-2023-0071: Marvin Attack in rsa crate (timing sidechannel).
+# jsonwebtoken depends on rsa 0.9; no fixed upgrade is available upstream.
+# Severity: medium (5.9). Local use and JWT verification with trusted keys
+# is not exposed to network timing observation.
+ignore = ["RUSTSEC-2023-0071"]

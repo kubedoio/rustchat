@@ -1,9 +1,0 @@
-- Status: Superseded.
-- This plan proposed a mobile-user-agent specific keep-online policy.
-- Final implementation moved to a stricter Mattermost-style conservative policy:
-  - preserve manual status on disconnect,
-  - set offline only when global connection count is zero,
-  - use Redis-backed connection tracking across nodes,
-  - avoid forced offline when global count lookup fails.
-- See authoritative gap/verification file:
-  - `/Users/scolak/Projects/rustchat/previous-analyses/2026-02-17-mattermost-background-presence-insights/GAP_PLAN.md`.

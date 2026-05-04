@@ -35,7 +35,7 @@ All paths not listed below are owned by `@senolcolak` (catchall).
 | `docker/**` | `@senolcolak` | none | standard |
 | `scripts/**` | `@senolcolak` | none | standard |
 | `docs/**` | `@senolcolak` | `compat-agent` (specs/plans only) | standard |
-| `AGENTS.md` | `@senolcolak` | none | standard |
+| `docs/internal/AGENTS.md` | `@senolcolak` | none | standard |
 | `*` (everything else) | `@senolcolak` | — | standard |
 
 ---

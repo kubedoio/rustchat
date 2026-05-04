@@ -26,17 +26,15 @@ services:
       retries: 20
 
   test-s3:
-    image: minio/minio:latest
+    image: rustfs/rustfs@sha256:103dd40b84d5aa3d5ab02f3a693797eb1d14cb842554b222dfbb589f364aa47f
     container_name: rustchat-test-s3
-    command: server /data --address ":9000" --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      RUSTFS_ACCESS_KEY: testaccesskey
+      RUSTFS_SECRET_KEY: testsecretkey
     ports:
       - "59000:9000"
-      - "59001:9001"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 5s
       timeout: 5s
       retries: 20

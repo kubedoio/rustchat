@@ -304,7 +304,7 @@ mod tests {
     #[test]
     fn normalizes_internal_presigned_avatar_urls_to_stable_path() {
         let user_id = Uuid::parse_str("545a19ad-35e4-4cb6-85d6-8b6fc9b09b50").unwrap();
-        let presigned = "https://s3.rustchat.io/rustchat-uploads/files/545a19ad-35e4-4cb6-85d6-8b6fc9b09b50/9e0472c0-de97-4b1a-a2cc-b3b929f53f16.jpg?x-id=GetObject&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260401T232501Z";
+        let presigned = "https://s3.example.com/rustchat-uploads/files/545a19ad-35e4-4cb6-85d6-8b6fc9b09b50/9e0472c0-de97-4b1a-a2cc-b3b929f53f16.jpg?x-id=GetObject&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260401T232501Z";
 
         assert_eq!(
             normalize_avatar_url(user_id, Some(presigned)),
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn extracts_legacy_avatar_key_from_presigned_url() {
         let user_id = Uuid::parse_str("545a19ad-35e4-4cb6-85d6-8b6fc9b09b50").unwrap();
-        let presigned = "https://s3.rustchat.io/rustchat-uploads/files/545a19ad-35e4-4cb6-85d6-8b6fc9b09b50/9e0472c0-de97-4b1a-a2cc-b3b929f53f16.jpg?x-id=GetObject&X-Amz-Algorithm=AWS4-HMAC-SHA256";
+        let presigned = "https://s3.example.com/rustchat-uploads/files/545a19ad-35e4-4cb6-85d6-8b6fc9b09b50/9e0472c0-de97-4b1a-a2cc-b3b929f53f16.jpg?x-id=GetObject&X-Amz-Algorithm=AWS4-HMAC-SHA256";
 
         assert_eq!(
             legacy_avatar_key_from_url(user_id, presigned),

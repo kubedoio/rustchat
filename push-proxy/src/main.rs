@@ -23,7 +23,12 @@
 mod apns;
 mod fcm;
 
-use axum::{extract::State, http::{HeaderMap, StatusCode}, routing::post, Json, Router};
+use axum::{
+    Json, Router,
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    routing::post,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -114,7 +119,9 @@ async fn main() -> anyhow::Result<()> {
     // Initialize APNS client (iOS VoIP)
     let apns_client = init_apns_client().await?;
 
-    let auth_key = std::env::var("PUSH_PROXY_AUTH_KEY").ok().filter(|s| !s.is_empty());
+    let auth_key = std::env::var("PUSH_PROXY_AUTH_KEY")
+        .ok()
+        .filter(|s| !s.is_empty());
 
     let state = Arc::new(AppState {
         fcm_client,
@@ -477,7 +484,9 @@ async fn send_fcm_push(
             ))
         }
         Err(fcm::FcmError::Api(ref s)) if s.contains("SENDER_ID_MISMATCH") => {
-            warn!("FCM token Sender ID mismatch - token was registered with a different Firebase project");
+            warn!(
+                "FCM token Sender ID mismatch - token was registered with a different Firebase project"
+            );
             Err((
                 StatusCode::GONE,
                 Json(PushResponse {

@@ -193,7 +193,6 @@ pub struct ChecklistWithTasks {
 /// Run with task statuses for dashboard
 #[derive(Debug, Clone, Serialize)]
 pub struct RunWithTasks {
-    #[serde(flatten)]
     pub run: PlaybookRun,
     pub tasks: Vec<RunTask>,
     pub progress: RunProgress,

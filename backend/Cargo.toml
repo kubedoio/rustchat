@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.92"
 authors = ["rustchat contributors"]
 description = "Self-hosted, enterprise-ready team collaboration platform"
-license = "MIT"
+license = "Apache-2.0"
 repository = "https://github.com/rustchat/rustchat"
 
 [dependencies]
@@ -62,7 +62,7 @@ async-trait = "0.1"
 handlebars = "5.1"
 
 # S3 Storage
-aws-sdk-s3 = { version = "1.127", features = ["behavior-version-latest"] }
+aws-sdk-s3 = { version = "1.127", default-features = false, features = ["behavior-version-latest", "sigv4a", "http-1x", "default-https-client", "rt-tokio"] }
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 
 # File handling

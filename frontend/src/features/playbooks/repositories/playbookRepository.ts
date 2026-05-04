@@ -83,7 +83,7 @@ export const playbookRepository = {
   },
 
   // Update run task
-  async updateTask(taskId: string, status: string): Promise<void> {
-    await withRetry(() => playbooksApi.updateTask(taskId, { status }))
+  async updateRunTask(runId: string, taskId: string, status: string): Promise<void> {
+    await withRetry(() => playbooksApi.updateRunTask(runId, taskId, { status }))
   }
 }

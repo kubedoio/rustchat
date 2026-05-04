@@ -171,17 +171,17 @@ mod tests {
     fn test_static_credentials() {
         let config = TurnServerConfig {
             enabled: true,
-            url: "turn:turn.kubedo.io:3478".to_string(),
-            username: "PtU7Uv7NdR2YcBJMC5n6EdfGoFhXLp".to_string(),
-            credential: "axY1ofBashEbJat9".to_string(),
+            url: "turn:turn.example.com:3478".to_string(),
+            username: "test-user".to_string(),
+            credential: "test-password".to_string(),
         };
 
         let generator = TurnCredentialGenerator::with_static_credentials(config);
         let creds = generator.generate_credentials("user-123");
 
         // Should return static credentials
-        assert_eq!(creds.username, "PtU7Uv7NdR2YcBJMC5n6EdfGoFhXLp");
-        assert_eq!(creds.credential, "axY1ofBashEbJat9");
+        assert_eq!(creds.username, "test-user");
+        assert_eq!(creds.credential, "test-password");
         assert!(generator.is_using_static_credentials());
     }
 

@@ -5,7 +5,7 @@ This guide covers backing up and restoring RustChat data.
 ## What to Back Up
 
 1. **PostgreSQL Database** - All application data
-2. **S3/MinIO File Storage** - User uploads
+2. **S3-compatible File Storage (RustFS)** - User uploads
 3. **Configuration** - Environment variables, secrets
 
 ## Database Backup
@@ -58,16 +58,14 @@ gzip backup_*.sql
 
 ## File Storage Backup
 
-### S3/MinIO Backup
+### S3-compatible Backup (RustFS)
 
-If using MinIO:
+If using RustFS or another S3-compatible store:
 
 ```bash
 # Mirror bucket to backup location
-mc mirror rustchat/rustchat-files /backups/rustchat-files
-
-# Or use rclone
-rclone sync minio:rustchat-files /backups/rustchat-files
+# Using rclone with an S3 remote configured for RustFS
+rclone sync s3:rustchat-files /backups/rustchat-files
 ```
 
 ### AWS S3 Backup
@@ -106,10 +104,8 @@ docker compose start backend
 
 ```bash
 # Restore from backup
-mc mirror /backups/rustchat-files rustchat/rustchat-files
-
-# Or with rclone
-rclone sync /backups/rustchat-files minio:rustchat-files
+# Using rclone with an S3 remote configured for RustFS
+rclone sync /backups/rustchat-files s3:rustchat-files
 ```
 
 ## Disaster Recovery

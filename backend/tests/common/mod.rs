@@ -46,10 +46,10 @@ pub async fn spawn_app_with_config(config: Config) -> TestApp {
         .unwrap_or_else(|_| "http://localhost:9000".to_string());
     let s3_access_key = std::env::var("RUSTCHAT_TEST_S3_ACCESS_KEY")
         .or_else(|_| std::env::var("RUSTCHAT_S3_ACCESS_KEY"))
-        .unwrap_or_else(|_| "minioadmin".to_string());
+        .unwrap_or_else(|_| "testaccesskey".to_string());
     let s3_secret_key = std::env::var("RUSTCHAT_TEST_S3_SECRET_KEY")
         .or_else(|_| std::env::var("RUSTCHAT_S3_SECRET_KEY"))
-        .unwrap_or_else(|_| "minioadmin".to_string());
+        .unwrap_or_else(|_| "testsecretkey".to_string());
     let s3_bucket = std::env::var("RUSTCHAT_TEST_S3_BUCKET")
         .or_else(|_| std::env::var("RUSTCHAT_S3_BUCKET"))
         .unwrap_or_else(|_| "test-bucket".to_string());
@@ -124,8 +124,8 @@ pub fn test_config() -> Config {
         s3_endpoint: Some("http://localhost:9000".to_string()),
         s3_public_endpoint: None,
         s3_bucket: "test-bucket".to_string(),
-        s3_access_key: Some("minioadmin".to_string()),
-        s3_secret_key: Some("minioadmin".to_string()),
+        s3_access_key: Some("testaccesskey".to_string()),
+        s3_secret_key: Some("testsecretkey".to_string()),
         s3_region: "us-east-1".to_string(),
         admin_user: None,
         admin_password: None,
@@ -341,8 +341,8 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
         Some("http://localhost:9000".to_string()),
         None,
         "test-bucket".to_string(),
-        Some("minioadmin".to_string()),
-        Some("minioadmin".to_string()),
+        Some("testaccesskey".to_string()),
+        Some("testsecretkey".to_string()),
         "us-east-1".to_string(),
     );
 

@@ -325,11 +325,11 @@ fn default_calls_tcp_port() -> u16 {
 }
 
 fn default_turn_server_enabled() -> bool {
-    true // Enabled by default
+    false // Disabled by default; operators must explicitly enable and configure their own TURN server
 }
 
 fn default_turn_server_url() -> String {
-    "turn:turn.kubedo.io:3478".to_string()
+    String::new() // Empty by default; set to your own TURN server when enabled
 }
 
 fn default_turn_ttl() -> u64 {

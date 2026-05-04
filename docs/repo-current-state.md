@@ -33,7 +33,7 @@ Versioning follows semver. Releases are cut by pushing a `v*` tag — the `relea
 **External services required:**
 - PostgreSQL 16+ (port 5432)
 - Redis 7+ (port 6379)
-- S3-compatible storage (port 9000 for MinIO/RustFS)
+- S3-compatible storage (port 9000 for RustFS)
 
 For local setup see `docs/running_environment.md`.
 
@@ -83,7 +83,7 @@ git clone https://github.com/rustchatio/rustchat
 cd rustchat
 
 # Start infrastructure
-docker compose up -d postgres redis minio
+docker compose up -d postgres redis rustfs
 
 # Backend
 cd backend

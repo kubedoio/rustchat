@@ -86,7 +86,7 @@ Reference documentation.
 
 - [Main Repository](https://github.com/rustchatio/rustchat) — Source code and issues
 - [CHANGELOG](https://github.com/rustchatio/rustchat/blob/main/CHANGELOG.md) — Release history
-- [LICENSE](https://github.com/rustchatio/rustchat/blob/main/LICENSE) — MIT License
+- [LICENSE](https://github.com/rustchatio/rustchat/blob/main/LICENSE) — Apache-2.0 License
 
 ---
 

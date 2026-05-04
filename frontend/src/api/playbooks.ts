@@ -108,8 +108,6 @@ export interface RunProgress {
 }
 
 export interface RunWithTasks {
-    id: string // run id
-    // ... run fields
     run: PlaybookRun
     tasks: RunTask[]
     progress: RunProgress

@@ -118,7 +118,8 @@ pub struct ApnsClient {
     pub config: ApnsConfig,
     /// JWT authentication token
     auth_token: String,
-    /// Token expiration time
+    /// Token expiration time (intentionally kept for future refresh logic)
+    #[allow(dead_code)]
     token_expires_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -129,7 +130,7 @@ impl ApnsClient {
         let http_client = reqwest::Client::builder()
             .http2_prior_knowledge()
             .build()
-            .map_err(|e| ApnsError::Network(e))?;
+            .map_err(ApnsError::Network)?;
 
         // Generate initial JWT token
         let (auth_token, token_expires_at) = generate_jwt_token(&config).await?;
@@ -149,6 +150,7 @@ impl ApnsClient {
     }
 
     /// Get a valid JWT token (refreshing if necessary)
+    #[allow(dead_code)]
     fn get_auth_token(&mut self) -> Result<String, ApnsError> {
         let now = chrono::Utc::now();
 
@@ -314,7 +316,7 @@ fn is_invalid_token_reason(body: &str) -> bool {
 async fn generate_jwt_token(
     config: &ApnsConfig,
 ) -> Result<(String, chrono::DateTime<chrono::Utc>), ApnsError> {
-    use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+    use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 
     // Read the private key
     let key_content = tokio::fs::read_to_string(&config.key_path)

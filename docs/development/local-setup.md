@@ -1,12 +1,14 @@
 # Running the RustChat Environment
 
+> **Note:** For the comprehensive development guide (tools, commands, troubleshooting), see [Development Guide](../development.md). This page covers Docker-based setup specifically.
+
 RustChat is containerized using Docker Compose for easy setup and development. The environment includes:
 
 - **Backend**: Rust (Axum) API
 - **Frontend**: Vue 3 + Vite (Served via Nginx)
 - **Postgres**: Database
 - **Redis**: Caching
-- **MinIO**: S3-compatible object storage
+- **RustFS**: S3-compatible object storage
 - **Meilisearch**: (Optional) Full-text search engine
 
 ## Prerequisites
@@ -29,13 +31,13 @@ RustChat is containerized using Docker Compose for easy setup and development. T
     ```bash
     docker compose ps
     ```
-    All services (`backend`, `frontend`, `postgres`, `redis`, `minio`, `createbuckets`) should be `Up` (or `Exited (0)` for `createbuckets`).
+    All services (`backend`, `frontend`, `postgres`, `redis`, `rustfs`) should be `Up`.
 
 3.  **Access the Application:**
 
     - **Frontend:** [http://localhost:8080](http://localhost:8080)
     - **Backend API:** [http://localhost:3000](http://localhost:3000)
-    - **MinIO Console:** [http://localhost:9001](http://localhost:9001) (use your `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY`)
+    - **RustFS Console:** [http://localhost:9001](http://localhost:9001) (use your `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY`)
     - **Meilisearch:** [http://localhost:7700](http://localhost:7700) (if enabled)
 
 ## Development Mode
@@ -43,14 +45,14 @@ RustChat is containerized using Docker Compose for easy setup and development. T
 If you are actively developing code:
 
 ### Backend Development
-You can run the backend locally while keeping infrastructure services (DB, Redis, MinIO) in Docker.
+You can run the backend locally while keeping infrastructure services (DB, Redis, RustFS) in Docker.
 1.  Stop the `backend` container if running: `docker compose stop backend`
 2.  Run cargo locally:
     ```bash
     cd backend
     cargo run
     ```
-    *Note: Ensure your local `.env` file points to localhost ports for DB/Redis/MinIO.*
+    *Note: Ensure your local `.env` file points to localhost ports for DB/Redis/RustFS.*
 
 ### Frontend Development
 1.  Stop the `frontend` container if running: `docker compose stop frontend`
@@ -82,7 +84,7 @@ Recommended production settings:
 ## Troubleshooting
 
 - **Database Connection Errors:** Ensure the `postgres` container is healthy (`docker compose ps`).
-- **S3 Upload Failures:** Ensure the `createbuckets` service ran successfully. You can manually create the bucket in MinIO Console if needed.
+- **S3 Upload Failures:** The backend creates the upload bucket automatically on startup. If uploads still fail, check that the RustFS service is healthy and that the `RUSTFS_ACCESS_KEY` and `RUSTFS_SECRET_KEY` in `.env` match the `RUSTCHAT_S3_ACCESS_KEY` and `RUSTCHAT_S3_SECRET_KEY`.
 - **Rebuild:** If you change dependencies or Dockerfiles, force a rebuild:
     ```bash
     docker compose up --build -d
