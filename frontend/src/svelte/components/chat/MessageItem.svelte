@@ -9,8 +9,10 @@
 
   const dispatch = createEventDispatcher<{
     reply: string
+    thread: { messageId: string; channelId: string }
     edit: { id: string; content: string }
     delete: string
+    openProfile: string
   }>()
 
   let showActions = false
@@ -60,6 +62,13 @@
 
   function handleReply() {
     dispatch('reply', message.id)
+  }
+
+  function handleThreadClick() {
+    dispatch('thread', {
+      messageId: message.id,
+      channelId: message.channelId ?? message.channel_id ?? '',
+    })
   }
 
   function startEditing() {
@@ -145,7 +154,15 @@
     aria-label={`Message from ${authorName}`}
   >
     <!-- Avatar -->
-    <div data-testid="message-avatar" class="shrink-0 select-none mr-2 sm:mr-3 mt-0.5 cursor-pointer">
+    <div
+      data-testid="message-avatar"
+      class="shrink-0 select-none mr-2 sm:mr-3 mt-0.5 cursor-pointer"
+      on:click={() => message.user_id && dispatch('openProfile', message.user_id)}
+      role="button"
+      tabindex="0"
+      aria-label={`Open profile for ${authorName}`}
+      on:keydown={(e) => e.key === 'Enter' && message.user_id && dispatch('openProfile', message.user_id)}
+    >
       {#if message.avatarUrl}
         <img src={message.avatarUrl} alt={authorName} class="w-8 h-8 rounded-r-1 object-cover" />
       {:else}
@@ -158,7 +175,13 @@
     <div class="flex-1 min-w-0">
       <!-- Header -->
       <div class="flex items-baseline gap-1.5 flex-wrap">
-        <span class="font-semibold text-sm text-text-1 hover:underline cursor-pointer transition-colors hover:text-brand">
+        <span
+          class="font-semibold text-sm text-text-1 hover:underline cursor-pointer transition-colors hover:text-brand"
+          on:click={() => message.user_id && dispatch('openProfile', message.user_id)}
+          role="button"
+          tabindex="0"
+          on:keydown={(e) => e.key === 'Enter' && message.user_id && dispatch('openProfile', message.user_id)}
+        >
           {authorName}
         </span>
         {#if formatTime(timestamp)}
@@ -258,7 +281,8 @@
         {#if message.threadCount && message.threadCount > 0}
           <div class="mt-1.5">
             <button
-              on:click={handleReply}
+              data-testid="thread-count-button"
+              on:click={handleThreadClick}
               class="inline-flex items-center gap-2 px-2 py-1 rounded-r-1 hover:bg-brand/5 transition-standard border border-transparent hover:border-brand/20"
             >
               <MessageSquare class="w-3.5 h-3.5 text-brand" />

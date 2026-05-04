@@ -166,6 +166,7 @@
             <label for="email" class="block text-sm font-medium text-gray-700">Email address</label>
             <input
               id="email"
+              data-testid="login-username"
               name="email"
               type="email"
               autocomplete="email"
@@ -180,6 +181,7 @@
             <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
             <input
               id="password"
+              data-testid="login-password"
               name="password"
               type="password"
               autocomplete="current-password"
@@ -200,6 +202,7 @@
 
           <button
             type="submit"
+            data-testid="login-submit"
             disabled={loading}
             class="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-3 px-4 text-base font-medium text-white shadow-md transition-all duration-200 hover:bg-indigo-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >

@@ -1,6 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import type { ChatChannel, ChatMember, ChatTeam } from './types'
+  import { Hash, Lock } from 'lucide-svelte'
+  import type { ChatMember, ChatTeam } from './types'
+  import type { SvelteChatChannel } from '../../stores/chat'
+  import UserMenu from '../ui/UserMenu.svelte'
+
+  interface SidebarChannel extends SvelteChatChannel {
+    displayName?: string
+    unreadCount?: number
+  }
 
   export let teams: ChatTeam[] = [
     {
@@ -13,7 +21,7 @@
       ]
     }
   ]
-  export let channels: ChatChannel[] = []
+  export let channels: SidebarChannel[] = []
   export let activeChannelId = 'general'
   export let currentChannelId: string | null | undefined = activeChannelId
   export let members: ChatMember[] = [
@@ -23,7 +31,7 @@
   export let onSelectChannel: ((channelId: string) => void | Promise<void>) | undefined = undefined
 
   const dispatch = createEventDispatcher<{
-    selectChannel: ChatChannel
+    selectChannel: SidebarChannel
   }>()
 
   $: selectedChannelId = currentChannelId ?? activeChannelId
@@ -32,18 +40,64 @@
     return team.displayName ?? team.display_name ?? team.name
   }
 
-  function channelName(channel: ChatChannel) {
-    return channel.displayName ?? channel.display_name ?? channel.name
+  function channelDisplayName(channel: SidebarChannel) {
+    return channel.display_name ?? channel.displayName ?? channel.name
   }
 
-  function channelsForTeam(team: ChatTeam) {
-    if (team.channels?.length) return team.channels
+  function channelsForTeam(team: ChatTeam): SidebarChannel[] {
+    if (team.channels?.length) {
+      return team.channels as SidebarChannel[]
+    }
     return channels.filter((channel) => !channel.team_id || channel.team_id === team.id)
   }
 
-  function selectChannel(channel: ChatChannel) {
+  function regularChannelsForTeam(team: ChatTeam): SidebarChannel[] {
+    return channelsForTeam(team).filter((c) => c.channel_type !== 'direct' && c.channel_type !== 'group')
+  }
+
+  function dmChannelsForTeam(team: ChatTeam): SidebarChannel[] {
+    return channelsForTeam(team).filter((c) => c.channel_type === 'direct' || c.channel_type === 'group')
+  }
+
+  function selectChannel(channel: SidebarChannel) {
     void onSelectChannel?.(channel.id)
     dispatch('selectChannel', channel)
+  }
+
+  function getInitials(name: string) {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .filter(Boolean)
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  function presenceLabel(presence?: string | null): string {
+    switch (presence) {
+      case 'online':
+        return 'Online'
+      case 'away':
+        return 'Away'
+      case 'dnd':
+        return 'Do not disturb'
+      default:
+        return 'Offline'
+    }
+  }
+
+  function presenceDotClass(presence?: string | null): string {
+    switch (presence) {
+      case 'online':
+        return 'bg-emerald-400'
+      case 'away':
+        return 'bg-amber-400'
+      case 'dnd':
+        return 'bg-rose-400'
+      default:
+        return 'bg-slate-500'
+    }
   }
 </script>
 
@@ -58,20 +112,79 @@
       <section class="mb-5" aria-label={teamName(team)}>
         <h3 class="px-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{teamName(team)}</h3>
         <div class="mt-2 space-y-1">
-          {#each channelsForTeam(team) as channel (channel.id)}
+          <!-- Regular Channels -->
+          {#each regularChannelsForTeam(team) as channel (channel.id)}
             <button
               type="button"
+              data-testid="channel-sidebar-row"
               class={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${channel.id === selectedChannelId ? 'bg-white text-slate-950' : 'text-slate-200 hover:bg-white/10'}`}
               aria-current={channel.id === selectedChannelId ? 'page' : undefined}
               on:click={() => selectChannel(channel)}
             >
-              <span># {channelName(channel)}</span>
+              <span class="flex items-center gap-2">
+                {#if channel.channel_type === 'private'}
+                  <Lock class="w-3.5 h-3.5 shrink-0" />
+                {:else}
+                  <Hash class="w-4 h-4 shrink-0" />
+                {/if}
+                <span>{channelDisplayName(channel)}</span>
+              </span>
               {#if channel.unreadCount}
-                <span class="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-semibold text-white">{channel.unreadCount}</span>
+                <span data-testid="unread-badge" class="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-semibold text-white">{channel.unreadCount}</span>
               {/if}
             </button>
           {/each}
         </div>
+
+        <!-- Direct Messages -->
+        {#each [dmChannelsForTeam(team)] as dms}
+          {#if dms.length > 0}
+            <h4 class="mt-4 px-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Direct Messages</h4>
+            <div class="mt-2 space-y-1">
+              {#each dms as channel (channel.id)}
+                {@const isSelected = channel.id === selectedChannelId}
+                {@const placeholderPresence = 'online'}
+                {@const statusLabel = presenceLabel(placeholderPresence)}
+                {@const statusText = ''}
+                {@const statusEmoji = ''}
+                <button
+                  type="button"
+                  data-testid="dm-sidebar-row"
+                  class={`group flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${isSelected ? 'bg-white text-slate-950' : 'text-slate-200 hover:bg-white/10'}`}
+                  aria-current={isSelected ? 'page' : undefined}
+                  on:click={() => selectChannel(channel)}
+                >
+                  <span class="flex items-center gap-2 min-w-0">
+                    <span class="relative shrink-0">
+                      <div class="h-6 w-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-[10px] font-bold">
+                        {getInitials(channelDisplayName(channel))}
+                      </div>
+                      <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-slate-950 {presenceDotClass(placeholderPresence)}" aria-hidden="true"></span>
+                    </span>
+                    <span class="min-w-0 flex flex-col">
+                      <span class="truncate">{channelDisplayName(channel)}</span>
+                      <span
+                        data-testid="dm-sidebar-status"
+                        class="mt-0.5 block truncate text-[11px] {isSelected ? 'text-slate-600' : 'text-slate-400'}"
+                      >
+                        {#if statusText || statusEmoji}
+                          {#if statusEmoji}<span>{statusEmoji}</span>{/if}
+                          {#if statusEmoji && statusText}<span class="mx-1">·</span>{/if}
+                          {statusText || statusLabel}
+                        {:else}
+                          {statusLabel}
+                        {/if}
+                      </span>
+                    </span>
+                  </span>
+                  {#if channel.unreadCount}
+                    <span data-testid="unread-badge" class="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-semibold text-white shrink-0 ml-2">{channel.unreadCount}</span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        {/each}
       </section>
     {/each}
   </nav>
@@ -87,4 +200,8 @@
       {/each}
     </ul>
   </section>
+
+  <div class="border-t border-white/10 p-3">
+    <UserMenu />
+  </div>
 </aside>

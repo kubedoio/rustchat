@@ -5,9 +5,17 @@
   import ChannelInfoPanel from '../../components/chat/ChannelInfoPanel.svelte'
   import MessageComposer from '../../components/chat/MessageComposer.svelte'
   import MessageList from '../../components/chat/MessageList.svelte'
+  import UserProfileModal from '../../components/modals/UserProfileModal.svelte'
   import ConnectionStatusBar from '../../components/ui/ConnectionStatusBar.svelte'
+  import ConnectionLostModal from '../../components/ui/ConnectionLostModal.svelte'
+  import SettingsModal from '../../components/settings/SettingsModal.svelte'
+  import ThreadPanel from '../../components/thread/ThreadPanel.svelte'
+  import SearchModal from '../../components/search/SearchModal.svelte'
+  import QuickSwitcherModal from '../../components/search/QuickSwitcherModal.svelte'
   import { chatStore } from '../../stores/chat'
-  import { connectionStatus, registerWebSocketHandlers } from '../../stores/websocket'
+  import { uiStore } from '../../stores/ui'
+  import { quickSwitcherStore } from '../../stores/quickSwitcher'
+  import { connectionStatus, registerWebSocketHandlers, retryConnection } from '../../stores/websocket'
 
   const currentChannel = $derived(
     $chatStore.channels.find((channel) => channel.id === $chatStore.currentChannelId) ?? null,
@@ -35,6 +43,10 @@
   )
 
   let infoPanelOpen = $state(false)
+  let profileUserId = $state<string | null>(null)
+  let threadPanelOpen = $state(false)
+  let activeThreadId = $state<string | null>(null)
+  let searchOpen = $state(false)
 
   onMount(() => {
     void chatStore.bootstrap()
@@ -52,6 +64,23 @@
 
   function toggleInfoPanel() {
     infoPanelOpen = !infoPanelOpen
+  }
+
+  function handleThread(event: CustomEvent<{ messageId: string; channelId: string }>) {
+    activeThreadId = event.detail.messageId
+    threadPanelOpen = true
+  }
+
+  function handleQuickSelect(event: CustomEvent<{ id: string; type: string }>) {
+    const item = event.detail
+    if (item.type === 'channel' || item.type === 'dm') {
+      chatStore.selectChannel(item.id)
+    }
+    quickSwitcherStore.close()
+  }
+
+  function handleSearchClose() {
+    searchOpen = false
   }
 </script>
 
@@ -79,7 +108,7 @@
     {/if}
 
     <div data-testid="main-content" class="flex min-w-0 flex-1 flex-col transition-opacity duration-300 {contentOpacityClass}">
-      <MessageList messages={currentMessages} />
+      <MessageList messages={currentMessages} on:openProfile={(e) => { profileUserId = e.detail }} on:thread={handleThread} />
 
       {#if currentChannel}
         <MessageComposer
@@ -99,6 +128,48 @@
       members={currentMembers}
       open={infoPanelOpen}
       on:close={() => (infoPanelOpen = false)}
+    />
+  {/if}
+
+  {#if profileUserId}
+    <UserProfileModal
+      userId={profileUserId}
+      open={true}
+      on:close={() => (profileUserId = null)}
+      on:message={() => (profileUserId = null)}
+    />
+  {/if}
+
+  {#if $connectionStatus === 'failed'}
+    <ConnectionLostModal
+      open={true}
+      on:reconnect={() => retryConnection()}
+      on:refresh={() => window.location.reload()}
+    />
+  {/if}
+
+  {#if $uiStore.isSettingsOpen}
+    <SettingsModal open={true} on:close={uiStore.closeSettings} />
+  {/if}
+
+  {#if threadPanelOpen && activeThreadId}
+    <ThreadPanel
+      threadId={activeThreadId}
+      channelId={currentChannel?.id ?? null}
+      open={threadPanelOpen}
+      on:close={() => { threadPanelOpen = false; activeThreadId = null }}
+    />
+  {/if}
+
+  {#if searchOpen}
+    <SearchModal open={true} on:close={handleSearchClose} />
+  {/if}
+
+  {#if $quickSwitcherStore.open}
+    <QuickSwitcherModal
+      open={true}
+      on:close={quickSwitcherStore.close}
+      on:select={handleQuickSelect}
     />
   {/if}
 </main>

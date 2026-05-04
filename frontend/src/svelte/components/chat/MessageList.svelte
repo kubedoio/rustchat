@@ -51,6 +51,8 @@
           on:reply
           on:edit
           on:delete
+          on:openProfile
+          on:thread
         />
       {/each}
     </div>

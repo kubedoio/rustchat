@@ -29,6 +29,12 @@ export interface SvelteChatFile {
     height?: number
 }
 
+export interface SvelteChatReaction {
+    emoji: string
+    count: number
+    users: string[]
+}
+
 export interface SvelteChatPost {
     id: string
     channel_id: string
@@ -37,6 +43,12 @@ export interface SvelteChatPost {
     created_at: string
     files: SvelteChatFile[]
     client_msg_id?: string
+    username?: string
+    avatar_url?: string
+    reactions?: SvelteChatReaction[]
+    reply_count?: number
+    root_id?: string
+    parent_id?: string
 }
 
 export interface SvelteChatMember {
@@ -59,6 +71,8 @@ export interface SvelteChatState {
     messagesByChannel: Record<string, SvelteChatPost[]>
     membersByTeam: Record<string, SvelteChatMember[]>
     readStateByChannel: Record<string, SvelteChatReadState | null>
+    unreadCounts: Record<string, number>
+    threadsByParent: Record<string, SvelteChatPost[]>
     loading: boolean
     error: string | null
 }
@@ -82,6 +96,8 @@ const initialState: SvelteChatState = {
     messagesByChannel: {},
     membersByTeam: {},
     readStateByChannel: {},
+    unreadCounts: {},
+    threadsByParent: {},
     loading: false,
     error: null,
 }
@@ -123,6 +139,20 @@ function normalizeFiles(value: unknown): SvelteChatFile[] {
     }))
 }
 
+function normalizeReactions(value: unknown): SvelteChatReaction[] | undefined {
+    if (!Array.isArray(value)) {
+        return undefined
+    }
+
+    const reactions = value.filter(isRecord).map((r) => ({
+        emoji: stringField(r, 'emoji'),
+        count: typeof r.count === 'number' ? r.count : 0,
+        users: Array.isArray(r.users) ? r.users.filter((u: unknown): u is string => typeof u === 'string') : [],
+    }))
+
+    return reactions.length > 0 ? reactions : undefined
+}
+
 function normalizeTeam(value: unknown): SvelteChatTeam {
     const team = isRecord(value) ? value : {}
     const name = stringField(team, 'name')
@@ -158,6 +188,12 @@ function normalizePost(value: unknown, fallbackChannelId: string): SvelteChatPos
         created_at: stringField(post, 'created_at', new Date().toISOString()),
         files: normalizeFiles(post.files),
         client_msg_id: optionalStringField(post, 'client_msg_id'),
+        username: optionalStringField(post, 'username'),
+        avatar_url: optionalStringField(post, 'avatar_url'),
+        reactions: normalizeReactions(post.reactions),
+        reply_count: typeof post.reply_count === 'number' ? post.reply_count : undefined,
+        root_id: optionalStringField(post, 'root_id'),
+        parent_id: optionalStringField(post, 'parent_id'),
     }
 }
 
@@ -253,6 +289,22 @@ function createChatStore() {
         } catch (error) {
             update((state) => ({ ...state, loading: false, error: errorMessage(error, 'Failed to fetch members') }))
             throw error
+        }
+    }
+
+    async function fetchUnreadCounts(): Promise<void> {
+        try {
+            const { data } = await svelteApi.get<{
+                channels: Array<{ channel_id: string; unread_count: number; mention_count?: number }>
+                teams?: Array<{ team_id: string; unread_count: number }>
+            }>('/unreads/overview')
+            const unreadCounts: Record<string, number> = {}
+            data.channels.forEach((c) => {
+                unreadCounts[c.channel_id] = c.unread_count
+            })
+            update((state) => ({ ...state, unreadCounts }))
+        } catch (error) {
+            console.error('Failed to fetch unread counts:', error)
         }
     }
 
@@ -386,6 +438,75 @@ function createChatStore() {
         })
     }
 
+    async function fetchThreadReplies(threadId: string): Promise<SvelteChatPost[]> {
+        update((state) => ({ ...state, loading: true, error: null }))
+
+        try {
+            const { data } = await svelteApi.get<{
+                order: string[]
+                posts: Record<string, unknown>
+                next_cursor?: string
+            }>(`/posts/${threadId}/thread`)
+
+            const allPosts = data.order
+                .map((id) => (isRecord(data.posts[id]) ? data.posts[id] : null))
+                .filter((post): post is Record<string, unknown> => post !== null)
+
+            const channelId = allPosts[0] ? stringField(allPosts[0], 'channel_id') : ''
+            const replies = allPosts
+                .filter((post) => stringField(post, 'id') !== threadId)
+                .map((post) => normalizePost(post, channelId))
+
+            update((state) => ({
+                ...state,
+                threadsByParent: { ...state.threadsByParent, [threadId]: replies },
+                loading: false,
+            }))
+
+            return replies
+        } catch (error) {
+            update((state) => ({
+                ...state,
+                loading: false,
+                error: errorMessage(error, 'Failed to fetch thread replies'),
+            }))
+            throw error
+        }
+    }
+
+    async function sendThreadReply(threadId: string, channelId: string, message: string): Promise<SvelteChatPost> {
+        try {
+            const { data } = await svelteApi.post<unknown>('/posts', {
+                channel_id: channelId,
+                root_id: threadId,
+                parent_id: threadId,
+                message,
+                file_ids: [],
+            })
+            const post = normalizePost(data, channelId)
+            update((state) => {
+                const messages = state.messagesByChannel[channelId] ?? []
+                const updatedMessages = messages.map((msg) =>
+                    msg.id === threadId ? { ...msg, reply_count: (msg.reply_count ?? 0) + 1 } : msg,
+                )
+                return {
+                    ...state,
+                    messagesByChannel: { ...state.messagesByChannel, [channelId]: updatedMessages },
+                    threadsByParent: {
+                        ...state.threadsByParent,
+                        [threadId]: [...(state.threadsByParent[threadId] ?? []), post],
+                    },
+                    error: null,
+                }
+            })
+
+            return post
+        } catch (error) {
+            update((state) => ({ ...state, error: errorMessage(error, 'Failed to send thread reply') }))
+            throw error
+        }
+    }
+
     return {
         subscribe,
         update,
@@ -396,11 +517,14 @@ function createChatStore() {
         fetchMessages,
         sendMessage,
         fetchMembers,
+        fetchUnreadCounts,
         addLocalFileMessage,
         addMessage,
         updateMessage,
         deleteMessage,
         updateMemberPresence,
+        fetchThreadReplies,
+        sendThreadReply,
         reset: () => set(initialState),
     }
 }

@@ -10,7 +10,8 @@ let unsubscribeAuth: Unsubscriber | null = null
 let currentToken: string | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let statusTimer: ReturnType<typeof setTimeout> | null = null
-let countdownTimer: ReturnType<typeof setInterval> | null = null
+let failedTimer: ReturnType<typeof setTimeout> | null = null
+let hasBeenConnected = false
 
 export const connectionStatus = writable<ConnectionStatus>('connecting')
 
@@ -38,9 +39,9 @@ function clearTimers(): void {
         clearTimeout(statusTimer)
         statusTimer = null
     }
-    if (countdownTimer) {
-        clearInterval(countdownTimer)
-        countdownTimer = null
+    if (failedTimer) {
+        clearTimeout(failedTimer)
+        failedTimer = null
     }
 }
 
@@ -67,6 +68,11 @@ function scheduleReconnect(): void {
     statusTimer = setTimeout(() => {
         connectionStatus.set('disconnected')
     }, 5000)
+
+    // After 30s without reconnection → failed
+    failedTimer = setTimeout(() => {
+        connectionStatus.set('failed')
+    }, 30000)
 }
 
 function handleMessage(data: string): void {
@@ -127,6 +133,19 @@ function handleMessage(data: string): void {
                 }
                 break
             }
+            case 'unread_counts_updated': {
+                const unreadData = payload as { channel_id: string; team_id: string; unread_count: number }
+                if (unreadData.channel_id) {
+                    chatStore.update((state) => ({
+                        ...state,
+                        unreadCounts: {
+                            ...state.unreadCounts,
+                            [unreadData.channel_id]: unreadData.unread_count,
+                        },
+                    }))
+                }
+                break
+            }
             default:
                 break
         }
@@ -149,8 +168,18 @@ export function connect(token: string): void {
 
     nextSocket.onopen = () => {
         if (socket === nextSocket) {
+            const wasReconnecting = get(connectionStatus) === 'reconnecting'
             connectionStatus.set('connected')
             clearTimers()
+
+            if (wasReconnecting && hasBeenConnected) {
+                const currentChannelId = get(chatStore).currentChannelId
+                if (currentChannelId) {
+                    void chatStore.fetchMessages(currentChannelId)
+                }
+                void chatStore.fetchUnreadCounts()
+            }
+            hasBeenConnected = true
         }
     }
 
@@ -238,17 +267,11 @@ export function registerWebSocketHandlers(): () => void {
         )
     },
     simulateUnreadCounts: (counts: { channel_id: string; unread_count: number }) => {
-        // Simulate by updating the chat store read state directly for testing
-        chatStore.update((state) => ({
-            ...state,
-            readStateByChannel: {
-                ...state.readStateByChannel,
-                [counts.channel_id]: {
-                    ...state.readStateByChannel[counts.channel_id],
-                    last_read_message_id: null,
-                    first_unread_message_id: null,
-                },
-            },
-        }))
+        handleMessage(
+            JSON.stringify({
+                event: 'unread_counts_updated',
+                data: JSON.stringify(counts),
+            }),
+        )
     },
 }
