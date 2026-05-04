@@ -6,12 +6,14 @@
   import ForgotPasswordView from './views/auth/ForgotPasswordView.svelte'
   import ResetPasswordView from './views/auth/ResetPasswordView.svelte'
   import ChatView from './views/main/ChatView.svelte'
-  import { isAuthenticated } from './stores/auth'
+  import AdminConsole from './views/admin/AdminConsole.svelte'
+  import { authStore, isAuthenticated } from './stores/auth'
   import { chatStore } from './stores/chat'
 
   type Route = {
     component: Component
     requiresAuth?: boolean
+    requiresAdmin?: boolean
     params?: Record<string, string>
   }
 
@@ -24,9 +26,15 @@
     '/': { component: ChatView, requiresAuth: true },
   }
 
+  const adminRoles = new Set(['system_admin', 'org_admin', 'admin', 'administrator'])
+
   function matchRoute(path: string): Route {
     if (staticRoutes[path]) {
       return staticRoutes[path]
+    }
+
+    if (path === '/admin' || path.startsWith('/admin/')) {
+      return { component: AdminConsole, requiresAuth: true, requiresAdmin: true }
     }
 
     const channelMatch = path.match(/^\/channels\/([^/]+)$/)
@@ -42,6 +50,8 @@
   const currentRoute = $derived(matchRoute(path))
   const CurrentComponent = $derived(currentRoute.component)
   const signedIn = $derived($isAuthenticated)
+  const signedInUser = $derived($authStore.user)
+  const signedInUserIsAdmin = $derived(adminRoles.has(signedInUser?.role || ''))
 
   function navigate(nextPath: string) {
     if (window.location.pathname === nextPath) {
@@ -82,8 +92,20 @@
       return
     }
 
+    if (currentRoute.requiresAdmin) {
+      if (!signedInUser) {
+        return
+      }
+
+      if (!signedInUserIsAdmin) {
+        navigate('/')
+        return
+      }
+    }
+
     if ((path === '/login' || path === '/register') && signedIn) {
-      navigate('/')
+      const channelId = $chatStore.currentChannelId
+      navigate(channelId ? `/channels/${channelId}` : '/')
     }
   })
 

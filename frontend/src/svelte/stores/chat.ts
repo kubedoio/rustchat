@@ -16,6 +16,8 @@ export interface SvelteChatChannel {
     display_name: string
     team_id: string
     channel_type: SvelteChatChannelType
+    unreadCount?: number
+    mentionCount?: number
 }
 
 export interface SvelteChatFile {
@@ -174,6 +176,16 @@ function normalizeChannel(value: unknown): SvelteChatChannel {
         display_name: stringField(channel, 'display_name', name),
         team_id: stringField(channel, 'team_id'),
         channel_type: normalizeChannelType(channel.channel_type ?? channel.type),
+        unreadCount: typeof channel.unreadCount === 'number'
+            ? channel.unreadCount
+            : typeof channel.unread_count === 'number'
+                ? channel.unread_count
+                : undefined,
+        mentionCount: typeof channel.mentionCount === 'number'
+            ? channel.mentionCount
+            : typeof channel.mention_count === 'number'
+                ? channel.mention_count
+                : undefined,
     }
 }
 
@@ -302,7 +314,14 @@ function createChatStore() {
             data.channels.forEach((c) => {
                 unreadCounts[c.channel_id] = c.unread_count
             })
-            update((state) => ({ ...state, unreadCounts }))
+            update((state) => ({
+                ...state,
+                channels: state.channels.map((channel) => ({
+                    ...channel,
+                    unreadCount: unreadCounts[channel.id] ?? channel.unreadCount,
+                })),
+                unreadCounts,
+            }))
         } catch (error) {
             console.error('Failed to fetch unread counts:', error)
         }
@@ -330,7 +349,7 @@ function createChatStore() {
             if (channel?.team_id) {
                 await fetchMembers(channel.team_id)
             }
-            await fetchMessages(channelId)
+            await Promise.all([fetchMessages(channelId), fetchUnreadCounts()])
         }
     }
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { get } from 'svelte/store'
   import ChatSidebar from '../../components/chat/ChatSidebar.svelte'
   import ChannelHeader from '../../components/chat/ChannelHeader.svelte'
   import ChannelInfoPanel from '../../components/chat/ChannelInfoPanel.svelte'
@@ -26,7 +27,7 @@
   import { uiStore } from '../../stores/ui'
   import { quickSwitcherStore } from '../../stores/quickSwitcher'
   import { activityStore } from '../../stores/activity'
-  import { connectionStatus, registerWebSocketHandlers, retryConnection } from '../../stores/websocket'
+  import { connectionStatus, retryConnection } from '../../stores/websocket'
   import { callsStore, registerCallWebSocketHandlers } from '../../stores/calls.svelte'
 
   const currentChannel = $derived(
@@ -65,11 +66,19 @@
   let setStatusOpen = $state(false)
 
   onMount(() => {
-    void chatStore.bootstrap()
-    const cleanupWs = registerWebSocketHandlers()
+    void bootstrapChat()
     registerCallWebSocketHandlers()
-    return cleanupWs
   })
+
+  async function bootstrapChat() {
+    await chatStore.bootstrap()
+
+    const channelId = get(chatStore).currentChannelId
+    if (channelId && window.location.pathname === '/') {
+      window.history.replaceState({}, '', `/channels/${channelId}`)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }
+  }
 
   async function sendMessage(event: CustomEvent<{ content: string; file_ids?: string[] }>) {
     if (!currentChannel) {
@@ -105,6 +114,7 @@
   <ChatSidebar
     teams={$chatStore.teams}
     channels={$chatStore.channels}
+    unreadCounts={$chatStore.unreadCounts}
     currentChannelId={$chatStore.currentChannelId}
     onSelectChannel={(channelId) => chatStore.selectChannel(channelId)}
     on:createChannel={() => (createChannelOpen = true)}

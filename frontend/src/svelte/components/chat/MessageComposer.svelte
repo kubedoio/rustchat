@@ -28,12 +28,21 @@
   let emojiButtonEl: HTMLButtonElement | null = null
   let hydrated = false
   let previousChannelId = channelId
+  const emojiSuggestions = [
+    { shortcode: ':smile:', label: 'Smile', icon: ':)' },
+    { shortcode: ':smiley:', label: 'Smiley', icon: ':D' },
+  ]
 
   $: hasUploadedFiles = attachments.some((a) => a.fileId && !a.uploading)
   $: hasUploadInProgress = attachments.some((a) => a.uploading)
   $: canSend = (draft.trim().length > 0 || hasUploadedFiles) && !hasUploadInProgress
   $: isSendDisabled = !canSend || disabled
   $: emojiMatch = draft.includes(':smi') ? 'smi' : findToken(':')
+  $: matchingEmojiSuggestions = emojiMatch
+    ? emojiSuggestions.filter((suggestion) =>
+        suggestion.shortcode.slice(1).toLowerCase().startsWith(emojiMatch.toLowerCase()),
+      )
+    : []
   $: mentionMatch = draft.includes('@ad') ? 'ad' : findToken('@')
   $: availableMembers = members.length > 0
     ? members
@@ -297,6 +306,23 @@
       {#each matchingMembers as member (member.id ?? member.user_id ?? member.username)}
         <button type="button" class="mt-2 block rounded-md px-2 py-1 text-left hover:bg-white" on:click={() => replaceCurrentToken('@', `@${member.username}`)}>
           {member.displayName ?? member.display_name ?? member.username}
+        </button>
+      {/each}
+    </div>
+  {/if}
+
+  {#if emojiMatch && matchingEmojiSuggestions.length > 0}
+    <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" role="listbox" aria-label="Emoji autocomplete">
+      <p class="font-medium text-gray-900">Emoji matching "{emojiMatch}"</p>
+      {#each matchingEmojiSuggestions as suggestion (suggestion.shortcode)}
+        <button
+          type="button"
+          class="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-white"
+          on:click={() => replaceCurrentToken(':', suggestion.shortcode)}
+        >
+          <span aria-hidden="true">{suggestion.icon}</span>
+          <span>{suggestion.shortcode}</span>
+          <span class="text-xs text-gray-500">{suggestion.label}</span>
         </button>
       {/each}
     </div>

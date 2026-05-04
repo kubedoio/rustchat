@@ -22,6 +22,7 @@
     }
   ]
   export let channels: SidebarChannel[] = []
+  export let unreadCounts: Record<string, number> = {}
   export let activeChannelId = 'general'
   export let currentChannelId: string | null | undefined = activeChannelId
   export let members: ChatMember[] = [
@@ -103,6 +104,10 @@
         return 'bg-slate-500'
     }
   }
+
+  function unreadCount(channel: SidebarChannel): number {
+    return unreadCounts[channel.id] ?? channel.unreadCount ?? 0
+  }
 </script>
 
 <aside class="flex w-72 shrink-0 flex-col border-r border-gray-200 bg-slate-950 text-white" aria-label="Chat sidebar">
@@ -164,8 +169,8 @@
                 {/if}
                 <span>{channelDisplayName(channel)}</span>
               </span>
-              {#if channel.unreadCount}
-                <span data-testid="unread-badge" class="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-semibold text-white">{channel.unreadCount}</span>
+              {#if unreadCount(channel)}
+                <span data-testid="unread-badge" class="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-semibold text-white">{unreadCount(channel)}</span>
               {/if}
             </button>
           {/each}
@@ -212,8 +217,8 @@
                       </span>
                     </span>
                   </span>
-                  {#if channel.unreadCount}
-                    <span data-testid="unread-badge" class="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-semibold text-white shrink-0 ml-2">{channel.unreadCount}</span>
+                  {#if unreadCount(channel)}
+                    <span data-testid="unread-badge" class="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-semibold text-white shrink-0 ml-2">{unreadCount(channel)}</span>
                   {/if}
                 </button>
               {/each}

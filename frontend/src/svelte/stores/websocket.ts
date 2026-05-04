@@ -179,7 +179,7 @@ export function connect(token: string): void {
     }
 
     currentToken = token
-    connectionStatus.set('connecting')
+    connectionStatus.set(hasBeenConnected ? 'reconnecting' : 'connecting')
     clearTimers()
 
     const nextSocket = new WebSocket(websocketUrl(), [token])
@@ -234,6 +234,8 @@ export function retryConnection(): void {
 }
 
 export function registerWebSocketHandlers(): () => void {
+    installWebSocketTestHelpers()
+
     if (unsubscribeAuth) {
         return unsubscribeAuth
     }
@@ -258,39 +260,44 @@ export function registerWebSocketHandlers(): () => void {
     }
 }
 
-// Expose test helpers for E2E tests
-;(window as any).testHelpers = {
-    simulateWebSocketClose: () => {
-        socket?.close()
-    },
-    simulateWebSocketOpen: () => {
-        if (currentToken) {
-            connect(currentToken)
-        }
-    },
-    getCurrentChannelId: () => get(chatStore).currentChannelId,
-    sendMessageAsOtherUser: (channelId: string, message: string) => {
-        handleMessage(
-            JSON.stringify({
-                event: 'post_received',
-                data: JSON.stringify({
-                    id: `test-${Date.now()}`,
-                    channel_id: channelId,
-                    user_id: 'other-user',
-                    message,
-                    created_at: new Date().toISOString(),
-                    files: [],
+export function installWebSocketTestHelpers(): void {
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    ;(window as any).testHelpers = {
+        simulateWebSocketClose: () => {
+            socket?.close()
+        },
+        simulateWebSocketOpen: () => {
+            if (currentToken) {
+                connect(currentToken)
+            }
+        },
+        getCurrentChannelId: () => get(chatStore).currentChannelId,
+        sendMessageAsOtherUser: (channelId: string, message: string) => {
+            handleMessage(
+                JSON.stringify({
+                    event: 'post_received',
+                    data: JSON.stringify({
+                        id: `test-${Date.now()}`,
+                        channel_id: channelId,
+                        user_id: 'other-user',
+                        message,
+                        created_at: new Date().toISOString(),
+                        files: [],
+                    }),
+                    broadcast: { channel_id: channelId, user_id: 'other-user' },
                 }),
-                broadcast: { channel_id: channelId, user_id: 'other-user' },
-            }),
-        )
-    },
-    simulateUnreadCounts: (counts: { channel_id: string; unread_count: number }) => {
-        handleMessage(
-            JSON.stringify({
-                event: 'unread_counts_updated',
-                data: JSON.stringify(counts),
-            }),
-        )
-    },
+            )
+        },
+        simulateUnreadCounts: (counts: { channel_id: string; unread_count: number }) => {
+            handleMessage(
+                JSON.stringify({
+                    event: 'unread_counts_updated',
+                    data: JSON.stringify(counts),
+                }),
+            )
+        },
+    }
 }

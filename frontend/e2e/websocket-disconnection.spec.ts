@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+import { installStableWebSocket, mockChatApi } from './support/chat-fixtures'
 
 /**
  * WebSocket Disconnection UX E2E Tests
@@ -9,17 +10,25 @@ import { test, expect } from '@playwright/test'
  * 3. Failed (> 30s): Full-screen modal, reconnect/refresh actions
  */
 
-test.describe('WebSocket Connection States', () => {
-  test.beforeEach(async ({ page }) => {
-    // Login and navigate to a channel
+async function loginToChannel(page: Page) {
     await page.goto('/login')
     await page.fill('[data-testid="login-username"]', 'testuser')
     await page.fill('[data-testid="login-password"]', 'testpass')
     await page.click('[data-testid="login-submit"]')
     await page.waitForURL('**/channels/**')
-    
+
     // Wait for WebSocket to connect
     await page.waitForSelector('[data-testid="connection-indicator"][data-status="connected"]')
+}
+
+test.beforeEach(async ({ page }) => {
+  await installStableWebSocket(page)
+  await mockChatApi(page)
+})
+
+test.describe('WebSocket Connection States', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginToChannel(page)
   })
 
   test('shows reconnecting banner on brief disconnect', async ({ page }) => {
@@ -242,11 +251,7 @@ test.describe('WebSocket Connection States', () => {
 test.describe('WebSocket Reconnection Sync', () => {
   test('syncs missed messages after reconnect', async ({ page }) => {
     // Login and load channel
-    await page.goto('/login')
-    await page.fill('[data-testid="login-username"]', 'testuser')
-    await page.fill('[data-testid="login-password"]', 'testpass')
-    await page.click('[data-testid="login-submit"]')
-    await page.waitForURL('**/channels/**')
+    await loginToChannel(page)
 
     const channelId = await page.evaluate(() => {
       return (window as any).testHelpers.getCurrentChannelId()
@@ -301,6 +306,10 @@ test.describe('WebSocket Reconnection Sync', () => {
 })
 
 test.describe('Accessibility', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginToChannel(page)
+  })
+
   test('status bar has correct ARIA attributes', async ({ page }) => {
     await page.evaluate(() => {
       (window as any).testHelpers.simulateWebSocketClose()

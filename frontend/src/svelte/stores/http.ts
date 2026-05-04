@@ -129,6 +129,8 @@ export const svelteApi = {
         svelteHttpFormData<T>(path, formData, options),
     put: <T>(path: string, body?: unknown, options?: SvelteHttpOptions) =>
         svelteHttp<T>('PUT', path, body, options),
+    patch: <T>(path: string, body?: unknown, options?: SvelteHttpOptions) =>
+        svelteHttp<T>('PATCH', path, body, options),
     delete: <T>(path: string, options?: SvelteHttpOptions) =>
         svelteHttp<T>('DELETE', path, undefined, options),
 }
