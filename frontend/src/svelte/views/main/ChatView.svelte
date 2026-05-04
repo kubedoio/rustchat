@@ -13,11 +13,16 @@
   import SearchModal from '../../components/search/SearchModal.svelte'
   import QuickSwitcherModal from '../../components/search/QuickSwitcherModal.svelte'
   import ActivityFeed from '../../components/activity/ActivityFeed.svelte'
+  import IncomingCallModal from '../../components/calls/IncomingCallModal.svelte'
+  import ActiveCall from '../../components/calls/ActiveCall.svelte'
+  import PinnedMessagesPanel from '../../components/chat/PinnedMessagesPanel.svelte'
+  import SavedMessagesPanel from '../../components/chat/SavedMessagesPanel.svelte'
   import { chatStore } from '../../stores/chat'
   import { uiStore } from '../../stores/ui'
   import { quickSwitcherStore } from '../../stores/quickSwitcher'
   import { activityStore } from '../../stores/activity'
   import { connectionStatus, registerWebSocketHandlers, retryConnection } from '../../stores/websocket'
+  import { callsStore, registerCallWebSocketHandlers } from '../../stores/calls.svelte'
 
   const currentChannel = $derived(
     $chatStore.channels.find((channel) => channel.id === $chatStore.currentChannelId) ?? null,
@@ -53,6 +58,7 @@
   onMount(() => {
     void chatStore.bootstrap()
     const cleanupWs = registerWebSocketHandlers()
+    registerCallWebSocketHandlers()
     return cleanupWs
   })
 
@@ -103,6 +109,9 @@
       onToggleInfo={toggleInfoPanel}
       on:search={() => (searchOpen = true)}
       on:toggleActivity={() => activityStore.toggleFeed()}
+      on:togglePinned={() => uiStore.toggleRhs('pinned')}
+      on:toggleSaved={() => uiStore.toggleRhs('saved')}
+      on:startCall={() => { if (currentChannel) void callsStore.startCall(currentChannel.id) }}
     />
 
     {#if $chatStore.error}
@@ -171,6 +180,14 @@
 
   <ActivityFeed />
 
+  {#if $uiStore.rhsView === 'pinned' && currentChannel}
+    <PinnedMessagesPanel channelId={currentChannel.id} open={true} on:close={() => uiStore.closeRhs()} on:jump={() => { /* TODO: scroll to message */ }} />
+  {/if}
+
+  {#if $uiStore.rhsView === 'saved'}
+    <SavedMessagesPanel open={true} on:close={() => uiStore.closeRhs()} on:jump={() => { /* TODO: scroll to message */ }} />
+  {/if}
+
   {#if $quickSwitcherStore.open}
     <QuickSwitcherModal
       open={true}
@@ -178,4 +195,7 @@
       on:select={handleQuickSelect}
     />
   {/if}
+
+  <IncomingCallModal />
+  <ActiveCall />
 </main>

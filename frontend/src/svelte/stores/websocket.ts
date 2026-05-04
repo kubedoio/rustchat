@@ -12,8 +12,19 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let statusTimer: ReturnType<typeof setTimeout> | null = null
 let failedTimer: ReturnType<typeof setTimeout> | null = null
 let hasBeenConnected = false
+const eventHandlers = new Map<string, Set<(data: any) => void>>()
 
 export const connectionStatus = writable<ConnectionStatus>('connecting')
+
+export function onWebSocketEvent(event: string, handler: (data: any) => void): () => void {
+    if (!eventHandlers.has(event)) {
+        eventHandlers.set(event, new Set())
+    }
+    eventHandlers.get(event)!.add(handler)
+    return () => {
+        eventHandlers.get(event)?.delete(handler)
+    }
+}
 
 function isAuthExpiryCloseEvent(event: CloseEvent): boolean {
     const reason = (event.reason || '').toLowerCase()
@@ -146,8 +157,16 @@ function handleMessage(data: string): void {
                 }
                 break
             }
-            default:
+            default: {
+                // Dispatch to registered custom handlers
+                const handlers = eventHandlers.get(event.event)
+                if (handlers) {
+                    for (const handler of handlers) {
+                        handler(payload)
+                    }
+                }
                 break
+            }
         }
     } catch {
         // Ignore malformed messages

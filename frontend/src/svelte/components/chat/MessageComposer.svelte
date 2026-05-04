@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from 'svelte'
   import { chatStore } from '../../stores/chat'
+  import EmojiPicker from '../../components/composer/EmojiPicker.svelte'
   import type { ChatAttachment, ChatMember, ComposerSubmit } from './types'
 
   export let channelId = 'general'
@@ -24,6 +25,7 @@
   let attachments: ChatAttachment[] = []
   let formattingOpen = true
   let emojiOpen = false
+  let emojiButtonEl: HTMLButtonElement | null = null
   let hydrated = false
   let previousChannelId = channelId
 
@@ -96,6 +98,17 @@
     void tick().then(() => {
       textarea?.focus()
       textarea?.setSelectionRange(start + before.length, start + before.length + selected.length)
+    })
+  }
+
+  function insertAtCursor(text: string) {
+    const start = textarea?.selectionStart ?? draft.length
+    const end = textarea?.selectionEnd ?? draft.length
+    draft = `${draft.slice(0, start)}${text} ${draft.slice(end)}`
+    void tick().then(() => {
+      const nextCursor = start + text.length + 1
+      textarea?.focus()
+      textarea?.setSelectionRange(nextCursor, nextCursor)
     })
   }
 
@@ -271,21 +284,12 @@
     </div>
   {/if}
 
-  {#if emojiOpen || emojiMatch}
-    <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" role="listbox" aria-label="Emoji matching">
-      <p class="font-medium text-gray-900">Emoji matching</p>
-      {#if emojiOpen}
-        <input
-          class="mt-2 w-full rounded-md border border-gray-200 px-2 py-1"
-          placeholder="Search emoji..."
-          aria-label="Search emoji"
-        />
-      {/if}
-      <button type="button" class="mt-2 rounded-md px-2 py-1 text-left hover:bg-white" role="option" aria-selected="false" on:click={() => replaceCurrentToken(':', ':smile:')}>
-        :smile:
-      </button>
-    </div>
-  {/if}
+  <EmojiPicker
+    show={emojiOpen}
+    anchorEl={emojiButtonEl}
+    onSelect={(emoji) => { insertAtCursor(emoji); emojiOpen = false }}
+    onClose={() => { emojiOpen = false }}
+  />
 
   {#if mentionMatch && matchingMembers.length > 0}
     <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" role="listbox" aria-label="Channel Members">
@@ -329,7 +333,7 @@
         </button>
         <input bind:this={fileInput} class="sr-only" type="file" multiple tabindex="-1" on:change={handleFileInput} />
 
-        <button type="button" class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Insert emoji" on:click={() => (emojiOpen = !emojiOpen)}>
+        <button type="button" bind:this={emojiButtonEl} class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Insert emoji" on:click={() => (emojiOpen = !emojiOpen)}>
           :)
         </button>
       </div>

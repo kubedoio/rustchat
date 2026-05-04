@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import { Hash, Lock, MoreVertical, Info, Users, Search, ClipboardList } from 'lucide-svelte'
+  import { Hash, Lock, MoreVertical, Info, Users, Search, ClipboardList, Pin, Bookmark, Phone } from 'lucide-svelte'
   import ConnectionIndicator from '../ui/ConnectionIndicator.svelte'
   import NotificationsDropdown from '../ui/NotificationsDropdown.svelte'
   import type { SvelteChatChannel, SvelteChatMember } from '../../stores/chat'
@@ -9,7 +9,7 @@
   export let members: SvelteChatMember[] = []
   export let onToggleInfo: (() => void) | undefined = undefined
 
-  const dispatch = createEventDispatcher<{ toggleInfo: void; search: void; toggleActivity: void }>()
+  const dispatch = createEventDispatcher<{ toggleInfo: void; search: void; toggleActivity: void; togglePinned: void; toggleSaved: void; startCall: void }>()
 
   let showMenu = false
 
@@ -38,6 +38,21 @@
 
   function handleToggleActivity() {
     dispatch('toggleActivity')
+  }
+
+  function handleTogglePinned() {
+    dispatch('togglePinned')
+    showMenu = false
+  }
+
+  function handleToggleSaved() {
+    dispatch('toggleSaved')
+    showMenu = false
+  }
+
+  function handleStartCall() {
+    dispatch('startCall')
+    showMenu = false
   }
 </script>
 
@@ -114,6 +129,24 @@
     <NotificationsDropdown />
 
     <button
+      on:click={handleTogglePinned}
+      class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
+      aria-label="Pinned messages"
+      title="Pinned messages"
+    >
+      <Pin class="h-4 w-4" />
+    </button>
+
+    <button
+      on:click={handleToggleSaved}
+      class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
+      aria-label="Saved messages"
+      title="Saved messages"
+    >
+      <Bookmark class="h-4 w-4" />
+    </button>
+
+    <button
       on:click={handleToggleActivity}
       class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
       aria-label="Activity feed"
@@ -146,6 +179,30 @@
           >
             <Info class="h-4 w-4" />
             Channel Details
+          </button>
+
+          <button
+            on:click={handleTogglePinned}
+            class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+          >
+            <Pin class="h-4 w-4" />
+            Pinned Messages
+          </button>
+
+          <button
+            on:click={handleToggleSaved}
+            class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+          >
+            <Bookmark class="h-4 w-4" />
+            Saved Messages
+          </button>
+
+          <button
+            on:click={handleStartCall}
+            class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+          >
+            <Phone class="h-4 w-4" />
+            Start Call
           </button>
 
           <button
