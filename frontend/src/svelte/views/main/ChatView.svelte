@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { flushSync, onMount } from 'svelte'
   import { get } from 'svelte/store'
   import ChatSidebar from '../../components/chat/ChatSidebar.svelte'
   import ChannelHeader from '../../components/chat/ChannelHeader.svelte'
@@ -23,20 +23,21 @@
   import BrowseChannelsModal from '../../components/modals/BrowseChannelsModal.svelte'
   import DirectMessageModal from '../../components/modals/DirectMessageModal.svelte'
   import SetStatusModal from '../../components/modals/SetStatusModal.svelte'
+  import AddChannelMembersModal from '../../components/modals/AddChannelMembersModal.svelte'
+  import CreateTeamModal from '../../components/modals/CreateTeamModal.svelte'
+  import EditProfileModal from '../../components/modals/EditProfileModal.svelte'
+  import CommandPalette from '../../components/ui/CommandPalette.svelte'
   import { chatStore } from '../../stores/chat'
-  import type { SvelteChatChannel, SvelteChatMember } from '../../stores/chat'
+  import type { SvelteChatChannel, SvelteChatMember, SvelteChatPost } from '../../stores/chat'
   import { uiStore } from '../../stores/ui'
   import { quickSwitcherStore } from '../../stores/quickSwitcher'
   import { activityStore } from '../../stores/activity'
   import { authStore } from '../../stores/auth'
-  import { connectionStatus, retryConnection } from '../../stores/websocket'
+  import { connectionStatus, retryConnection, type ConnectionStatus } from '../../stores/websocket'
   import { callsStore, registerCallWebSocketHandlers } from '../../stores/calls.svelte'
 
   const currentChannel = $derived(
     $chatStore.channels.find((channel) => channel.id === $chatStore.currentChannelId) ?? null,
-  )
-  const currentMessages = $derived(
-    currentChannel ? ($chatStore.messagesByChannel[currentChannel.id] ?? []) : [],
   )
   const currentMembers = $derived(
     currentChannel
@@ -55,17 +56,6 @@
   const sidebarMembers = $derived(
     $chatStore.teams.flatMap((team) => $chatStore.membersByTeam[team.id] ?? []),
   )
-  const isDisconnected = $derived($connectionStatus !== 'connected')
-  const contentOpacityClass = $derived(
-    $connectionStatus === 'failed'
-      ? 'blur-sm'
-      : $connectionStatus === 'disconnected'
-        ? 'opacity-60'
-        : $connectionStatus === 'reconnecting'
-          ? 'opacity-80'
-          : '',
-  )
-
   let infoPanelOpen = $state(false)
   let profileUserId = $state<string | null>(null)
   let threadPanelOpen = $state(false)
@@ -75,7 +65,15 @@
   let browseChannelsOpen = $state(false)
   let dmOpen = $state(false)
   let setStatusOpen = $state(false)
+  let addMembersOpen = $state(false)
+  let createTeamOpen = $state(false)
+  let editProfileOpen = $state(false)
+  let commandPaletteOpen = $state(false)
   let requestedChannelLoad = $state<string | null>(null)
+  let currentConnectionStatus = $state<ConnectionStatus>('connecting')
+  let visibleMessages = $state.raw<SvelteChatPost[]>([])
+  let messageListVersion = $state(0)
+  let messageListRef: MessageList | null = $state(null)
 
   function resolveDirectMembers(
     channel: SvelteChatChannel,
@@ -98,8 +96,27 @@
   }
 
   onMount(() => {
+    const unsubscribeConnectionStatus = connectionStatus.subscribe((status) => {
+      currentConnectionStatus = status
+    })
+    const unsubscribeChat = chatStore.subscribe((state) => {
+      const channelId = state.currentChannelId
+      const nextMessages = channelId ? (state.messagesByChannel[channelId] ?? []) : []
+      if (nextMessages !== visibleMessages) {
+        flushSync(() => {
+          visibleMessages = nextMessages
+          messageListVersion += 1
+        })
+      }
+    })
+
     void bootstrapChat()
     registerCallWebSocketHandlers()
+
+    return () => {
+      unsubscribeConnectionStatus()
+      unsubscribeChat()
+    }
   })
 
   $effect(() => {
@@ -154,7 +171,21 @@
   function handleSearchClose() {
     searchOpen = false
   }
+
+  function handleJumpToMessage(messageId: string) {
+    uiStore.closeRhs()
+    messageListRef?.scrollToMessage(messageId)
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'k' && (event.metaKey || event.ctrlKey) && event.shiftKey) {
+      event.preventDefault()
+      commandPaletteOpen = true
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleKeydown} />
 
 <main class="flex h-screen overflow-hidden bg-bg-app text-text-1">
   <ChatSidebar
@@ -169,6 +200,8 @@
     on:browseChannels={() => (browseChannelsOpen = true)}
     on:directMessage={() => (dmOpen = true)}
     on:setStatus={() => (setStatusOpen = true)}
+    on:createTeam={() => (createTeamOpen = true)}
+    on:editProfile={() => (editProfileOpen = true)}
   />
 
   <section class="flex min-w-0 flex-1 flex-col bg-bg-surface-1">
@@ -191,8 +224,22 @@
       </div>
     {/if}
 
-    <div data-testid="main-content" class="flex min-w-0 flex-1 flex-col transition-opacity duration-300 {contentOpacityClass}">
-      <MessageList messages={currentMessages} on:openProfile={(e) => { profileUserId = e.detail }} on:thread={handleThread} />
+    <div
+      data-testid="main-content"
+      class="flex min-w-0 flex-1 flex-col transition-opacity duration-300"
+      class:opacity-80={currentConnectionStatus === 'reconnecting'}
+      class:opacity-60={currentConnectionStatus === 'disconnected'}
+      class:blur-sm={currentConnectionStatus === 'failed'}
+    >
+      {#key `${$chatStore.currentChannelId ?? 'none'}:${messageListVersion}`}
+        <MessageList
+          bind:this={messageListRef}
+          messages={visibleMessages}
+          channelId={$chatStore.currentChannelId}
+          on:openProfile={(e) => { profileUserId = e.detail }}
+          on:thread={handleThread}
+        />
+      {/key}
 
       {#if currentChannel}
         <TypingIndicator channelId={currentChannel.id} />
@@ -200,7 +247,7 @@
           channelId={currentChannel.id}
           channelName={currentChannel.display_name || currentChannel.name}
           members={currentMembers}
-          disabled={isDisconnected}
+          disabled={currentConnectionStatus !== 'connected'}
           on:send={sendMessage}
         />
       {/if}
@@ -225,7 +272,7 @@
     />
   {/if}
 
-  {#if $connectionStatus === 'failed'}
+  {#if currentConnectionStatus === 'failed'}
     <ConnectionLostModal
       open={true}
       on:reconnect={() => retryConnection()}
@@ -253,11 +300,11 @@
   <ActivityFeed />
 
   {#if $uiStore.rhsView === 'pinned' && currentChannel}
-    <PinnedMessagesPanel channelId={currentChannel.id} open={true} on:close={() => uiStore.closeRhs()} on:jump={() => { /* TODO: scroll to message */ }} />
+    <PinnedMessagesPanel channelId={currentChannel.id} open={true} on:close={() => uiStore.closeRhs()} on:jump={(e) => handleJumpToMessage(e.detail)} />
   {/if}
 
   {#if $uiStore.rhsView === 'saved'}
-    <SavedMessagesPanel open={true} on:close={() => uiStore.closeRhs()} on:jump={() => { /* TODO: scroll to message */ }} />
+    <SavedMessagesPanel open={true} on:close={() => uiStore.closeRhs()} on:jump={(e) => handleJumpToMessage(e.detail)} />
   {/if}
 
   {#if $quickSwitcherStore.open}
@@ -271,8 +318,13 @@
   <IncomingCallModal />
   <ActiveCall />
 
+  <CommandPalette open={commandPaletteOpen} on:close={() => (commandPaletteOpen = false)} on:select={() => (commandPaletteOpen = false)} />
+
   <CreateChannelModal open={createChannelOpen} on:close={() => (createChannelOpen = false)} />
   <BrowseChannelsModal open={browseChannelsOpen} on:close={() => (browseChannelsOpen = false)} />
   <DirectMessageModal open={dmOpen} on:close={() => (dmOpen = false)} on:select={(e) => { chatStore.selectChannel(e.detail); dmOpen = false }} />
   <SetStatusModal open={setStatusOpen} on:close={() => (setStatusOpen = false)} />
+  <AddChannelMembersModal open={addMembersOpen} channelId={currentChannel?.id} channelName={currentChannel?.name} onclose={() => (addMembersOpen = false)} />
+  <CreateTeamModal open={createTeamOpen} on:close={() => (createTeamOpen = false)} />
+  <EditProfileModal open={editProfileOpen} on:close={() => (editProfileOpen = false)} />
 </main>

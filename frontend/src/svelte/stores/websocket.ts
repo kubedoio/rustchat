@@ -12,8 +12,8 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let statusTimer: ReturnType<typeof setTimeout> | null = null
 let failedTimer: ReturnType<typeof setTimeout> | null = null
 let hasBeenConnected = false
-let testForceConnected = false
 const eventHandlers = new Map<string, Set<(data: any) => void>>()
+const pendingTestWebSocketMessages: string[] = []
 
 export const connectionStatus = writable<ConnectionStatus>('connecting')
 
@@ -34,32 +34,77 @@ function releaseHeldTestWebSockets(): void {
     ;(window as any).__rustchatOpenHeldWebSockets?.()
 }
 
-function hasTestWebSocketHarness(): boolean {
-    return typeof window !== 'undefined' && '__rustchatHoldWebSocketClosed' in window
+function socketIsClosed(candidate: WebSocket | null): boolean {
+    return !candidate || candidate.readyState === WebSocket.CLOSED || candidate.readyState === WebSocket.CLOSING
 }
 
-function openCurrentTestSocket(): void {
+function openCurrentTestSocket(): boolean {
     if (typeof window === 'undefined' || !socket) {
-        return
+        return false
     }
 
-    ;(socket as any).open?.()
+    const testSocket = socket as WebSocket & { open?: () => void; onopen?: ((event: Event) => void) | null }
+    testSocket.open?.()
+
+    if (get(connectionStatus) !== 'connected' && typeof testSocket.onopen === 'function') {
+        // Some mock sockets can miss their constructor-time open callback; invoke
+        // the normal socket open handler so tests still exercise production state transitions.
+        testSocket.onopen(new Event('open'))
+    }
+
+    return get(connectionStatus) === 'connected'
 }
 
-function completeTestReconnect(): void {
-    if (get(connectionStatus) === 'connected') {
+function republishConnectedTestState(): void {
+    if (typeof window === 'undefined' || !('__rustchatHoldWebSocketClosed' in window)) {
         return
     }
 
-    connectionStatus.set('connected')
-    clearTimers()
-    hasBeenConnected = true
-
-    const currentChannelId = get(chatStore).currentChannelId
-    if (currentChannelId) {
-        void chatStore.fetchMessages(currentChannelId)
+    if (get(connectionStatus) !== 'connected') {
+        return
     }
-    void chatStore.fetchUnreadCounts()
+
+    // The mock WebSocket can be opened from test helper code rather than the
+    // browser event loop. Re-publish the already-connected state so Svelte
+    // subscribers flush the same transition the real socket open path produced.
+    connectionStatus.set('reconnecting')
+    connectionStatus.set('connected')
+}
+
+function replayPendingTestWebSocketMessages(): void {
+    while (pendingTestWebSocketMessages.length > 0) {
+        const message = pendingTestWebSocketMessages.shift()
+        if (message) {
+            handleMessage(message)
+        }
+    }
+}
+
+function openTestWebSocketPath(): void {
+    releaseHeldTestWebSockets()
+    const token = currentToken ?? get(authStore).token
+
+    if (token && socketIsClosed(socket)) {
+        connect(token)
+    }
+    openCurrentTestSocket()
+    setTimeout(() => {
+        if (token && socketIsClosed(socket)) {
+            connect(token)
+        }
+        openCurrentTestSocket()
+        republishConnectedTestState()
+        replayPendingTestWebSocketMessages()
+    }, 150)
+}
+
+function dispatchOrQueueTestWebSocketMessage(message: string): void {
+    if (get(connectionStatus) === 'connected') {
+        handleMessage(message)
+        return
+    }
+
+    pendingTestWebSocketMessages.push(message)
 }
 
 export function onWebSocketEvent(event: string, handler: (data: any) => void): () => void {
@@ -222,13 +267,6 @@ function handleMessage(data: string): void {
 export function connect(token: string, preserveReconnectTimers = false): void {
     currentToken = token
 
-    if (testForceConnected) {
-        clearTimers()
-        connectionStatus.set('connected')
-        hasBeenConnected = true
-        return
-    }
-
     if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
         return
     }
@@ -267,12 +305,6 @@ export function connect(token: string, preserveReconnectTimers = false): void {
             return
         }
 
-        if (testForceConnected) {
-            connectionStatus.set('connected')
-            clearTimers()
-            return
-        }
-
         socket = null
 
         if (isAuthExpiryCloseEvent(event)) {
@@ -296,11 +328,7 @@ export function retryConnection(): void {
         connect(currentToken)
     }
     setTimeout(() => {
-        releaseHeldTestWebSockets()
-        openCurrentTestSocket()
-        if (hasTestWebSocketHarness()) {
-            completeTestReconnect()
-        }
+        openTestWebSocketPath()
     }, 0)
 }
 
@@ -338,39 +366,45 @@ export function installWebSocketTestHelpers(): void {
 
     ;(window as any).testHelpers = {
         simulateWebSocketClose: () => {
-            testForceConnected = false
             setTestWebSocketHold(true)
             socket?.close()
         },
         simulateWebSocketOpen: () => {
-            testForceConnected = true
-            releaseHeldTestWebSockets()
-            openCurrentTestSocket()
-            if (currentToken) {
-                connect(currentToken)
-            }
-            openCurrentTestSocket()
-            completeTestReconnect()
+            openTestWebSocketPath()
             setTimeout(() => {
-                openCurrentTestSocket()
-                completeTestReconnect()
+                openTestWebSocketPath()
             }, 0)
         },
         getCurrentChannelId: () => get(chatStore).currentChannelId,
+        getCurrentMessagesForTest: () => {
+            const state = get(chatStore)
+            const channelId = state.currentChannelId ?? ''
+            return state.messagesByChannel[channelId] ?? []
+        },
+        getPendingWebSocketMessagesForTest: () => pendingTestWebSocketMessages.length,
         sendMessageAsOtherUser: (channelId: string, message: string) => {
-            const targetChannelId = channelId || get(chatStore).currentChannelId || ''
-            chatStore.addMessage(targetChannelId, {
-                id: `test-${Date.now()}`,
-                channel_id: targetChannelId,
-                user_id: 'other-user',
-                username: 'Other User',
-                message,
-                created_at: new Date().toISOString(),
-                files: [],
-            })
+            const visibleChannelId = window.location.pathname.match(/^\/channels\/([^/]+)$/)?.[1]
+            const targetChannelId = visibleChannelId || get(chatStore).currentChannelId || channelId || ''
+            if (!targetChannelId) {
+                return
+            }
+
+            dispatchOrQueueTestWebSocketMessage(JSON.stringify({
+                event: 'post_received',
+                data: JSON.stringify({
+                    id: `test-${Date.now()}`,
+                    channel_id: targetChannelId,
+                    user_id: 'other-user',
+                    username: 'Other User',
+                    message,
+                    created_at: new Date().toISOString(),
+                    files: [],
+                }),
+                broadcast: { channel_id: targetChannelId, user_id: 'other-user' },
+            }))
         },
         simulateUnreadCounts: (counts: { channel_id: string; unread_count: number }) => {
-            handleMessage(
+            dispatchOrQueueTestWebSocketMessage(
                 JSON.stringify({
                     event: 'unread_counts_updated',
                     data: JSON.stringify(counts),

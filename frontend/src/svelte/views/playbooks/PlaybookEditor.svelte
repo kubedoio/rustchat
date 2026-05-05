@@ -23,6 +23,7 @@
     keyword_triggers: '',
   })
   let checklists = $state<EditableChecklist[]>([])
+  let originalChecklists = $state<EditableChecklist[]>([])
 
   const isEditing = $derived(Boolean(playbookId))
 
@@ -91,6 +92,116 @@
     })
   }
 
+  function isTemporaryChecklist(checklist: EditableChecklist) {
+    return checklist.id.startsWith('temp-')
+  }
+
+  function isTemporaryTask(task: EditableChecklist['tasks'][number]) {
+    return task.id.startsWith('temp-')
+  }
+
+  function taskPayload(task: EditableChecklist['tasks'][number], sortOrder?: number) {
+    return {
+      title: task.title.trim(),
+      description: task.description?.trim() ?? '',
+      sort_order: sortOrder ?? task.sort_order,
+    }
+  }
+
+  function taskChanged(task: EditableChecklist['tasks'][number], originalTask: EditableChecklist['tasks'][number]) {
+    const currentPayload = taskPayload(task)
+
+    return currentPayload.title !== originalTask.title
+      || currentPayload.description !== (originalTask.description ?? '')
+  }
+
+  async function createTasks(checklistId: string, tasks: EditableChecklist['tasks']) {
+    for (const [taskIndex, task] of tasks.entries()) {
+      const payload = taskPayload(task, taskIndex + 1)
+      if (!payload.title) continue
+
+      await playbooksStore.createTask(checklistId, {
+        ...payload,
+        description: payload.description || null,
+      })
+    }
+  }
+
+  async function createChecklistWithTasks(playbookId: string, checklist: EditableChecklist, sortOrder: number) {
+    const createdChecklist = await playbooksStore.createChecklist(playbookId, {
+      name: checklist.name.trim(),
+      sort_order: sortOrder,
+    })
+    await createTasks(createdChecklist.id, checklist.tasks)
+  }
+
+  async function syncExistingChecklistTasks(checklist: EditableChecklist, originalChecklist: EditableChecklist) {
+    const currentTaskIds = new Set(
+      checklist.tasks
+        .filter((task) => !isTemporaryTask(task))
+        .map((task) => task.id),
+    )
+
+    for (const originalTask of originalChecklist.tasks) {
+      if (!currentTaskIds.has(originalTask.id)) {
+        await playbooksStore.deleteTask(originalTask.id)
+      }
+    }
+
+    const originalTasksById = new Map(originalChecklist.tasks.map((task) => [task.id, task]))
+    for (const [taskIndex, task] of checklist.tasks.entries()) {
+      if (isTemporaryTask(task)) {
+        const payload = taskPayload(task, taskIndex + 1)
+        if (!payload.title) continue
+
+        await playbooksStore.createTask(checklist.id, {
+          ...payload,
+          description: payload.description || null,
+        })
+        continue
+      }
+
+      const originalTask = originalTasksById.get(task.id)
+      if (originalTask && taskChanged(task, originalTask)) {
+        await playbooksStore.updateTask(task.id, taskPayload(task))
+      }
+    }
+  }
+
+  async function syncChecklists(savedPlaybookId: string) {
+    const originalChecklistsById = new Map(originalChecklists.map((checklist) => [checklist.id, checklist]))
+    const currentChecklistIds = new Set(
+      checklists
+        .filter((checklist) => !isTemporaryChecklist(checklist))
+        .map((checklist) => checklist.id),
+    )
+    const replacedChecklistIds = new Set<string>()
+
+    for (const [checklistIndex, checklist] of checklists.entries()) {
+      if (isTemporaryChecklist(checklist)) {
+        await createChecklistWithTasks(savedPlaybookId, checklist, checklistIndex + 1)
+        continue
+      }
+
+      const originalChecklist = originalChecklistsById.get(checklist.id)
+      if (!originalChecklist) continue
+
+      if (checklist.name.trim() !== originalChecklist.name) {
+        await createChecklistWithTasks(savedPlaybookId, checklist, checklistIndex + 1)
+        replacedChecklistIds.add(checklist.id)
+        continue
+      }
+
+      await syncExistingChecklistTasks(checklist, originalChecklist)
+    }
+
+    for (const originalChecklist of originalChecklists) {
+      if (!currentChecklistIds.has(originalChecklist.id) || replacedChecklistIds.has(originalChecklist.id)) {
+        await playbooksStore.deleteChecklist(savedPlaybookId, originalChecklist.id)
+      }
+    }
+  }
+
   async function load() {
     const match = window.location.pathname.match(/^\/playbooks\/([^/]+)\/edit$/)
     playbookId = match?.[1] ?? null
@@ -102,6 +213,7 @@
 
     if (!playbookId) {
       checklists = [makeChecklist()]
+      originalChecklists = []
       return
     }
 
@@ -119,6 +231,7 @@
         keyword_triggers: playbook.keyword_triggers?.join(', ') ?? '',
       }
       checklists = structuredClone(playbook.checklists ?? [])
+      originalChecklists = structuredClone(playbook.checklists ?? [])
       if (checklists.length === 0) {
         checklists = [makeChecklist()]
       }
@@ -160,26 +273,7 @@
         savedPlaybookId = created.id
       }
 
-      for (const checklist of checklists) {
-        let checklistId = checklist.id
-        if (checklist.id.startsWith('temp-')) {
-          const createdChecklist = await playbooksStore.createChecklist(savedPlaybookId, {
-            name: checklist.name,
-            sort_order: checklist.sort_order,
-          })
-          checklistId = (createdChecklist.data as { id: string }).id
-        }
-
-        for (const task of checklist.tasks) {
-          if (task.id.startsWith('temp-task-') && task.title.trim()) {
-            await playbooksStore.createTask(checklistId, {
-              title: task.title.trim(),
-              description: task.description?.trim() || null,
-              sort_order: task.sort_order,
-            })
-          }
-        }
-      }
+      await syncChecklists(savedPlaybookId)
 
       navigate('/playbooks')
     } catch (saveError) {

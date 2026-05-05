@@ -144,6 +144,7 @@
   </div>
 {:else}
   <div
+    data-message-id={message.id}
     class="flex items-start group transition-standard relative px-2 sm:px-3 py-1 hover:bg-bg-app/30 {statusClasses}"
     on:mouseenter={() => (showActions = true)}
     on:mouseleave={() => {

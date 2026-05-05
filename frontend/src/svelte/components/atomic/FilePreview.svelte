@@ -1,0 +1,101 @@
+<script lang="ts">
+  import { File as FileIcon, Download, ExternalLink } from 'lucide-svelte'
+
+  interface FileData {
+    id: string
+    name: string
+    url: string
+    size: number
+    mime_type: string
+    thumbnail_url?: string
+  }
+
+  interface Props {
+    file: FileData
+    onPreview?: (file: FileData) => void
+  }
+
+  let { file, onPreview }: Props = $props()
+
+  const formatSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
+  const isImage = (mimeType: string): boolean => {
+    return mimeType.startsWith('image/')
+  }
+
+  const canPreview = $derived(isImage(file.mime_type) && Boolean(onPreview))
+
+  function handlePreview() {
+    if (canPreview) {
+      onPreview?.(file)
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handlePreview()
+    }
+  }
+</script>
+
+<div
+  class="group relative flex flex-col p-1 rounded-xl border border-gray-200 bg-white hover:shadow-md transition-all duration-200 max-w-sm overflow-hidden"
+  class:cursor-pointer={canPreview}
+  class:hover:border-indigo-400={canPreview}
+  data-testid="file-preview"
+  role={canPreview ? 'button' : undefined}
+  tabindex={canPreview ? 0 : undefined}
+  onclick={canPreview ? handlePreview : undefined}
+  onkeydown={canPreview ? handleKeydown : undefined}
+>
+  <!-- Icon or Thumbnail -->
+  <div class="relative aspect-video w-full rounded-lg overflow-hidden bg-gray-100 border border-gray-100">
+    {#if isImage(file.mime_type)}
+      <img
+        src={file.thumbnail_url || file.url}
+        alt={file.name}
+        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        loading="lazy"
+      />
+    {:else}
+      <div class="w-full h-full flex flex-col items-center justify-center text-gray-400">
+        <FileIcon class="w-10 h-10 mb-2 stroke-1" />
+        <span class="text-[10px] uppercase font-bold tracking-widest">{file.mime_type.split('/')[1] || 'FILE'}</span>
+      </div>
+    {/if}
+
+    <!-- Hover Overlay -->
+    {#if canPreview}
+      <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+        <ExternalLink class="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" aria-hidden="true" />
+      </div>
+    {/if}
+  </div>
+
+  <!-- Details -->
+  <div class="p-2 flex items-center justify-between">
+    <div class="flex-1 min-w-0 mr-2">
+      <div class="text-xs font-semibold text-gray-900 truncate" title={file.name}>
+        {file.name}
+      </div>
+      <div class="text-[10px] text-gray-500 flex items-center space-x-2 font-medium">
+        <span>{formatSize(file.size)}</span>
+      </div>
+    </div>
+
+    <a
+      href={file.url}
+      download
+      onclick={(e) => e.stopPropagation()}
+      class="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-indigo-600 transition-colors"
+      aria-label={`Download ${file.name}`}
+    >
+      <Download class="w-4 h-4" />
+    </a>
+  </div>
+</div>

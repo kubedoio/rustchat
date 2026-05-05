@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import { Hash, Lock, Plus, Globe, MessageCircle } from 'lucide-svelte'
+  import { Hash, Lock, Plus, Globe, MessageCircle, Users } from 'lucide-svelte'
   import type { ChatMember, ChatTeam } from './types'
   import type { SvelteChatChannel } from '../../stores/chat'
   import UserMenu from '../ui/UserMenu.svelte'
@@ -38,6 +38,8 @@
     browseChannels: void
     directMessage: void
     setStatus: void
+    createTeam: void
+    editProfile: void
   }>()
 
   $: selectedChannelId = currentChannelId ?? activeChannelId
@@ -173,6 +175,15 @@
             >
               <MessageCircle class="w-3.5 h-3.5" />
             </button>
+            <button
+              type="button"
+              class="rounded p-1 text-slate-400 hover:text-white hover:bg-white/10 transition"
+              title="Create team"
+              aria-label="Create team"
+              on:click={() => dispatch('createTeam')}
+            >
+              <Users class="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
         <div class="mt-2 space-y-1">
@@ -269,6 +280,6 @@
   </section>
 
   <div class="border-t border-white/10 p-3">
-    <UserMenu on:setStatus={() => dispatch('setStatus')} />
+    <UserMenu on:setStatus={() => dispatch('setStatus')} on:editProfile={() => dispatch('editProfile')} />
   </div>
 </aside>

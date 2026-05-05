@@ -4,8 +4,10 @@ import type {
     ChecklistWithTasks,
     CreatePlaybookRequest,
     Playbook,
+    PlaybookChecklist,
     PlaybookFull,
     PlaybookRun,
+    PlaybookTask,
     RunStatusUpdate,
     RunWithTasks,
     StartRunRequest,
@@ -128,12 +130,27 @@ function createPlaybooksStore() {
         }
     }
 
-    async function createChecklist(playbookId: string, data: { name: string; sort_order?: number }) {
-        return svelteApi.post(`/playbooks/${playbookId}/checklists`, data)
+    async function createChecklist(playbookId: string, data: { name: string; sort_order?: number }): Promise<PlaybookChecklist> {
+        const { data: checklist } = await svelteApi.post<PlaybookChecklist>(`/playbooks/${playbookId}/checklists`, data)
+        return checklist
     }
 
-    async function createTask(checklistId: string, data: { title: string; description?: string | null; sort_order?: number }) {
-        return svelteApi.post(`/checklists/${checklistId}/tasks`, data)
+    async function deleteChecklist(playbookId: string, id: string): Promise<void> {
+        await svelteApi.delete(`/playbooks/${playbookId}/checklists/${id}`)
+    }
+
+    async function createTask(checklistId: string, data: { title: string; description?: string | null; sort_order?: number }): Promise<PlaybookTask> {
+        const { data: task } = await svelteApi.post<PlaybookTask>(`/checklists/${checklistId}/tasks`, data)
+        return task
+    }
+
+    async function updateTask(id: string, data: { title: string; description?: string | null; sort_order?: number }): Promise<PlaybookTask> {
+        const { data: task } = await svelteApi.put<PlaybookTask>(`/tasks/${id}`, data)
+        return task
+    }
+
+    async function deleteTask(id: string): Promise<void> {
+        await svelteApi.delete(`/tasks/${id}`)
     }
 
     async function startRun(teamId: string, data: StartRunRequest): Promise<RunWithTasks> {
@@ -210,7 +227,10 @@ function createPlaybooksStore() {
         createPlaybook,
         updatePlaybook,
         createChecklist,
+        deleteChecklist,
         createTask,
+        updateTask,
+        deleteTask,
         startRun,
         fetchRun,
         finishRun,
