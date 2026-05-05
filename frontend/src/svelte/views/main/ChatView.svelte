@@ -24,9 +24,11 @@
   import DirectMessageModal from '../../components/modals/DirectMessageModal.svelte'
   import SetStatusModal from '../../components/modals/SetStatusModal.svelte'
   import { chatStore } from '../../stores/chat'
+  import type { SvelteChatChannel, SvelteChatMember } from '../../stores/chat'
   import { uiStore } from '../../stores/ui'
   import { quickSwitcherStore } from '../../stores/quickSwitcher'
   import { activityStore } from '../../stores/activity'
+  import { authStore } from '../../stores/auth'
   import { connectionStatus, retryConnection } from '../../stores/websocket'
   import { callsStore, registerCallWebSocketHandlers } from '../../stores/calls.svelte'
 
@@ -38,11 +40,20 @@
   )
   const currentMembers = $derived(
     currentChannel
-      ? ($chatStore.membersByTeam[currentChannel.team_id] ?? [
+      ? currentChannel.channel_type === 'direct'
+        ? resolveDirectMembers(
+            currentChannel,
+            $chatStore.membersByTeam[currentChannel.team_id] ?? [],
+            $authStore.user?.id,
+          )
+        : ($chatStore.membersByTeam[currentChannel.team_id] ?? [
           { user_id: 'adam', username: 'adam', display_name: 'Adam Builder' },
           { user_id: 'member', username: 'member', display_name: 'Member' },
         ])
       : [],
+  )
+  const sidebarMembers = $derived(
+    $chatStore.teams.flatMap((team) => $chatStore.membersByTeam[team.id] ?? []),
   )
   const isDisconnected = $derived($connectionStatus !== 'connected')
   const contentOpacityClass = $derived(
@@ -64,10 +75,45 @@
   let browseChannelsOpen = $state(false)
   let dmOpen = $state(false)
   let setStatusOpen = $state(false)
+  let requestedChannelLoad = $state<string | null>(null)
+
+  function resolveDirectMembers(
+    channel: SvelteChatChannel,
+    members: SvelteChatMember[],
+    currentUserId: string | undefined,
+  ) {
+    const counterparty = members.find((member) => {
+      if (currentUserId && member.user_id === currentUserId) return false
+      const displayName = member.display_name ?? ''
+      return (
+        channel.name.toLowerCase().includes(member.username.toLowerCase()) ||
+        channel.display_name.toLowerCase() === displayName.toLowerCase() ||
+        channel.display_name.toLowerCase().includes(member.username.toLowerCase())
+      )
+    })
+
+    return counterparty
+      ? [counterparty]
+      : members.filter((member) => !currentUserId || member.user_id !== currentUserId).slice(0, 1)
+  }
 
   onMount(() => {
     void bootstrapChat()
     registerCallWebSocketHandlers()
+  })
+
+  $effect(() => {
+    const channelId = $chatStore.currentChannelId
+    if (!channelId || requestedChannelLoad === channelId || $chatStore.messagesByChannel[channelId]) {
+      return
+    }
+
+    requestedChannelLoad = channelId
+    void chatStore.fetchMessages(channelId).finally(() => {
+      if (requestedChannelLoad === channelId) {
+        requestedChannelLoad = null
+      }
+    })
   })
 
   async function bootstrapChat() {
@@ -114,6 +160,8 @@
   <ChatSidebar
     teams={$chatStore.teams}
     channels={$chatStore.channels}
+    members={sidebarMembers}
+    currentUserId={$authStore.user?.id}
     unreadCounts={$chatStore.unreadCounts}
     currentChannelId={$chatStore.currentChannelId}
     onSelectChannel={(channelId) => chatStore.selectChannel(channelId)}

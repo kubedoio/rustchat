@@ -59,6 +59,8 @@ export interface SvelteChatMember {
     display_name?: string
     avatar_url?: string
     presence?: 'online' | 'away' | 'dnd' | 'offline'
+    status_text?: string | null
+    status_emoji?: string | null
 }
 
 export interface SvelteChatReadState {
@@ -118,6 +120,16 @@ function optionalStringField(source: Record<string, unknown>, field: string): st
     const value = source[field]
 
     return typeof value === 'string' ? value : undefined
+}
+
+function customStatusField(source: Record<string, unknown>, field: 'text' | 'emoji'): string | undefined {
+    const value = source.custom_status
+
+    if (!isRecord(value)) {
+        return undefined
+    }
+
+    return optionalStringField(value, field)
 }
 
 function normalizeChannelType(value: unknown): SvelteChatChannelType {
@@ -217,6 +229,8 @@ function normalizeMember(value: unknown): SvelteChatMember {
         username: stringField(member, 'username'),
         display_name: optionalStringField(member, 'display_name'),
         avatar_url: optionalStringField(member, 'avatar_url'),
+        status_text: optionalStringField(member, 'status_text') ?? customStatusField(member, 'text'),
+        status_emoji: optionalStringField(member, 'status_emoji') ?? customStatusField(member, 'emoji'),
         presence:
             member.presence === 'online' || member.presence === 'away' || member.presence === 'dnd' || member.presence === 'offline'
                 ? member.presence
@@ -273,7 +287,10 @@ function createChatStore() {
             const messages = data.messages.map((post) => normalizePost(post, channelId))
             update((state) => ({
                 ...state,
-                messagesByChannel: { ...state.messagesByChannel, [channelId]: messages },
+                messagesByChannel: {
+                    ...state.messagesByChannel,
+                    [channelId]: mergeMessages(messages, state.messagesByChannel[channelId] ?? []),
+                },
                 readStateByChannel: { ...state.readStateByChannel, [channelId]: data.read_state },
                 loading: false,
             }))
@@ -570,6 +587,23 @@ function createChatStore() {
         uploadFile,
         reset: () => set(initialState),
     }
+}
+
+function mergeMessages(fetched: SvelteChatPost[], existing: SvelteChatPost[]): SvelteChatPost[] {
+    const merged = new Map<string, SvelteChatPost>()
+
+    for (const message of fetched) {
+        merged.set(message.id, message)
+    }
+    for (const message of existing) {
+        merged.set(message.id, message)
+    }
+
+    return Array.from(merged.values()).sort((a, b) => {
+        const left = new Date(a.created_at).getTime()
+        const right = new Date(b.created_at).getTime()
+        return left - right
+    })
 }
 
 export const chatStore = createChatStore()

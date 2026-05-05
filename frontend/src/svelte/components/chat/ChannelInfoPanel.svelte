@@ -63,6 +63,14 @@
     return name.slice(0, 2).toUpperCase()
   }
 
+  function memberStatusText(member: SvelteChatMember): string {
+    return member.status_text ?? ''
+  }
+
+  function memberStatusEmoji(member: SvelteChatMember): string {
+    return member.status_emoji ?? ''
+  }
+
   function formatDate(value: string | undefined): string {
     if (!value) return '—'
     try {
@@ -134,12 +142,17 @@
               <span class="h-2 w-2 rounded-full {presenceDotClass(member.presence)}"></span>
               {presenceLabel(member.presence)}
             </span>
-            <span
-              data-testid="channel-info-custom-status"
-              class="inline-flex max-w-full items-center gap-1 rounded-full border border-border-1 bg-bg-surface-1 px-3 py-1 text-sm text-text-2"
-            >
-              <span class="truncate">No status set</span>
-            </span>
+            {#if memberStatusText(member) || memberStatusEmoji(member)}
+              <span
+                data-testid="channel-info-custom-status"
+                class="inline-flex max-w-full items-center gap-1 rounded-full border border-border-1 bg-bg-surface-1 px-3 py-1 text-sm text-text-2"
+              >
+                {#if memberStatusEmoji(member)}
+                  <span>{memberStatusEmoji(member)}</span>
+                {/if}
+                <span class="truncate">{memberStatusText(member)}</span>
+              </span>
+            {/if}
           {/each}
         </div>
       {/if}

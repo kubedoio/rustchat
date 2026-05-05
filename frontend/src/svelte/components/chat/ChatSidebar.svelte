@@ -25,6 +25,7 @@
   export let unreadCounts: Record<string, number> = {}
   export let activeChannelId = 'general'
   export let currentChannelId: string | null | undefined = activeChannelId
+  export let currentUserId: string | undefined = undefined
   export let members: ChatMember[] = [
     { id: 'adam', username: 'adam', displayName: 'Adam' },
     { id: 'member', username: 'member', displayName: 'Member' }
@@ -108,6 +109,29 @@
   function unreadCount(channel: SidebarChannel): number {
     return unreadCounts[channel.id] ?? channel.unreadCount ?? 0
   }
+
+  function memberForDm(channel: SidebarChannel): ChatMember | null {
+    const normalizedName = channel.name.toLowerCase()
+    const normalizedDisplayName = channelDisplayName(channel).toLowerCase()
+
+    return members.find((member) => {
+      if (currentUserId && (member.user_id ?? member.id) === currentUserId) return false
+      const displayName = member.displayName ?? member.display_name ?? ''
+      return (
+        normalizedName.includes(member.username.toLowerCase()) ||
+        normalizedDisplayName === displayName.toLowerCase() ||
+        normalizedDisplayName.includes(member.username.toLowerCase())
+      )
+    }) ?? members.find((member) => !currentUserId || (member.user_id ?? member.id) !== currentUserId) ?? null
+  }
+
+  function memberStatusText(member: ChatMember | null): string {
+    return member?.status_text ?? member?.statusText ?? ''
+  }
+
+  function memberStatusEmoji(member: ChatMember | null): string {
+    return member?.status_emoji ?? member?.statusEmoji ?? ''
+  }
 </script>
 
 <aside class="flex w-72 shrink-0 flex-col border-r border-gray-200 bg-slate-950 text-white" aria-label="Chat sidebar">
@@ -183,10 +207,11 @@
             <div class="mt-2 space-y-1">
               {#each dms as channel (channel.id)}
                 {@const isSelected = channel.id === selectedChannelId}
-                {@const placeholderPresence = 'online'}
-                {@const statusLabel = presenceLabel(placeholderPresence)}
-                {@const statusText = ''}
-                {@const statusEmoji = ''}
+                {@const member = memberForDm(channel)}
+                {@const presence = member?.presence ?? 'offline'}
+                {@const statusLabel = presenceLabel(presence)}
+                {@const statusText = memberStatusText(member)}
+                {@const statusEmoji = memberStatusEmoji(member)}
                 <button
                   type="button"
                   data-testid="dm-sidebar-row"
@@ -199,7 +224,7 @@
                       <div class="h-6 w-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-[10px] font-bold">
                         {getInitials(channelDisplayName(channel))}
                       </div>
-                      <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-slate-950 {presenceDotClass(placeholderPresence)}" aria-hidden="true"></span>
+                      <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-slate-950 {presenceDotClass(presence)}" aria-hidden="true"></span>
                     </span>
                     <span class="min-w-0 flex flex-col">
                       <span class="truncate">{channelDisplayName(channel)}</span>
@@ -208,9 +233,11 @@
                         class="mt-0.5 block truncate text-[11px] {isSelected ? 'text-slate-600' : 'text-slate-400'}"
                       >
                         {#if statusText || statusEmoji}
-                          {#if statusEmoji}<span>{statusEmoji}</span>{/if}
-                          {#if statusEmoji && statusText}<span class="mx-1">·</span>{/if}
-                          {statusText || statusLabel}
+                          {#if statusEmoji && statusText}
+                            {statusEmoji} {statusText}
+                          {:else}
+                            {statusText || statusEmoji || statusLabel}
+                          {/if}
                         {:else}
                           {statusLabel}
                         {/if}

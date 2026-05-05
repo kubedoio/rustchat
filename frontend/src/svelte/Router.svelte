@@ -7,6 +7,10 @@
   import ResetPasswordView from './views/auth/ResetPasswordView.svelte'
   import ChatView from './views/main/ChatView.svelte'
   import AdminConsole from './views/admin/AdminConsole.svelte'
+  import PlaybooksView from './views/playbooks/PlaybooksView.svelte'
+  import PlaybookEditor from './views/playbooks/PlaybookEditor.svelte'
+  import PlaybookRun from './views/playbooks/PlaybookRun.svelte'
+  import ProfileSettingsView from './views/settings/ProfileSettingsView.svelte'
   import { authStore, isAuthenticated } from './stores/auth'
   import { chatStore } from './stores/chat'
 
@@ -24,6 +28,9 @@
     '/reset-password': { component: ResetPasswordView },
     '/set-password': { component: ResetPasswordView },
     '/': { component: ChatView, requiresAuth: true },
+    '/playbooks': { component: PlaybooksView, requiresAuth: true },
+    '/playbooks/new': { component: PlaybookEditor, requiresAuth: true },
+    '/settings/profile': { component: ProfileSettingsView, requiresAuth: true },
   }
 
   const adminRoles = new Set(['system_admin', 'org_admin', 'admin', 'administrator'])
@@ -40,6 +47,16 @@
     const channelMatch = path.match(/^\/channels\/([^/]+)$/)
     if (channelMatch) {
       return { component: ChatView, requiresAuth: true, params: { id: channelMatch[1] } }
+    }
+
+    const playbookEditMatch = path.match(/^\/playbooks\/([^/]+)\/edit$/)
+    if (playbookEditMatch) {
+      return { component: PlaybookEditor, requiresAuth: true, params: { id: playbookEditMatch[1] } }
+    }
+
+    const runMatch = path.match(/^\/runs\/([^/]+)$/)
+    if (runMatch) {
+      return { component: PlaybookRun, requiresAuth: true, params: { id: runMatch[1] } }
     }
 
     return staticRoutes['/']

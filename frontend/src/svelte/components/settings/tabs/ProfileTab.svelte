@@ -1,15 +1,66 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import { authStore } from '../../../stores/auth'
+  import { svelteApi } from '../../../stores/http'
 
-  let firstName = $authStore.user?.first_name || ''
-  let lastName = $authStore.user?.last_name || ''
-  let nickname = $authStore.user?.nickname || ''
-  let position = $authStore.user?.position || ''
-  let displayName = $authStore.user?.display_name || ''
+  let firstName = $state('')
+  let lastName = $state('')
+  let nickname = $state('')
+  let position = $state('')
+  let displayName = $state('')
+  let syncedUserId = $state<string | null>(null)
+  let saving = $state(false)
+  let error = $state<string | null>(null)
+  let success = $state<string | null>(null)
 
-  function handleSave() {
-    // Placeholder: will be wired to API in a future step
-    console.log('Save profile', { firstName, lastName, nickname, position, displayName })
+  function syncFromUser() {
+    const user = $authStore.user
+    if (!user || syncedUserId === user.id) return
+
+    syncedUserId = user.id
+    firstName = user.first_name || user.firstName || ''
+    lastName = user.last_name || user.lastName || ''
+    nickname = user.nickname || ''
+    position = user.position || ''
+    displayName = user.display_name || user.displayName || ''
+  }
+
+  $effect(() => {
+    syncFromUser()
+  })
+
+  async function handleSave() {
+    const user = $authStore.user
+    if (!user || saving) {
+      return
+    }
+
+    saving = true
+    error = null
+    success = null
+
+    try {
+      await svelteApi.put('/users/me/patch', {
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        nickname: nickname.trim(),
+        position: position.trim(),
+      }, { baseURL: '/api/v4' })
+
+      await svelteApi.put(`/users/${user.id}`, {
+        display_name: displayName.trim(),
+        username: user.username,
+      })
+
+      syncedUserId = null
+      await authStore.fetchMe()
+      await tick()
+      success = 'Profile saved.'
+    } catch (saveError) {
+      error = saveError instanceof Error ? saveError.message : 'Failed to save profile.'
+    } finally {
+      saving = false
+    }
   }
 </script>
 
@@ -93,13 +144,26 @@
       </div>
 
       <!-- Save Button -->
+      {#if error}
+        <div class="rounded-r-2 border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
+          {error}
+        </div>
+      {/if}
+
+      {#if success}
+        <div class="rounded-r-2 border border-success/30 bg-success/10 px-3 py-2 text-sm text-success" role="status">
+          {success}
+        </div>
+      {/if}
+
       <div class="flex justify-end">
         <button
           type="button"
           on:click={handleSave}
-          class="rounded-r-2 bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-standard hover:bg-brand-hover"
+          disabled={saving || !$authStore.user}
+          class="rounded-r-2 bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-standard hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Save Profile
+          {saving ? 'Saving...' : 'Save Profile'}
         </button>
       </div>
     </div>

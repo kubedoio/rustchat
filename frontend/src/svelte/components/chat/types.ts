@@ -4,6 +4,11 @@ export type ChatMember = {
   username: string
   displayName?: string
   display_name?: string
+  presence?: 'online' | 'away' | 'dnd' | 'offline'
+  statusText?: string | null
+  status_text?: string | null
+  statusEmoji?: string | null
+  status_emoji?: string | null
 }
 
 export type ChatAttachment = {

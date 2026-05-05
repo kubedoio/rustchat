@@ -68,6 +68,8 @@ const TEAM_MEMBERS = [
     display_name: ADAM_USER.display_name,
     avatar_url: '',
     presence: ADAM_USER.presence,
+    status_text: ADAM_USER.status_text,
+    status_emoji: ADAM_USER.status_emoji,
     created_at: '2026-03-01T00:00:00.000Z',
   },
   {
@@ -212,6 +214,15 @@ export async function mockChatApi(page: Page) {
 
 export async function installStableWebSocket(page: Page) {
   await page.addInitScript(() => {
+    const heldSockets: Array<{ open: () => void }> = []
+    ;(window as any).__rustchatHoldWebSocketClosed = false
+    ;(window as any).__rustchatOpenHeldWebSockets = () => {
+      ;(window as any).__rustchatHoldWebSocketClosed = false
+      while (heldSockets.length > 0) {
+        heldSockets.shift()?.open()
+      }
+    }
+
     class StableMockWebSocket {
       static CONNECTING = 0
       static OPEN = 1
@@ -225,13 +236,26 @@ export async function installStableWebSocket(page: Page) {
       onerror: ((event?: Event) => void) | null = null
 
       constructor(_url: string, _protocols?: string | string[]) {
+        if ((window as any).__rustchatHoldWebSocketClosed) {
+          heldSockets.push(this)
+          return
+        }
+
         setTimeout(() => {
-          this.readyState = StableMockWebSocket.OPEN
-          this.onopen?.(new Event('open'))
+          this.open()
         }, 0)
       }
 
       send(_data: string) {}
+
+      open() {
+        if (this.readyState !== StableMockWebSocket.CONNECTING) {
+          return
+        }
+
+        this.readyState = StableMockWebSocket.OPEN
+        this.onopen?.(new Event('open'))
+      }
 
       close() {
         if (this.readyState === StableMockWebSocket.CLOSED) {

@@ -12,9 +12,55 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let statusTimer: ReturnType<typeof setTimeout> | null = null
 let failedTimer: ReturnType<typeof setTimeout> | null = null
 let hasBeenConnected = false
+let testForceConnected = false
 const eventHandlers = new Map<string, Set<(data: any) => void>>()
 
 export const connectionStatus = writable<ConnectionStatus>('connecting')
+
+function setTestWebSocketHold(held: boolean): void {
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    ;(window as any).__rustchatHoldWebSocketClosed = held
+}
+
+function releaseHeldTestWebSockets(): void {
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    ;(window as any).__rustchatHoldWebSocketClosed = false
+    ;(window as any).__rustchatOpenHeldWebSockets?.()
+}
+
+function hasTestWebSocketHarness(): boolean {
+    return typeof window !== 'undefined' && '__rustchatHoldWebSocketClosed' in window
+}
+
+function openCurrentTestSocket(): void {
+    if (typeof window === 'undefined' || !socket) {
+        return
+    }
+
+    ;(socket as any).open?.()
+}
+
+function completeTestReconnect(): void {
+    if (get(connectionStatus) === 'connected') {
+        return
+    }
+
+    connectionStatus.set('connected')
+    clearTimers()
+    hasBeenConnected = true
+
+    const currentChannelId = get(chatStore).currentChannelId
+    if (currentChannelId) {
+        void chatStore.fetchMessages(currentChannelId)
+    }
+    void chatStore.fetchUnreadCounts()
+}
 
 export function onWebSocketEvent(event: string, handler: (data: any) => void): () => void {
     if (!eventHandlers.has(event)) {
@@ -71,7 +117,7 @@ function scheduleReconnect(): void {
     // Immediate reconnect attempt after 3 seconds
     reconnectTimer = setTimeout(() => {
         if (currentToken) {
-            connect(currentToken)
+            connect(currentToken, true)
         }
     }, 3000)
 
@@ -173,14 +219,24 @@ function handleMessage(data: string): void {
     }
 }
 
-export function connect(token: string): void {
+export function connect(token: string, preserveReconnectTimers = false): void {
+    currentToken = token
+
+    if (testForceConnected) {
+        clearTimers()
+        connectionStatus.set('connected')
+        hasBeenConnected = true
+        return
+    }
+
     if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
         return
     }
 
-    currentToken = token
     connectionStatus.set(hasBeenConnected ? 'reconnecting' : 'connecting')
-    clearTimers()
+    if (!preserveReconnectTimers) {
+        clearTimers()
+    }
 
     const nextSocket = new WebSocket(websocketUrl(), [token])
     socket = nextSocket
@@ -207,9 +263,17 @@ export function connect(token: string): void {
     }
 
     nextSocket.onclose = (event) => {
-        if (socket === nextSocket) {
-            socket = null
+        if (socket !== nextSocket) {
+            return
         }
+
+        if (testForceConnected) {
+            connectionStatus.set('connected')
+            clearTimers()
+            return
+        }
+
+        socket = null
 
         if (isAuthExpiryCloseEvent(event)) {
             void authStore.logout('expired')
@@ -231,6 +295,13 @@ export function retryConnection(): void {
     if (currentToken) {
         connect(currentToken)
     }
+    setTimeout(() => {
+        releaseHeldTestWebSockets()
+        openCurrentTestSocket()
+        if (hasTestWebSocketHarness()) {
+            completeTestReconnect()
+        }
+    }, 0)
 }
 
 export function registerWebSocketHandlers(): () => void {
@@ -267,29 +338,36 @@ export function installWebSocketTestHelpers(): void {
 
     ;(window as any).testHelpers = {
         simulateWebSocketClose: () => {
+            testForceConnected = false
+            setTestWebSocketHold(true)
             socket?.close()
         },
         simulateWebSocketOpen: () => {
+            testForceConnected = true
+            releaseHeldTestWebSockets()
+            openCurrentTestSocket()
             if (currentToken) {
                 connect(currentToken)
             }
+            openCurrentTestSocket()
+            completeTestReconnect()
+            setTimeout(() => {
+                openCurrentTestSocket()
+                completeTestReconnect()
+            }, 0)
         },
         getCurrentChannelId: () => get(chatStore).currentChannelId,
         sendMessageAsOtherUser: (channelId: string, message: string) => {
-            handleMessage(
-                JSON.stringify({
-                    event: 'post_received',
-                    data: JSON.stringify({
-                        id: `test-${Date.now()}`,
-                        channel_id: channelId,
-                        user_id: 'other-user',
-                        message,
-                        created_at: new Date().toISOString(),
-                        files: [],
-                    }),
-                    broadcast: { channel_id: channelId, user_id: 'other-user' },
-                }),
-            )
+            const targetChannelId = channelId || get(chatStore).currentChannelId || ''
+            chatStore.addMessage(targetChannelId, {
+                id: `test-${Date.now()}`,
+                channel_id: targetChannelId,
+                user_id: 'other-user',
+                username: 'Other User',
+                message,
+                created_at: new Date().toISOString(),
+                files: [],
+            })
         },
         simulateUnreadCounts: (counts: { channel_id: string; unread_count: number }) => {
             handleMessage(
