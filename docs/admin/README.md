@@ -37,7 +37,7 @@ This guide is for system administrators, DevOps engineers, and IT staff responsi
 
 Before deploying, review the [System Architecture](../architecture/overview.md) to understand:
 - Backend components (Rust/Axum)
-- Frontend (Vue.js SPA)
+- Frontend (Svelte SPA)
 - Database (PostgreSQL)
 - Cache and pub/sub (Redis)
 - File storage (S3-compatible)

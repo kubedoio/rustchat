@@ -90,14 +90,14 @@ impl UserService {
 }
 ```
 
-## TypeScript/Vue (Frontend)
+## TypeScript/Svelte (Frontend)
 
 ### Formatting
 - Prettier with 2-space indent
 - Enforced in CI
 
 ### Linting
-- ESLint with Vue 3 recommended rules
+- ESLint with TypeScript recommended rules
 - No `any` types without justification
 
 ### Naming Conventions
@@ -111,50 +111,44 @@ impl UserService {
 | Constants | SCREAMING_SNAKE_CASE | `MAX_RETRIES` |
 | Composables | camelCase with 'use' | `useUserStore` |
 
-### Vue Component Structure
+### Svelte Component Structure
 
-```vue
-<script setup lang="ts">
-// 1. Imports
-import { ref, computed } from 'vue'
-import type { User } from '@/types'
+```svelte
+<script lang="ts">
+  // 1. Imports
+  import type { User } from '@/types'
 
-// 2. Props/Emits
-const props = defineProps<{
-  userId: string
-}>()
-
-const emit = defineEmits<{
-  updated: [user: User]
-}>()
-
-// 3. Composables
-const userStore = useUserStore()
-
-// 4. Reactive state
-const loading = ref(false)
-const error = ref<string | null>(null)
-
-// 5. Computed
-const user = computed(() => userStore.getUser(props.userId))
-
-// 6. Methods
-async function updateProfile(data: UserUpdate) {
-  loading.value = true
-  try {
-    const updated = await userStore.update(props.userId, data)
-    emit('updated', updated)
-  } catch (e) {
-    error.value = String(e)
-  } finally {
-    loading.value = false
+  // 2. Props
+  interface Props {
+    userId: string
   }
-}
+  let { userId }: Props = $props()
+
+  // 3. Shared utilities
+  import { userStore } from '@/stores/userStore'
+
+  // 4. Reactive state
+  let loading = $state(false)
+  let error = $state<string | null>(null)
+
+  // 5. Derived
+  let user = $derived(userStore.getUser(userId))
+
+  // 6. Methods
+  async function updateProfile(data: UserUpdate) {
+    loading = true
+    try {
+      const updated = await userStore.update(userId, data)
+      // Emit via callback prop or custom event
+    } catch (e) {
+      error = String(e)
+    } finally {
+      loading = false
+    }
+  }
 </script>
 
-<template>
-  <!-- Template here -->
-</template>
+<!-- Template here -->
 ```
 
 ### Type Safety

@@ -310,7 +310,7 @@ RUSTCHAT_PUSH_PORT=3001 cargo run
 
 Recommended extensions:
 - **Rust:** `rust-lang.rust-analyzer` — enable `cargo check` on save
-- **Vue:** Vue.volar (official Vue 3 + TypeScript support)
+- **Svelte:** Svelte for VS Code (official Svelte 5 + TypeScript support)
 - **Tailwind:** bradlc.vscode-tailwindcss
 - **Docker:** ms-azuretools.vscode-docker
 
@@ -326,7 +326,7 @@ Settings for `settings.json`:
 ### Vim / Neovim
 
 - Rust: `rust-analyzer` via `nvim-lspconfig`
-- Vue: `volar` language server
+- Svelte: `svelte-language-server`
 - See [docs/development/local-setup.md](development/local-setup.md) for additional editor-specific tips.
 
 ---
