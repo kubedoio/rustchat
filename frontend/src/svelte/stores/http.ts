@@ -23,17 +23,33 @@ export interface SvelteHttpOptions {
     baseURL?: string
     headers?: Record<string, string>
     authenticated?: boolean
+    params?: Record<string, string | number | boolean | undefined>
 }
 
 const AUTH_TOKEN_KEY = 'auth_token'
 const DEFAULT_API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
-function buildUrl(path: string, baseURL = DEFAULT_API_BASE): string {
+function buildUrl(path: string, baseURL = DEFAULT_API_BASE, params?: Record<string, string | number | boolean | undefined>): string {
     if (/^https?:\/\//.test(path)) {
         return path
     }
 
-    return `${baseURL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
+    let url = `${baseURL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
+
+    if (params) {
+        const searchParams = new URLSearchParams()
+        for (const [key, value] of Object.entries(params)) {
+            if (value !== undefined && value !== null) {
+                searchParams.append(key, String(value))
+            }
+        }
+        const queryString = searchParams.toString()
+        if (queryString) {
+            url += `?${queryString}`
+        }
+    }
+
+    return url
 }
 
 async function parseBody<T>(response: Response): Promise<T> {
@@ -73,7 +89,7 @@ export async function svelteHttp<T>(
         init.body = JSON.stringify(body)
     }
 
-    const response = await fetch(buildUrl(path, options.baseURL), init)
+    const response = await fetch(buildUrl(path, options.baseURL, options.params), init)
     const data = await parseBody<T>(response)
 
     if (!response.ok) {
@@ -106,7 +122,7 @@ export async function svelteHttpFormData<T>(
         body: formData,
     }
 
-    const response = await fetch(buildUrl(path, options.baseURL), init)
+    const response = await fetch(buildUrl(path, options.baseURL, options.params), init)
     const data = await parseBody<T>(response)
 
     if (!response.ok) {
