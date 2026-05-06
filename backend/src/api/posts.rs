@@ -480,7 +480,7 @@ async fn add_reaction(
         INSERT INTO reactions (post_id, user_id, emoji_name)
         VALUES ($1, $2, $3)
         ON CONFLICT (post_id, user_id, emoji_name) DO UPDATE SET create_at = extract(epoch from now()) * 1000
-        RETURNING *
+        RETURNING post_id, user_id, emoji_name, create_at
         "#,
     )
     .bind(id)
@@ -805,7 +805,7 @@ async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> Api
     let post_ids: Vec<Uuid> = posts.iter().map(|p| p.id).collect();
 
     let reactions: Vec<Reaction> =
-        sqlx::query_as("SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY create_at")
+        sqlx::query_as("SELECT post_id, user_id, emoji_name, create_at FROM reactions WHERE post_id = ANY($1) ORDER BY create_at")
             .bind(&post_ids)
             .fetch_all(&state.db)
             .await?;

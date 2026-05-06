@@ -95,7 +95,7 @@ pub(super) async fn add_reaction(
         INSERT INTO reactions (user_id, post_id, emoji_name)
         VALUES ($1, $2, $3)
         ON CONFLICT (user_id, post_id, emoji_name) DO UPDATE SET emoji_name = $3
-        RETURNING *
+        RETURNING post_id, user_id, emoji_name, create_at
         "#,
     )
     .bind(auth.user_id)
@@ -252,7 +252,7 @@ async fn remove_reaction_internal(
     let emoji_name = crate::mattermost_compat::emoji_data::get_short_name_for_emoji(emoji_name);
 
     let reaction: Option<crate::models::reaction::Reaction> = sqlx::query_as(
-        "SELECT * FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
+        "SELECT post_id, user_id, emoji_name, create_at FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
     )
     .bind(user_id)
     .bind(post_id)

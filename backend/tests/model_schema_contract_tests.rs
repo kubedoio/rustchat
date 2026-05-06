@@ -96,7 +96,6 @@ async fn test_post_schema_parity(pool: PgPool) -> anyhow::Result<()> {
 /// - `create_at BIGINT NOT NULL`
 ///
 /// `models::reaction::Reaction` has all these fields with the correct types:
-/// - `id: Uuid`
 /// - `post_id: Uuid`
 /// - `user_id: Uuid`
 /// - `emoji_name: String`
@@ -106,13 +105,12 @@ async fn test_post_schema_parity(pool: PgPool) -> anyhow::Result<()> {
 #[sqlx::test]
 async fn test_reaction_schema_parity(pool: PgPool) -> anyhow::Result<()> {
     let row: Option<rustchat::models::reaction::Reaction> =
-        sqlx::query_as("SELECT * FROM reactions LIMIT 1")
+        sqlx::query_as("SELECT post_id, user_id, emoji_name, create_at FROM reactions LIMIT 1")
             .fetch_optional(&pool)
             .await?;
 
     if let Some(row) = row {
         // Verify all required fields are present and have correct types.
-        let _id: uuid::Uuid = row.id;
         let _post_id: uuid::Uuid = row.post_id;
         let _user_id: uuid::Uuid = row.user_id;
         let _emoji_name: String = row.emoji_name;
@@ -131,13 +129,12 @@ async fn test_reaction_schema_parity(pool: PgPool) -> anyhow::Result<()> {
 #[sqlx::test]
 async fn test_reaction_is_canonical(pool: PgPool) -> anyhow::Result<()> {
     let row: Option<rustchat::models::reaction::Reaction> =
-        sqlx::query_as("SELECT * FROM reactions LIMIT 1")
+        sqlx::query_as("SELECT post_id, user_id, emoji_name, create_at FROM reactions LIMIT 1")
             .fetch_optional(&pool)
             .await?;
 
     if let Some(row) = row {
         // Verify all schema fields are present on the canonical type.
-        let _id: uuid::Uuid = row.id;
         let _post_id: uuid::Uuid = row.post_id;
         let _user_id: uuid::Uuid = row.user_id;
         let _emoji_name: String = row.emoji_name;
