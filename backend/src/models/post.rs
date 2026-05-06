@@ -87,6 +87,8 @@ pub struct PostResponse {
     pub deleted_at: Option<DateTime<Utc>>,
     pub reply_count: i64,
     pub last_reply_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    pub seq: i64,
     // User info from JOIN
     pub username: Option<String>,
     pub avatar_url: Option<String>,
@@ -101,8 +103,6 @@ pub struct PostResponse {
     pub is_saved: bool,
     #[sqlx(skip)]
     pub client_msg_id: Option<String>,
-    #[sqlx(default)]
-    pub seq: i64,
 }
 
 /// Response for thread endpoint
