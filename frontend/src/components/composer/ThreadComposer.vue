@@ -49,7 +49,7 @@ const editor = useEditor({
 
 const canSend = computed(() => {
   const html = editor.value?.getHTML() || ''
-  const textOnly = html.replace(/<[^>]*>/g, '').trim()
+  const textOnly = html.replace(/<\/?[^>]+(>|$)/g, '').trim()
   return textOnly.length > 0 && !props.isSending
 })
 

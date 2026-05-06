@@ -64,10 +64,10 @@ const moveToCategories = ref<SidebarCategory[]>([]);
 const moveToChannelId = ref('');
 const { canManageTeam: canManageCurrentTeam } = useCurrentTeamManagementPermission(
   () => teamStore.currentTeamId,
-)
+);
 const canCreateChannelsInCurrentTeam = computed(() =>
   !!teamStore.currentTeamId && canCreateChannelForRole(authStore.user?.role),
-)
+);
 
 // Reload channels when team changes
 watch(() => teamStore.currentTeamId, (teamId) => {
