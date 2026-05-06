@@ -1,11 +1,15 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
   import { format, formatDistanceToNow } from 'date-fns'
-  import { MessageSquare, Pencil, Trash2, Pin, Check, Bookmark, MoreHorizontal, X } from 'lucide-svelte'
+  import { MessageSquare, Pencil, Trash2, Pin, Check, Bookmark, MoreHorizontal, X, Video, Phone } from 'lucide-svelte'
+  import { renderMarkdown } from '../../utils/markdown'
+  import { authStore } from '../../stores/auth'
+  import ImageGallery from '../../components/atomic/ImageGallery.svelte'
   import type { ChatMessage } from './types'
 
   export let message: ChatMessage
   export let currentUserId: string | undefined = undefined
+  export let isHighlighted = false
 
   const dispatch = createEventDispatcher<{
     reply: string
@@ -21,6 +25,10 @@
   let editContent = ''
   let saving = false
 
+  let galleryImages: { id: string; name: string; url: string }[] = []
+  let galleryOpen = false
+  let galleryIndex = 0
+
   const quickEmojis = ['👍', '❤️', '😄']
 
   $: isOwnMessage = currentUserId !== undefined && message.user_id === currentUserId
@@ -29,12 +37,18 @@
     message.props?.type === 'system_join_leave' ||
     message.props?.type === 'system_purpose' ||
     message.props?.type === 'system_header'
+  $: isVideoCall = message.props?.type === 'video_call'
+  $: isCallsProtocol = message.props?.type === 'calls_protocol'
 
   $: timestamp = message.createdAt ?? message.created_at
   $: authorName = message.username ?? message.authorName ?? 'Someone'
   $: body = message.body ?? message.message ?? ''
   $: files = message.attachments ?? message.files ?? []
   $: reactions = message.reactions ?? []
+
+  $: currentUsername = $authStore.user?.username
+  $: isMentioned = currentUsername && body.includes(`@${currentUsername}`)
+  $: renderedBody = renderMarkdown(body, currentUsername)
 
   $: statusClasses = [
     message.status === 'sending' ? 'opacity-70' : '',
@@ -131,6 +145,17 @@
       })
       .filter((r) => r.count > 0)
   }
+
+  function openGallery(clickedUrl: string) {
+    const imageFiles = files.filter(
+      (f) => f.mimeType?.startsWith('image/') || f.mime_type?.startsWith('image/')
+    )
+    galleryImages = imageFiles
+      .map((f) => ({ id: f.id, name: f.name ?? 'Image', url: f.url ?? '' }))
+      .filter((f) => f.url)
+    galleryIndex = galleryImages.findIndex((f) => f.url === clickedUrl)
+    galleryOpen = true
+  }
 </script>
 
 {#if isSystemMessage}
@@ -142,10 +167,32 @@
       {/if}
     </div>
   </div>
+{:else if isVideoCall}
+  <div class="flex items-center px-3 py-2 hover:bg-bg-app/50 transition-standard">
+    <div class="flex items-center gap-3 p-3 rounded-r-2 bg-bg-surface-2 border border-border-1 w-full max-w-md mx-auto">
+      <Video class="w-5 h-5 text-brand" />
+      <div class="flex-1">
+        <p class="text-sm font-medium text-text-1">Video call</p>
+        <p class="text-xs text-text-3">{message.props?.ended ? 'Ended' : 'In progress'}</p>
+      </div>
+      {#if !message.props?.ended}
+        <button class="px-3 py-1.5 bg-brand text-brand-foreground text-xs font-medium rounded-r-1 hover:bg-brand-hover transition-standard">
+          Join
+        </button>
+      {/if}
+    </div>
+  </div>
+{:else if isCallsProtocol}
+  <div class="flex items-center px-3 py-1 hover:bg-bg-app/50 transition-standard">
+    <div class="flex items-center gap-2 text-sm text-text-2 w-full justify-center">
+      <Phone class="w-4 h-4" />
+      <span>{(message.props?.text as string) || 'Call started'}</span>
+    </div>
+  </div>
 {:else}
   <div
     data-message-id={message.id}
-    class="flex items-start group transition-standard relative px-2 sm:px-3 py-1 hover:bg-bg-app/30 {statusClasses}"
+    class="flex items-start group transition-standard relative px-2 sm:px-3 py-1 hover:bg-bg-app/30 {statusClasses} {isMentioned ? 'bg-brand/5' : ''} {isHighlighted ? 'ring-1 ring-brand/20 bg-brand/5' : ''}"
     on:mouseenter={() => (showActions = true)}
     on:mouseleave={() => {
       showActions = false
@@ -248,8 +295,8 @@
       {:else}
         <!-- Message Content -->
         <div class="relative">
-          <div class="message-content text-text-1 text-sm mt-0.5 whitespace-pre-wrap leading-relaxed max-w-full break-words">
-            {body}
+          <div class="message-content text-text-1 text-sm mt-0.5 leading-relaxed max-w-full break-words">
+            {@html renderedBody}
           </div>
         </div>
 
@@ -258,14 +305,20 @@
           <div class="mt-2 flex flex-wrap gap-2">
             {#each files as file (file.id)}
               {#if file.mimeType?.startsWith('image/') || file.mime_type?.startsWith('image/')}
-                <div data-testid="file-attachment" class="rounded-r-1 overflow-hidden border border-border-1 w-20 h-20 bg-bg-surface-2">
+                <button
+                  data-testid="file-attachment"
+                  class="rounded-r-1 overflow-hidden border border-border-1 w-20 h-20 bg-bg-surface-2 p-0"
+                  on:click={() => openGallery(file.url ?? '')}
+                  type="button"
+                  aria-label={`Open image gallery: ${file.name ?? 'Image'}`}
+                >
                   <img
                     src={file.url ?? ''}
                     alt={file.name ?? 'Image'}
                     class="w-full h-full object-cover"
                     loading="lazy"
                   />
-                </div>
+                </button>
               {:else}
                 <div data-testid="file-attachment" class="rounded-full border border-border-1 bg-bg-surface-2 px-3 py-1 text-xs text-text-2 flex items-center gap-1.5">
                   <span class="truncate max-w-[12rem]">{file.name ?? 'Attached file'}</span>
@@ -388,4 +441,12 @@
       </div>
     {/if}
   </div>
+{/if}
+
+{#if galleryOpen}
+  <ImageGallery
+    images={galleryImages}
+    initialIndex={galleryIndex}
+    onClose={() => (galleryOpen = false)}
+  />
 {/if}
