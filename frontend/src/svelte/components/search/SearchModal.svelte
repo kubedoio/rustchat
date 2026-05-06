@@ -57,7 +57,7 @@
 </script>
 
 <svelte:window
-  on:keydown={(e) => {
+  onkeydown={(e) => {
     if (open && e.key === 'Escape') {
       e.preventDefault()
       handleClose()
@@ -70,8 +70,8 @@
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-black/50"
-      on:click={handleClose}
-      on:keydown={(e) => e.key === 'Escape' && handleClose()}
+      onclick={handleClose}
+      onkeydown={(e) => e.key === 'Escape' && handleClose()}
       role="button"
       tabindex="-1"
       aria-label="Close search"
@@ -89,7 +89,7 @@
         <Search class="mr-3 h-5 w-5 text-gray-400" />
         <input
           bind:value={query}
-          on:input={onInput}
+          oninput={onInput}
           type="text"
           placeholder="Search messages, files, and more..."
           class="flex-1 bg-transparent text-lg text-gray-900 placeholder-gray-400 outline-none"
@@ -98,7 +98,7 @@
         />
         <div class="flex items-center space-x-2">
           <kbd class="hidden rounded bg-gray-100 px-2 py-1 text-xs text-gray-500 sm:block">ESC</kbd>
-          <button on:click={handleClose} class="rounded p-1 hover:bg-gray-100" aria-label="Close">
+          <button onclick={handleClose} class="rounded p-1 hover:bg-gray-100" aria-label="Close">
             <X class="h-5 w-5 text-gray-400" />
           </button>
         </div>
@@ -114,7 +114,7 @@
             class:border-brand={$searchStore.filter === filter}
             class:text-gray-500={$searchStore.filter !== filter}
             class:hover:text-gray-700={$searchStore.filter !== filter}
-            on:click={() => handleFilterClick(filter)}
+            onclick={() => handleFilterClick(filter)}
           >
             {filterLabels[filter]}
           </button>
@@ -139,8 +139,8 @@
             </div>
             {#each $searchStore.results as result (result.id)}
               <div
-                on:click={handleResultClick}
-                on:keydown={(e) => e.key === 'Enter' && handleResultClick()}
+                onclick={handleResultClick}
+                onkeydown={(e) => e.key === 'Enter' && handleResultClick()}
                 class="cursor-pointer border-b border-gray-100 px-4 py-3 last:border-0 hover:bg-gray-50"
                 role="button"
                 tabindex="0"
@@ -175,7 +175,7 @@
               <div class="space-y-1">
                 {#each $searchStore.recentSearches as search}
                   <button
-                    on:click={() => handleRecentClick(search)}
+                    onclick={() => handleRecentClick(search)}
                     class="flex w-full items-center rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     <Clock class="mr-2 h-4 w-4 text-gray-400" />

@@ -40,21 +40,21 @@
         <button
           type="button"
           class={themeButtonClass(theme === 'dark')}
-          on:click={() => (theme = 'dark')}
+          onclick={() => (theme = 'dark')}
         >
           Dark
         </button>
         <button
           type="button"
           class={themeButtonClass(theme === 'light')}
-          on:click={() => (theme = 'light')}
+          onclick={() => (theme = 'light')}
         >
           Light
         </button>
         <button
           type="button"
           class={themeButtonClass(theme === 'system')}
-          on:click={() => (theme = 'system')}
+          onclick={() => (theme = 'system')}
         >
           System
         </button>
@@ -69,14 +69,14 @@
         <button
           type="button"
           class={timeButtonClass(timeFormat === '12h')}
-          on:click={() => (timeFormat = '12h')}
+          onclick={() => (timeFormat = '12h')}
         >
           12-hour
         </button>
         <button
           type="button"
           class={timeButtonClass(timeFormat === '24h')}
-          on:click={() => (timeFormat = '24h')}
+          onclick={() => (timeFormat = '24h')}
         >
           24-hour
         </button>
@@ -91,14 +91,14 @@
         <button
           type="button"
           class={displayButtonClass(messageDisplay === 'standard')}
-          on:click={() => (messageDisplay = 'standard')}
+          onclick={() => (messageDisplay = 'standard')}
         >
           Standard
         </button>
         <button
           type="button"
           class={displayButtonClass(messageDisplay === 'compact')}
-          on:click={() => (messageDisplay = 'compact')}
+          onclick={() => (messageDisplay = 'compact')}
         >
           Compact
         </button>

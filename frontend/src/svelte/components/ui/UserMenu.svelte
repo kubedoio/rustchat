@@ -44,14 +44,14 @@
   }
 </script>
 
-<svelte:window on:click={handleClickOutside} on:keydown={handleKeydown} />
+<svelte:window onclick={handleClickOutside} onkeydown={handleKeydown} />
 
 <div class="relative" bind:this={menuEl}>
   <button
     type="button"
     data-testid="user-menu-trigger"
     class="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-sm font-bold text-brand-foreground transition-standard hover:opacity-90 focus-ring"
-    on:click={toggleMenu}
+    onclick={toggleMenu}
     aria-haspopup="true"
     aria-expanded={open}
   >
@@ -85,7 +85,7 @@
           type="button"
           class="flex w-full items-center gap-2.5 rounded-r-2 px-2.5 py-2 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-2 hover:text-text-1"
           role="menuitem"
-          on:click={() => { closeMenu(); dispatch('setStatus') }}
+          onclick={() => { closeMenu(); dispatch('setStatus') }}
         >
           <Smile class="h-4 w-4 shrink-0" />
           Set status
@@ -95,7 +95,7 @@
           type="button"
           class="flex w-full items-center gap-2.5 rounded-r-2 px-2.5 py-2 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-2 hover:text-text-1"
           role="menuitem"
-          on:click={() => { closeMenu(); dispatch('editProfile') }}
+          onclick={() => { closeMenu(); dispatch('editProfile') }}
         >
           <User class="h-4 w-4 shrink-0" />
           Edit Profile
@@ -105,7 +105,7 @@
           type="button"
           class="flex w-full items-center gap-2.5 rounded-r-2 px-2.5 py-2 text-sm font-medium text-danger transition-standard hover:bg-danger/5"
           role="menuitem"
-          on:click={handleLogout}
+          onclick={handleLogout}
         >
           <LogOut class="h-4 w-4 shrink-0" />
           Log out

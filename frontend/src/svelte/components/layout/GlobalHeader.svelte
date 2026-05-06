@@ -27,7 +27,7 @@
   }
 </script>
 
-<svelte:window on:keydown={handleMenuKeydown} />
+<svelte:window onkeydown={handleMenuKeydown} />
 
 <header class="shrink-0 h-[var(--header-height)] bg-bg-surface-1/95 backdrop-blur-sm border-b border-border-1 flex items-center px-3 gap-2 z-30">
   <!-- Logo / Site name -->
@@ -41,7 +41,7 @@
   <!-- Search bar (desktop) -->
   <button
     class="hidden md:flex items-center gap-2 flex-1 max-w-md mx-4 px-3 py-1.5 bg-bg-app border border-border-1 rounded-r-2 text-sm text-text-3 hover:border-border-2 transition-standard"
-    on:click={openSearch}
+    onclick={openSearch}
   >
     <Search class="w-4 h-4" />
     <span class="flex-1 text-left">Search</span>
@@ -53,12 +53,12 @@
     <div class="relative">
       <button
         class="w-9 h-9 flex items-center justify-center rounded-r-2 hover:bg-bg-surface-2 text-text-2 transition-standard relative"
-        on:click={() => showNotifications = !showNotifications}
+        onclick={() => showNotifications = !showNotifications}
         aria-label="Notifications"
       >
         <Bell class="w-5 h-5" />
         {#if $uiStore.unreadNotificationCount > 0}
-          <span class="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full" />
+          <span class="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full"></span>
         {/if}
       </button>
       {#if showNotifications}
@@ -69,7 +69,7 @@
     <!-- Activity feed -->
     <button
       class="w-9 h-9 flex items-center justify-center rounded-r-2 hover:bg-bg-surface-2 text-text-2 transition-standard relative"
-      on:click={() => activityStore.openFeed()}
+      onclick={() => activityStore.openFeed()}
       aria-label="Activity feed"
     >
       <Activity class="w-5 h-5" />
@@ -84,7 +84,7 @@
     <div class="relative">
       <button
         class="flex items-center gap-2 pl-2 pr-1 py-1 rounded-r-2 hover:bg-bg-surface-2 transition-standard"
-        on:click={() => showUserMenu = !showUserMenu}
+        onclick={() => showUserMenu = !showUserMenu}
       >
         <div class="w-7 h-7 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xs font-bold">
           {($authStore.user?.username ?? '?').slice(0, 2).toUpperCase()}
@@ -96,22 +96,22 @@
       </button>
 
       {#if showUserMenu}
-        <div class="fixed inset-0 z-30" on:click={() => showUserMenu = false} transition:fade={{ duration: 100 }} />
+        <div class="fixed inset-0 z-30" onclick={() => showUserMenu = false} onkeydown={(e) => { if (e.key === 'Escape') showUserMenu = false }} role="button" tabindex="-1" transition:fade={{ duration: 100 }}></div>
         <div class="absolute right-0 top-full mt-1 w-56 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 py-1 z-40" role="menu" transition:fly={{ duration: 150, y: -5 }}>
           <div class="px-3 py-2 border-b border-border-1">
             <p class="text-sm font-semibold text-text-1">{$authStore.user?.display_name || $authStore.user?.username}</p>
             <p class="text-xs text-text-3">@{$authStore.user?.username}</p>
           </div>
-          <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => { uiStore.openSettings(); showUserMenu = false }} role="menuitem">
+          <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => { uiStore.openSettings(); showUserMenu = false }} role="menuitem">
             <Settings class="w-4 h-4" /> Settings
           </button>
           {#if $authStore.user?.role === 'system_admin'}
-            <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => { window.location.href = '/admin'; showUserMenu = false }} role="menuitem">
+            <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => { window.location.href = '/admin'; showUserMenu = false }} role="menuitem">
               <Shield class="w-4 h-4" /> Admin Console
             </button>
           {/if}
-          <div class="my-1 border-t border-border-1" />
-          <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-danger/5 transition-standard" on:click={logout} role="menuitem">
+          <div class="my-1 border-t border-border-1"></div>
+          <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-danger/5 transition-standard" onclick={logout} role="menuitem">
             <LogOut class="w-4 h-4" /> Log out
           </button>
         </div>

@@ -15,7 +15,7 @@
         type="button"
         class="flex h-9 w-9 items-center justify-center rounded-r-2 text-text-3 transition-standard hover:bg-bg-surface-2 hover:text-text-1"
         aria-label="Back to chat"
-        on:click={() => navigate('/')}
+        onclick={() => navigate('/')}
       >
         <ArrowLeft class="h-5 w-5" />
       </button>

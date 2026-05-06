@@ -172,6 +172,7 @@
       {#if filteredCommands.length > 0}
         <div class="max-h-96 scroll-py-3 overflow-y-auto p-3">
           {#each filteredCommands as item, index (item.id)}
+            {@const Icon = getIconComponent(item.iconType)}
             <button
               type="button"
               onclick={() => handleSelect(item.id)}
@@ -185,7 +186,7 @@
                 class:bg-bg-surface-1={selectedIndex === index}
                 class:bg-bg-surface-2={selectedIndex !== index}
               >
-                <svelte:component this={getIconComponent(item.iconType)} class="h-6 w-6 text-text-3" />
+                <Icon class="h-6 w-6 text-text-3" />
               </div>
               <div class="ml-4 flex-auto">
                 <p

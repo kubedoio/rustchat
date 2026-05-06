@@ -296,7 +296,7 @@
           type="button"
           class="flex h-9 w-9 items-center justify-center rounded-r-2 text-text-3 transition-standard hover:bg-bg-surface-2 hover:text-text-1"
           aria-label="Back to playbooks"
-          on:click={back}
+          onclick={back}
         >
           <ArrowLeft class="h-5 w-5" />
         </button>
@@ -309,7 +309,7 @@
         type="button"
         class="inline-flex items-center gap-2 rounded-r-2 bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground transition-standard hover:bg-brand-hover disabled:opacity-60"
         disabled={saving || loading}
-        on:click={save}
+        onclick={save}
       >
         {#if saving}
           <Loader2 class="h-4 w-4 animate-spin" />
@@ -374,7 +374,7 @@
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-bold">Checklists</h2>
-          <button type="button" class="inline-flex items-center gap-2 rounded-r-2 border border-border-1 px-3 py-2 text-sm font-semibold" on:click={addChecklist}>
+          <button type="button" class="inline-flex items-center gap-2 rounded-r-2 border border-border-1 px-3 py-2 text-sm font-semibold" onclick={addChecklist}>
             <Plus class="h-4 w-4" />
             Add Checklist
           </button>
@@ -384,7 +384,7 @@
           <article class="rounded-r-3 border border-border-1 bg-bg-surface-1 p-5 shadow-1">
             <div class="flex gap-3">
               <input class="min-w-0 flex-1 rounded-r-2 border border-border-1 bg-bg-surface-1 px-3 py-2 text-sm font-semibold" bind:value={checklist.name} />
-              <button type="button" class="rounded-r-2 p-2 text-text-3 transition-standard hover:bg-danger/10 hover:text-danger" aria-label="Remove checklist" on:click={() => removeChecklist(checklistIndex)}>
+              <button type="button" class="rounded-r-2 p-2 text-text-3 transition-standard hover:bg-danger/10 hover:text-danger" aria-label="Remove checklist" onclick={() => removeChecklist(checklistIndex)}>
                 <Trash2 class="h-4 w-4" />
               </button>
             </div>
@@ -394,12 +394,12 @@
                 <div class="grid gap-2 rounded-r-2 bg-bg-surface-2 p-3 sm:grid-cols-[1fr_1fr_auto]">
                   <input class="rounded-r-2 border border-border-1 bg-bg-surface-1 px-3 py-2 text-sm" bind:value={task.title} placeholder="Task title" />
                   <input class="rounded-r-2 border border-border-1 bg-bg-surface-1 px-3 py-2 text-sm" bind:value={task.description} placeholder="Optional description" />
-                  <button type="button" class="rounded-r-2 p-2 text-text-3 transition-standard hover:bg-danger/10 hover:text-danger" aria-label="Remove task" on:click={() => removeTask(checklistIndex, taskIndex)}>
+                  <button type="button" class="rounded-r-2 p-2 text-text-3 transition-standard hover:bg-danger/10 hover:text-danger" aria-label="Remove task" onclick={() => removeTask(checklistIndex, taskIndex)}>
                     <Trash2 class="h-4 w-4" />
                   </button>
                 </div>
               {/each}
-              <button type="button" class="inline-flex items-center gap-2 rounded-r-2 border border-dashed border-border-1 px-3 py-2 text-sm text-text-2" on:click={() => addTask(checklistIndex)}>
+              <button type="button" class="inline-flex items-center gap-2 rounded-r-2 border border-dashed border-border-1 px-3 py-2 text-sm text-text-2" onclick={() => addTask(checklistIndex)}>
                 <Plus class="h-4 w-4" />
                 Add Task
               </button>

@@ -91,14 +91,14 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#if open}
   <div class="fixed inset-0 z-50 flex items-center justify-center" data-testid="direct-message-modal" role="dialog" aria-modal="true">
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-bg-app/70 backdrop-blur-sm"
-      on:click={handleClose}
+      onclick={handleClose}
       role="button"
       tabindex="-1"
       aria-label="Close modal"
@@ -118,7 +118,7 @@
           <p class="text-xs text-text-3">Start a private conversation in the current workspace.</p>
         </div>
         <button
-          on:click={handleClose}
+          onclick={handleClose}
           class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2"
           aria-label="Close"
         >
@@ -160,7 +160,7 @@
           <div class="space-y-1">
             {#each filteredMembers as member (member.user_id)}
               <button
-                on:click={() => startDM(member)}
+                onclick={() => startDM(member)}
                 disabled={loading}
                 class="group flex w-full items-center rounded-r-2 border border-transparent px-4 py-3 text-left transition-standard hover:border-border-1 hover:bg-bg-surface-2/70"
               >
@@ -199,7 +199,7 @@
       <div class="flex justify-end border-t border-border-1 bg-bg-surface-2/45 px-6 py-4">
         <button
           type="button"
-          on:click={handleClose}
+          onclick={handleClose}
           disabled={loading}
           class="inline-flex items-center rounded-r-2 border border-border-2 bg-bg-surface-2 px-4 py-2 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-1 disabled:opacity-50"
         >

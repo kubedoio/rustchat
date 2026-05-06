@@ -89,7 +89,7 @@
 
 </script>
 
-<svelte:window on:keydown={(e) => open && e.key === 'Escape' && handleClose()} />
+<svelte:window onkeydown={(e) => open && e.key === 'Escape' && handleClose()} />
 
 {#if open}
   <div
@@ -101,7 +101,7 @@
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-bg-app/70 backdrop-blur-sm"
-      on:click={handleClose}
+      onclick={handleClose}
       role="button"
       tabindex="-1"
       aria-label="Close browse channels modal"
@@ -127,7 +127,7 @@
         </div>
         <button
           type="button"
-          on:click={handleClose}
+          onclick={handleClose}
           class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2"
           aria-label="Close"
         >
@@ -171,7 +171,7 @@
                   {/if}
                 </div>
                 <button
-                  on:click={() => joinChannel(channel.id)}
+                  onclick={() => joinChannel(channel.id)}
                   disabled={joining === channel.id}
                   class="ml-4 flex items-center rounded-r-2 bg-brand px-3 py-1.5 text-sm font-medium text-brand-foreground transition-standard hover:opacity-90 disabled:opacity-50"
                 >

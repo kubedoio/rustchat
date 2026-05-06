@@ -48,7 +48,7 @@
         data-testid="retry-connection-button"
         type="button"
         class="ml-3 rounded-md bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800 hover:bg-orange-200"
-        on:click={handleRetry}
+        onclick={handleRetry}
       >
         Retry now
       </button>

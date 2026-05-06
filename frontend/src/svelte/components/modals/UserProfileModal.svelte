@@ -105,12 +105,12 @@
   }
 </script>
 
-<svelte:window on:keydown={(e) => open && e.key === 'Escape' && handleClose()} />
+<svelte:window onkeydown={(e) => open && e.key === 'Escape' && handleClose()} />
 
 {#if open}
   <div class="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
     <!-- Backdrop -->
-    <div class="absolute inset-0 bg-bg-app/70 backdrop-blur-sm" on:click={handleClose} on:keydown={(e) => e.key === 'Escape' && handleClose()} role="button" tabindex="-1" aria-label="Close modal" transition:fade={{ duration: 150, easing: cubicOut }}></div>
+    <div class="absolute inset-0 bg-bg-app/70 backdrop-blur-sm" onclick={handleClose} onkeydown={(e) => e.key === 'Escape' && handleClose()} role="button" tabindex="-1" aria-label="Close modal" transition:fade={{ duration: 150, easing: cubicOut }}></div>
 
     <!-- Modal -->
     <div
@@ -120,7 +120,7 @@
     >
       <!-- Header -->
       <div class="flex items-center justify-end border-b border-border-1 px-4 py-3">
-        <button on:click={handleClose} class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2" aria-label="Close">
+        <button onclick={handleClose} class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2" aria-label="Close">
           <X class="h-5 w-5 text-text-3" />
         </button>
       </div>
@@ -234,7 +234,7 @@
           <div class="mt-6 px-6">
             <button
               class="w-full inline-flex items-center justify-center rounded-r-2 bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-standard hover:bg-brand-hover"
-              on:click={handleMessage}
+              onclick={handleMessage}
             >
               <MessageCircle class="w-4 h-4 mr-2" />
               Message

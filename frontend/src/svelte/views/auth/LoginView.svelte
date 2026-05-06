@@ -121,7 +121,7 @@
         SSO authentication is required for this server
       {:else}
         Or
-        <a href="/register" class="font-medium text-indigo-600 hover:text-indigo-500" on:click|preventDefault={() => navigate('/register')}>create a new account</a>
+        <a href="/register" class="font-medium text-indigo-600 hover:text-indigo-500" onclick={(e) => { e.preventDefault(); () => navigate('/register') }}>create a new account</a>
       {/if}
     </p>
   </section>
@@ -134,7 +134,7 @@
             <button
               type="button"
               class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 font-medium"
-              on:click={() => loginWithSSO(provider)}
+              onclick={() => loginWithSSO(provider)}
             >
               <span aria-hidden="true" class="h-5 w-5 rounded-full bg-gray-100"></span>
               <span>Continue with {provider.display_name}</span>
@@ -155,7 +155,7 @@
       {/if}
 
       {#if showPasswordLogin}
-        <form class="space-y-6" on:submit|preventDefault={handleLogin}>
+        <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleLogin() }}>
           {#if error}
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm" role="alert">
               {error}
@@ -197,7 +197,7 @@
               <label for="remember-me" class="ml-2 block text-sm text-gray-900 cursor-pointer">Remember me</label>
             </div>
 
-            <a href="/forgot-password" class="text-sm font-medium text-indigo-600 hover:text-indigo-500" on:click|preventDefault={() => navigate('/forgot-password')}>Forgot your password?</a>
+            <a href="/forgot-password" class="text-sm font-medium text-indigo-600 hover:text-indigo-500" onclick={(e) => { e.preventDefault(); () => navigate('/forgot-password') }}>Forgot your password?</a>
           </div>
 
           <button

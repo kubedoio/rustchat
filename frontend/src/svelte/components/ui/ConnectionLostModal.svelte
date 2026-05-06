@@ -40,7 +40,7 @@
             data-testid="modal-reconnect-button"
             type="button"
             class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-standard hover:bg-brand-hover"
-            on:click={() => dispatch('reconnect')}
+            onclick={() => dispatch('reconnect')}
           >
             <RotateCcw class="h-4 w-4" />
             Reconnect
@@ -50,7 +50,7 @@
             data-testid="modal-refresh-button"
             type="button"
             class="inline-flex items-center justify-center gap-2 rounded-lg bg-bg-surface-2 px-4 py-2.5 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-3 hover:text-text-1"
-            on:click={() => dispatch('refresh')}
+            onclick={() => dispatch('refresh')}
           >
             <RefreshCw class="h-4 w-4" />
             Refresh page

@@ -190,7 +190,7 @@
   $: currentTeamMembers = team ? $teamStore.membersByTeam[team.id] ?? [] : []
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#if open && team}
   <div
@@ -202,7 +202,7 @@
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      on:click={handleClose}
+      onclick={handleClose}
       role="button"
       tabindex="-1"
       aria-label="Close team settings"
@@ -230,7 +230,7 @@
         </div>
         <button
           type="button"
-          on:click={handleClose}
+          onclick={handleClose}
           class="flex h-10 w-10 items-center justify-center rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
           aria-label="Close"
         >
@@ -243,7 +243,7 @@
         {#each tabs as tab (tab.id)}
           <button
             type="button"
-            on:click={() => (activeTab = tab.id)}
+            onclick={() => (activeTab = tab.id)}
             class="flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors"
             class:border-brand={activeTab === tab.id}
             class:text-brand={activeTab === tab.id}
@@ -297,7 +297,7 @@
               <div class="space-y-3">
                 <button
                   type="button"
-                  on:click={handleLeave}
+                  onclick={handleLeave}
                   disabled={leaving || deleting}
                   class="flex items-center px-4 py-2 text-sm font-medium text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition-colors disabled:opacity-50"
                 >
@@ -307,7 +307,7 @@
 
                 <button
                   type="button"
-                  on:click={handleDelete}
+                  onclick={handleDelete}
                   disabled={deleting || leaving}
                   class="flex items-center px-4 py-2 text-sm font-medium text-danger border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                 >
@@ -329,7 +329,7 @@
                 <input
                   type="text"
                   bind:value={searchQuery}
-                  on:input={onSearchInput}
+                  oninput={onSearchInput}
                   placeholder="Search users by name or username"
                   class="block w-full pl-10 pr-3 py-2 border border-border-2 rounded-lg leading-5 bg-bg-surface-1 placeholder-text-4 focus:outline-none focus:placeholder-text-4 focus:ring-1 focus:ring-brand focus:border-brand sm:text-sm transition duration-150 ease-in-out"
                 />
@@ -359,7 +359,7 @@
                       </div>
                       <button
                         type="button"
-                        on:click={() => addMember(user)}
+                        onclick={() => addMember(user)}
                         disabled={addingMember === user.id}
                         class="p-1.5 bg-brand/10 text-brand rounded-lg hover:bg-brand/20 transition-colors disabled:opacity-50"
                       >
@@ -411,7 +411,7 @@
                         <div class="flex items-center">
                           <button
                             type="button"
-                            on:click={() => removeMember(member.user_id)}
+                            onclick={() => removeMember(member.user_id)}
                             disabled={removingMember === member.user_id}
                             class="p-1.5 text-text-4 hover:text-danger hover:bg-danger/10 rounded-lg transition-colors disabled:opacity-50"
                             title="Remove member"
@@ -443,14 +443,14 @@
       <div class="px-6 py-4 border-t border-border-1 flex justify-end space-x-3 shrink-0">
         <button
           type="button"
-          on:click={handleClose}
+          onclick={handleClose}
           class="px-4 py-2 text-sm font-medium text-text-2 bg-bg-surface-2 rounded-lg hover:bg-bg-surface-1 border border-border-2 transition-colors"
         >
           Cancel
         </button>
         <button
           type="button"
-          on:click={handleSave}
+          onclick={handleSave}
           disabled={loading}
           class="px-4 py-2 text-sm font-medium text-brand-foreground bg-brand rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
         >

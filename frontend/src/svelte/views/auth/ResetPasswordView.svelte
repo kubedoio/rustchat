@@ -187,7 +187,7 @@
           </div>
           <h2 class="text-xl font-semibold text-gray-900 mb-2">Link expired or invalid</h2>
           <p class="text-gray-600 mb-6">{error}</p>
-          <button type="button" class="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700" on:click={() => navigate('/forgot-password')}>
+          <button type="button" class="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700" onclick={() => navigate('/forgot-password')}>
             Request New Link
           </button>
         </div>
@@ -204,12 +204,12 @@
           <p class="text-gray-600 mb-6">
             Your password has been {isSetup ? 'set' : 'reset'}. You can now sign in with your new password.
           </p>
-          <button type="button" class="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700" on:click={() => navigate('/login')}>
+          <button type="button" class="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700" onclick={() => navigate('/login')}>
             Sign In
           </button>
         </div>
       {:else}
-        <form class="space-y-6" on:submit|preventDefault={handleSubmit}>
+        <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit() }}>
           {#if error}
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm" role="alert">
               {error}

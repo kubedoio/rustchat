@@ -19,6 +19,7 @@ export interface SvelteChatChannel {
     unreadCount?: number
     mentionCount?: number
     header?: string
+    created_at?: string
 }
 
 export interface SvelteChatFile {
@@ -205,6 +206,7 @@ function normalizeChannel(value: unknown): SvelteChatChannel {
             : typeof channel.mention_count === 'number'
                 ? channel.mention_count
                 : undefined,
+        created_at: optionalStringField(channel, 'created_at'),
     }
 }
 

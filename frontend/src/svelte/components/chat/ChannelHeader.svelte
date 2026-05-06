@@ -89,7 +89,7 @@
   }
 </script>
 
-<svelte:window on:keydown={handleMenuKeydown} />
+<svelte:window onkeydown={handleMenuKeydown} />
 
 <header
   class="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border-1 bg-bg-surface-1/95 px-3 backdrop-blur-sm sm:px-4"
@@ -99,7 +99,7 @@
     <!-- Mobile sidebar toggle -->
     <button
       class="lg:hidden flex h-9 w-9 items-center justify-center rounded-r-2 text-text-2 transition-standard hover:bg-bg-surface-2"
-      on:click={handleToggleMobileSidebar}
+      onclick={handleToggleMobileSidebar}
       aria-label="Toggle sidebar"
       title="Toggle sidebar"
     >
@@ -165,7 +165,7 @@
     <!-- Members button -->
     <button
       class="hidden md:flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
-      on:click={handleToggleMembers}
+      onclick={handleToggleMembers}
       aria-label="Members"
       title="Members"
     >
@@ -176,7 +176,7 @@
     {#if isInCall}
       <button
         class="flex h-11 w-11 items-center justify-center rounded-r-2 bg-success/10 text-success transition-standard"
-        on:click={() => callsStore.toggleExpanded()}
+        onclick={() => callsStore.toggleExpanded()}
         aria-label="Show call"
         title="Show call"
       >
@@ -185,7 +185,7 @@
     {:else if hasActiveCall}
       <button
         class="flex h-11 w-11 items-center justify-center rounded-r-2 bg-success/10 text-success animate-pulse transition-standard"
-        on:click={() => channel?.id && callsStore.joinCall(channel.id)}
+        onclick={() => channel?.id && callsStore.joinCall(channel.id)}
         aria-label="Join call"
         title="Join call"
       >
@@ -194,7 +194,7 @@
     {:else}
       <button
         class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
-        on:click={handleStartCall}
+        onclick={handleStartCall}
         aria-label="Start audio call"
         title="Start audio call"
       >
@@ -204,7 +204,7 @@
 
     <button
       data-testid="search-button"
-      on:click={() => dispatch('search')}
+      onclick={() => dispatch('search')}
       class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
       aria-label="Search"
       title="Search"
@@ -217,7 +217,7 @@
     <NotificationsDropdown />
 
     <button
-      on:click={handleTogglePinned}
+      onclick={handleTogglePinned}
       class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
       aria-label="Pinned messages"
       title="Pinned messages"
@@ -226,7 +226,7 @@
     </button>
 
     <button
-      on:click={handleToggleSaved}
+      onclick={handleToggleSaved}
       class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
       aria-label="Saved messages"
       title="Saved messages"
@@ -235,7 +235,7 @@
     </button>
 
     <button
-      on:click={handleToggleActivity}
+      onclick={handleToggleActivity}
       class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
       aria-label="Activity feed"
       title="Activity feed"
@@ -247,7 +247,7 @@
     <div class="relative">
       <button
         data-testid="channel-header-menu"
-        on:click={() => (showMenu = !showMenu)}
+        onclick={() => (showMenu = !showMenu)}
         class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
         class:bg-bg-surface-2={showMenu}
         title="More options"
@@ -258,7 +258,7 @@
 
       {#if showMenu}
         <!-- Click outside -->
-        <div class="fixed inset-0 z-10" on:click={() => (showMenu = false)} role="presentation" transition:fade={{ duration: 100 }}></div>
+        <div class="fixed inset-0 z-10" onclick={() => (showMenu = false)} role="presentation" transition:fade={{ duration: 100 }}></div>
         <div
           class="absolute right-0 top-full z-20 mt-2 w-48 origin-top-right rounded-r-2 border border-border-1 bg-bg-surface-1 py-1 shadow-2xl"
           role="menu"
@@ -266,7 +266,7 @@
         >
           <button
             data-testid="channel-details-button"
-            on:click={handleToggleInfo}
+            onclick={handleToggleInfo}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
             role="menuitem"
           >
@@ -275,7 +275,7 @@
           </button>
 
           <button
-            on:click={handleToggleMembers}
+            onclick={handleToggleMembers}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
             role="menuitem"
           >
@@ -284,7 +284,7 @@
           </button>
 
           <button
-            on:click={handleTogglePinned}
+            onclick={handleTogglePinned}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
             role="menuitem"
           >
@@ -293,7 +293,7 @@
           </button>
 
           <button
-            on:click={handleToggleSaved}
+            onclick={handleToggleSaved}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
             role="menuitem"
           >
@@ -302,7 +302,7 @@
           </button>
 
           <button
-            on:click={handleStartCall}
+            onclick={handleStartCall}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
             role="menuitem"
           >

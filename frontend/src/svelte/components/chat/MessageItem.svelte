@@ -212,8 +212,8 @@
   <div
     data-message-id={message.id}
     class="flex items-start group transition-standard relative px-2 sm:px-3 py-1 hover:bg-bg-app/30 {statusClasses} {isMentioned ? 'bg-brand/5' : ''} {isHighlighted ? 'ring-1 ring-brand/20 bg-brand/5' : ''}"
-    on:mouseenter={() => (showActions = true)}
-    on:mouseleave={() => {
+    onmouseenter={() => (showActions = true)}
+    onmouseleave={() => {
       showActions = false
       showMenu = false
     }}
@@ -224,11 +224,11 @@
     <div
       data-testid="message-avatar"
       class="shrink-0 select-none mr-2 sm:mr-3 mt-0.5 cursor-pointer"
-      on:click={() => message.user_id && dispatch('openProfile', message.user_id)}
+      onclick={() => message.user_id && dispatch('openProfile', message.user_id)}
       role="button"
       tabindex="0"
       aria-label={`Open profile for ${authorName}`}
-      on:keydown={(e) => e.key === 'Enter' && message.user_id && dispatch('openProfile', message.user_id)}
+      onkeydown={(e) => e.key === 'Enter' && message.user_id && dispatch('openProfile', message.user_id)}
     >
       {#if message.avatarUrl}
         <img src={message.avatarUrl} alt={authorName} class="w-8 h-8 rounded-r-1 object-cover" />
@@ -244,10 +244,10 @@
       <div class="flex items-baseline gap-1.5 flex-wrap">
         <span
           class="font-semibold text-sm text-text-1 hover:underline cursor-pointer transition-colors hover:text-brand"
-          on:click={() => message.user_id && dispatch('openProfile', message.user_id)}
+          onclick={() => message.user_id && dispatch('openProfile', message.user_id)}
           role="button"
           tabindex="0"
-          on:keydown={(e) => e.key === 'Enter' && message.user_id && dispatch('openProfile', message.user_id)}
+          onkeydown={(e) => e.key === 'Enter' && message.user_id && dispatch('openProfile', message.user_id)}
         >
           {authorName}
         </span>
@@ -287,13 +287,13 @@
           <textarea
             id={`edit-textarea-${message.id}`}
             bind:value={editContent}
-            on:keydown={handleEditKeydown}
+            onkeydown={handleEditKeydown}
             rows={2}
             class="w-full px-3 py-2 border border-brand rounded-r-2 bg-bg-surface-1 text-text-1 resize-none focus:ring-2 focus:ring-brand/20 focus:outline-none text-sm"
           ></textarea>
           <div class="flex items-center gap-2 mt-1.5">
             <button
-              on:click={saveEdit}
+              onclick={saveEdit}
               disabled={saving}
               class="flex items-center gap-1 rounded-r-1 bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-standard hover:bg-brand-hover disabled:opacity-50"
             >
@@ -301,7 +301,7 @@
               <span>{saving ? 'Saving...' : 'Save'}</span>
             </button>
             <button
-              on:click={cancelEditing}
+              onclick={cancelEditing}
               disabled={saving}
               class="px-3 py-1.5 bg-bg-surface-2 text-text-2 text-xs font-medium rounded-r-1 hover:bg-bg-surface-1 transition-standard flex items-center gap-1"
             >
@@ -327,7 +327,7 @@
                 <button
                   data-testid="file-attachment"
                   class="rounded-r-1 overflow-hidden border border-border-1 w-32 h-32 bg-bg-surface-2 p-0"
-                  on:click={() => openGallery(file.url ?? '')}
+                  onclick={() => openGallery(file.url ?? '')}
                   type="button"
                   aria-label={`Open image gallery: ${file.name ?? 'Image'}`}
                 >
@@ -361,7 +361,7 @@
           <div class="mt-1.5">
             <button
               data-testid="thread-count-button"
-              on:click={handleThreadClick}
+              onclick={handleThreadClick}
               class="inline-flex items-center gap-2 px-2 py-1 rounded-r-1 hover:bg-brand/5 transition-standard border border-transparent hover:border-brand/20"
             >
               <MessageSquare class="w-3.5 h-3.5 text-brand" />
@@ -383,7 +383,7 @@
             {#each reactions as reaction (reaction.emoji)}
               {#if hasUserReacted(reaction)}
                 <button
-                  on:click={() => toggleReaction(reaction.emoji)}
+                  onclick={() => toggleReaction(reaction.emoji)}
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-all hover:scale-105 bg-brand/10 border-brand/30 text-brand"
                 >
                   <span>{reaction.emoji}</span>
@@ -391,7 +391,7 @@
                 </button>
               {:else}
                 <button
-                  on:click={() => toggleReaction(reaction.emoji)}
+                  onclick={() => toggleReaction(reaction.emoji)}
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-all hover:scale-105 bg-bg-surface-2 border-border-1 text-text-2 hover:border-border-2"
                 >
                   <span>{reaction.emoji}</span>
@@ -413,7 +413,7 @@
         <div class="flex items-center border-r border-border-1 pr-1 mr-1">
           {#each quickEmojis as emoji}
             <button
-              on:click={() => toggleReaction(emoji)}
+              onclick={() => toggleReaction(emoji)}
               class="p-1.5 hover:bg-bg-surface-2 rounded transition-colors text-base leading-none"
               title={`React with ${emoji}`}
             >
@@ -423,7 +423,7 @@
         </div>
 
         <button
-          on:click={handleReply}
+          onclick={handleReply}
           class="p-1.5 hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-colors rounded"
           title="Reply in thread"
         >
@@ -432,7 +432,7 @@
 
         <div class="relative">
           <button
-            on:click|stopPropagation={() => (showMenu = !showMenu)}
+            onclick={(e) => { e.stopPropagation(); showMenu = !showMenu }}
             class="p-1.5 hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-colors rounded"
             title="More actions"
           >
@@ -446,7 +446,7 @@
             >
               {#if canEdit}
                 <button
-                  on:click={startEditing}
+                  onclick={startEditing}
                   class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
                 >
                   <Pencil class="w-4 h-4" />
@@ -454,21 +454,21 @@
                 </button>
               {/if}
               <button
-                on:click={toggleSave}
+                onclick={toggleSave}
                 class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
               >
                 <Bookmark class="w-4 h-4 {message.isSaved ? 'fill-current' : ''}" />
                 {message.isSaved ? 'Unsave' : 'Save'}
               </button>
               <button
-                on:click={togglePin}
+                onclick={togglePin}
                 class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
               >
                 <Pin class="w-4 h-4" />
                 {message.isPinned ? 'Unpin' : 'Pin'}
               </button>
               <button
-                on:click={markUnread}
+                onclick={markUnread}
                 class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
               >
                 <MessageSquare class="w-4 h-4" />
@@ -477,7 +477,7 @@
               {#if isOwnMessage}
                 <div class="my-1 border-t border-border-1"></div>
                 <button
-                  on:click={handleDelete}
+                  onclick={handleDelete}
                   class="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/5 flex items-center gap-2 transition-standard"
                 >
                   <Trash2 class="w-4 h-4" />

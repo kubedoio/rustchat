@@ -341,7 +341,7 @@
   })
 </script>
 
-<svelte:window on:keydown={(event) => {
+<svelte:window onkeydown={(event) => {
   if (event.key === 'Escape') {
     emojiOpen = false
   }
@@ -351,9 +351,9 @@
   class="relative"
   role="region"
   aria-label="File drop zone"
-  on:dragover={handleDragOver}
-  on:dragleave={handleDragLeave}
-  on:drop={handleDrop}
+  ondragover={handleDragOver}
+  ondragleave={handleDragLeave}
+  ondrop={handleDrop}
 >
   {#if isDragging}
     <div class="absolute inset-0 z-10 bg-brand/10 border-2 border-dashed border-brand rounded-r-2 flex items-center justify-center">
@@ -386,7 +386,7 @@
               class="text-text-3 hover:text-gray-900 disabled:opacity-40"
               aria-label={`Remove ${attachment.name}`}
               disabled={attachment.uploading}
-              on:click={() => removeAttachment(attachment.id)}
+              onclick={() => removeAttachment(attachment.id)}
             >
               x
             </button>
@@ -406,7 +406,7 @@
       <div class="mb-3 rounded-lg border border-border-1 bg-bg-app p-3 text-sm text-gray-700" role="listbox" aria-label="Channel Members">
         <p class="font-medium text-gray-900">Channel Members</p>
         {#each matchingMembers as member (member.id ?? member.user_id ?? member.username)}
-          <button type="button" class="mt-2 block rounded-md px-2 py-1 text-left hover:bg-bg-surface-1" on:click={() => replaceCurrentToken('@', `@${member.username}`)}>
+          <button type="button" class="mt-2 block rounded-md px-2 py-1 text-left hover:bg-bg-surface-1" onclick={() => replaceCurrentToken('@', `@${member.username}`)}>
             {member.displayName ?? member.display_name ?? member.username}
           </button>
         {/each}
@@ -417,7 +417,7 @@
       {#if emojiMatch && matchingEmojis.length > 0}
         <div class="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 z-20">
           {#each matchingEmojis as [name, char]}
-            <button class="flex items-center gap-3 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => insertEmoji(name)}>
+            <button class="flex items-center gap-3 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => insertEmoji(name)}>
               <span class="text-lg">{char}</span>
               <span class="text-text-3">:{name}:</span>
             </button>
@@ -428,7 +428,7 @@
       {#if channelMatch && matchingChannels.length > 0}
         <div class="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 z-20">
           {#each matchingChannels as channel}
-            <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => insertChannel(channel)}>
+            <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => insertChannel(channel)}>
               <Hash class="w-4 h-4 text-text-3" />
               <span class="truncate">{channel.display_name || channel.name}</span>
             </button>
@@ -439,7 +439,7 @@
       {#if commandMatch && matchingCommands.length > 0}
         <div class="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 z-20">
           {#each matchingCommands as cmd}
-            <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => executeCommand(cmd.id)}>
+            <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => executeCommand(cmd.id)}>
               <svelte:component this={cmd.icon} class="w-4 h-4 text-text-3" />
               <span class="truncate">{cmd.label}</span>
             </button>
@@ -460,36 +460,36 @@
           class="min-h-24 w-full resize-y rounded-t-xl border-0 p-3 text-sm text-gray-900 outline-none placeholder:text-gray-400"
           placeholder={`${placeholder} in ${channelName}`}
           rows="3"
-          on:keydown={handleKeydown}
+          onkeydown={handleKeydown}
         ></textarea>
       {/if}
 
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-3 py-2 text-sm text-gray-600">
         <div class="flex flex-wrap items-center gap-1">
-          <button type="button" class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Toggle formatting toolbar" on:click={() => (formattingOpen = !formattingOpen)}>
+          <button type="button" class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Toggle formatting toolbar" onclick={() => (formattingOpen = !formattingOpen)}>
             Aa
           </button>
 
           {#if formattingOpen}
             <div class="bg-bg-surface-2/50 flex items-center gap-1 rounded-md px-1 py-0.5">
-              <button type="button" class="rounded-md px-2 py-1 font-bold hover:bg-gray-100" aria-label="Bold" on:click={() => insertFormatting('**')}>B</button>
-              <button type="button" class="rounded-md px-2 py-1 italic hover:bg-gray-100" aria-label="Italic" on:click={() => insertFormatting('*')}>I</button>
-              <button type="button" class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Link" on:click={() => insertFormatting('[', '](url)')}>Link</button>
+              <button type="button" class="rounded-md px-2 py-1 font-bold hover:bg-gray-100" aria-label="Bold" onclick={() => insertFormatting('**')}>B</button>
+              <button type="button" class="rounded-md px-2 py-1 italic hover:bg-gray-100" aria-label="Italic" onclick={() => insertFormatting('*')}>I</button>
+              <button type="button" class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Link" onclick={() => insertFormatting('[', '](url)')}>Link</button>
             </div>
           {/if}
 
-          <button type="button" class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Attach file" on:click={() => fileInput?.click()}>
+          <button type="button" class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Attach file" onclick={() => fileInput?.click()}>
             Attach
           </button>
-          <input bind:this={fileInput} class="sr-only" type="file" multiple tabindex="-1" on:change={handleFileInput} />
+          <input bind:this={fileInput} class="sr-only" type="file" multiple tabindex="-1" onchange={handleFileInput} />
 
-          <button type="button" bind:this={emojiButtonEl} class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Insert emoji" on:click={() => (emojiOpen = !emojiOpen)}>
+          <button type="button" bind:this={emojiButtonEl} class="rounded-md px-2 py-1 hover:bg-gray-100" aria-label="Insert emoji" onclick={() => (emojiOpen = !emojiOpen)}>
             :)
           </button>
 
           <button
             class="p-1.5 rounded {showPreview ? 'bg-brand/10 text-brand' : 'text-text-3 hover:text-text-1 hover:bg-bg-surface-2'} transition-standard"
-            on:click={() => showPreview = !showPreview}
+            onclick={() => showPreview = !showPreview}
             title="Preview markdown"
           >
             <Eye class="w-4 h-4" />
@@ -499,7 +499,7 @@
             <button
               type="button"
               class="flex items-center gap-1 rounded-md px-2 py-1 text-success hover:bg-bg-surface-2 transition-standard"
-              on:click={() => callsStore.toggleExpanded()}
+              onclick={() => callsStore.toggleExpanded()}
             >
               <Phone class="w-4 h-4" />
               <span class="text-xs">Show call</span>
@@ -508,7 +508,7 @@
             <button
               type="button"
               class="flex items-center gap-1 rounded-md px-2 py-1 text-success hover:bg-bg-surface-2 transition-standard animate-pulse"
-              on:click={() => callsStore.joinCall(callsStore.currentCall!.channelId)}
+              onclick={() => callsStore.joinCall(callsStore.currentCall!.channelId)}
             >
               <Phone class="w-4 h-4" />
               <span class="text-xs">Join call</span>
@@ -517,7 +517,7 @@
             <button
               type="button"
               class="flex items-center gap-1 rounded-md px-2 py-1 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard"
-              on:click={() => callsStore.startCall(channelId)}
+              onclick={() => callsStore.startCall(channelId)}
             >
               <Phone class="w-4 h-4" />
               <span class="text-xs">Start call</span>
@@ -533,7 +533,7 @@
             aria-label="Send message"
             disabled={isSendDisabled}
             title={disabled ? 'Reconnecting...' : ''}
-            on:click={sendMessage}
+            onclick={sendMessage}
           >
             Send
           </button>

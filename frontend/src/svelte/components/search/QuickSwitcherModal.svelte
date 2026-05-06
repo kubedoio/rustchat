@@ -149,7 +149,7 @@
 </script>
 
 <svelte:window
-  on:keydown={(e) => {
+  onkeydown={(e) => {
     if (open && e.key === 'Escape') {
       e.preventDefault()
       dispatch('close')
@@ -161,16 +161,16 @@
   <div
     class="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 pt-[20vh]"
     data-testid="quick-switcher"
-    on:click={() => dispatch('close')}
-    on:keydown={(e) => e.key === 'Escape' && dispatch('close')}
+    onclick={() => dispatch('close')}
+    onkeydown={(e) => e.key === 'Escape' && dispatch('close')}
     role="button"
     tabindex="-1"
     aria-label="Close quick switcher"
   >
     <div
       class="mx-4 w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl"
-      on:click|stopPropagation
-      on:keydown={(e) => e.key === 'Escape' && dispatch('close')}
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.key === 'Escape' && dispatch('close')}
       role="dialog"
       tabindex="-1"
       aria-modal="true"
@@ -185,7 +185,7 @@
           placeholder="Jump to..."
           class="flex-1 bg-transparent text-base placeholder-gray-400 outline-none"
           data-testid="quick-switcher-input"
-          on:keydown={handleKeydown}
+          onkeydown={handleKeydown}
         />
         <kbd class="hidden rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-400 sm:block">ESC</kbd>
       </div>
@@ -209,9 +209,9 @@
               class="flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors"
               class:bg-blue-50={selectedIndex === index}
               class:hover:bg-gray-50={selectedIndex !== index}
-              on:click={() => selectItem(item)}
-              on:mouseenter={() => (selectedIndex = index)}
-              on:keydown={(e) => e.key === 'Enter' && selectItem(item)}
+              onclick={() => selectItem(item)}
+              onmouseenter={() => (selectedIndex = index)}
+              onkeydown={(e) => e.key === 'Enter' && selectItem(item)}
               role="button"
               tabindex="0"
             >

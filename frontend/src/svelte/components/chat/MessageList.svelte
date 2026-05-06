@@ -104,14 +104,14 @@
 
 <section
   bind:this={container}
-  on:scroll={handleScroll}
+  onscroll={handleScroll}
   class="flex-1 overflow-y-auto bg-bg-app p-4 custom-scrollbar"
   aria-label="Message list"
 >
   <div class="max-w-[var(--msg-max-width)] mx-auto">
     {#if pagination.isLoading && renderedMessages.length === 0}
       <div class="flex justify-center py-4">
-        <div class="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        <div class="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
       </div>
     {:else if renderedMessages.length === 0}
       <div class="rounded-r-2 border border-dashed border-border-2 bg-bg-surface-1 p-6 text-center text-sm text-text-3">
@@ -121,7 +121,7 @@
       <div class="space-y-1">
         {#if pagination.isLoading || isLoadingMore}
           <div class="flex justify-center py-2">
-            <div class="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            <div class="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
           </div>
         {/if}
         {#each timeline as item (item.type === 'date' ? `date-${item.date.toISOString()}` : item.message.id)}
@@ -152,7 +152,7 @@
 {#if showNewMessagesButton}
   <button
     class="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 bg-brand text-brand-foreground text-sm font-medium rounded-full shadow-2 hover:bg-brand-hover transition-standard z-20"
-    on:click={() => { scrollToBottom('smooth'); showNewMessagesButton = false }}
+    onclick={() => { scrollToBottom('smooth'); showNewMessagesButton = false }}
   >
     New messages ↓
   </button>

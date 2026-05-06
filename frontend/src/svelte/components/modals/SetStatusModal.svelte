@@ -65,7 +65,7 @@
   }
 </script>
 
-<svelte:window on:keydown={(e) => open && handleKeydown(e)} />
+<svelte:window onkeydown={(e) => open && handleKeydown(e)} />
 
 {#if open}
   <div
@@ -77,7 +77,7 @@
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-      on:click={handleClose}
+      onclick={handleClose}
       role="button"
       tabindex="-1"
       aria-label="Close modal"
@@ -94,7 +94,7 @@
       <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Set a status</h3>
         <button
-          on:click={handleClose}
+          onclick={handleClose}
           class="text-gray-400 hover:text-gray-500 transition-colors"
           aria-label="Close"
         >
@@ -118,7 +118,7 @@
             type="text"
             placeholder="What's your status?"
             class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            on:keydown={handleKeydown}
+            onkeydown={handleKeydown}
             autofocus
           />
         </div>
@@ -143,7 +143,7 @@
         <button
           type="button"
           class="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto transition-colors"
-          on:click={save}
+          onclick={save}
         >
           Save
         </button>
@@ -151,7 +151,7 @@
           <button
             type="button"
             class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:mr-auto transition-colors"
-            on:click={clear}
+            onclick={clear}
           >
             Clear Status
           </button>
@@ -159,7 +159,7 @@
         <button
           type="button"
           class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto transition-colors"
-          on:click={handleClose}
+          onclick={handleClose}
         >
           Cancel
         </button>

@@ -137,12 +137,12 @@
     role="button"
     tabindex="-1"
     aria-label="Close thread"
-    on:click={(e) => {
+    onclick={(e) => {
       if ((e.target as HTMLElement).classList.contains('thread-panel-overlay')) {
         handleClose()
       }
     }}
-    on:keydown={(e) => {
+    onkeydown={(e) => {
       if (e.key === 'Escape') {
         e.preventDefault()
         handleClose()
@@ -157,7 +157,7 @@
     aria-modal="true"
     aria-label="Thread panel"
     tabindex="-1"
-    on:keydown={handleKeydown}
+    onkeydown={handleKeydown}
     transition:fly={{ x: 300, duration: 250, easing: cubicOut }}
   >
     <!-- Header -->
@@ -174,7 +174,7 @@
           {/if}
         </div>
         <button
-          on:click={handleClose}
+          onclick={handleClose}
           class="p-1.5 hover:bg-bg-surface-1 rounded-lg text-text-3 hover:text-text-1 transition-standard focus-ring"
           aria-label="Close thread"
           title="Close thread"
@@ -236,7 +236,7 @@
     <div
       bind:this={listRef}
       class="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar"
-      on:scroll={handleScroll}
+      onscroll={handleScroll}
     >
       {#if replies.length === 0}
         <div class="flex flex-col items-center justify-center py-12 text-center">
@@ -261,7 +261,7 @@
         <textarea
           bind:this={composerRef}
           bind:value={draft}
-          on:keydown={handleKeydown}
+          onkeydown={handleKeydown}
           rows={2}
           data-testid="thread-composer"
           class="flex-1 px-3 py-2 bg-transparent text-text-1 resize-none border-none focus:ring-0 text-[14px] scrollbar-none"
@@ -270,7 +270,7 @@
         ></textarea>
 
         <button
-          on:click={sendReply}
+          onclick={sendReply}
           disabled={!draft.trim() || isSending}
           class="mb-1 mr-1 flex items-center justify-center rounded-lg bg-brand p-2.5 text-brand-foreground shadow-lg shadow-brand/20 transition-all hover:bg-brand-hover active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
         >

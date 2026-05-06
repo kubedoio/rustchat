@@ -302,7 +302,7 @@
     background: #cbd5e1;
     border-radius: 4px;
   }
-  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #475569;
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--border-2);
   }
 </style>

@@ -74,7 +74,7 @@
           type="button"
           class="flex h-9 w-9 items-center justify-center rounded-r-2 text-text-3 transition-standard hover:bg-bg-surface-2 hover:text-text-1"
           aria-label="Back to playbooks"
-          on:click={() => navigate('/playbooks')}
+          onclick={() => navigate('/playbooks')}
         >
           <ArrowLeft class="h-5 w-5" />
         </button>
@@ -87,7 +87,7 @@
         <button
           type="button"
           class="inline-flex items-center gap-2 rounded-r-2 bg-success px-4 py-2.5 text-sm font-semibold text-white transition-standard hover:opacity-90"
-          on:click={finishRun}
+          onclick={finishRun}
         >
           <CheckCircle2 class="h-4 w-4" />
           Finish Run
@@ -125,7 +125,7 @@
             <button
               type="button"
               class="flex w-full items-start gap-3 rounded-r-2 border border-border-1 p-3 text-left transition-standard hover:bg-bg-surface-2"
-              on:click={() => toggleTask(task.id, task.status === 'done')}
+              onclick={() => toggleTask(task.id, task.status === 'done')}
             >
               {#if task.status === 'done'}
                 <CheckCircle2 class="mt-0.5 h-5 w-5 shrink-0 text-success" />
@@ -181,9 +181,9 @@
               class="min-w-0 flex-1 rounded-r-2 border border-border-1 bg-bg-surface-1 px-3 py-2 text-sm"
               bind:value={updateMessage}
               placeholder="Post an update"
-              on:keydown={(event) => { if (event.key === 'Enter') void postUpdate() }}
+              onkeydown={(event) => { if (event.key === 'Enter') void postUpdate() }}
             />
-            <button type="button" class="rounded-r-2 bg-brand p-2 text-brand-foreground" aria-label="Post update" on:click={postUpdate}>
+            <button type="button" class="rounded-r-2 bg-brand p-2 text-brand-foreground" aria-label="Post update" onclick={postUpdate}>
               <Send class="h-4 w-4" />
             </button>
           </div>

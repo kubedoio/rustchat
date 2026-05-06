@@ -73,7 +73,7 @@
         {#if $unreadActivityCount > 0}
           <button
             class="text-xs text-brand hover:text-brand-hover"
-            on:click={() => activityStore.markAllRead()}
+            onclick={() => activityStore.markAllRead()}
           >
             Mark all read
           </button>
@@ -81,7 +81,7 @@
         <button
           class="flex h-8 w-8 items-center justify-center rounded-r-1 text-text-3 transition-standard hover:bg-bg-surface-2 hover:text-text-1 focus-ring"
           aria-label="Close activity feed"
-          on:click={() => activityStore.closeFeed()}
+          onclick={() => activityStore.closeFeed()}
         >
           <X class="h-4 w-4" />
         </button>
@@ -98,7 +98,7 @@
           class:bg-bg-surface-2={$activityStore.filter !== filter.value}
           class:text-text-2={$activityStore.filter !== filter.value}
           class:hover:bg-bg-surface-3={$activityStore.filter !== filter.value}
-          on:click={() => activityStore.setFilter(filter.value)}
+          onclick={() => activityStore.setFilter(filter.value)}
         >
           {filter.label}
         </button>
@@ -123,7 +123,7 @@
           {#each $activityList as activity (activity.id)}
             <button
               class="flex w-full items-start gap-3 p-4 text-left transition-standard {!activity.read ? 'bg-brand/5' : ''} {activity.read ? 'hover:bg-bg-surface-2' : ''}"
-              on:click={() => handleActivityClick(activity)}
+              onclick={() => handleActivityClick(activity)}
             >
               <div class="w-1.5 self-stretch pt-1.5">
                 {#if !activity.read}
@@ -170,7 +170,7 @@
               <button
                 class="text-sm text-brand hover:text-brand-hover disabled:opacity-50"
                 disabled={$activityStore.isLoading}
-                on:click={() => activityStore.loadMore()}
+                onclick={() => activityStore.loadMore()}
               >
                 {$activityStore.isLoading ? 'Loading...' : 'Load more'}
               </button>

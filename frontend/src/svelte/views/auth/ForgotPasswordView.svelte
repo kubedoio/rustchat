@@ -98,7 +98,7 @@
     </h1>
     <p class="mt-2 text-center text-sm text-gray-600">
       Remember your password?
-      <a href="/login" class="font-medium text-primary hover:text-blue-500" on:click|preventDefault={() => navigate('/login')}>Sign in</a>
+      <a href="/login" class="font-medium text-primary hover:text-blue-500" onclick={(e) => { e.preventDefault(); () => navigate('/login') }}>Sign in</a>
     </p>
   </section>
 
@@ -115,12 +115,12 @@
           <p class="text-gray-600 mb-6">
             If an account exists for <strong>{email}</strong>, you will receive a password reset link. Please check your inbox and spam folder.
           </p>
-          <button type="button" class="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50" on:click={() => navigate('/login')}>
+          <button type="button" class="flex w-full justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50" onclick={() => navigate('/login')}>
             Back to Login
           </button>
         </div>
       {:else}
-        <form class="space-y-6" on:submit|preventDefault={handleSubmit}>
+        <form class="space-y-6" onsubmit={(e) => { e.preventDefault(); handleSubmit() }}>
           {#if error}
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm" role="alert">
               {error}

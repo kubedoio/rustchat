@@ -203,7 +203,7 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="flex flex-col h-screen overflow-hidden bg-bg-app text-text-1">
   <GlobalHeader />
@@ -211,7 +211,7 @@
   <div class="flex flex-1 overflow-hidden relative">
     <!-- Mobile sidebar overlay -->
     {#if isMobile && mobileSidebarOpen}
-      <div class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" on:click={closeMobileSidebar} />
+      <div class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onclick={closeMobileSidebar} onkeydown={(e) => e.key === 'Escape' && closeMobileSidebar()} role="presentation" tabindex="-1"></div>
       <div class="fixed top-0 left-0 bottom-0 z-50 flex shadow-2xl">
         <TeamRail
           onSelectTeam={(id) => { chatStore.selectTeam(id); closeMobileSidebar() }}

@@ -79,7 +79,7 @@
   {#if open === undefined}
     <button
       data-testid="notifications-trigger"
-      on:click={handleToggle}
+      onclick={handleToggle}
       class="relative flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
       class:bg-bg-surface-2={isOpen}
       aria-label="Notifications"
@@ -106,7 +106,7 @@
         {#if unreadChannels.length > 0}
           <button
             class="text-xs font-medium text-brand hover:text-brand-hover"
-            on:click={markAllAsRead}
+            onclick={markAllAsRead}
           >
             Mark all as read
           </button>
@@ -125,7 +125,7 @@
             {#each unreadChannels as channel (channel.id)}
               <button
                 class="flex w-full items-center gap-3 px-4 py-3 text-left transition-standard hover:bg-bg-surface-2"
-                on:click={() => selectChannel(channel.id)}
+                onclick={() => selectChannel(channel.id)}
               >
                 <Hash class="h-5 w-5 shrink-0 text-text-3" />
                 <div class="min-w-0 flex-1">
@@ -157,6 +157,6 @@
     </div>
 
     <!-- Click outside backdrop -->
-    <div class="fixed inset-0 z-10" on:click={close} role="presentation"></div>
+    <div class="fixed inset-0 z-10" onclick={close} role="presentation"></div>
   {/if}
 </div>

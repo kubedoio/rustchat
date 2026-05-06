@@ -65,7 +65,7 @@
       <button
         type="button"
         class="inline-flex items-center gap-2 rounded-r-2 bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground transition-standard hover:bg-brand-hover"
-        on:click={() => navigate('/playbooks/new')}
+        onclick={() => navigate('/playbooks/new')}
       >
         <Plus class="h-4 w-4" />
         Create Playbook
@@ -78,14 +78,14 @@
       <button
         type="button"
         class="border-b-2 px-1 pb-3 text-sm font-semibold transition-standard {activeTab === 'library' ? 'border-brand text-brand' : 'border-transparent text-text-3 hover:text-text-1'}"
-        on:click={() => (activeTab = 'library')}
+        onclick={() => (activeTab = 'library')}
       >
         Library
       </button>
       <button
         type="button"
         class="border-b-2 px-1 pb-3 text-sm font-semibold transition-standard {activeTab === 'runs' ? 'border-brand text-brand' : 'border-transparent text-text-3 hover:text-text-1'}"
-        on:click={() => (activeTab = 'runs')}
+        onclick={() => (activeTab = 'runs')}
       >
         Runs
       </button>
@@ -122,7 +122,7 @@
                 <button
                   type="button"
                   class="rounded-r-2 border border-border-1 px-3 py-2 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-2"
-                  on:click={() => navigate(`/playbooks/${playbook.id}/edit`)}
+                  onclick={() => navigate(`/playbooks/${playbook.id}/edit`)}
                 >
                   Edit
                 </button>
@@ -130,7 +130,7 @@
                   type="button"
                   class="inline-flex items-center gap-2 rounded-r-2 bg-brand px-3 py-2 text-sm font-semibold text-brand-foreground transition-standard hover:bg-brand-hover disabled:opacity-60"
                   disabled={$playbooksStore.saving}
-                  on:click={() => startRun(playbook)}
+                  onclick={() => startRun(playbook)}
                 >
                   <Play class="h-4 w-4" />
                   Run
@@ -152,7 +152,7 @@
           <button
             type="button"
             class="flex w-full items-center justify-between gap-4 rounded-r-3 border border-border-1 bg-bg-surface-1 p-4 text-left shadow-1 transition-standard hover:bg-bg-surface-2"
-            on:click={() => navigate(`/runs/${run.id}`)}
+            onclick={() => navigate(`/runs/${run.id}`)}
           >
             <div class="flex items-center gap-3">
               <div class="flex h-10 w-10 items-center justify-center rounded-r-2 bg-success/10 text-success">

@@ -22,7 +22,7 @@
     return Math.min(Math.max(Math.trunc(index), 0), length - 1)
   }
 
-  let currentIndex = $state(boundedIndex(initialIndex, images.length))
+  let currentIndex = $state(0)
 
   let currentImage = $derived(images[currentIndex])
 

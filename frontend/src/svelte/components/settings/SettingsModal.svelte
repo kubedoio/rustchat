@@ -65,14 +65,14 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#if open}
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      on:click={handleClose}
+      onclick={handleClose}
       role="button"
       tabindex="-1"
       aria-label="Close settings"
@@ -90,7 +90,7 @@
         <h2 class="text-xl sm:text-2xl font-semibold text-text-1">Settings</h2>
         <button
           type="button"
-          on:click={handleClose}
+          onclick={handleClose}
           class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
           aria-label="Close settings"
         >
@@ -117,7 +117,7 @@
             {#each tabs as tab (tab.id)}
               <button
                 type="button"
-                on:click={() => setTab(tab.id)}
+                onclick={() => setTab(tab.id)}
                 class="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-r-2 whitespace-nowrap transition-standard"
                 class:bg-bg-surface-1={activeTab === tab.id}
                 class:text-brand={activeTab === tab.id}
@@ -142,7 +142,7 @@
             {#each pluginTabs as tab (tab.id)}
               <button
                 type="button"
-                on:click={() => setTab(tab.id)}
+                onclick={() => setTab(tab.id)}
                 class="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-r-2 whitespace-nowrap transition-standard"
                 class:bg-bg-surface-1={activeTab === tab.id}
                 class:text-brand={activeTab === tab.id}
@@ -163,7 +163,7 @@
           <div class="grid grid-cols-2 gap-2 p-3 border-t border-border-1 sm:mt-auto sm:block sm:p-2">
             <button
               type="button"
-              on:click={() => setTab('profile')}
+              onclick={() => setTab('profile')}
               class="w-full flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-r-2 transition-standard sm:mb-1"
               class:bg-bg-surface-1={activeTab === 'profile'}
               class:text-brand={activeTab === 'profile'}
@@ -179,7 +179,7 @@
             </button>
             <button
               type="button"
-              on:click={handleLogout}
+              onclick={handleLogout}
               class="w-full flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-r-2 transition-standard"
             >
               <LogOut class="w-4 h-4 shrink-0" />

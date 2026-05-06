@@ -305,7 +305,7 @@
   </div>
 {/snippet}
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 <aside class="flex w-72 shrink-0 flex-col border-r border-border-1 bg-bg-surface-2 text-text-1" aria-label="Chat sidebar">
   <!-- Team Header -->

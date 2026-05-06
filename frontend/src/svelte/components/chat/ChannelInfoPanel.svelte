@@ -103,7 +103,7 @@
       <button
         class="flex h-8 w-8 items-center justify-center rounded-r-1 text-text-3 transition-standard hover:bg-bg-surface-2 hover:text-text-1 focus-ring"
         aria-label="Close channel info"
-        on:click={handleClose}
+        onclick={handleClose}
       >
         <X class="h-4 w-4" />
       </button>
@@ -174,7 +174,7 @@
             <Calendar class="h-4 w-4" />
             <span class="text-[11px] font-bold uppercase tracking-wider">Created</span>
           </div>
-          <p class="text-sm font-medium text-text-1">{formatDate(undefined)}</p>
+          <p class="text-sm font-medium text-text-1">{formatDate(channel?.created_at)}</p>
         </div>
       </div>
     </div>

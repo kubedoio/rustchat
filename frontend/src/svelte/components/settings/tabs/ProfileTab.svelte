@@ -159,7 +159,7 @@
       <div class="flex justify-end">
         <button
           type="button"
-          on:click={handleSave}
+          onclick={handleSave}
           disabled={saving || !$authStore.user}
           class="rounded-r-2 bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-standard hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
         >

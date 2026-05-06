@@ -81,7 +81,7 @@
   }
 </script>
 
-<svelte:window on:keydown={(e) => open && e.key === 'Escape' && handleClose()} />
+<svelte:window onkeydown={(e) => open && e.key === 'Escape' && handleClose()} />
 
 {#if open}
   <div
@@ -93,7 +93,7 @@
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      on:click={handleClose}
+      onclick={handleClose}
       role="button"
       tabindex="-1"
       aria-label="Close create team modal"
@@ -111,7 +111,7 @@
         <h2 class="text-lg font-semibold text-text-1">Create Team</h2>
         <button
           type="button"
-          on:click={handleClose}
+          onclick={handleClose}
           class="flex h-10 w-10 items-center justify-center rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
           aria-label="Close"
         >
@@ -127,7 +127,7 @@
           <div class="flex justify-end pt-2">
             <button
               type="button"
-              on:click={handleClose}
+              onclick={handleClose}
               class="px-4 py-2 text-sm font-medium text-text-2 bg-bg-surface-2 rounded-lg hover:bg-bg-surface-1 border border-border-2 transition-colors"
             >
               Close
@@ -135,7 +135,7 @@
           </div>
         </div>
       {:else}
-        <form on:submit={handleSubmit} class="p-6 space-y-4">
+        <form onsubmit={handleSubmit} class="p-6 space-y-4">
           <!-- Error -->
           {#if error}
             <div class="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
@@ -190,7 +190,7 @@
           <div class="flex justify-end space-x-3 pt-4">
             <button
               type="button"
-              on:click={handleClose}
+              onclick={handleClose}
               disabled={loading}
               class="px-4 py-2 text-sm font-medium text-text-2 bg-bg-surface-2 rounded-lg hover:bg-bg-surface-1 border border-border-2 transition-colors disabled:opacity-50"
             >
