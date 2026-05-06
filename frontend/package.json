@@ -20,13 +20,13 @@
     "test:e2e:settings-parity:update": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test e2e/settings_parity.spec.ts --project=chromium --update-snapshots"
   },
   "dependencies": {
-    "@tiptap/extension-placeholder": "^3.22.4",
-    "@tiptap/starter-kit": "^3.22.4",
-    "@tiptap/vue-3": "^3.22.4",
+    "@tiptap/extension-placeholder": "^3.22.5",
+    "@tiptap/starter-kit": "^3.22.5",
+    "@tiptap/vue-3": "^3.22.5",
     "@types/md5": "^2.3.6",
-    "@vueuse/core": "^14.2.1",
+    "@vueuse/core": "^14.3.0",
     "date-fns": "^4.1.0",
-    "dompurify": "^3.4.1",
+    "dompurify": "^3.4.2",
     "highlight.js": "^11.11.1",
     "lucide-svelte": "^1.0.1",
     "lucide-vue-next": "^0.577.0",
@@ -35,7 +35,7 @@
     "md5": "^2.3.0",
     "pinia": "^3.0.4",
     "svelte": "^5.55.5",
-    "vue": "^3.5.33",
+    "vue": "^3.5.34",
     "vue-router": "^4.6.4"
   },
   "overrides": {
@@ -49,15 +49,15 @@
     "@types/node": "^24.12.2",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@vitejs/plugin-vue": "^6.0.6",
-    "@vue/test-utils": "^2.4.8",
+    "@vue/test-utils": "^2.4.10",
     "@vue/tsconfig": "^0.9.1",
-    "jsdom": "^29.1.0",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.12",
-    "svelte-check": "^4.4.7",
+    "svelte-check": "^4.4.8",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "vite": "^7.3.2",
     "vitest": "^4.1.5",
-    "vue-tsc": "^3.2.7"
+    "vue-tsc": "^3.2.8"
   }
 }
