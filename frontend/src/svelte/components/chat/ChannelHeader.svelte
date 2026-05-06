@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fade, fly } from 'svelte/transition'
   import { Hash, Lock, MoreVertical, Info, Users, Search, ClipboardList, Pin, Bookmark, Phone, PanelLeft } from 'lucide-svelte'
   import ConnectionIndicator from '../ui/ConnectionIndicator.svelte'
   import NotificationsDropdown from '../ui/NotificationsDropdown.svelte'
@@ -66,6 +67,12 @@
     showMenu = false
   }
 
+  function handleMenuKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && showMenu) {
+      showMenu = false
+    }
+  }
+
   function handleStartCall() {
     dispatch('startCall')
     showMenu = false
@@ -81,6 +88,8 @@
     dispatch('toggleMobileSidebar')
   }
 </script>
+
+<svelte:window on:keydown={handleMenuKeydown} />
 
 <header
   class="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border-1 bg-bg-surface-1/95 px-3 backdrop-blur-sm sm:px-4"
@@ -248,13 +257,18 @@
       </button>
 
       {#if showMenu}
+        <!-- Click outside -->
+        <div class="fixed inset-0 z-10" on:click={() => (showMenu = false)} role="presentation" transition:fade={{ duration: 100 }}></div>
         <div
           class="absolute right-0 top-full z-20 mt-2 w-48 origin-top-right rounded-r-2 border border-border-1 bg-bg-surface-1 py-1 shadow-2xl"
+          role="menu"
+          transition:fly={{ duration: 150, y: -5 }}
         >
           <button
             data-testid="channel-details-button"
             on:click={handleToggleInfo}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+            role="menuitem"
           >
             <Info class="h-4 w-4" />
             Channel Details
@@ -263,6 +277,7 @@
           <button
             on:click={handleToggleMembers}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+            role="menuitem"
           >
             <Users class="h-4 w-4" />
             Members
@@ -271,6 +286,7 @@
           <button
             on:click={handleTogglePinned}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+            role="menuitem"
           >
             <Pin class="h-4 w-4" />
             Pinned Messages
@@ -279,6 +295,7 @@
           <button
             on:click={handleToggleSaved}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+            role="menuitem"
           >
             <Bookmark class="h-4 w-4" />
             Saved Messages
@@ -287,14 +304,12 @@
           <button
             on:click={handleStartCall}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+            role="menuitem"
           >
             <Phone class="h-4 w-4" />
             Start Call
           </button>
         </div>
-
-        <!-- Click outside -->
-        <div class="fixed inset-0 z-10" on:click={() => (showMenu = false)} role="presentation"></div>
       {/if}
     </div>
   </div>

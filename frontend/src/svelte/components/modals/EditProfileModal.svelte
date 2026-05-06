@@ -1,6 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher, untrack } from 'svelte'
+  import { fade, scale } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { X, Camera } from 'lucide-svelte'
+  import { focusTrap } from '../../lib/focusTrap'
   import { svelteApi, SvelteHttpError } from '../../stores/http'
   import { authStore } from '../../stores/auth'
   import type { AuthUser } from '../../../core/entities/Auth'
@@ -125,11 +128,14 @@
       role="button"
       tabindex="-1"
       aria-label="Close edit profile modal"
+      transition:fade={{ duration: 150, easing: cubicOut }}
     ></div>
 
     <!-- Modal -->
     <div
       class="relative bg-bg-surface-1 rounded-r-3 shadow-2xl ring-1 ring-border-1 w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto"
+      use:focusTrap
+      transition:scale={{ duration: 200, start: 0.95, easing: cubicOut }}
     >
       <!-- Header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-border-1">

@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
   import { createEventDispatcher } from 'svelte'
+  import { fly } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { format } from 'date-fns'
   import { X, MessageSquare, Send, Loader2 } from 'lucide-svelte'
   import { chatStore } from '../../stores/chat'
@@ -156,6 +158,7 @@
     aria-label="Thread panel"
     tabindex="-1"
     on:keydown={handleKeydown}
+    transition:fly={{ x: 300, duration: 250, easing: cubicOut }}
   >
     <!-- Header -->
     <div class="border-b border-border-1 bg-bg-surface-2">

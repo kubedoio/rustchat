@@ -1,5 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fly } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { Pin, X, ExternalLink } from 'lucide-svelte'
   import { format } from 'date-fns'
   import { svelteApi } from '../../stores/http'
@@ -63,7 +65,7 @@
 </script>
 
 {#if open}
-  <aside class="h-full bg-bg-surface-1 flex flex-col" data-testid="pinned-messages-panel">
+  <aside class="h-full bg-bg-surface-1 flex flex-col" data-testid="pinned-messages-panel" transition:fly={{ x: 300, duration: 250, easing: cubicOut }}>
     <!-- Header -->
     <div class="h-12 border-b border-border-1 flex items-center justify-between px-4">
       <div class="flex items-center space-x-2">

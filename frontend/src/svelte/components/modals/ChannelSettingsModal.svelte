@@ -1,6 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fade, scale } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { X, Hash, Lock, Settings, Users, Shield, Bell, Trash2, Search, Plus, UserMinus } from 'lucide-svelte'
+  import { focusTrap } from '../../lib/focusTrap'
   import { svelteApi } from '../../stores/http'
   import { authStore } from '../../stores/auth'
   import { chatStore } from '../../stores/chat'
@@ -181,11 +184,14 @@
       role="button"
       tabindex="-1"
       aria-label="Close channel settings"
+      transition:fade={{ duration: 150, easing: cubicOut }}
     ></div>
 
     <!-- Modal -->
     <div
       class="relative bg-bg-surface-1 rounded-r-3 shadow-2xl ring-1 ring-border-1 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+      use:focusTrap
+      transition:scale={{ duration: 200, start: 0.95, easing: cubicOut }}
     >
       <!-- Header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-border-1 shrink-0">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fade, fly } from 'svelte/transition'
   import { Search, Bell, Activity, ChevronDown, Settings, LogOut, Shield } from 'lucide-svelte'
   import { authStore } from '../../stores/auth'
   import { uiStore } from '../../stores/ui'
@@ -17,7 +18,16 @@
   function logout() {
     authStore.logout()
   }
+
+  function handleMenuKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      showUserMenu = false
+      showNotifications = false
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleMenuKeydown} />
 
 <header class="shrink-0 h-[var(--header-height)] bg-bg-surface-1/95 backdrop-blur-sm border-b border-border-1 flex items-center px-3 gap-2 z-30">
   <!-- Logo / Site name -->
@@ -86,22 +96,22 @@
       </button>
 
       {#if showUserMenu}
-        <div class="fixed inset-0 z-30" on:click={() => showUserMenu = false} />
-        <div class="absolute right-0 top-full mt-1 w-56 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 py-1 z-40">
+        <div class="fixed inset-0 z-30" on:click={() => showUserMenu = false} transition:fade={{ duration: 100 }} />
+        <div class="absolute right-0 top-full mt-1 w-56 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 py-1 z-40" role="menu" transition:fly={{ duration: 150, y: -5 }}>
           <div class="px-3 py-2 border-b border-border-1">
             <p class="text-sm font-semibold text-text-1">{$authStore.user?.display_name || $authStore.user?.username}</p>
             <p class="text-xs text-text-3">@{$authStore.user?.username}</p>
           </div>
-          <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => { uiStore.openSettings(); showUserMenu = false }}>
+          <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => { uiStore.openSettings(); showUserMenu = false }} role="menuitem">
             <Settings class="w-4 h-4" /> Settings
           </button>
           {#if $authStore.user?.role === 'system_admin'}
-            <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => { window.location.href = '/admin'; showUserMenu = false }}>
+            <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" on:click={() => { window.location.href = '/admin'; showUserMenu = false }} role="menuitem">
               <Shield class="w-4 h-4" /> Admin Console
             </button>
           {/if}
           <div class="my-1 border-t border-border-1" />
-          <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-danger/5 transition-standard" on:click={logout}>
+          <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-danger/5 transition-standard" on:click={logout} role="menuitem">
             <LogOut class="w-4 h-4" /> Log out
           </button>
         </div>

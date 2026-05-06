@@ -1,5 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fly } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { Hash, Lock, X, Users, Calendar } from 'lucide-svelte'
   import type { SvelteChatChannel, SvelteChatMember } from '../../stores/chat'
 
@@ -91,8 +93,9 @@
 
 {#if open}
   <aside
-    class="flex w-80 shrink-0 flex-col border-l border-border-1 bg-bg-surface-1 animate-slide-in-right"
+    class="flex w-80 shrink-0 flex-col border-l border-border-1 bg-bg-surface-1"
     aria-label="Channel info"
+    transition:fly={{ x: 300, duration: 250, easing: cubicOut }}
   >
     <!-- Header -->
     <div class="flex h-[var(--header-height)] items-center justify-between border-b border-border-1 px-4">

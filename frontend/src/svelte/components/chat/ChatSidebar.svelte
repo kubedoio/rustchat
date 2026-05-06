@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
   import { svelteApi } from '../../stores/http'
+  import { fly } from 'svelte/transition'
   import {
     Hash,
     Lock,
@@ -167,6 +168,13 @@
     contextMenu = null
   }
 
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      showTeamMenu = false
+      contextMenu = null
+    }
+  }
+
   async function markChannelRead(channelId: string) {
     try {
       await svelteApi.post(`/channels/${channelId}/read`)
@@ -297,6 +305,8 @@
   </div>
 {/snippet}
 
+<svelte:window on:keydown={handleKeydown} />
+
 <aside class="flex w-72 shrink-0 flex-col border-r border-border-1 bg-bg-surface-2 text-text-1" aria-label="Chat sidebar">
   <!-- Team Header -->
   <div class="relative border-b border-border-1">
@@ -310,11 +320,12 @@
 
     {#if showTeamMenu}
       <div class="fixed inset-0 z-30" onclick={() => (showTeamMenu = false)} role="presentation"></div>
-      <div class="absolute left-2 right-2 top-full mt-1 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 py-1 z-40">
+      <div class="absolute left-2 right-2 top-full mt-1 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 py-1 z-40" role="menu" transition:fly={{ duration: 150, y: -5 }}>
         {#if isAdmin}
           <button
             class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard"
             onclick={() => { /* system console */ showTeamMenu = false }}
+            role="menuitem"
           >
             <Settings class="w-4 h-4" />
             System Console
@@ -323,6 +334,7 @@
         <button
           class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard"
           onclick={() => { dispatch('browseTeams'); showTeamMenu = false }}
+          role="menuitem"
         >
           <Globe class="w-4 h-4" />
           Browse Teams
@@ -331,6 +343,7 @@
         <button
           class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard"
           onclick={() => { dispatch('teamSettings'); showTeamMenu = false }}
+          role="menuitem"
         >
           <Settings class="w-4 h-4" />
           Team Settings
@@ -338,6 +351,7 @@
         <button
           class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-danger/5 transition-standard"
           onclick={() => { /* leave team */ showTeamMenu = false }}
+          role="menuitem"
         >
           <LogOut class="w-4 h-4" />
           Leave Team
@@ -400,17 +414,19 @@
   <div
     class="fixed z-50 w-48 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2 py-1"
     style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+    role="menu"
+    transition:fly={{ duration: 150, y: -5 }}
   >
-    <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => { if (contextMenu) { markChannelRead(contextMenu.channel.id); closeContextMenu() } }}>
+    <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => { if (contextMenu) { markChannelRead(contextMenu.channel.id); closeContextMenu() } }} role="menuitem">
       <Check class="w-4 h-4" />
       Mark as Read
     </button>
-    <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => { /* mute */ closeContextMenu() }}>
+    <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-1 hover:bg-bg-surface-2 transition-standard" onclick={() => { /* mute */ closeContextMenu() }} role="menuitem">
       <BellOff class="w-4 h-4" />
       Mute Channel
     </button>
     <div class="my-1 border-t border-border-1"></div>
-    <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-danger/5 transition-standard" onclick={() => { /* leave */ closeContextMenu() }}>
+    <button class="flex items-center gap-2 w-full px-3 py-2 text-sm text-danger hover:bg-danger/5 transition-standard" onclick={() => { /* leave */ closeContextMenu() }} role="menuitem">
       <LogOut class="w-4 h-4" />
       Leave Channel
     </button>
