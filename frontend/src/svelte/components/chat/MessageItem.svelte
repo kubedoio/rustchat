@@ -1,7 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
   import { format, formatDistanceToNow } from 'date-fns'
-  import { MessageSquare, Pencil, Trash2, Pin, Check, Bookmark, MoreHorizontal, X, Video, Phone } from 'lucide-svelte'
+  import { MessageSquare, Pencil, Trash2, Pin, Check, Bookmark, MoreHorizontal, X, Video, Phone, File } from 'lucide-svelte'
+  import { chatStore } from '../../stores/chat'
+  import { configStore } from '../../stores/config'
   import { renderMarkdown } from '../../utils/markdown'
   import { authStore } from '../../stores/auth'
   import ImageGallery from '../../components/atomic/ImageGallery.svelte'
@@ -33,6 +35,8 @@
 
   $: isOwnMessage = currentUserId !== undefined && message.user_id === currentUserId
   $: isEdited = Boolean(message.editedAt)
+  $: editTimeLimit = ($configStore?.siteConfig?.post_edit_time_limit_seconds ?? 0) * 1000
+  $: canEdit = isOwnMessage && (editTimeLimit <= 0 || Date.now() - new Date(message.createdAt ?? message.created_at ?? 0).getTime() < editTimeLimit)
   $: isSystemMessage =
     message.props?.type === 'system_join_leave' ||
     message.props?.type === 'system_purpose' ||
@@ -131,19 +135,34 @@
     return currentUserId !== undefined && reaction.users.includes(currentUserId)
   }
 
-  function toggleReaction(emoji: string) {
+  async function toggleReaction(emoji: string) {
     if (!currentUserId) return
-    reactions = reactions
-      .map((r) => {
-        if (r.emoji !== emoji) return r
-        const reacted = r.users.includes(currentUserId)
-        return {
-          ...r,
-          count: reacted ? r.count - 1 : r.count + 1,
-          users: reacted ? r.users.filter((id) => id !== currentUserId) : [...r.users, currentUserId],
-        }
-      })
-      .filter((r) => r.count > 0)
+    const hasReacted = reactions.some((r) => r.emoji === emoji && r.users.includes(currentUserId))
+    if (hasReacted) {
+      await chatStore.removeReaction(message.id, emoji)
+    } else {
+      await chatStore.addReaction(message.id, emoji)
+    }
+  }
+
+  async function toggleSave() {
+    if (message.isSaved) {
+      await chatStore.unsavePost(message.id)
+    } else {
+      await chatStore.savePost(message.id)
+    }
+  }
+
+  async function togglePin() {
+    if (message.isPinned) {
+      await chatStore.unpinPost(message.id)
+    } else {
+      await chatStore.pinPost(message.id)
+    }
+  }
+
+  async function markUnread() {
+    await chatStore.markPostUnread(message.id)
   }
 
   function openGallery(clickedUrl: string) {
@@ -307,7 +326,7 @@
               {#if file.mimeType?.startsWith('image/') || file.mime_type?.startsWith('image/')}
                 <button
                   data-testid="file-attachment"
-                  class="rounded-r-1 overflow-hidden border border-border-1 w-20 h-20 bg-bg-surface-2 p-0"
+                  class="rounded-r-1 overflow-hidden border border-border-1 w-32 h-32 bg-bg-surface-2 p-0"
                   on:click={() => openGallery(file.url ?? '')}
                   type="button"
                   aria-label={`Open image gallery: ${file.name ?? 'Image'}`}
@@ -315,17 +334,23 @@
                   <img
                     src={file.url ?? ''}
                     alt={file.name ?? 'Image'}
-                    class="w-full h-full object-cover"
+                    class="w-full h-full object-cover cursor-pointer"
                     loading="lazy"
                   />
                 </button>
               {:else}
-                <div data-testid="file-attachment" class="rounded-full border border-border-1 bg-bg-surface-2 px-3 py-1 text-xs text-text-2 flex items-center gap-1.5">
+                <a
+                  data-testid="file-attachment"
+                  href={file.url ?? '#'}
+                  download={file.name}
+                  class="rounded-full border border-border-1 bg-bg-surface-2 px-3 py-1.5 text-xs text-text-2 flex items-center gap-1.5 hover:bg-bg-surface-1 transition-standard"
+                >
+                  <File class="w-3.5 h-3.5" />
                   <span class="truncate max-w-[12rem]">{file.name ?? 'Attached file'}</span>
                   {#if file.size}
                     <span class="text-text-4">({Math.round(file.size / 1024)}KB)</span>
                   {/if}
-                </div>
+                </a>
               {/if}
             {/each}
           </div>
@@ -419,7 +444,7 @@
             <div
               class="absolute right-0 top-full mt-1 w-44 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-2xl py-1 z-20 origin-top-right"
             >
-              {#if isOwnMessage}
+              {#if canEdit}
                 <button
                   on:click={startEditing}
                   class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
@@ -429,12 +454,36 @@
                 </button>
               {/if}
               <button
-                on:click={handleDelete}
-                class="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/5 flex items-center gap-2 transition-standard"
+                on:click={toggleSave}
+                class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
               >
-                <Trash2 class="w-4 h-4" />
-                Delete message
+                <Bookmark class="w-4 h-4 {message.isSaved ? 'fill-current' : ''}" />
+                {message.isSaved ? 'Unsave' : 'Save'}
               </button>
+              <button
+                on:click={togglePin}
+                class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
+              >
+                <Pin class="w-4 h-4" />
+                {message.isPinned ? 'Unpin' : 'Pin'}
+              </button>
+              <button
+                on:click={markUnread}
+                class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
+              >
+                <MessageSquare class="w-4 h-4" />
+                Mark as unread
+              </button>
+              {#if isOwnMessage}
+                <div class="my-1 border-t border-border-1"></div>
+                <button
+                  on:click={handleDelete}
+                  class="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/5 flex items-center gap-2 transition-standard"
+                >
+                  <Trash2 class="w-4 h-4" />
+                  Delete message
+                </button>
+              {/if}
             </div>
           {/if}
         </div>
