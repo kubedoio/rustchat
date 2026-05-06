@@ -20,7 +20,7 @@
     },
     "@tiptap/vue-3": {
       "category": "impossible-to-replace-economically",
-      "reason": "Vue integration layer for the existing rich text composer."
+      "reason": "Vue integration layer for the existing rich text composer. To be removed when composer is migrated to Svelte."
     },
     "@types/md5": {
       "category": "editor-format-tooling-critical",
@@ -28,7 +28,7 @@
     },
     "@vueuse/core": {
       "category": "impossible-to-replace-economically",
-      "reason": "Shared reactive browser utilities already used for storage and breakpoint hooks."
+      "reason": "Shared reactive browser utilities. Legacy Vue dependency; to be removed after composable cleanup."
     },
     "date-fns": {
       "category": "impossible-to-replace-economically",
@@ -42,9 +42,13 @@
       "category": "impossible-to-replace-economically",
       "reason": "Syntax highlighting for markdown code blocks."
     },
+    "lucide-svelte": {
+      "category": "impossible-to-replace-economically",
+      "reason": "Shared icon set used throughout the Svelte UI."
+    },
     "lucide-vue-next": {
       "category": "impossible-to-replace-economically",
-      "reason": "Shared icon set used throughout the Vue UI."
+      "reason": "Shared icon set. Legacy Vue dependency; to be removed after component cleanup."
     },
     "marked": {
       "category": "impossible-to-replace-economically",
@@ -60,21 +64,29 @@
     },
     "pinia": {
       "category": "framework-critical",
-      "reason": "Primary frontend state management library."
+      "reason": "Legacy frontend state management library. Not used by Svelte runtime; to be removed after store cleanup."
     },
-    "vue": {
+    "svelte": {
       "category": "framework-critical",
       "reason": "Core frontend runtime framework."
     },
+    "vue": {
+      "category": "framework-critical",
+      "reason": "Legacy frontend runtime framework. Not used by Svelte runtime; to be removed after file cleanup."
+    },
     "vue-router": {
       "category": "framework-critical",
-      "reason": "Primary frontend routing library."
+      "reason": "Legacy frontend routing library. Not used by Svelte runtime; to be removed after file cleanup."
     }
   },
   "directDevDependencies": {
     "@playwright/test": {
       "category": "build-tool-critical",
       "reason": "End-to-end and visual regression testing framework."
+    },
+    "@sveltejs/vite-plugin-svelte": {
+      "category": "build-tool-critical",
+      "reason": "Official Vite integration for Svelte component compilation."
     },
     "@tailwindcss/postcss": {
       "category": "build-tool-critical",
@@ -94,15 +106,15 @@
     },
     "@vitejs/plugin-vue": {
       "category": "build-tool-critical",
-      "reason": "Official Vite integration for Vue SFC compilation."
+      "reason": "Official Vite integration for Vue SFC compilation. Legacy; to be removed when all Vue files are purged from build."
     },
     "@vue/test-utils": {
       "category": "build-tool-critical",
-      "reason": "Vue component testing utilities used by existing frontend tests."
+      "reason": "Vue component testing utilities. Legacy; to be removed after test migration."
     },
     "@vue/tsconfig": {
       "category": "build-tool-critical",
-      "reason": "Base TypeScript configuration preset for Vue projects."
+      "reason": "Base TypeScript configuration preset for Vue projects. Legacy; to be replaced with generic tsconfig."
     },
     "jsdom": {
       "category": "build-tool-critical",
@@ -111,6 +123,10 @@
     "postcss": {
       "category": "build-tool-critical",
       "reason": "CSS transformation pipeline used by Vite and Tailwind."
+    },
+    "svelte-check": {
+      "category": "build-tool-critical",
+      "reason": "Svelte-aware TypeScript checking for the production build."
     },
     "tailwindcss": {
       "category": "build-tool-critical",
@@ -130,7 +146,7 @@
     },
     "vue-tsc": {
       "category": "build-tool-critical",
-      "reason": "Vue-aware TypeScript checking for the production build."
+      "reason": "Vue-aware TypeScript checking. Legacy; to be removed after Vue file cleanup."
     }
   },
   "overrides": {

@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
 // https://vite.dev/config/
@@ -14,7 +13,7 @@ export default defineConfig({
       '$svelte': fileURLToPath(new URL('./src/svelte', import.meta.url)),
     }
   },
-  plugins: [svelte(), vue()],
+  plugins: [svelte()],
   build: {
     rollupOptions: {
       output: {
@@ -25,11 +24,8 @@ export default defineConfig({
 
           if (id.includes('node_modules')) {
             if (
-              id.includes('/vue/') ||
-              id.includes('/pinia/') ||
-              id.includes('/vue-router/') ||
               id.includes('/svelte/') ||
-              id.includes('/@vue/')
+              id.includes('/@sveltejs/')
             ) {
               return 'vendor-framework'
             }
@@ -40,10 +36,6 @@ export default defineConfig({
               id.includes('/dompurify/')
             ) {
               return 'vendor-markdown'
-            }
-
-            if (id.includes('/@vueuse/')) {
-              return 'vendor-vueuse'
             }
 
             return 'vendor'
