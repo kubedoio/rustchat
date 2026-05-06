@@ -47,11 +47,11 @@
 <section
   bind:this={container}
   on:scroll={handleScroll}
-  class="flex-1 overflow-y-auto bg-gray-50 p-4"
+  class="flex-1 overflow-y-auto bg-bg-app p-4"
   aria-label="Message list"
 >
   {#if renderedMessages.length === 0}
-    <div class="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+    <div class="rounded-xl border border-dashed border-border-2 bg-bg-surface-1 p-6 text-center text-sm text-text-3">
       No messages yet. Start the conversation below.
     </div>
   {:else}

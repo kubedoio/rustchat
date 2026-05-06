@@ -61,57 +61,57 @@
 </script>
 
 {#if open}
-  <aside class="h-full bg-white flex flex-col" data-testid="saved-messages-panel">
+  <aside class="h-full bg-bg-surface-1 flex flex-col" data-testid="saved-messages-panel">
     <!-- Header -->
-    <div class="h-12 border-b border-gray-200 flex items-center justify-between px-4">
+    <div class="h-12 border-b border-border-1 flex items-center justify-between px-4">
       <div class="flex items-center space-x-2">
-        <Bookmark class="w-5 h-5 text-gray-500 fill-current" />
-        <span class="font-semibold text-gray-900">Saved Items</span>
+        <Bookmark class="w-5 h-5 text-text-3 fill-current" />
+        <span class="font-semibold text-text-1">Saved Items</span>
       </div>
       <button
         class="p-1 hover:bg-gray-100 rounded transition-colors"
         aria-label="Close saved messages"
         onclick={() => dispatch('close')}
       >
-        <X class="w-5 h-5 text-gray-400" />
+        <X class="w-5 h-5 text-text-4" />
       </button>
     </div>
 
     <!-- Saved List -->
     <div class="flex-1 overflow-y-auto p-0">
       {#if loading}
-        <div class="text-center py-8 text-gray-500">
+        <div class="text-center py-8 text-text-3">
           <div class="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
           Loading saved items...
         </div>
       {:else if savedMessages.length === 0}
-        <div class="text-center py-8 text-gray-500 px-4">
-          <div class="mb-2 text-gray-400">
+        <div class="text-center py-8 text-text-3 px-4">
+          <div class="mb-2 text-text-4">
             <Bookmark class="w-12 h-12 mx-auto mb-3 opacity-20" />
             No saved items yet
           </div>
           <div class="text-xs">Save messages to access them quickly here</div>
         </div>
       {:else}
-        <div class="divide-y divide-gray-100">
+        <div class="divide-y divide-border-1">
           {#each savedMessages as message (message.id)}
-            <div class="px-4 py-4 hover:bg-gray-50 transition-colors group relative">
+            <div class="px-4 py-4 hover:bg-bg-surface-2 transition-colors group relative">
               <div class="flex items-start justify-between mb-1">
                 <div class="flex items-center space-x-2">
-                  <span class="font-bold text-sm text-gray-900">{message.username}</span>
-                  <span class="text-[10px] text-gray-400">{format(new Date(message.timestamp), 'MMM d, h:mm a')}</span>
+                  <span class="font-bold text-sm text-text-1">{message.username}</span>
+                  <span class="text-[10px] text-text-4">{format(new Date(message.timestamp), 'MMM d, h:mm a')}</span>
                 </div>
                 <!-- Actions -->
                 <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    class="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-red-500 transition-colors"
+                    class="p-1 hover:bg-gray-200 rounded text-text-4 hover:text-red-500 transition-colors"
                     title="Unsave"
                     onclick={() => handleUnsave(message)}
                   >
                     <Bookmark class="w-3.5 h-3.5" />
                   </button>
                   <button
-                    class="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-blue-500 transition-colors"
+                    class="p-1 hover:bg-gray-200 rounded text-text-4 hover:text-blue-500 transition-colors"
                     title="Jump to message"
                     onclick={() => jumpToMessage(message)}
                   >

@@ -258,7 +258,7 @@
 }} />
 
 <section
-  class="border-t border-gray-200 bg-white p-4"
+  class="border-t border-border-1 bg-bg-surface-1 p-4"
   aria-label="Message composer region"
   on:drop|preventDefault={handleDrop}
   on:dragover|preventDefault
@@ -268,10 +268,10 @@
       {#each attachments as attachment (attachment.id)}
         <span
           data-testid="file-attachment"
-          class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm {attachment.uploadError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-700'}"
+          class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm {attachment.uploadError ? 'border-red-200 bg-red-50 text-red-700' : 'border-border-1 bg-bg-app text-gray-700'}"
         >
           {#if attachment.uploading}
-            <span data-testid="upload-progress" class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600"></span>
+            <span data-testid="upload-progress" class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-border-2 border-t-indigo-600"></span>
           {:else if attachment.uploadError}
             <span class="text-red-500" aria-label="Upload failed">!</span>
           {/if}
@@ -281,7 +281,7 @@
           {/if}
           <button
             type="button"
-            class="text-gray-500 hover:text-gray-900 disabled:opacity-40"
+            class="text-text-3 hover:text-gray-900 disabled:opacity-40"
             aria-label={`Remove ${attachment.name}`}
             disabled={attachment.uploading}
             on:click={() => removeAttachment(attachment.id)}
@@ -301,10 +301,10 @@
   />
 
   {#if mentionMatch && matchingMembers.length > 0}
-    <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" role="listbox" aria-label="Channel Members">
+    <div class="mb-3 rounded-lg border border-border-1 bg-bg-app p-3 text-sm text-gray-700" role="listbox" aria-label="Channel Members">
       <p class="font-medium text-gray-900">Channel Members</p>
       {#each matchingMembers as member (member.id ?? member.user_id ?? member.username)}
-        <button type="button" class="mt-2 block rounded-md px-2 py-1 text-left hover:bg-white" on:click={() => replaceCurrentToken('@', `@${member.username}`)}>
+        <button type="button" class="mt-2 block rounded-md px-2 py-1 text-left hover:bg-bg-surface-1" on:click={() => replaceCurrentToken('@', `@${member.username}`)}>
           {member.displayName ?? member.display_name ?? member.username}
         </button>
       {/each}
@@ -312,23 +312,23 @@
   {/if}
 
   {#if emojiMatch && matchingEmojiSuggestions.length > 0}
-    <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" role="listbox" aria-label="Emoji autocomplete">
+    <div class="mb-3 rounded-lg border border-border-1 bg-bg-app p-3 text-sm text-gray-700" role="listbox" aria-label="Emoji autocomplete">
       <p class="font-medium text-gray-900">Emoji matching "{emojiMatch}"</p>
       {#each matchingEmojiSuggestions as suggestion (suggestion.shortcode)}
         <button
           type="button"
-          class="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-white"
+          class="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-bg-surface-1"
           on:click={() => replaceCurrentToken(':', suggestion.shortcode)}
         >
           <span aria-hidden="true">{suggestion.icon}</span>
           <span>{suggestion.shortcode}</span>
-          <span class="text-xs text-gray-500">{suggestion.label}</span>
+          <span class="text-xs text-text-3">{suggestion.label}</span>
         </button>
       {/each}
     </div>
   {/if}
 
-  <div class="rounded-xl border border-gray-300 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+  <div class="rounded-xl border border-border-2 bg-bg-surface-1 shadow-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/10">
     <textarea
       data-testid="message-input"
       bind:this={textarea}
@@ -365,11 +365,11 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <span class="text-xs text-gray-500">Enter to send, Shift+Enter for newline</span>
+        <span class="text-xs text-text-3">Enter to send, Shift+Enter for newline</span>
         <button
           data-testid="send-button"
           type="button"
-          class="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          class="rounded-lg bg-brand px-4 py-2 font-medium text-white shadow-sm hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Send message"
           disabled={isSendDisabled}
           title={disabled ? 'Reconnecting...' : ''}
