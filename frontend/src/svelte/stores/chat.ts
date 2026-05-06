@@ -260,11 +260,12 @@ function createChatStore() {
         }
     }
 
-    async function fetchChannels(): Promise<SvelteChatChannel[]> {
+    async function fetchChannels(teamId?: string): Promise<SvelteChatChannel[]> {
         update((state) => ({ ...state, loading: true, error: null }))
 
         try {
-            const { data } = await svelteApi.get<unknown[]>('/channels')
+            const params = teamId ? { team_id: teamId } : undefined
+            const { data } = await svelteApi.get<unknown[]>('/channels', { params })
             const channels = data.map(normalizeChannel)
             update((state) => {
                 const currentChannelId = state.currentChannelId ?? channels[0]?.id ?? null
@@ -358,7 +359,11 @@ function createChatStore() {
     }
 
     async function bootstrap(): Promise<void> {
-        await Promise.all([fetchTeams(), fetchChannels()])
+        const teams = await fetchTeams()
+        const teamId = teams[0]?.id
+        if (teamId) {
+            await fetchChannels(teamId)
+        }
 
         const channelId = get(chatStore).currentChannelId
         if (channelId) {
