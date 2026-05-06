@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte'
   import { Bell, BellOff } from 'lucide-svelte'
   import { formatDistanceToNow } from 'date-fns'
   import { svelteApi } from '../../stores/http'
@@ -12,9 +12,15 @@
     read: boolean
   }
 
-  let open = false
+  export let open: boolean | undefined = undefined
+
+  const dispatch = createEventDispatcher<{ close: void }>()
+
+  let internalOpen = false
   let notifications: NotificationItem[] = []
   let loading = false
+
+  $: isOpen = open !== undefined ? open : internalOpen
 
   async function loadNotifications() {
     loading = true
@@ -42,14 +48,22 @@
   }
 
   function handleToggle() {
-    open = !open
-    if (open && notifications.length === 0) {
-      void loadNotifications()
+    if (open !== undefined) {
+      dispatch('close')
+    } else {
+      internalOpen = !internalOpen
+      if (internalOpen && notifications.length === 0) {
+        void loadNotifications()
+      }
     }
   }
 
   function close() {
-    open = false
+    if (open !== undefined) {
+      dispatch('close')
+    } else {
+      internalOpen = false
+    }
   }
 
   function markAsRead(id: string) {
@@ -61,13 +75,16 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape' && open) {
+    if (e.key === 'Escape' && isOpen) {
       close()
     }
   }
 
   onMount(() => {
     document.addEventListener('keydown', handleKeydown)
+    if (open !== undefined && open && notifications.length === 0) {
+      void loadNotifications()
+    }
   })
 
   onDestroy(() => {
@@ -78,25 +95,27 @@
 </script>
 
 <div class="relative">
-  <button
-    data-testid="notifications-trigger"
-    on:click={handleToggle}
-    class="relative flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
-    class:bg-bg-surface-2={open}
-    aria-label="Notifications"
-    title="Notifications"
-  >
-    <Bell class="h-4 w-4" />
-    {#if unreadCount > 0}
-      <span
-        class="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white"
-      >
-        {unreadCount > 99 ? '99+' : unreadCount}
-      </span>
-    {/if}
-  </button>
+  {#if open === undefined}
+    <button
+      data-testid="notifications-trigger"
+      on:click={handleToggle}
+      class="relative flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
+      class:bg-bg-surface-2={isOpen}
+      aria-label="Notifications"
+      title="Notifications"
+    >
+      <Bell class="h-4 w-4" />
+      {#if unreadCount > 0}
+        <span
+          class="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white"
+        >
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      {/if}
+    </button>
+  {/if}
 
-  {#if open}
+  {#if isOpen}
     <div
       class="absolute right-0 top-full z-20 mt-2 w-80 origin-top-right rounded-r-2 border border-border-1 bg-bg-surface-1 py-1 shadow-2xl"
     >

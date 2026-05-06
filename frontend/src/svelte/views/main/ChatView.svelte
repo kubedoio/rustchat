@@ -1,6 +1,8 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
   import { get } from 'svelte/store'
+  import GlobalHeader from '../../components/layout/GlobalHeader.svelte'
+  import TeamRail from '../../components/layout/TeamRail.svelte'
   import ChatSidebar from '../../components/chat/ChatSidebar.svelte'
   import ChannelHeader from '../../components/chat/ChannelHeader.svelte'
   import ChannelInfoPanel from '../../components/chat/ChannelInfoPanel.svelte'
@@ -75,6 +77,18 @@
   let messageListVersion = $state(0)
   let messageListRef: MessageList | null = $state(null)
 
+  // Mobile drawer state
+  let mobileSidebarOpen = $state(false)
+  let isMobile = $state(false)
+
+  function checkMobile() {
+    isMobile = window.innerWidth < 768
+  }
+
+  function closeMobileSidebar() {
+    mobileSidebarOpen = false
+  }
+
   function resolveDirectMembers(
     channel: SvelteChatChannel,
     members: SvelteChatMember[],
@@ -96,6 +110,9 @@
   }
 
   onMount(() => {
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
     const unsubscribeConnectionStatus = connectionStatus.subscribe((status) => {
       currentConnectionStatus = status
     })
@@ -114,6 +131,7 @@
     registerCallWebSocketHandlers()
 
     return () => {
+      window.removeEventListener('resize', checkMobile)
       unsubscribeConnectionStatus()
       unsubscribeChat()
     }
@@ -187,81 +205,145 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<main class="flex h-screen overflow-hidden bg-bg-app text-text-1">
-  <ChatSidebar
-    teams={$chatStore.teams}
-    channels={$chatStore.channels}
-    members={sidebarMembers}
-    currentUserId={$authStore.user?.id}
-    unreadCounts={$chatStore.unreadCounts}
-    currentChannelId={$chatStore.currentChannelId}
-    onSelectChannel={(channelId) => chatStore.selectChannel(channelId)}
-    on:createChannel={() => (createChannelOpen = true)}
-    on:browseChannels={() => (browseChannelsOpen = true)}
-    on:directMessage={() => (dmOpen = true)}
-    on:setStatus={() => (setStatusOpen = true)}
-    on:createTeam={() => (createTeamOpen = true)}
-    on:editProfile={() => (editProfileOpen = true)}
-  />
+<div class="flex flex-col h-screen overflow-hidden bg-bg-app text-text-1">
+  <GlobalHeader />
 
-  <section class="flex min-w-0 flex-1 flex-col bg-bg-surface-1">
-    <ConnectionStatusBar />
-
-    <ChannelHeader
-      channel={currentChannel}
-      members={currentMembers}
-      onToggleInfo={toggleInfoPanel}
-      on:search={() => (searchOpen = true)}
-      on:toggleActivity={() => activityStore.toggleFeed()}
-      on:togglePinned={() => uiStore.toggleRhs('pinned')}
-      on:toggleSaved={() => uiStore.toggleRhs('saved')}
-      on:startCall={() => { if (currentChannel) void callsStore.startCall(currentChannel.id) }}
-    />
-
-    {#if $chatStore.error}
-      <div class="border-b border-danger/30 bg-danger/10 px-5 py-3 text-sm text-danger" role="alert">
-        {$chatStore.error}
+  <div class="flex flex-1 overflow-hidden relative">
+    <!-- Mobile sidebar overlay -->
+    {#if isMobile && mobileSidebarOpen}
+      <div class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" on:click={closeMobileSidebar} />
+      <div class="fixed top-0 left-0 bottom-0 z-50 flex shadow-2xl">
+        <TeamRail
+          onSelectTeam={(id) => { chatStore.selectTeam(id); closeMobileSidebar() }}
+          onCreateTeam={() => { createTeamOpen = true; closeMobileSidebar() }}
+        />
+        <ChatSidebar
+          teams={$chatStore.teams}
+          channels={$chatStore.channels}
+          members={sidebarMembers}
+          currentUserId={$authStore.user?.id}
+          unreadCounts={$chatStore.unreadCounts}
+          currentChannelId={$chatStore.currentChannelId}
+          onSelectChannel={(channelId) => { chatStore.selectChannel(channelId); closeMobileSidebar() }}
+          on:createChannel={() => (createChannelOpen = true)}
+          on:browseChannels={() => (browseChannelsOpen = true)}
+          on:directMessage={() => (dmOpen = true)}
+          on:setStatus={() => (setStatusOpen = true)}
+          on:createTeam={() => (createTeamOpen = true)}
+          on:editProfile={() => (editProfileOpen = true)}
+        />
       </div>
     {/if}
 
-    <div
-      data-testid="main-content"
-      class="flex min-w-0 flex-1 flex-col transition-opacity duration-300"
-      class:opacity-80={currentConnectionStatus === 'reconnecting'}
-      class:opacity-60={currentConnectionStatus === 'disconnected'}
-      class:blur-sm={currentConnectionStatus === 'failed'}
-    >
-      {#key `${$chatStore.currentChannelId ?? 'none'}:${messageListVersion}`}
-        <MessageList
-          bind:this={messageListRef}
-          messages={visibleMessages}
-          channelId={$chatStore.currentChannelId}
-          on:openProfile={(e) => { profileUserId = e.detail }}
-          on:thread={handleThread}
-        />
-      {/key}
+    <!-- Desktop TeamRail -->
+    {#if !isMobile}
+      <TeamRail
+        onSelectTeam={(id) => chatStore.selectTeam(id)}
+        onCreateTeam={() => (createTeamOpen = true)}
+      />
+    {/if}
 
-      {#if currentChannel}
-        <TypingIndicator channelId={currentChannel.id} />
-        <MessageComposer
-          channelId={currentChannel.id}
-          channelName={currentChannel.display_name || currentChannel.name}
+    <!-- Desktop Sidebar -->
+    {#if !isMobile}
+      <ChatSidebar
+        teams={$chatStore.teams}
+        channels={$chatStore.channels}
+        members={sidebarMembers}
+        currentUserId={$authStore.user?.id}
+        unreadCounts={$chatStore.unreadCounts}
+        currentChannelId={$chatStore.currentChannelId}
+        onSelectChannel={(channelId) => chatStore.selectChannel(channelId)}
+        on:createChannel={() => (createChannelOpen = true)}
+        on:browseChannels={() => (browseChannelsOpen = true)}
+        on:directMessage={() => (dmOpen = true)}
+        on:setStatus={() => (setStatusOpen = true)}
+        on:createTeam={() => (createTeamOpen = true)}
+        on:editProfile={() => (editProfileOpen = true)}
+      />
+    {/if}
+
+    <!-- Main content -->
+    <section class="flex min-w-0 flex-1 flex-col bg-bg-surface-1">
+      <ConnectionStatusBar />
+
+      <ChannelHeader
+        channel={currentChannel}
+        members={currentMembers}
+        onToggleInfo={toggleInfoPanel}
+        onToggleMembers={() => uiStore.setRhsView('members')}
+        onToggleMobileSidebar={() => (mobileSidebarOpen = !mobileSidebarOpen)}
+        on:search={() => (searchOpen = true)}
+        on:toggleActivity={() => activityStore.toggleFeed()}
+        on:togglePinned={() => uiStore.toggleRhs('pinned')}
+        on:toggleSaved={() => uiStore.toggleRhs('saved')}
+        on:startCall={() => { if (currentChannel) void callsStore.startCall(currentChannel.id) }}
+      />
+
+      {#if $chatStore.error}
+        <div class="border-b border-danger/30 bg-danger/10 px-5 py-3 text-sm text-danger" role="alert">
+          {$chatStore.error}
+        </div>
+      {/if}
+
+      <div
+        data-testid="main-content"
+        class="flex min-w-0 flex-1 flex-col transition-opacity duration-300"
+        class:opacity-80={currentConnectionStatus === 'reconnecting'}
+        class:opacity-60={currentConnectionStatus === 'disconnected'}
+        class:blur-sm={currentConnectionStatus === 'failed'}
+      >
+        {#key `${$chatStore.currentChannelId ?? 'none'}:${messageListVersion}`}
+          <MessageList
+            bind:this={messageListRef}
+            messages={visibleMessages}
+            channelId={$chatStore.currentChannelId}
+            on:openProfile={(e) => { profileUserId = e.detail }}
+            on:thread={handleThread}
+          />
+        {/key}
+
+        {#if currentChannel}
+          <TypingIndicator channelId={currentChannel.id} />
+          <MessageComposer
+            channelId={currentChannel.id}
+            channelName={currentChannel.display_name || currentChannel.name}
+            members={currentMembers}
+            disabled={currentConnectionStatus !== 'connected'}
+            on:send={sendMessage}
+          />
+        {/if}
+      </div>
+    </section>
+
+    <!-- RHS panels (desktop) -->
+    {#if !isMobile}
+      {#if infoPanelOpen}
+        <ChannelInfoPanel
+          channel={currentChannel}
           members={currentMembers}
-          disabled={currentConnectionStatus !== 'connected'}
-          on:send={sendMessage}
+          open={infoPanelOpen}
+          on:close={() => (infoPanelOpen = false)}
         />
       {/if}
-    </div>
-  </section>
 
-  {#if infoPanelOpen}
-    <ChannelInfoPanel
-      channel={currentChannel}
-      members={currentMembers}
-      open={infoPanelOpen}
-      on:close={() => (infoPanelOpen = false)}
-    />
-  {/if}
+      {#if threadPanelOpen && activeThreadId}
+        <ThreadPanel
+          threadId={activeThreadId}
+          channelId={currentChannel?.id ?? null}
+          open={threadPanelOpen}
+          on:close={() => { threadPanelOpen = false; activeThreadId = null }}
+        />
+      {/if}
+
+      {#if $uiStore.rhsView === 'pinned' && currentChannel}
+        <PinnedMessagesPanel channelId={currentChannel.id} open={true} on:close={() => uiStore.closeRhs()} on:jump={(e) => handleJumpToMessage(e.detail)} />
+      {/if}
+
+      {#if $uiStore.rhsView === 'saved'}
+        <SavedMessagesPanel open={true} on:close={() => uiStore.closeRhs()} on:jump={(e) => handleJumpToMessage(e.detail)} />
+      {/if}
+    {/if}
+  </div>
 
   {#if profileUserId}
     <UserProfileModal
@@ -284,28 +366,7 @@
     <SettingsModal open={true} on:close={uiStore.closeSettings} />
   {/if}
 
-  {#if threadPanelOpen && activeThreadId}
-    <ThreadPanel
-      threadId={activeThreadId}
-      channelId={currentChannel?.id ?? null}
-      open={threadPanelOpen}
-      on:close={() => { threadPanelOpen = false; activeThreadId = null }}
-    />
-  {/if}
-
-  {#if searchOpen}
-    <SearchModal open={true} on:close={handleSearchClose} />
-  {/if}
-
   <ActivityFeed />
-
-  {#if $uiStore.rhsView === 'pinned' && currentChannel}
-    <PinnedMessagesPanel channelId={currentChannel.id} open={true} on:close={() => uiStore.closeRhs()} on:jump={(e) => handleJumpToMessage(e.detail)} />
-  {/if}
-
-  {#if $uiStore.rhsView === 'saved'}
-    <SavedMessagesPanel open={true} on:close={() => uiStore.closeRhs()} on:jump={(e) => handleJumpToMessage(e.detail)} />
-  {/if}
 
   {#if $quickSwitcherStore.open}
     <QuickSwitcherModal
@@ -327,4 +388,8 @@
   <AddChannelMembersModal open={addMembersOpen} channelId={currentChannel?.id} channelName={currentChannel?.name} onclose={() => (addMembersOpen = false)} />
   <CreateTeamModal open={createTeamOpen} on:close={() => (createTeamOpen = false)} />
   <EditProfileModal open={editProfileOpen} on:close={() => (editProfileOpen = false)} />
-</main>
+
+  {#if searchOpen}
+    <SearchModal open={true} on:close={handleSearchClose} />
+  {/if}
+</div>

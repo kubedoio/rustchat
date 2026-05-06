@@ -1,17 +1,33 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
-  import { Hash, Lock, MoreVertical, Info, Users, Search, ClipboardList, Pin, Bookmark, Phone } from 'lucide-svelte'
+  import { Hash, Lock, MoreVertical, Info, Users, Search, ClipboardList, Pin, Bookmark, Phone, PanelLeft } from 'lucide-svelte'
   import ConnectionIndicator from '../ui/ConnectionIndicator.svelte'
   import NotificationsDropdown from '../ui/NotificationsDropdown.svelte'
+  import { callsStore } from '../../stores/calls.svelte'
   import type { SvelteChatChannel, SvelteChatMember } from '../../stores/chat'
 
   export let channel: SvelteChatChannel | null = null
   export let members: SvelteChatMember[] = []
   export let onToggleInfo: (() => void) | undefined = undefined
+  export let onToggleMembers: (() => void) | undefined = undefined
+  export let onToggleMobileSidebar: (() => void) | undefined = undefined
 
-  const dispatch = createEventDispatcher<{ toggleInfo: void; search: void; toggleActivity: void; togglePinned: void; toggleSaved: void; startCall: void }>()
+  const dispatch = createEventDispatcher<{
+    toggleInfo: void
+    search: void
+    toggleActivity: void
+    togglePinned: void
+    toggleSaved: void
+    startCall: void
+    toggleMembers: void
+    toggleMobileSidebar: void
+  }>()
 
   let showMenu = false
+
+  $: activeCall = callsStore.currentCall
+  $: isInCall = activeCall?.channelId === channel?.id
+  $: hasActiveCall = callsStore.activeCalls.has(channel?.id ?? '') && !isInCall
 
   function channelTypeLabel(type: string): string {
     const labels: Record<string, string> = {
@@ -54,6 +70,16 @@
     dispatch('startCall')
     showMenu = false
   }
+
+  function handleToggleMembers() {
+    onToggleMembers?.()
+    dispatch('toggleMembers')
+  }
+
+  function handleToggleMobileSidebar() {
+    onToggleMobileSidebar?.()
+    dispatch('toggleMobileSidebar')
+  }
 </script>
 
 <header
@@ -61,6 +87,16 @@
 >
   <!-- Left: Channel Info -->
   <div class="flex min-w-0 items-center gap-2.5">
+    <!-- Mobile sidebar toggle -->
+    <button
+      class="lg:hidden flex h-9 w-9 items-center justify-center rounded-r-2 text-text-2 transition-standard hover:bg-bg-surface-2"
+      on:click={handleToggleMobileSidebar}
+      aria-label="Toggle sidebar"
+      title="Toggle sidebar"
+    >
+      <PanelLeft class="h-5 w-5" />
+    </button>
+
     <div class="flex min-w-0 items-center gap-2">
       <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-r-1 bg-brand/10 text-brand">
         {#if channel?.channel_type === 'private'}
@@ -76,6 +112,9 @@
         <h1 class="truncate text-sm font-semibold text-brand sm:text-base">
           {channelPrefix(channel?.channel_type ?? '')}{channel?.display_name || channel?.name || 'No channel selected'}
         </h1>
+        {#if channel?.header}
+          <p class="hidden sm:block text-xs text-text-3 truncate max-w-[300px]">{channel.header}</p>
+        {/if}
       </div>
     </div>
 
@@ -114,6 +153,46 @@
 
   <!-- Right: Actions -->
   <div class="flex shrink-0 items-center gap-0.5 rounded-r-3 border border-border-1 bg-bg-surface-2/70 p-1 sm:gap-1">
+    <!-- Members button -->
+    <button
+      class="hidden md:flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
+      on:click={handleToggleMembers}
+      aria-label="Members"
+      title="Members"
+    >
+      <Users class="h-4 w-4" />
+    </button>
+
+    <!-- Call buttons -->
+    {#if isInCall}
+      <button
+        class="flex h-11 w-11 items-center justify-center rounded-r-2 bg-success/10 text-success transition-standard"
+        on:click={() => callsStore.toggleExpanded()}
+        aria-label="Show call"
+        title="Show call"
+      >
+        <Phone class="h-4 w-4" />
+      </button>
+    {:else if hasActiveCall}
+      <button
+        class="flex h-11 w-11 items-center justify-center rounded-r-2 bg-success/10 text-success animate-pulse transition-standard"
+        on:click={() => channel?.id && callsStore.joinCall(channel.id)}
+        aria-label="Join call"
+        title="Join call"
+      >
+        <Phone class="h-4 w-4" />
+      </button>
+    {:else}
+      <button
+        class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-2 transition-standard focus-ring hover:bg-bg-surface-2"
+        on:click={handleStartCall}
+        aria-label="Start audio call"
+        title="Start audio call"
+      >
+        <Phone class="h-4 w-4" />
+      </button>
+    {/if}
+
     <button
       data-testid="search-button"
       on:click={() => dispatch('search')}
@@ -182,6 +261,14 @@
           </button>
 
           <button
+            on:click={handleToggleMembers}
+            class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
+          >
+            <Users class="h-4 w-4" />
+            Members
+          </button>
+
+          <button
             on:click={handleTogglePinned}
             class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
           >
@@ -203,13 +290,6 @@
           >
             <Phone class="h-4 w-4" />
             Start Call
-          </button>
-
-          <button
-            class="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-text-2 transition-standard hover:bg-bg-surface-2"
-          >
-            <Users class="h-4 w-4" />
-            Members
           </button>
         </div>
 

@@ -18,6 +18,7 @@ export interface SvelteChatChannel {
     channel_type: SvelteChatChannelType
     unreadCount?: number
     mentionCount?: number
+    header?: string
 }
 
 export interface SvelteChatFile {
@@ -71,6 +72,7 @@ export interface SvelteChatReadState {
 export interface SvelteChatState {
     teams: SvelteChatTeam[]
     channels: SvelteChatChannel[]
+    currentTeamId: string | null
     currentChannelId: string | null
     messagesByChannel: Record<string, SvelteChatPost[]>
     membersByTeam: Record<string, SvelteChatMember[]>
@@ -96,6 +98,7 @@ interface SendPostBody {
 const initialState: SvelteChatState = {
     teams: [],
     channels: [],
+    currentTeamId: null,
     currentChannelId: null,
     messagesByChannel: {},
     membersByTeam: {},
@@ -269,8 +272,9 @@ function createChatStore() {
             const channels = data.map(normalizeChannel)
             update((state) => {
                 const currentChannelId = state.currentChannelId ?? channels[0]?.id ?? null
+                const currentTeamId = state.currentTeamId ?? teamId ?? channels[0]?.team_id ?? state.teams[0]?.id ?? null
 
-                return { ...state, channels, currentChannelId, loading: false }
+                return { ...state, channels, currentTeamId, currentChannelId, loading: false }
             })
 
             return channels
@@ -346,9 +350,14 @@ function createChatStore() {
     }
 
     async function selectChannel(channelId: string): Promise<void> {
-        update((state) => ({ ...state, currentChannelId: channelId, error: null }))
-
         const channel = get(chatStore).channels.find((candidate) => candidate.id === channelId)
+        update((state) => ({
+            ...state,
+            currentChannelId: channelId,
+            currentTeamId: channel?.team_id ?? state.currentTeamId,
+            error: null,
+        }))
+
         if (channel?.team_id && !get(chatStore).membersByTeam[channel.team_id]) {
             await fetchMembers(channel.team_id)
         }
@@ -358,6 +367,10 @@ function createChatStore() {
         }
     }
 
+    function selectTeam(teamId: string): void {
+        update((state) => ({ ...state, currentTeamId: teamId }))
+    }
+
     async function bootstrap(): Promise<void> {
         const teams = await fetchTeams()
         const teamId = teams[0]?.id
@@ -365,9 +378,10 @@ function createChatStore() {
             await fetchChannels(teamId)
         }
 
-        const channelId = get(chatStore).currentChannelId
+        const state = get(chatStore)
+        const channelId = state.currentChannelId
         if (channelId) {
-            const channel = get(chatStore).channels.find((candidate) => candidate.id === channelId)
+            const channel = state.channels.find((candidate) => candidate.id === channelId)
             if (channel?.team_id) {
                 await fetchMembers(channel.team_id)
             }
@@ -661,6 +675,7 @@ function createChatStore() {
         update,
         bootstrap,
         selectChannel,
+        selectTeam,
         fetchTeams,
         fetchChannels,
         fetchMessages,

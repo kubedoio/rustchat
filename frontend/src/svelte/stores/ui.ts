@@ -22,6 +22,8 @@ export interface UIState {
     videoCallUrl: string | null
     isVideoCallOpen: boolean
     density: Density
+    unreadNotificationCount: number
+    unreadCountsByTeam: Record<string, number>
 }
 
 function normalizeDensity(value: string): Density {
@@ -39,6 +41,8 @@ function getInitialState(): UIState {
         videoCallUrl: null,
         isVideoCallOpen: false,
         density: normalizeDensity(readLocalStorage('density', 'comfortable')),
+        unreadNotificationCount: 0,
+        unreadCountsByTeam: {},
     }
 }
 
@@ -86,6 +90,9 @@ function createUIStore() {
         setDensity(density: Density): void {
             writeLocalStorage('density', density)
             update((state) => ({ ...state, density }))
+        },
+        setRhsView(rhsView: RhsView): void {
+            update((state) => ({ ...state, rhsView, isRhsOpen: true }))
         },
         reset(): void {
             set(getInitialState())
