@@ -270,7 +270,7 @@
   <section class="border-t border-white/10 p-4" aria-label="Members">
     <h3 class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Members</h3>
     <ul class="mt-3 space-y-2 text-sm text-slate-200">
-      {#each members as member (member.id)}
+      {#each members as member (member.id ?? member.user_id ?? member.username)}
         <li class="flex items-center gap-2">
           <span class="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true"></span>
           <span>{member.displayName ?? member.display_name ?? member.username}</span>
