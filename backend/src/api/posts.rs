@@ -95,13 +95,14 @@ async fn list_posts(
             .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     // Get read state
-    let last_read: Option<i64> = sqlx::query_scalar(
+    let last_read: Option<i64> = sqlx::query_scalar::<_, Option<i64>>(
         "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
     )
     .bind(auth.user_id)
     .bind(channel_id)
     .fetch_optional(&state.db)
-    .await?;
+    .await?
+    .flatten();
 
     let first_unread: Option<i64> = match last_read {
         Some(lr) => sqlx::query_scalar(
