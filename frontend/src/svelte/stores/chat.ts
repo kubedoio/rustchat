@@ -571,6 +571,91 @@ function createChatStore() {
         }
     }
 
+    function updatePostField(postId: string, field: string, value: unknown): void {
+        const channelId = get(chatStore).currentChannelId
+        if (!channelId) return
+        chatStore.update((state) => {
+            const messages = state.messagesByChannel[channelId] ?? []
+            const msg = messages.find((m) => m.id === postId)
+            if (msg) {
+                ;(msg as unknown as Record<string, unknown>)[field] = value
+            }
+            return state
+        })
+    }
+
+    async function addReaction(postId: string, emojiName: string): Promise<void> {
+        await svelteApi.post(`/posts/${postId}/reactions`, { emoji_name: emojiName })
+        const channelId = get(chatStore).currentChannelId
+        if (!channelId) return
+        chatStore.update((state) => {
+            const messages = state.messagesByChannel[channelId] ?? []
+            const msg = messages.find((m) => m.id === postId)
+            if (!msg) return state
+            const existing = msg.reactions?.find((r) => r.emoji === emojiName)
+            const userId = get(authStore).user?.id
+            if (existing && userId) {
+                existing.count += 1
+                existing.users = [...existing.users, userId]
+            } else if (userId) {
+                msg.reactions = [...(msg.reactions ?? []), { emoji: emojiName, count: 1, users: [userId] }]
+            }
+            return state
+        })
+    }
+
+    async function removeReaction(postId: string, emojiName: string): Promise<void> {
+        await svelteApi.delete_(`/posts/${postId}/reactions/${encodeURIComponent(emojiName)}`)
+        const channelId = get(chatStore).currentChannelId
+        if (!channelId) return
+        chatStore.update((state) => {
+            const messages = state.messagesByChannel[channelId] ?? []
+            const msg = messages.find((m) => m.id === postId)
+            if (!msg) return state
+            const userId = get(authStore).user?.id
+            const reaction = msg.reactions?.find((r) => r.emoji === emojiName)
+            if (reaction && userId) {
+                reaction.count -= 1
+                reaction.users = reaction.users.filter((id) => id !== userId)
+                if (reaction.count <= 0) {
+                    msg.reactions = msg.reactions?.filter((r) => r.emoji !== emojiName)
+                }
+            }
+            return state
+        })
+    }
+
+    async function savePost(postId: string): Promise<void> {
+        await svelteApi.post(`/posts/${postId}/save`)
+        updatePostField(postId, 'isSaved', true)
+    }
+
+    async function unsavePost(postId: string): Promise<void> {
+        await svelteApi.delete_(`/posts/${postId}/save`)
+        updatePostField(postId, 'isSaved', false)
+    }
+
+    async function pinPost(postId: string): Promise<void> {
+        await svelteApi.post(`/posts/${postId}/pin`)
+        updatePostField(postId, 'isPinned', true)
+    }
+
+    async function unpinPost(postId: string): Promise<void> {
+        await svelteApi.delete_(`/posts/${postId}/pin`)
+        updatePostField(postId, 'isPinned', false)
+    }
+
+    async function markPostUnread(postId: string): Promise<void> {
+        try {
+            await svelteApi.post(`/posts/${postId}/set_unread`)
+        } catch {
+            const userId = get(authStore).user?.id
+            if (userId) {
+                await svelteApi.post(`/users/${userId}/posts/${postId}/set_unread`)
+            }
+        }
+    }
+
     return {
         subscribe,
         update,
@@ -590,6 +675,13 @@ function createChatStore() {
         fetchThreadReplies,
         sendThreadReply,
         uploadFile,
+        addReaction,
+        removeReaction,
+        savePost,
+        unsavePost,
+        pinPost,
+        unpinPost,
+        markPostUnread,
         reset: () => set(initialState),
     }
 }

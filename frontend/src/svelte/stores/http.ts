@@ -149,4 +149,6 @@ export const svelteApi = {
         svelteHttp<T>('PATCH', path, body, options),
     delete: <T>(path: string, options?: SvelteHttpOptions) =>
         svelteHttp<T>('DELETE', path, undefined, options),
+    delete_: <T>(path: string, options?: SvelteHttpOptions) =>
+        svelteHttp<T>('DELETE', path, undefined, options),
 }
