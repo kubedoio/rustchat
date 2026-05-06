@@ -32,7 +32,7 @@ This guide is for developers contributing to RustChat.
 ```
 rustchat/
 ├── backend/            # Rust API server (Axum + SQLx)
-├── frontend/           # Svelte 5 + TypeScript SPA
+├── frontend/           # Vue 3 + TypeScript SPA
 ├── push-proxy/         # Mobile push notification gateway
 ├── docs/               # Documentation
 └── scripts/            # Utility scripts
@@ -47,9 +47,9 @@ rustchat/
 - S3-compatible storage
 
 **Frontend:**
-- Svelte 5 with runes
+- Vue 3.5 with Composition API
 - TypeScript 5.9+
-- Svelte stores for state management
+- Pinia for state management
 - Vite for building
 
 ---

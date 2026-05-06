@@ -3,10 +3,8 @@
  */
 
 import { ref, computed } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useTeamStore } from '../stores/teams'
-
-// Simple inline alias to avoid vue-router dependency
-type RouteLocationRaw = string | { path: string } | { name: string; params?: Record<string, any> }
 import { useChannelStore } from '../stores/channels'
 
 export interface QuickSwitcherItem {

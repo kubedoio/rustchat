@@ -59,7 +59,7 @@ docker compose up -d --build
 | Path | Contents |
 |------|----------|
 | `backend/` | Rust API server (Axum 0.8 + Tokio) |
-| `frontend/` | Svelte 5 + TypeScript SPA |
+| `frontend/` | Vue 3.5 + TypeScript SPA |
 | `push-proxy/` | Mobile push notification gateway |
 | `scripts/` | Smoke and utility scripts |
 | `tools/mm-compat/` | Python Mattermost compatibility tooling |
@@ -127,13 +127,13 @@ Run these when touching v4 API/websocket/compatibility-sensitive behavior:
 - **Error handling:** Use `thiserror` for error types, `Result<T, AppError>` pattern
 - **Async:** Tokio runtime, prefer `async fn` for IO-bound work
 
-### TypeScript/Svelte (Frontend)
+### TypeScript/Vue (Frontend)
 
 - **Formatting:** Prettier with 2-space indent
-- **Linting:** ESLint with TypeScript recommended rules
+- **Linting:** ESLint with Vue 3 recommended rules
 - **Naming:** `camelCase` for functions/variables, `PascalCase` for components/types
-- **Components:** Svelte runes with `<script lang="ts">`
-- **State:** Svelte stores in `svelte/stores/`
+- **Components:** Composition API with `<script setup>`
+- **State:** Pinia stores in `features/[domain]/stores/`
 
 ### General
 
@@ -218,7 +218,7 @@ We use the following labels to organize work:
 | `type/feature` | New functionality request |
 | `type/docs` | Documentation improvement |
 | `area/backend` | Rust backend code |
-| `area/frontend` | Svelte/TypeScript frontend code |
+| `area/frontend` | Vue/TypeScript frontend code |
 | `area/ci` | CI/CD, workflows, automation |
 | `area/docs` | Documentation content |
 | `risk/low` | Safe change with limited blast radius |

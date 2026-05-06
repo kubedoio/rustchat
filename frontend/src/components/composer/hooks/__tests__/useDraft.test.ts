@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ref, nextTick } from 'vue'
 import { useDraft, useDrafts } from '../useDraft'

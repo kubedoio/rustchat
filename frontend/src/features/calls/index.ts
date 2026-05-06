@@ -24,4 +24,7 @@ export type {
   SessionId
 } from '../../core/entities/Call'
 
-// Components (Svelte versions exist in src/svelte/components/calls/)
+// Components (to be created)
+// export { default as CallPanel } from './components/CallPanel.vue'
+// export { default as CallControls } from './components/CallControls.vue'
+// export { default as IncomingCallModal } from './components/IncomingCallModal.vue'
