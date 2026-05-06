@@ -35,6 +35,7 @@ pub fn router() -> Router<AppState> {
         .route("/posts/{id}/thread", get(get_thread))
         .route("/posts/{id}/pin", post(pin_post).delete(unpin_post))
         .route("/posts/{id}/save", post(save_post).delete(unsave_post))
+        .route("/posts/{post_id}/set_unread", post(mark_post_unread))
         .route("/active_user/saved_posts", get(get_saved_posts))
 }
 
@@ -760,6 +761,62 @@ async fn unsave_post(
     Ok(Json(serde_json::json!({"status": "unsaved"})))
 }
 
+/// Mark a post as unread
+async fn mark_post_unread(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(post_id): Path<Uuid>,
+) -> ApiResult<Json<serde_json::Value>> {
+    // Get the post to find its channel
+    let post: Post = sqlx::query_as(
+        r#"
+        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
+               is_pinned, created_at, edited_at, deleted_at,
+               reply_count::int8 as reply_count,
+               last_reply_at, seq
+        FROM posts WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(post_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    // Verify membership
+    let _: ChannelMember =
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(post.channel_id)
+            .bind(auth.user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+
+    // Update channel_reads to set last_read_message_id to the post BEFORE this one
+    let prev_post: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT id FROM posts WHERE channel_id = $1 AND created_at < $2 ORDER BY created_at DESC LIMIT 1"
+    )
+    .bind(post.channel_id)
+    .bind(post.created_at)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let last_read_id = prev_post.map(|(id,)| id);
+
+    sqlx::query(
+        "INSERT INTO channel_reads (user_id, channel_id, last_read_message_id, last_viewed_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (user_id, channel_id) DO UPDATE SET
+         last_read_message_id = EXCLUDED.last_read_message_id,
+         last_viewed_at = EXCLUDED.last_viewed_at"
+    )
+    .bind(auth.user_id)
+    .bind(post.channel_id)
+    .bind(last_read_id)
+    .execute(&state.db)
+    .await?;
+
+    Ok(Json(serde_json::json!({"status": "OK"})))
+}
+
 /// Get saved posts for current user
 async fn get_saved_posts(
     State(state): State<AppState>,
@@ -797,7 +854,7 @@ async fn get_saved_posts(
 }
 
 /// Helper to populate reactions status
-async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> ApiResult<()> {
+pub async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> ApiResult<()> {
     if posts.is_empty() {
         return Ok(());
     }
@@ -838,7 +895,7 @@ async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> Api
 }
 
 /// Helper to populate is_saved status
-async fn populate_saved_status(
+pub async fn populate_saved_status(
     state: &AppState,
     user_id: Uuid,
     posts: &mut [PostResponse],
