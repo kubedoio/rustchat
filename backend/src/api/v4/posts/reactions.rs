@@ -5,7 +5,6 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -91,12 +90,12 @@ pub(super) async fn add_reaction(
         }
     }
 
-    let reaction: crate::models::post::Reaction = sqlx::query_as(
+    let reaction: crate::models::reaction::Reaction = sqlx::query_as(
         r#"
         INSERT INTO reactions (user_id, post_id, emoji_name)
         VALUES ($1, $2, $3)
         ON CONFLICT (user_id, post_id, emoji_name) DO UPDATE SET emoji_name = $3
-        RETURNING *
+        RETURNING post_id, user_id, emoji_name, create_at
         "#,
     )
     .bind(auth.user_id)
@@ -139,8 +138,8 @@ pub(super) async fn add_reaction(
         user_id: encode_mm_id(reaction.user_id),
         post_id: encode_mm_id(reaction.post_id),
         emoji_name: reaction.emoji_name,
-        create_at: reaction.created_at.timestamp_millis(),
-        update_at: reaction.created_at.timestamp_millis(),
+        create_at: reaction.create_at,
+        update_at: reaction.create_at,
         delete_at: 0,
         channel_id: encode_mm_id(channel_id),
         remote_id: "".to_string(),
@@ -170,9 +169,9 @@ pub(crate) async fn reactions_for_posts(
         return Ok(HashMap::new());
     }
 
-    let reactions: Vec<(Uuid, Uuid, String, DateTime<Utc>, Uuid)> = sqlx::query_as(
+    let reactions: Vec<(Uuid, Uuid, String, i64, Uuid)> = sqlx::query_as(
         r#"
-        SELECT r.post_id, r.user_id, r.emoji_name, r.created_at, p.channel_id
+        SELECT r.post_id, r.user_id, r.emoji_name, r.create_at, p.channel_id
         FROM reactions r
         JOIN posts p ON p.id = r.post_id
         WHERE r.post_id = ANY($1)
@@ -183,13 +182,13 @@ pub(crate) async fn reactions_for_posts(
     .await?;
 
     let mut map: HashMap<Uuid, Vec<mm::Reaction>> = HashMap::new();
-    for (post_id, user_id, emoji_name, created_at, channel_id) in reactions {
+    for (post_id, user_id, emoji_name, create_at, channel_id) in reactions {
         map.entry(post_id).or_default().push(mm::Reaction {
             user_id: encode_mm_id(user_id),
             post_id: encode_mm_id(post_id),
             emoji_name: crate::mattermost_compat::emoji_data::get_short_name_for_emoji(&emoji_name),
-            create_at: created_at.timestamp_millis(),
-            update_at: created_at.timestamp_millis(),
+            create_at,
+            update_at: create_at,
             delete_at: 0,
             channel_id: encode_mm_id(channel_id),
             remote_id: "".to_string(),
@@ -252,8 +251,8 @@ async fn remove_reaction_internal(
 ) -> ApiResult<()> {
     let emoji_name = crate::mattermost_compat::emoji_data::get_short_name_for_emoji(emoji_name);
 
-    let reaction: Option<crate::models::post::Reaction> = sqlx::query_as(
-        "SELECT * FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
+    let reaction: Option<crate::models::reaction::Reaction> = sqlx::query_as(
+        "SELECT post_id, user_id, emoji_name, create_at FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
     )
     .bind(user_id)
     .bind(post_id)
@@ -280,8 +279,8 @@ async fn remove_reaction_internal(
             user_id: encode_mm_id(r.user_id),
             post_id: encode_mm_id(r.post_id),
             emoji_name: r.emoji_name,
-            create_at: r.created_at.timestamp_millis(),
-            update_at: r.created_at.timestamp_millis(),
+            create_at: r.create_at,
+            update_at: r.create_at,
             delete_at: 0,
             channel_id: encode_mm_id(channel_id),
             remote_id: "".to_string(),
@@ -313,9 +312,9 @@ pub(super) async fn get_reactions(
     // Verify the caller is a member of the channel that owns this post.
     check_channel_membership(&state, post_id, auth.user_id).await?;
 
-    let reactions: Vec<(Uuid, Uuid, String, DateTime<Utc>, Uuid)> = sqlx::query_as(
+    let reactions: Vec<(Uuid, Uuid, String, i64, Uuid)> = sqlx::query_as(
         r#"
-        SELECT r.user_id, r.post_id, r.emoji_name, r.created_at, p.channel_id
+        SELECT r.user_id, r.post_id, r.emoji_name, r.create_at, p.channel_id
         FROM reactions r
         JOIN posts p ON p.id = r.post_id
         WHERE r.post_id = $1
@@ -328,14 +327,14 @@ pub(super) async fn get_reactions(
     let mm_reactions = reactions
         .into_iter()
         .map(
-            |(user_id, post_id, emoji_name, created_at, channel_id)| mm::Reaction {
+            |(user_id, post_id, emoji_name, create_at, channel_id)| mm::Reaction {
                 user_id: encode_mm_id(user_id),
                 post_id: encode_mm_id(post_id),
                 emoji_name: crate::mattermost_compat::emoji_data::get_short_name_for_emoji(
                     &emoji_name,
                 ),
-                create_at: created_at.timestamp_millis(),
-                update_at: created_at.timestamp_millis(),
+                create_at,
+                update_at: create_at,
                 delete_at: 0,
                 channel_id: encode_mm_id(channel_id),
                 remote_id: "".to_string(),

@@ -14,9 +14,9 @@ use super::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
+use crate::models::reaction::Reaction;
 use crate::models::{
-    ChannelMember, CreatePost, CreateReaction, Post, PostResponse, Reaction, ThreadResponse,
-    UpdatePost,
+    ChannelMember, CreatePost, CreateReaction, Post, PostResponse, ThreadResponse, UpdatePost,
 };
 
 /// Build posts routes
@@ -95,13 +95,14 @@ async fn list_posts(
             .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     // Get read state
-    let last_read: Option<i64> = sqlx::query_scalar(
+    let last_read: Option<i64> = sqlx::query_scalar::<_, Option<i64>>(
         "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
     )
     .bind(auth.user_id)
     .bind(channel_id)
     .fetch_optional(&state.db)
-    .await?;
+    .await?
+    .flatten();
 
     let first_unread: Option<i64> = match last_read {
         Some(lr) => sqlx::query_scalar(
@@ -478,8 +479,8 @@ async fn add_reaction(
         r#"
         INSERT INTO reactions (post_id, user_id, emoji_name)
         VALUES ($1, $2, $3)
-        ON CONFLICT (post_id, user_id, emoji_name) DO UPDATE SET created_at = NOW()
-        RETURNING *
+        ON CONFLICT (post_id, user_id, emoji_name) DO UPDATE SET create_at = extract(epoch from now()) * 1000
+        RETURNING post_id, user_id, emoji_name, create_at
         "#,
     )
     .bind(id)
@@ -804,7 +805,7 @@ async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> Api
     let post_ids: Vec<Uuid> = posts.iter().map(|p| p.id).collect();
 
     let reactions: Vec<Reaction> =
-        sqlx::query_as("SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY created_at")
+        sqlx::query_as("SELECT post_id, user_id, emoji_name, create_at FROM reactions WHERE post_id = ANY($1) ORDER BY create_at")
             .bind(&post_ids)
             .fetch_all(&state.db)
             .await?;
