@@ -81,6 +81,7 @@ export interface SvelteChatState {
     threadsByParent: Record<string, SvelteChatPost[]>
     loading: boolean
     error: string | null
+    pagination: Record<string, { hasMore: boolean; oldestMessageId: string | null; isLoading: boolean }>
 }
 
 interface PostsResponse {
@@ -107,6 +108,7 @@ const initialState: SvelteChatState = {
     threadsByParent: {},
     loading: false,
     error: null,
+    pagination: {},
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -284,25 +286,76 @@ function createChatStore() {
         }
     }
 
-    async function fetchMessages(channelId: string): Promise<SvelteChatPost[]> {
-        update((state) => ({ ...state, loading: true, error: null }))
+    async function fetchMessages(
+        channelId: string,
+        options?: { before?: string; after?: string; limit?: number }
+    ): Promise<SvelteChatPost[]> {
+        const limit = options?.limit ?? 50
+        const params: Record<string, string | number> = { limit }
+        if (options?.before) params.before = options.before
+        if (options?.after) params.after = options.after
+
+        update((state) => ({
+            ...state,
+            pagination: {
+                ...state.pagination,
+                [channelId]: { ...(state.pagination[channelId] ?? {}), isLoading: true },
+            },
+        }))
 
         try {
-            const { data } = await svelteApi.get<PostsResponse>(`/channels/${channelId}/posts`)
+            const { data } = await svelteApi.get<PostsResponse>(`/channels/${channelId}/posts`, { params })
             const messages = data.messages.map((post) => normalizePost(post, channelId))
-            update((state) => ({
-                ...state,
-                messagesByChannel: {
-                    ...state.messagesByChannel,
-                    [channelId]: mergeMessages(messages, state.messagesByChannel[channelId] ?? []),
-                },
-                readStateByChannel: { ...state.readStateByChannel, [channelId]: data.read_state },
-                loading: false,
-            }))
+
+            update((state) => {
+                const existing = state.messagesByChannel[channelId] ?? []
+                let merged: SvelteChatPost[]
+
+                if (options?.before) {
+                    merged = [...messages, ...existing]
+                } else if (options?.after) {
+                    merged = [...existing, ...messages]
+                } else {
+                    merged = messages
+                }
+
+                const seen = new Set<string>()
+                merged = merged.filter((m) => {
+                    if (seen.has(m.id)) return false
+                    seen.add(m.id)
+                    return true
+                })
+
+                merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+                const oldest = merged[0]
+                const hasMore = messages.length === limit
+
+                return {
+                    ...state,
+                    messagesByChannel: { ...state.messagesByChannel, [channelId]: merged },
+                    readStateByChannel: { ...state.readStateByChannel, [channelId]: data.read_state },
+                    pagination: {
+                        ...state.pagination,
+                        [channelId]: {
+                            hasMore,
+                            oldestMessageId: oldest?.id ?? null,
+                            isLoading: false,
+                        },
+                    },
+                }
+            })
 
             return messages
         } catch (error) {
-            update((state) => ({ ...state, loading: false, error: errorMessage(error, 'Failed to fetch messages') }))
+            update((state) => ({
+                ...state,
+                pagination: {
+                    ...state.pagination,
+                    [channelId]: { ...(state.pagination[channelId] ?? {}), isLoading: false },
+                },
+                error: errorMessage(error, 'Failed to fetch messages'),
+            }))
             throw error
         }
     }
@@ -670,6 +723,10 @@ function createChatStore() {
         }
     }
 
+    function getPagination(channelId: string) {
+        return get(chatStore).pagination[channelId] ?? { hasMore: true, oldestMessageId: null, isLoading: false }
+    }
+
     return {
         subscribe,
         update,
@@ -697,25 +754,9 @@ function createChatStore() {
         pinPost,
         unpinPost,
         markPostUnread,
+        getPagination,
         reset: () => set(initialState),
     }
-}
-
-function mergeMessages(fetched: SvelteChatPost[], existing: SvelteChatPost[]): SvelteChatPost[] {
-    const merged = new Map<string, SvelteChatPost>()
-
-    for (const message of fetched) {
-        merged.set(message.id, message)
-    }
-    for (const message of existing) {
-        merged.set(message.id, message)
-    }
-
-    return Array.from(merged.values()).sort((a, b) => {
-        const left = new Date(a.created_at).getTime()
-        const right = new Date(b.created_at).getTime()
-        return left - right
-    })
 }
 
 export const chatStore = createChatStore()
