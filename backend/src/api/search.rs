@@ -5,13 +5,14 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
+use crate::api::posts::{populate_reactions, populate_saved_status};
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
-use crate::models::Post;
+use crate::models::PostResponse;
 
 /// Build search routes
 pub fn router() -> Router<AppState> {
@@ -22,79 +23,77 @@ pub fn router() -> Router<AppState> {
 pub struct SearchQuery {
     pub q: String,
     pub channel_id: Option<Uuid>,
-    pub page: Option<i64>,
-    pub per_page: Option<i64>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct SearchResult {
-    pub posts: Vec<Post>,
-    pub total: i64,
-    pub page: i64,
-    pub per_page: i64,
-}
-
-/// Full-text search for messages
+/// Search for messages
 async fn search_messages(
     State(state): State<AppState>,
     auth: AuthUser,
     Query(query): Query<SearchQuery>,
-) -> ApiResult<Json<SearchResult>> {
-    if query.q.trim().is_empty() {
+) -> ApiResult<Json<Vec<PostResponse>>> {
+    let search_term = query.q.trim();
+    if search_term.is_empty() {
         return Err(AppError::Validation(
             "Search query cannot be empty".to_string(),
         ));
     }
 
-    let page = query.page.unwrap_or(1).max(1);
-    let per_page = query.per_page.unwrap_or(20).min(100);
-    let offset = (page - 1) * per_page;
+    let search_pattern = format!("%{}%", search_term);
 
-    // Search across accessible channels using regular sqlx::query_as
-    let posts: Vec<Post> = if let Some(channel_id) = query.channel_id {
+    let posts: Vec<PostResponse> = if let Some(channel_id) = query.channel_id {
         sqlx::query_as(
             r#"
-            SELECT p.* FROM posts p
+            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                   p.reply_count::int8 as reply_count,
+                   p.last_reply_at, p.seq,
+                   CASE WHEN u.deleted_at IS NOT NULL THEN 'Deleted user' ELSE u.username END as username,
+                   u.avatar_url,
+                   CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email
+            FROM posts p
+            JOIN users u ON u.id = p.user_id
             INNER JOIN channel_members cm ON cm.channel_id = p.channel_id AND cm.user_id = $1
             WHERE p.channel_id = $2
               AND p.deleted_at IS NULL
-              AND to_tsvector('english', p.message) @@ plainto_tsquery('english', $3)
-            ORDER BY ts_rank(to_tsvector('english', p.message), plainto_tsquery('english', $3)) DESC, p.created_at DESC
-            LIMIT $4 OFFSET $5
+              AND p.message ILIKE $3
+            ORDER BY p.created_at DESC
+            LIMIT 50
             "#,
         )
         .bind(auth.user_id)
         .bind(channel_id)
-        .bind(&query.q)
-        .bind(per_page)
-        .bind(offset)
+        .bind(&search_pattern)
         .fetch_all(&state.db)
         .await?
     } else {
         sqlx::query_as(
             r#"
-            SELECT p.* FROM posts p
+            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+                   p.reply_count::int8 as reply_count,
+                   p.last_reply_at, p.seq,
+                   CASE WHEN u.deleted_at IS NOT NULL THEN 'Deleted user' ELSE u.username END as username,
+                   u.avatar_url,
+                   CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email
+            FROM posts p
+            JOIN users u ON u.id = p.user_id
             INNER JOIN channel_members cm ON cm.channel_id = p.channel_id AND cm.user_id = $1
             WHERE p.deleted_at IS NULL
-              AND to_tsvector('english', p.message) @@ plainto_tsquery('english', $2)
-            ORDER BY ts_rank(to_tsvector('english', p.message), plainto_tsquery('english', $2)) DESC, p.created_at DESC
-            LIMIT $3 OFFSET $4
+              AND p.message ILIKE $2
+            ORDER BY p.created_at DESC
+            LIMIT 50
             "#,
         )
         .bind(auth.user_id)
-        .bind(&query.q)
-        .bind(per_page)
-        .bind(offset)
+        .bind(&search_pattern)
         .fetch_all(&state.db)
         .await?
     };
 
-    let total = posts.len() as i64;
+    let mut posts = posts;
+    crate::services::posts::populate_files(&state, &mut posts).await?;
+    populate_reactions(&state, &mut posts).await?;
+    populate_saved_status(&state, auth.user_id, &mut posts).await?;
 
-    Ok(Json(SearchResult {
-        posts,
-        total,
-        page,
-        per_page,
-    }))
+    Ok(Json(posts))
 }
