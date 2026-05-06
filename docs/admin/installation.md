@@ -27,7 +27,7 @@ RustChat is designed to be highly portable:
 RustChat follows a modern, decoupled architecture designed for speed and horizontal scalability.
 
 - **Rust Backend:** A high-performance REST API built with Axum and Tokio. It handles business logic, database interactions, and secure authentication.
-- **SPA Frontend:** A Vue 3 + Vite single-page application served via Nginx. It provides a responsive, desktop-like experience in the browser.
+- **SPA Frontend:** A Svelte 5 + Vite single-page application served via Nginx. It provides a responsive, desktop-like experience in the browser.
 - **WebSocket Hub:** A real-time subsystem that manages persistent active connections for instant message delivery, typing indicators, and presence updates.
 - **PostgreSQL:** The primary relational database for message history, user profiles, and channel metadata.
 - **Redis (Optional/Recommended):** Used for caching frequently accessed data and providing pub/sub capabilities for real-time events across multiple backend instances.

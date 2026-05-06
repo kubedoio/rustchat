@@ -5,9 +5,9 @@ Deep dive into the RustChat frontend architecture.
 ## Overview
 
 The frontend is a Single Page Application (SPA) built with:
-- **Framework:** Vue 3.5
+- **Framework:** Svelte 5
 - **Language:** TypeScript 5.9+
-- **State:** Pinia 3+
+- **State:** Svelte stores
 - **Build:** Vite 7+
 - **Styling:** Tailwind CSS 4+
 
@@ -19,8 +19,8 @@ frontend/src/
 │   ├── http/        # HTTP client (Fetch-based)
 │   ├── client.ts    # Native API client
 │   └── calls.ts     # Calls API client
-├── components/       # Vue components
-├── composables/      # Vue composables
+├── components/       # Svelte components
+├── shared/          # Shared utilities and helpers
 ├── core/            # Shared primitives
 │   ├── entities/    # Domain entities
 │   ├── errors/      # Error types
@@ -31,8 +31,9 @@ frontend/src/
 │   ├── channels/
 │   ├── messages/
 │   └── ...
-├── router/          # Vue Router configuration
-├── stores/          # Legacy Pinia stores
+├── svelte/          # Svelte-specific infrastructure
+│   └── Router.svelte # Custom SPA router
+├── stores/          # Legacy stores (being migrated to Svelte stores)
 └── views/           # Page-level components
 ```
 
@@ -44,7 +45,7 @@ Each feature follows a consistent structure:
 features/[feature]/
 ├── repositories/    # Data access (API calls)
 ├── services/        # Business logic
-├── stores/          # Pinia state
+├── stores/          # Svelte stores
 ├── handlers/        # WebSocket event handlers
 ├── components/      # Feature-specific components
 └── index.ts         # Public API
@@ -64,15 +65,21 @@ stores/
 ### Modern Feature Stores (recommended)
 ```typescript
 // features/channels/stores/channelStore.ts
-export const useChannelStore = defineStore('channels', () => {
-  const channels = ref<Channel[]>([])
-  
-  async function fetchChannels() {
-    channels.value = await channelRepository.getChannels()
+import { writable } from 'svelte/store'
+
+function createChannelStore() {
+  const { subscribe, set, update } = writable<Channel[]>([])
+
+  return {
+    subscribe,
+    async fetchChannels() {
+      const channels = await channelRepository.getChannels()
+      set(channels)
+    }
   }
-  
-  return { channels, fetchChannels }
-})
+}
+
+export const channelStore = createChannelStore()
 ```
 
 ## Data Flow
@@ -122,10 +129,10 @@ Native WebSocket client for real-time updates:
 
 ## Component Guidelines
 
-- Use `<script setup>` syntax
-- Composition API preferred
-- Props/Emits for component interface
-- Composables for reusable logic
+- Use `<script lang="ts">` with Svelte 5 runes
+- Runes API preferred ($state, $derived, $effect)
+- Props/$props for component interface
+- Shared utilities for reusable logic
 
 ## Testing
 

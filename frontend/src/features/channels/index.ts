@@ -19,7 +19,4 @@ export type {
   ChannelUnreadCounts
 } from './repositories/channelRepository'
 
-// Components (to be created)
-// export { default as ChannelList } from './components/ChannelList.vue'
-// export { default as ChannelSidebar } from './components/ChannelSidebar.vue'
-// export { default as CreateChannelModal } from './components/CreateChannelModal.vue'
+// Components (Svelte versions exist in src/svelte/components/)
