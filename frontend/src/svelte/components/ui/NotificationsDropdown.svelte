@@ -1,60 +1,37 @@
 <script lang="ts">
   import { onMount, onDestroy, createEventDispatcher } from 'svelte'
-  import { Bell, BellOff } from 'lucide-svelte'
-  import { formatDistanceToNow } from 'date-fns'
-  import { svelteApi } from '../../stores/http'
-
-  interface NotificationItem {
-    id: string
-    avatarUrl?: string
-    message: string
-    timestamp: string
-    read: boolean
-  }
+  import { Bell, BellOff, Hash, ChevronRight } from 'lucide-svelte'
+  import { chatStore } from '../../stores/chat'
 
   export let open: boolean | undefined = undefined
+  export let onClose: (() => void) | undefined = undefined
 
   const dispatch = createEventDispatcher<{ close: void }>()
 
   let internalOpen = false
-  let notifications: NotificationItem[] = []
-  let loading = false
 
   $: isOpen = open !== undefined ? open : internalOpen
 
-  async function loadNotifications() {
-    loading = true
-    try {
-      const { data } = await svelteApi.get<NotificationItem[]>('/notifications')
-      notifications = data
-    } catch {
-      notifications = [
-        {
-          id: '1',
-          message: 'Alice mentioned you in #general',
-          timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-          read: false,
-        },
-        {
-          id: '2',
-          message: 'Bob replied to your thread in #dev',
-          timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          read: false,
-        },
-      ]
-    } finally {
-      loading = false
-    }
-  }
+  $: unreadChannels = ($chatStore.channels ?? [])
+    .map((channel) => {
+      const unread = $chatStore.unreadCounts?.[channel.id] ?? 0
+      const mentions = $chatStore.mentionCounts?.[channel.id] ?? 0
+      return { ...channel, unread, mentions }
+    })
+    .filter((c) => c.unread > 0)
+    .sort((a, b) => {
+      if (a.mentions > 0 && b.mentions === 0) return -1
+      if (b.mentions > 0 && a.mentions === 0) return 1
+      return b.unread - a.unread
+    })
+
+  $: totalUnread = unreadChannels.reduce((sum, c) => sum + c.unread, 0)
 
   function handleToggle() {
     if (open !== undefined) {
       dispatch('close')
     } else {
       internalOpen = !internalOpen
-      if (internalOpen && notifications.length === 0) {
-        void loadNotifications()
-      }
     }
   }
 
@@ -64,14 +41,23 @@
     } else {
       internalOpen = false
     }
+    onClose?.()
   }
 
-  function markAsRead(id: string) {
-    notifications = notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
+  async function markChannelRead(channelId: string) {
+    await chatStore.markChannelRead(channelId)
+    close()
   }
 
-  function markAllAsRead() {
-    notifications = notifications.map((n) => ({ ...n, read: true }))
+  async function markAllAsRead() {
+    const channels = unreadChannels.map((c) => c.id)
+    await Promise.all(channels.map((id) => chatStore.markChannelRead(id)))
+    close()
+  }
+
+  function selectChannel(channelId: string) {
+    chatStore.selectChannel(channelId)
+    markChannelRead(channelId)
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -82,16 +68,11 @@
 
   onMount(() => {
     document.addEventListener('keydown', handleKeydown)
-    if (open !== undefined && open && notifications.length === 0) {
-      void loadNotifications()
-    }
   })
 
   onDestroy(() => {
     document.removeEventListener('keydown', handleKeydown)
   })
-
-  $: unreadCount = notifications.filter((n) => !n.read).length
 </script>
 
 <div class="relative">
@@ -105,11 +86,11 @@
       title="Notifications"
     >
       <Bell class="h-4 w-4" />
-      {#if unreadCount > 0}
+      {#if totalUnread > 0}
         <span
           class="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white"
         >
-          {unreadCount > 99 ? '99+' : unreadCount}
+          {totalUnread > 99 ? '99+' : totalUnread}
         </span>
       {/if}
     </button>
@@ -117,13 +98,14 @@
 
   {#if isOpen}
     <div
-      class="absolute right-0 top-full z-20 mt-2 w-80 origin-top-right rounded-r-2 border border-border-1 bg-bg-surface-1 py-1 shadow-2xl"
+      class="absolute right-0 top-full z-40 mt-1 w-80 origin-top-right overflow-hidden rounded-r-2 border border-border-1 bg-bg-surface-1 shadow-2xl"
     >
-      <div class="flex items-center justify-between border-b border-border-1 px-4 py-3">
-        <h3 class="text-sm font-bold text-text-1">Notifications</h3>
-        {#if unreadCount > 0}
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-border-1 bg-bg-surface-2/50 px-4 py-3">
+        <h3 class="text-sm font-semibold text-text-1">Unread Activity</h3>
+        {#if unreadChannels.length > 0}
           <button
-            class="text-[11px] font-medium text-brand hover:underline"
+            class="text-xs font-medium text-brand hover:text-brand-hover"
             on:click={markAllAsRead}
           >
             Mark all as read
@@ -131,46 +113,43 @@
         {/if}
       </div>
 
-      <div class="max-h-[400px] overflow-y-auto custom-scrollbar-thin">
-        {#if loading}
-          <div class="py-8 text-center text-sm text-text-3">Loading...</div>
-        {:else if notifications.length === 0}
-          <div class="py-12 text-center">
-            <BellOff class="mx-auto mb-3 h-8 w-8 text-text-4" />
-            <p class="text-sm text-text-3">No new notifications</p>
+      <!-- Channel list -->
+      <div class="max-h-80 overflow-y-auto custom-scrollbar-thin">
+        {#if unreadChannels.length === 0}
+          <div class="flex flex-col items-center justify-center py-8 text-text-3">
+            <BellOff class="mb-2 h-10 w-10 opacity-50" />
+            <p class="text-sm">All caught up!</p>
           </div>
         {:else}
           <div class="divide-y divide-border-1">
-            {#each notifications as notification (notification.id)}
-              <div class="flex items-start gap-3 px-4 py-3" data-testid="notification-item">
-                {#if notification.avatarUrl}
-                  <img
-                    src={notification.avatarUrl}
-                    alt=""
-                    class="h-8 w-8 shrink-0 rounded-full object-cover"
-                  />
-                {:else}
-                  <div
-                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-semibold text-brand"
-                  >
-                    {(notification.message.charAt(0) || '?').toUpperCase()}
-                  </div>
-                {/if}
+            {#each unreadChannels as channel (channel.id)}
+              <button
+                class="flex w-full items-center gap-3 px-4 py-3 text-left transition-standard hover:bg-bg-surface-2"
+                on:click={() => selectChannel(channel.id)}
+              >
+                <Hash class="h-5 w-5 shrink-0 text-text-3" />
                 <div class="min-w-0 flex-1">
-                  <p class="text-sm text-text-1">{notification.message}</p>
-                  <p class="mt-0.5 text-xs text-text-3">
-                    {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
+                  <p class="truncate text-sm font-medium text-text-1">
+                    {channel.display_name || channel.name}
                   </p>
                 </div>
-                {#if !notification.read}
-                  <button
-                    class="shrink-0 text-[11px] font-medium text-brand hover:underline"
-                    on:click={() => markAsRead(notification.id)}
-                  >
-                    Mark as read
-                  </button>
-                {/if}
-              </div>
+                <div class="flex shrink-0 items-center gap-1.5">
+                  {#if channel.mentions > 0}
+                    <span
+                      class="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white"
+                    >
+                      {channel.mentions}
+                    </span>
+                  {:else if channel.unread > 0}
+                    <span
+                      class="flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-border-1 bg-bg-surface-2 px-1 text-[10px] font-bold text-text-3"
+                    >
+                      {channel.unread > 99 ? '99+' : channel.unread}
+                    </span>
+                  {/if}
+                  <ChevronRight class="h-4 w-4 text-text-4" />
+                </div>
+              </button>
             {/each}
           </div>
         {/if}

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fade, scale } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { X, Mail, MessageCircle, Briefcase, Check, Circle, Clock3, Minus } from 'lucide-svelte'
+  import { focusTrap } from '../../lib/focusTrap'
   import { svelteApi } from '../../stores/http'
 
   export let userId: string
@@ -105,15 +108,19 @@
 <svelte:window on:keydown={(e) => open && e.key === 'Escape' && handleClose()} />
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-center justify-center">
+  <div class="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
     <!-- Backdrop -->
-    <div class="absolute inset-0 bg-bg-app/70 backdrop-blur-sm" on:click={handleClose} on:keydown={(e) => e.key === 'Escape' && handleClose()} role="button" tabindex="-1" aria-label="Close modal"></div>
+    <div class="absolute inset-0 bg-bg-app/70 backdrop-blur-sm" on:click={handleClose} on:keydown={(e) => e.key === 'Escape' && handleClose()} role="button" tabindex="-1" aria-label="Close modal" transition:fade={{ duration: 150, easing: cubicOut }}></div>
 
     <!-- Modal -->
-    <div class="relative mx-4 w-full max-w-sm overflow-hidden rounded-r-3 border border-border-1 bg-bg-surface-1 shadow-2xl">
+    <div
+      class="relative mx-4 w-full max-w-sm overflow-hidden rounded-r-3 border border-border-1 bg-bg-surface-1 shadow-2xl"
+      use:focusTrap
+      transition:scale={{ duration: 200, start: 0.95, easing: cubicOut }}
+    >
       <!-- Header -->
       <div class="flex items-center justify-end border-b border-border-1 px-4 py-3">
-        <button on:click={handleClose} class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2">
+        <button on:click={handleClose} class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2" aria-label="Close">
           <X class="h-5 w-5 text-text-3" />
         </button>
       </div>

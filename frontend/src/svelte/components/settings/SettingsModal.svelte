@@ -1,6 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fade, scale } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { X, LogOut, Bell, Monitor, Layout, Settings, Phone, User } from 'lucide-svelte'
+  import { focusTrap } from '../../lib/focusTrap'
   import { authStore } from '../../stores/auth'
   import { uiStore, type SettingsTab } from '../../stores/ui'
   import NotificationsTab from './tabs/NotificationsTab.svelte'
@@ -73,11 +76,14 @@
       role="button"
       tabindex="-1"
       aria-label="Close settings"
+      transition:fade={{ duration: 150, easing: cubicOut }}
     ></div>
 
     <!-- Modal Panel -->
     <div
       class="relative bg-bg-surface-1 rounded-r-3 shadow-2xl ring-1 ring-border-1 w-full max-w-5xl max-h-[calc(100svh-1rem)] sm:max-h-[90vh] flex flex-col overflow-hidden"
+      use:focusTrap
+      transition:scale={{ duration: 200, start: 0.95, easing: cubicOut }}
     >
       <!-- Header -->
       <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border-1 shrink-0">

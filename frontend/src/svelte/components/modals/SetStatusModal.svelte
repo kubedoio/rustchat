@@ -1,6 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fade, scale } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { X } from 'lucide-svelte'
+  import { focusTrap } from '../../lib/focusTrap'
   import { svelteApi } from '../../stores/http'
   import { authStore } from '../../stores/auth'
 
@@ -78,10 +81,15 @@
       role="button"
       tabindex="-1"
       aria-label="Close modal"
+      transition:fade={{ duration: 150, easing: cubicOut }}
     ></div>
 
     <!-- Modal Panel -->
-    <div class="relative w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl transform transition-all">
+    <div
+      class="relative w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl transform transition-all"
+      use:focusTrap
+      transition:scale={{ duration: 200, start: 0.95, easing: cubicOut }}
+    >
       <!-- Header -->
       <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Set a status</h3>

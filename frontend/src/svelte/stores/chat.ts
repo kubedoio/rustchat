@@ -78,6 +78,7 @@ export interface SvelteChatState {
     membersByTeam: Record<string, SvelteChatMember[]>
     readStateByChannel: Record<string, SvelteChatReadState | null>
     unreadCounts: Record<string, number>
+    mentionCounts: Record<string, number>
     threadsByParent: Record<string, SvelteChatPost[]>
     loading: boolean
     error: string | null
@@ -105,6 +106,7 @@ const initialState: SvelteChatState = {
     membersByTeam: {},
     readStateByChannel: {},
     unreadCounts: {},
+    mentionCounts: {},
     threadsByParent: {},
     loading: false,
     error: null,
@@ -386,19 +388,43 @@ function createChatStore() {
                 teams?: Array<{ team_id: string; unread_count: number }>
             }>('/unreads/overview')
             const unreadCounts: Record<string, number> = {}
+            const mentionCounts: Record<string, number> = {}
             data.channels.forEach((c) => {
                 unreadCounts[c.channel_id] = c.unread_count
+                if (typeof c.mention_count === 'number') {
+                    mentionCounts[c.channel_id] = c.mention_count
+                }
             })
             update((state) => ({
                 ...state,
                 channels: state.channels.map((channel) => ({
                     ...channel,
                     unreadCount: unreadCounts[channel.id] ?? channel.unreadCount,
+                    mentionCount: mentionCounts[channel.id] ?? channel.mentionCount,
                 })),
                 unreadCounts,
+                mentionCounts,
             }))
         } catch (error) {
             console.error('Failed to fetch unread counts:', error)
+        }
+    }
+
+    async function markChannelRead(channelId: string): Promise<void> {
+        try {
+            await svelteApi.post(`/channels/${channelId}/read`)
+            update((state) => ({
+                ...state,
+                unreadCounts: { ...state.unreadCounts, [channelId]: 0 },
+                mentionCounts: { ...state.mentionCounts, [channelId]: 0 },
+                channels: state.channels.map((channel) =>
+                    channel.id === channelId
+                        ? { ...channel, unreadCount: 0, mentionCount: 0 }
+                        : channel
+                ),
+            }))
+        } catch (err) {
+            console.error('Failed to mark channel as read:', err)
         }
     }
 
@@ -754,6 +780,7 @@ function createChatStore() {
         pinPost,
         unpinPost,
         markPostUnread,
+        markChannelRead,
         getPagination,
         reset: () => set(initialState),
     }

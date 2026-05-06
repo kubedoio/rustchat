@@ -1,6 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fade, scale } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { Search, X, Hash, Clock, MessageSquare } from 'lucide-svelte'
+  import { focusTrap } from '../../lib/focusTrap'
   import { format } from 'date-fns'
   import { searchStore, type SearchFilter } from '../../stores/search'
   import { chatStore } from '../../stores/chat'
@@ -63,7 +66,7 @@
 />
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]" data-testid="search-modal">
+  <div class="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]" data-testid="search-modal" role="dialog" aria-modal="true">
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-black/50"
@@ -72,10 +75,15 @@
       role="button"
       tabindex="-1"
       aria-label="Close search"
+      transition:fade={{ duration: 150, easing: cubicOut }}
     ></div>
 
     <!-- Modal -->
-    <div class="relative mx-4 w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl">
+    <div
+      class="relative mx-4 w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl"
+      use:focusTrap
+      transition:scale={{ duration: 200, start: 0.95, easing: cubicOut }}
+    >
       <!-- Search Input -->
       <div class="flex items-center border-b border-gray-200 px-4 py-3">
         <Search class="mr-3 h-5 w-5 text-gray-400" />
@@ -90,7 +98,7 @@
         />
         <div class="flex items-center space-x-2">
           <kbd class="hidden rounded bg-gray-100 px-2 py-1 text-xs text-gray-500 sm:block">ESC</kbd>
-          <button on:click={handleClose} class="rounded p-1 hover:bg-gray-100">
+          <button on:click={handleClose} class="rounded p-1 hover:bg-gray-100" aria-label="Close">
             <X class="h-5 w-5 text-gray-400" />
           </button>
         </div>

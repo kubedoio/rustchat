@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { fade, scale } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { X, Search, User, UserPlus } from 'lucide-svelte'
+  import { focusTrap } from '../../lib/focusTrap'
   import { svelteApi, SvelteHttpError } from '../../stores/http'
   import { authStore } from '../../stores/auth'
   import { chatStore } from '../../stores/chat'
@@ -141,6 +144,8 @@
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
     data-testid="add-channel-members-modal"
+    role="dialog"
+    aria-modal="true"
   >
     <!-- Backdrop -->
     <div
@@ -149,11 +154,14 @@
       role="button"
       tabindex="-1"
       aria-label="Close modal"
+      transition:fade={{ duration: 150, easing: cubicOut }}
     ></div>
 
     <!-- Modal -->
     <div
       class="relative mx-4 flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+      use:focusTrap
+      transition:scale={{ duration: 200, start: 0.95, easing: cubicOut }}
     >
       <!-- Header -->
       <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
+  import { fade, scale } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { X, Search } from 'lucide-svelte'
+  import { focusTrap } from '../../lib/focusTrap'
   import { svelteApi } from '../../stores/http'
   import { authStore } from '../../stores/auth'
   import { chatStore } from '../../stores/chat'
@@ -91,7 +94,7 @@
 <svelte:window on:keydown={handleKeydown} />
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-center justify-center" data-testid="direct-message-modal">
+  <div class="fixed inset-0 z-50 flex items-center justify-center" data-testid="direct-message-modal" role="dialog" aria-modal="true">
     <!-- Backdrop -->
     <div
       class="absolute inset-0 bg-bg-app/70 backdrop-blur-sm"
@@ -99,11 +102,14 @@
       role="button"
       tabindex="-1"
       aria-label="Close modal"
+      transition:fade={{ duration: 150, easing: cubicOut }}
     ></div>
 
     <!-- Modal -->
     <div
       class="relative mx-4 flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-r-3 border border-border-1 bg-bg-surface-1 shadow-2xl"
+      use:focusTrap
+      transition:scale={{ duration: 200, start: 0.95, easing: cubicOut }}
     >
       <!-- Header -->
       <div class="flex items-center justify-between border-b border-border-1 px-6 py-4">
