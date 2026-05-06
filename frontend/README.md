@@ -1,6 +1,6 @@
 # RustChat Frontend
 
-Svelte 5 + TypeScript + Vite SPA for RustChat.
+Vue 3 + TypeScript + Vite SPA for RustChat.
 
 ## Commands
 

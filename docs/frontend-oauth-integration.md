@@ -13,7 +13,7 @@ Instead of receiving the JWT token directly in the URL (which appears in browser
 
 ## Implementation
 
-### React/Svelte Example
+### React/Vue Example
 
 ```typescript
 // auth/oauth.ts

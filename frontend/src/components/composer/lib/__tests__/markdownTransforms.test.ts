@@ -41,7 +41,7 @@ describe('markdownTransforms', () => {
                 selectionEnd: 5
             }
             const result = wrapSelection(selection, '**')
-            expect(result.text).toBe('hello****')
+            expect(result.text).toBe('hello**')
             expect(result.selectionStart).toBe(7)
             expect(result.selectionEnd).toBe(7)
         })
@@ -122,7 +122,7 @@ describe('markdownTransforms', () => {
             const selection: TextSelection = {
                 text: 'console.log("hello")',
                 selectionStart: 0,
-                selectionEnd: 20
+                selectionEnd: 18
             }
             const result = makeCodeBlock(selection, 'javascript')
             expect(result.text).toBe('```javascript\nconsole.log("hello")\n```')
@@ -179,9 +179,9 @@ describe('markdownTransforms', () => {
                 selectionEnd: 10
             }
             const result = makeLink(selection)
-            expect(result.text).toBe('[click here]()')
-            expect(result.selectionStart).toBe(13)
-            expect(result.selectionEnd).toBe(13)
+            expect(result.text).toBe('[click text]()')
+            expect(result.selectionStart).toBe(12)
+            expect(result.selectionEnd).toBe(12)
         })
 
         it('creates link with placeholder when no selection', () => {

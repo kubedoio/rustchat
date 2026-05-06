@@ -7,7 +7,7 @@ RustChat is composed of three runtime services and four external dependencies:
 | Service | Technology | Purpose |
 |---------|------------|---------|
 | **Backend** | Rust (Axum 0.8 + Tokio) | HTTP API, WebSocket hub, business logic |
-| **Frontend** | Svelte 5 + TypeScript | Single-page web application |
+| **Frontend** | Vue 3.5 + TypeScript + Pinia | Single-page web application |
 | **Push Proxy** | Rust (Axum) | Mobile push notification gateway (FCM / APNS) |
 
 **External dependencies:**
@@ -25,7 +25,7 @@ RustChat is composed of three runtime services and four external dependencies:
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │   Web Client    │────▶│  RustChat API    │◀────│  Push Proxy     │
-│  (Svelte SPA)   │     │  (Rust / Axum)   │     │ (Mobile Push)   │
+│  (Vue.js SPA)   │     │  (Rust / Axum)   │     │ (Mobile Push)   │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
                                │
            ┌───────────────────┼───────────────────┐

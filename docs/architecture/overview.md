@@ -12,7 +12,7 @@ rustchat is a self-hosted team collaboration platform composed of 3 runtime serv
 | Service | Language | Purpose |
 |---|---|---|
 | `backend` | Rust (Axum 0.8 + Tokio) | HTTP API, WebSocket hub, business logic, DB |
-| `frontend` | Svelte 5 + TypeScript | Single-page web application |
+| `frontend` | Vue 3.5 + TypeScript + Pinia | Single-page web application |
 | `push-proxy` | Rust | Mobile push notification gateway (FCM/APNS) |
 | `tools/mm-compat` | Python | Offline Mattermost compatibility analysis tooling |
 
@@ -30,7 +30,7 @@ rustchat is a self-hosted team collaboration platform composed of 3 runtime serv
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │                        Web / SPA Client                            │
-│                  (Svelte 5 + TypeScript)                           │
+│                  (Vue 3.5 + TypeScript + Pinia)                    │
 └──────────────────────────────┬─────────────────────────────────────┘
                                │ REST + WebSocket
                                ▼
@@ -128,7 +128,7 @@ Service writes event → realtime::hub → broadcast to subscribed connections
 
 ## 3. Frontend
 
-**Stack:** Svelte 5, TypeScript, Svelte stores, Vite (build)
+**Stack:** Vue 3.5, TypeScript, Pinia (state), Vue Router, Vite (build)
 
 **Directory structure:**
 ```
@@ -136,9 +136,9 @@ frontend/src/
 ├── core/          # Shared primitives: entities, errors, websocket infrastructure
 ├── features/      # 14 domain feature modules (auth, calls, channels, messages, …)
 ├── api/           # API client functions
-├── components/    # Svelte components
-├── shared/        # Shared utilities and helpers
-└── stores/        # Legacy stores (deprecated, being migrated to features/)
+├── components/    # Vue components
+├── composables/   # Vue composables
+└── stores/        # Legacy Pinia stores (deprecated, being migrated to features/)
 ```
 
 **Feature module pattern** — every feature follows the same layers:
@@ -146,7 +146,7 @@ frontend/src/
 features/[feature]/
 ├── repositories/    # Data access (API calls)
 ├── services/        # Business logic
-├── stores/          # Svelte stores (no business logic)
+├── stores/          # Pinia state (no business logic)
 ├── handlers/        # WebSocket event handlers
 └── index.ts         # Public API
 ```

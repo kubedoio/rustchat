@@ -5,7 +5,7 @@
 RustChat is containerized using Docker Compose for easy setup and development. The environment includes:
 
 - **Backend**: Rust (Axum) API
-- **Frontend**: Svelte 5 + Vite (Served via Nginx)
+- **Frontend**: Vue 3 + Vite (Served via Nginx)
 - **Postgres**: Database
 - **Redis**: Caching
 - **RustFS**: S3-compatible object storage

@@ -38,7 +38,7 @@ Guides for system administrators and operators.
 System architecture and design documentation.
 - [Overview](./architecture/overview.md) — High-level system design
 - [Backend](./architecture/backend.md) — Rust API server architecture
-- [Frontend](./architecture/frontend.md) — Svelte SPA architecture
+- [Frontend](./architecture/frontend.md) — Vue.js SPA architecture
 - [Data Model](./architecture/data-model.md) — Database schema and entities
 - [Calls Deployment](./architecture/calls-deployment.md) — Voice/video call architecture
 - [WebSocket](./architecture/websocket.md) — Real-time communication

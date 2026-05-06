@@ -2,11 +2,11 @@
 
 > **Self-hosted team collaboration that just works.**
 > 
-> RustChat is a self-hosted collaboration platform with a Rust backend and Svelte web client. It is under active development and moving toward a supported self-hosted product.
+> RustChat is a self-hosted collaboration platform with a Rust backend and Vue web client. It is under active development and moving toward a supported self-hosted product.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.92%2B-orange.svg)](https://www.rust-lang.org/)
-[![Svelte](https://img.shields.io/badge/Svelte-5%2B-orange.svg)](https://svelte.dev/)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.5%2B-green.svg)](https://vuejs.org/)
 
 ---
 
@@ -77,7 +77,7 @@ RustChat is designed as three focused services working together:
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │   Web Client    │────▶│  RustChat API    │◀────│  Push Proxy     │
-│  (Svelte SPA)   │     │  (Rust/Axum)     │     │ (Mobile Push)   │
+│  (Vue.js SPA)   │     │  (Rust/Axum)     │     │ (Mobile Push)   │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
                                │
            ┌───────────────────┼───────────────────┐
@@ -92,7 +92,7 @@ RustChat is designed as three focused services working together:
 - `/api/v1/*` — Native API for the web client
 - `/api/v4/*` — Mattermost-compatible API for mobile and desktop clients
 
-**The Frontend** — A Svelte single-page application that works in any modern browser. No Electron, no desktop installers.
+**The Frontend** — A Vue.js single-page application that works in any modern browser. No Electron, no desktop installers.
 
 **The Push Proxy** — A dedicated service for mobile push notifications (FCM for Android, APNS for iOS).
 
@@ -109,7 +109,7 @@ RustChat is designed as three focused services working together:
 ### For Developers
 - **Clean architecture** — Rust backend with explicit error handling, compile-time checked SQL
 - **Real-time by design** — WebSocket-first with Redis pub/sub for clustering
-- **Modern frontend** — Svelte 5 runes, TypeScript, Svelte stores
+- **Modern frontend** — Vue 3 Composition API, TypeScript, Pinia state management
 - **Extensible** — Webhook and API key support for integrations
 
 ### For Security Teams
@@ -310,4 +310,4 @@ RustChat is inspired by the team communication tools we've used over the years. 
 - **Mattermost's** self-hosting philosophy
 - **Discord's** real-time performance
 
-Built with [Rust](https://www.rust-lang.org/), [Svelte](https://svelte.dev/), and gratitude to the open source community.
+Built with [Rust](https://www.rust-lang.org/), [Vue.js](https://vuejs.org/), and gratitude to the open source community.

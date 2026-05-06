@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test'
-import { installStableWebSocket, mockChatApi } from './support/chat-fixtures'
 
 /**
  * DM Consistency E2E Tests
@@ -15,9 +14,6 @@ import { installStableWebSocket, mockChatApi } from './support/chat-fixtures'
 
 test.describe('DM Status Consistency', () => {
   test.beforeEach(async ({ page }) => {
-    await installStableWebSocket(page)
-    await mockChatApi(page)
-
     // Login and navigate to a channel
     await page.goto('/login')
     await page.fill('[data-testid="login-username"]', 'testuser')

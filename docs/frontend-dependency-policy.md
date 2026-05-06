@@ -1,6 +1,6 @@
 # Frontend Dependency Policy
 
-This document defines the approved supply-chain policy for the Svelte frontend in `rustchat`.
+This document defines the approved supply-chain policy for the Vue frontend in `rustchat`.
 
 ## Goals
 

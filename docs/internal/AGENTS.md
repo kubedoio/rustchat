@@ -6,7 +6,7 @@ This document defines how AI agents and contributors should work in `rustchat`.
 
 Rustchat is a self-hosted team collaboration platform built with:
 - **Backend**: Rust using Axum + Tokio + SQLx (PostgreSQL)
-- **Frontend**: Svelte 5 + TypeScript + Vite
+- **Frontend**: Vue 3 + TypeScript + Pinia + Vite
 - **Push Proxy**: Rust service for mobile push notifications (FCM/APNS)
 - **Compatibility**: Mattermost API v4 compatibility layer for external clients
 
@@ -31,15 +31,15 @@ rustchat/
 │   │   └── telemetry/    # Logging & tracing
 │   ├── migrations/       # SQLx database migrations
 │   └── tests/            # Integration tests
-├── frontend/             # Svelte 5 + TypeScript SPA
+├── frontend/             # Vue 3 + TypeScript SPA
 │   ├── src/
 │   │   ├── api/          # API client functions
-│   │   ├── components/   # Svelte components
-│   │   ├── composables/  # Shared utilities
+│   │   ├── components/   # Vue components
+│   │   ├── composables/  # Vue composables
 │   │   ├── core/         # Shared entities, errors, websocket
 │   │   ├── features/     # Feature-based modules (auth, calls, messages, etc.)
-│   │   ├── router/       # Custom Svelte router
-│   │   ├── stores/       # Svelte stores
+│   │   ├── router/       # Vue Router configuration
+│   │   ├── stores/       # Pinia stores
 │   │   ├── types/        # TypeScript type definitions
 │   │   └── views/        # Page-level components
 │   └── e2e/              # Playwright E2E tests
@@ -65,13 +65,13 @@ rustchat/
 - **Metrics**: Prometheus
 
 ### Frontend
-- **Framework**: Svelte 5+ (runes)
+- **Framework**: Vue 3.5+ (Composition API)
 - **Language**: TypeScript 5.9+
 - **Build Tool**: Vite 7+
-- **State**: Svelte stores
+- **State**: Pinia 3+
 - **Styling**: Tailwind CSS 4+
-- **Icons**: Lucide Svelte
-- **Utilities**: Svelte utilities (svelte-use, etc.), date-fns, axios
+- **Icons**: Lucide Vue
+- **Utilities**: VueUse, date-fns, axios
 - **E2E Testing**: Playwright
 
 ### Push Proxy
@@ -168,17 +168,17 @@ docker compose up -d --build
 5. **Formatting**: Use `cargo fmt` before committing.
 6. **Linting**: All code must pass `cargo clippy --all-targets --all-features -- -D warnings`.
 
-### Frontend TypeScript/Svelte
+### Frontend TypeScript/Vue
 
 1. **Feature Organization**: Code is organized by feature (`src/features/*`), not by type.
 2. **Architecture Pattern**:
    - Repository: Data access layer
    - Service: Business logic & orchestration
-   - Store: State management (Svelte stores)
+   - Store: State management (Pinia)
    - Handler: WebSocket event handlers
 3. **Type Safety**: Use branded types for IDs. Avoid `any`.
 4. **Imports**: Use `@/` path alias for project imports.
-5. **Svelte runes ($state, $derived, $effect)**: Use `<script lang="ts">` for components.
+5. **Composition API**: Use `<script setup>` syntax for components.
 
 ### Naming Conventions
 

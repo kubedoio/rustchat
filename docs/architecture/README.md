@@ -6,7 +6,7 @@ This section documents the system architecture of RustChat.
 
 RustChat is a self-hosted team collaboration platform built with:
 - **Backend:** Rust (Axum + Tokio + SQLx)
-- **Frontend:** Svelte 5 + TypeScript
+- **Frontend:** Vue 3 + TypeScript + Pinia
 - **Database:** PostgreSQL 16+
 - **Cache/Events:** Redis 7+
 - **Storage:** S3-compatible (RustFS)
@@ -16,7 +16,7 @@ RustChat is a self-hosted team collaboration platform built with:
 ### System Architecture
 - [Overview](./overview.md) - High-level system design and data flow
 - [Backend Architecture](./backend.md) - Rust backend deep dive
-- [Frontend Architecture](./frontend.md) - Svelte frontend structure
+- [Frontend Architecture](./frontend.md) - Vue.js frontend structure
 - [WebSocket Architecture](./websocket.md) - Real-time communication
 - [Calls Deployment](./calls-deployment.md) - Voice/video calls infrastructure
 
@@ -38,7 +38,7 @@ RustChat is a self-hosted team collaboration platform built with:
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │                        Web / SPA Client                            │
-│                  (Svelte 5 + TypeScript)                           │
+│                  (Vue 3.5 + TypeScript + Pinia)                    │
 └──────────────────────────────┬─────────────────────────────────────┘
                                │ REST + WebSocket
                                ▼

@@ -9,7 +9,7 @@ The fastest way to run RustChat for evaluation or small teams is single-host Doc
 | Component | Resource | Purpose |
 |-----------|----------|---------|
 | Backend | 1 CPU, 512 MB | API server, WebSocket hub, business logic |
-| Frontend | 0.1 CPU, 64 MB | Nginx serving the Svelte SPA |
+| Frontend | 0.1 CPU, 64 MB | Nginx serving the Vue.js SPA |
 | PostgreSQL | 0.5 CPU, 256 MB | Primary data store |
 | Redis | 0.1 CPU, 64 MB | Pub/sub, sessions, rate limiting |
 | RustFS (S3) | 0.1 CPU, 128 MB | File uploads and storage |
