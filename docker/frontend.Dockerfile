@@ -1,5 +1,5 @@
 # Build stage
-FROM node:24-alpine AS builder
+FROM node:25-alpine AS builder
 RUN apk add --no-cache git
 WORKDIR /app
 COPY package.json package-lock.json .npmrc dependency-policy.json dependency-patches.json ./
