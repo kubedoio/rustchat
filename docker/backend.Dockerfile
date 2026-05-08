@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.93-alpine AS builder
+FROM rust:1.95-alpine AS builder
 
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev
 
