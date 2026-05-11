@@ -20,9 +20,9 @@
     "test:e2e:settings-parity:update": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test e2e/settings_parity.spec.ts --project=chromium --update-snapshots"
   },
   "dependencies": {
-    "@tiptap/extension-placeholder": "^3.22.5",
-    "@tiptap/starter-kit": "^3.22.5",
-    "@tiptap/vue-3": "^3.22.5",
+    "@tiptap/extension-placeholder": "^3.23.1",
+    "@tiptap/starter-kit": "^3.23.1",
+    "@tiptap/vue-3": "^3.23.1",
     "@types/md5": "^2.3.6",
     "@vueuse/core": "^14.3.0",
     "date-fns": "^4.1.0",
@@ -41,10 +41,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@tailwindcss/postcss": "^4.2.4",
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/dompurify": "^3.2.0",
     "@types/marked": "^5.0.2",
-    "@types/node": "^24.12.2",
+    "@types/node": "^24.12.3",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/test-utils": "^2.4.10",
     "@vue/tsconfig": "^0.9.1",
@@ -52,7 +52,7 @@
     "postcss": "^8.5.12",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
-    "vite": "^7.3.2",
+    "vite": "^7.3.3",
     "vitest": "^4.1.5",
     "vue-tsc": "^3.2.8"
   }
