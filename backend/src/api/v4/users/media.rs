@@ -8,6 +8,7 @@ use super::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
+use crate::constants::MAX_IMAGE_SIZE;
 use crate::models::legacy_avatar_key_from_url;
 
 /// GET /users/{user_id}/image - Get user profile image (requires auth)
@@ -144,6 +145,14 @@ pub async fn upload_user_image(
 
             if data.is_empty() {
                 continue;
+            }
+
+            if data.len() > MAX_IMAGE_SIZE {
+                return Err(AppError::Validation(format!(
+                    "Image too large: {} bytes (max {})",
+                    data.len(),
+                    MAX_IMAGE_SIZE
+                )));
             }
 
             // Determine content type from data if not provided

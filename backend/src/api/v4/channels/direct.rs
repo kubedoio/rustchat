@@ -3,6 +3,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use super::{mm, parse_mm_or_uuid, ApiResult, AppState, MmAuthUser};
+use crate::repositories::{ChannelRepository, TeamRepository, UserRepository};
 
 const KEYCLOAK_GROUP_SOURCE: &str = "plugin_keycloak";
 
@@ -135,80 +136,46 @@ pub async fn create_direct_channel_internal(
     let mut ids = vec![creator_id, other_id];
     ids.sort();
 
-    let team_id: Uuid = sqlx::query_scalar(
-        "SELECT team_id FROM team_members WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1",
-    )
-    .bind(creator_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| crate::error::AppError::BadRequest("User has no team".to_string()))?;
+    let team_repo = TeamRepository::new(&state.db);
+    let user_repo = UserRepository::new(&state.db);
+    let channel_repo = ChannelRepository::new(&state.db);
 
-    let display_name: String = sqlx::query_scalar(
-        "SELECT COALESCE(NULLIF(display_name, ''), username) FROM users WHERE id = $1",
-    )
-    .bind(other_id)
-    .fetch_optional(&state.db)
-    .await?
-    .unwrap_or_else(|| "Direct Message".to_string());
+    let team_id = team_repo
+        .get_first_team_for_user(creator_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+        .ok_or_else(|| crate::error::AppError::BadRequest("User has no team".to_string()))?;
 
-    if let Some(channel) = sqlx::query_as::<_, crate::models::Channel>(
-        r#"
-        SELECT *
-        FROM channels
-        WHERE team_id = $1
-          AND type = 'direct'::channel_type
-          AND (name = $2 OR name = $3)
-        ORDER BY created_at ASC
-        LIMIT 1
-        "#,
-    )
-    .bind(team_id)
-    .bind(&canonical_name)
-    .bind(&legacy_name)
-    .fetch_optional(&state.db)
-    .await?
+    let display_name = user_repo
+        .get_display_name_or_username(other_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+
+    if let Some(channel) = channel_repo
+        .find_direct_channel(team_id, &canonical_name, &legacy_name)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
     {
         for user_id in ids {
-            sqlx::query(
-                "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
-            )
-            .bind(channel.id)
-            .bind(user_id)
-            .execute(&state.db)
-            .await?;
+            channel_repo
+                .add_member(channel.id, user_id, "member")
+                .await
+                .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
         }
 
         return Ok(channel);
     }
 
-    let channel: crate::models::Channel = sqlx::query_as(
-        r#"
-        INSERT INTO channels (team_id, type, name, display_name, purpose, header, creator_id)
-        VALUES ($1, 'direct', $2, $3, '', '', $4)
-        ON CONFLICT (team_id, name) DO UPDATE SET
-            name = EXCLUDED.name,
-            display_name = CASE
-                WHEN channels.display_name IS NULL OR channels.display_name = '' THEN EXCLUDED.display_name
-                ELSE channels.display_name
-            END
-        RETURNING *
-        "#,
-    )
-    .bind(team_id)
-    .bind(&canonical_name)
-    .bind(&display_name)
-    .bind(creator_id)
-    .fetch_one(&state.db)
-    .await?;
+    let channel = channel_repo
+        .create_direct_channel(team_id, &canonical_name, &display_name, creator_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     for user_id in ids {
-        sqlx::query(
-            "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
-        )
-        .bind(channel.id)
-        .bind(user_id)
-        .execute(&state.db)
-        .await?;
+        channel_repo
+            .add_member(channel.id, user_id, "member")
+            .await
+            .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
     }
 
     Ok(channel)
@@ -263,45 +230,36 @@ pub async fn create_group_channel_internal(
             .join("_")
     );
 
-    let team_id: Uuid = sqlx::query_scalar(
-        "SELECT team_id FROM team_members WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1",
-    )
-    .bind(creator_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| crate::error::AppError::BadRequest("User has no team".to_string()))?;
+    let team_repo = TeamRepository::new(&state.db);
+    let user_repo = UserRepository::new(&state.db);
+    let channel_repo = ChannelRepository::new(&state.db);
+
+    let team_id = team_repo
+        .get_first_team_for_user(creator_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+        .ok_or_else(|| crate::error::AppError::BadRequest("User has no team".to_string()))?;
 
     // Generate display name from usernames
-    let usernames: Vec<String> =
-        sqlx::query_scalar("SELECT username FROM users WHERE id = ANY($1)")
-            .bind(&ids)
-            .fetch_all(&state.db)
-            .await?;
+    let usernames: Vec<String> = user_repo
+        .get_by_ids(&ids)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+        .into_iter()
+        .map(|u| u.username)
+        .collect();
     let display_name = usernames.join(", ");
 
-    let channel: crate::models::Channel = sqlx::query_as(
-        r#"
-        INSERT INTO channels (team_id, type, name, display_name, purpose, header, creator_id)
-        VALUES ($1, 'group', $2, $3, '', '', $4)
-        ON CONFLICT (team_id, name) DO UPDATE SET name = EXCLUDED.name
-        RETURNING *
-        "#,
-    )
-    .bind(team_id)
-    .bind(&name)
-    .bind(&display_name)
-    .bind(creator_id)
-    .fetch_one(&state.db)
-    .await?;
+    let channel = channel_repo
+        .create_group_channel(team_id, &name, &display_name, creator_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     for user_id in ids {
-        sqlx::query(
-            "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
-        )
-        .bind(channel.id)
-        .bind(user_id)
-        .execute(&state.db)
-        .await?;
+        channel_repo
+            .add_member(channel.id, user_id, "member")
+            .await
+            .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
     }
 
     Ok(channel)

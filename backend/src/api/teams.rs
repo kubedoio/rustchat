@@ -16,6 +16,7 @@ use crate::{
         normalize_avatar_url,
         team::{AddTeamMember, CreateTeam, Team, TeamMember, TeamMemberResponse},
     },
+    repositories::TeamRepository,
     services::team_membership::{
         apply_default_channel_membership_for_team_join, ensure_default_channels_for_team,
     },
@@ -39,17 +40,8 @@ async fn list_teams(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> Result<Json<Vec<Team>>, AppError> {
-    let teams = sqlx::query_as::<_, Team>(
-        r#"
-        SELECT t.* FROM teams t
-        INNER JOIN team_members tm ON t.id = tm.team_id
-        WHERE tm.user_id = $1
-        ORDER BY t.name
-        "#,
-    )
-    .bind(auth.user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let repo = TeamRepository::new(&state.db);
+    let teams = repo.list_teams_for_user(auth.user_id).await?;
 
     Ok(Json(teams))
 }
@@ -67,14 +59,8 @@ async fn list_all_teams(
         ));
     }
 
-    let teams = sqlx::query_as::<_, Team>(
-        r#"
-        SELECT t.* FROM teams t
-        ORDER BY t.name
-        "#,
-    )
-    .fetch_all(&state.db)
-    .await?;
+    let repo = TeamRepository::new(&state.db);
+    let teams = repo.list_teams().await?;
 
     Ok(Json(teams))
 }
@@ -120,32 +106,19 @@ async fn create_team(
         new_org_id
     };
 
-    let team = sqlx::query_as::<_, Team>(
-        r#"
-        INSERT INTO teams (id, org_id, name, display_name, description)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-        "#,
-    )
-    .bind(team_id)
-    .bind(org_id)
-    .bind(&payload.name)
-    .bind(&payload.display_name)
-    .bind(&payload.description)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = TeamRepository::new(&state.db);
+    let team = repo
+        .create_team(
+            team_id,
+            org_id,
+            &payload.name,
+            payload.display_name.as_deref(),
+            payload.description.as_deref(),
+        )
+        .await?;
 
     // Auto-add creator as admin
-    sqlx::query(
-        r#"
-        INSERT INTO team_members (team_id, user_id, role)
-        VALUES ($1, $2, 'admin')
-        "#,
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .execute(&state.db)
-    .await?;
+    repo.add_team_member(team_id, auth.user_id, "admin").await?;
 
     ensure_default_channels_for_team(&state, team_id, auth.user_id).await?;
     if let Err(err) =
@@ -168,21 +141,15 @@ async fn get_team(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Team>, AppError> {
-    let team = sqlx::query_as::<_, Team>("SELECT * FROM teams WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let repo = TeamRepository::new(&state.db);
+    let team = repo
+        .get_team_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Team not found".into()))?;
 
     // Verify the user is a member of the team (or an admin)
     if !auth.has_permission(&permissions::TEAM_MANAGE) {
-        let is_member: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
-        )
-        .bind(id)
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+        let is_member = repo.is_team_member(id, auth.user_id).await?;
 
         if !is_member {
             return Err(AppError::Forbidden(
@@ -203,12 +170,8 @@ async fn ensure_team_management_access(
         return Ok(());
     }
 
-    let member: Option<TeamMember> =
-        sqlx::query_as("SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2")
-            .bind(team_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?;
+    let repo = TeamRepository::new(&state.db);
+    let member = repo.get_team_member(team_id, auth.user_id).await?;
 
     match member {
         Some(member) if member.role == "admin" || member.role == "owner" => Ok(()),
@@ -226,10 +189,8 @@ async fn delete_team(
 ) -> Result<(), AppError> {
     ensure_team_management_access(&state, &auth, id).await?;
 
-    sqlx::query("DELETE FROM teams WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
-        .await?;
+    let repo = TeamRepository::new(&state.db);
+    repo.delete_team(id).await?;
 
     Ok(())
 }
@@ -240,15 +201,11 @@ async fn get_members(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<TeamMemberResponse>>, AppError> {
+    let repo = TeamRepository::new(&state.db);
+
     // Verify the user is a member of the team (or an admin)
     if !auth.has_permission(&permissions::TEAM_MANAGE) {
-        let is_member: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
-        )
-        .bind(id)
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+        let is_member = repo.is_team_member(id, auth.user_id).await?;
 
         if !is_member {
             return Err(AppError::Forbidden(
@@ -257,19 +214,7 @@ async fn get_members(
         }
     }
 
-    let mut members = sqlx::query_as::<_, TeamMemberResponse>(
-        r#"
-        SELECT tm.team_id, tm.user_id, tm.role, tm.created_at,
-               u.username, u.display_name, u.avatar_url, u.presence
-        FROM team_members tm
-        JOIN users u ON tm.user_id = u.id
-        WHERE tm.team_id = $1
-        ORDER BY u.username
-        "#,
-    )
-    .bind(id)
-    .fetch_all(&state.db)
-    .await?;
+    let mut members = repo.list_team_members(id).await?;
 
     for member in &mut members {
         member.avatar_url = normalize_avatar_url(member.user_id, member.avatar_url.as_deref());
@@ -285,14 +230,11 @@ async fn add_member(
     Path(id): Path<Uuid>,
     Json(payload): Json<AddTeamMember>,
 ) -> Result<Json<TeamMember>, AppError> {
+    let repo = TeamRepository::new(&state.db);
+
     // Permission check
     if !auth.has_permission(&permissions::TEAM_MANAGE) {
-        let requester_role: Option<String> =
-            sqlx::query_scalar("SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2")
-                .bind(id)
-                .bind(auth.user_id)
-                .fetch_optional(&state.db)
-                .await?;
+        let requester_role = repo.get_member_role(id, auth.user_id).await?;
 
         match requester_role.as_deref() {
             Some("admin") | Some("owner") => {} // Allow
@@ -300,18 +242,13 @@ async fn add_member(
         }
     }
 
-    let member = sqlx::query_as::<_, TeamMember>(
-        r#"
-        INSERT INTO team_members (team_id, user_id, role)
-        VALUES ($1, $2, $3)
-        RETURNING *
-        "#,
-    )
-    .bind(id)
-    .bind(payload.user_id)
-    .bind(payload.role.unwrap_or_else(|| "member".into()))
-    .fetch_one(&state.db)
-    .await?;
+    let member = repo
+        .add_team_member(
+            id,
+            payload.user_id,
+            &payload.role.unwrap_or_else(|| "member".into()),
+        )
+        .await?;
 
     if let Err(err) =
         apply_default_channel_membership_for_team_join(&state, id, payload.user_id).await
@@ -333,25 +270,16 @@ async fn remove_member(
     auth: AuthUser,
     Path((id, user_id)): Path<(Uuid, Uuid)>,
 ) -> Result<(), AppError> {
+    let repo = TeamRepository::new(&state.db);
+
     // Permission check
     if !auth.has_permission(&permissions::TEAM_MANAGE) {
-        let requester_role: Option<String> =
-            sqlx::query_scalar("SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2")
-                .bind(id)
-                .bind(auth.user_id)
-                .fetch_optional(&state.db)
-                .await?;
+        let requester_role = repo.get_member_role(id, auth.user_id).await?;
 
         match requester_role.as_deref() {
             Some("admin") | Some("owner") => {
                 // Check target role
-                let target_role: Option<String> = sqlx::query_scalar(
-                    "SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2",
-                )
-                .bind(id)
-                .bind(user_id)
-                .fetch_optional(&state.db)
-                .await?;
+                let target_role = repo.get_member_role(id, user_id).await?;
 
                 if let Some(target) = target_role {
                     if target == "admin" || target == "owner" {
@@ -363,11 +291,7 @@ async fn remove_member(
         }
     }
 
-    sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
-        .bind(id)
-        .bind(user_id)
-        .execute(&state.db)
-        .await?;
+    repo.remove_team_member(id, user_id).await?;
 
     Ok(())
 }
@@ -378,18 +302,8 @@ async fn list_team_channels(
     auth: AuthUser,
     Path(team_id): Path<Uuid>,
 ) -> Result<Json<Vec<crate::models::channel::Channel>>, AppError> {
-    let channels = sqlx::query_as::<_, crate::models::channel::Channel>(
-        r#"
-        SELECT c.* FROM channels c
-        INNER JOIN channel_members cm ON c.id = cm.channel_id
-        WHERE c.team_id = $1 AND cm.user_id = $2
-        ORDER BY c.name
-        "#,
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let repo = TeamRepository::new(&state.db);
+    let channels = repo.list_team_channels(team_id, auth.user_id).await?;
 
     Ok(Json(channels))
 }
@@ -400,15 +314,8 @@ async fn list_public_teams(
     _auth: AuthUser,
 ) -> Result<Json<Vec<Team>>, AppError> {
     // Get all public teams, marking which ones user is already a member of
-    let teams = sqlx::query_as::<_, Team>(
-        r#"
-        SELECT t.* FROM teams t
-        WHERE t.is_public = true
-        ORDER BY t.name
-        "#,
-    )
-    .fetch_all(&state.db)
-    .await?;
+    let repo = TeamRepository::new(&state.db);
+    let teams = repo.list_public_teams().await?;
 
     Ok(Json(teams))
 }
@@ -419,10 +326,11 @@ async fn join_team(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<TeamMember>, AppError> {
+    let repo = TeamRepository::new(&state.db);
+
     // Check if team exists and is public
-    let team = sqlx::query_as::<_, Team>("SELECT * FROM teams WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let team = repo
+        .get_team_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Team not found".into()))?;
 
@@ -433,29 +341,14 @@ async fn join_team(
     }
 
     // Check if already a member
-    let existing: Option<TeamMember> =
-        sqlx::query_as("SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2")
-            .bind(id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?;
+    let existing = repo.get_team_member(id, auth.user_id).await?;
 
     if existing.is_some() {
         return Err(AppError::BadRequest("Already a member of this team".into()));
     }
 
     // Add user as member
-    let member = sqlx::query_as::<_, TeamMember>(
-        r#"
-        INSERT INTO team_members (team_id, user_id, role)
-        VALUES ($1, $2, 'member')
-        RETURNING *
-        "#,
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let member = repo.add_team_member(id, auth.user_id, "member").await?;
 
     if let Err(err) = apply_default_channel_membership_for_team_join(&state, id, auth.user_id).await
     {
@@ -476,26 +369,13 @@ async fn leave_team(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    let repo = TeamRepository::new(&state.db);
+
     // Remove from all channels in team first
-    sqlx::query(
-        r#"
-        DELETE FROM channel_members
-        WHERE user_id = $1 AND channel_id IN (
-            SELECT id FROM channels WHERE team_id = $2
-        )
-        "#,
-    )
-    .bind(auth.user_id)
-    .bind(id)
-    .execute(&state.db)
-    .await?;
+    repo.remove_user_from_team_channels(auth.user_id, id).await?;
 
     // Remove from team
-    sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
-        .bind(id)
-        .bind(auth.user_id)
-        .execute(&state.db)
-        .await?;
+    repo.remove_team_member(id, auth.user_id).await?;
 
     Ok(Json(serde_json::json!({"status": "left"})))
 }
@@ -519,27 +399,17 @@ async fn update_team(
 ) -> Result<Json<Team>, AppError> {
     ensure_team_management_access(&state, &auth, id).await?;
 
-    let team = sqlx::query_as::<_, Team>(
-        r#"
-        UPDATE teams SET
-            name = COALESCE($1, name),
-            display_name = COALESCE($2, display_name),
-            description = COALESCE($3, description),
-            is_public = COALESCE($4, is_public),
-            allow_open_invite = COALESCE($5, allow_open_invite),
-            updated_at = NOW()
-        WHERE id = $6
-        RETURNING *
-        "#,
-    )
-    .bind(payload.name)
-    .bind(payload.display_name)
-    .bind(payload.description)
-    .bind(payload.is_public)
-    .bind(payload.allow_open_invite)
-    .bind(id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = TeamRepository::new(&state.db);
+    let team = repo
+        .update_team(
+            id,
+            payload.name.as_deref(),
+            payload.display_name.as_deref(),
+            payload.description.as_deref(),
+            payload.is_public,
+            payload.allow_open_invite,
+        )
+        .await?;
 
     Ok(Json(team))
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
-import { useAdminStore } from '../../stores/admin';
+import { useAdminStore } from '../../features/admin/stores/adminStore';
 import { Save, Globe, Upload, Clock, Activity, Sliders } from 'lucide-vue-next';
 
 const adminStore = useAdminStore();

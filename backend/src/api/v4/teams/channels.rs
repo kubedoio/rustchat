@@ -14,6 +14,7 @@ use crate::mattermost_compat::{
 };
 use crate::models::channel::ChannelType;
 use crate::models::{Channel, Team};
+use crate::repositories::{ChannelRepository, TeamRepository};
 
 pub async fn get_team_channels(
     State(state): State<AppState>,
@@ -22,17 +23,9 @@ pub async fn get_team_channels(
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
     let team_id = parse_mm_or_uuid(&team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
-    let channels: Vec<Channel> = sqlx::query_as(
-        r#"
-        SELECT c.* FROM channels c
-        JOIN channel_members cm ON c.id = cm.channel_id
-        WHERE c.team_id = $1 AND cm.user_id = $2
-        "#,
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_team_channels_for_user(team_id, auth.user_id, true, None)
+        .await?;
 
     let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
     Ok(Json(mm_channels))
@@ -46,18 +39,9 @@ pub async fn get_team_channel_ids(
     let team_id = parse_mm_or_uuid(&team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
-    let ids: Vec<uuid::Uuid> = sqlx::query_scalar(
-        r#"
-        SELECT DISTINCT c.id
-        FROM channels c
-        LEFT JOIN channel_members cm ON c.id = cm.channel_id AND cm.user_id = $2
-        WHERE c.team_id = $1 AND (c.type = 'public' OR cm.user_id IS NOT NULL)
-        "#,
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let ids = ChannelRepository::new(&state.db)
+        .list_team_channel_ids(team_id, auth.user_id)
+        .await?;
     Ok(Json(ids.into_iter().map(encode_mm_id).collect()))
 }
 
@@ -69,18 +53,9 @@ pub async fn get_team_private_channels(
     let team_id = parse_mm_or_uuid(&team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
-    let channels: Vec<Channel> = sqlx::query_as(
-        r#"
-        SELECT c.*
-        FROM channels c
-        JOIN channel_members cm ON c.id = cm.channel_id
-        WHERE c.team_id = $1 AND c.type = 'private' AND cm.user_id = $2
-        "#,
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_team_private_channels(team_id, auth.user_id)
+        .await?;
     Ok(Json(channels.into_iter().map(|c| c.into()).collect()))
 }
 
@@ -93,23 +68,9 @@ pub async fn get_team_deleted_channels(
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
     // Return public archived channels plus private archived channels the user belongs to
-    let channels: Vec<Channel> = sqlx::query_as(
-        r#"
-        SELECT c.* FROM channels c
-        WHERE c.team_id = $1 AND c.is_archived = true
-          AND (
-            c.type != 'private'
-            OR EXISTS (
-                SELECT 1 FROM channel_members cm
-                WHERE cm.channel_id = c.id AND cm.user_id = $2
-            )
-          )
-        "#,
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_team_deleted_channels(team_id, auth.user_id)
+        .await?;
     Ok(Json(channels.into_iter().map(|c| c.into()).collect()))
 }
 
@@ -160,22 +121,15 @@ pub async fn get_team_channel_by_name(
 ) -> ApiResult<Json<mm::Channel>> {
     let team_id = parse_mm_or_uuid(&team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
-    let channel: Channel =
-        sqlx::query_as("SELECT * FROM channels WHERE team_id = $1 AND name = $2")
-            .bind(team_id)
-            .bind(&channel_name)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+    let channel: Channel = ChannelRepository::new(&state.db)
+        .get_channel_by_name(team_id, &channel_name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
 
     if channel.channel_type == ChannelType::Private {
-        let is_member: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-        )
-        .bind(channel.id)
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+        let is_member = ChannelRepository::new(&state.db)
+            .is_channel_member(channel.id, auth.user_id)
+            .await?;
         if !is_member {
             return Err(AppError::Forbidden(
                 "Not a member of this channel".to_string(),
@@ -191,9 +145,8 @@ pub async fn get_team_channel_by_name_for_team_name(
     auth: MmAuthUser,
     Path((team_name, channel_name)): Path<(String, String)>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let team: Team = sqlx::query_as("SELECT * FROM teams WHERE name = $1")
-        .bind(&team_name)
-        .fetch_optional(&state.db)
+    let team: Team = TeamRepository::new(&state.db)
+        .get_team_by_name(&team_name)
         .await?
         .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
     get_team_channel_by_name(

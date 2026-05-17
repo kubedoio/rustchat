@@ -23,6 +23,7 @@ import {
 } from 'lucide-vue-next';
 import adminApi, { type AdminTeam, type AdminChannel, type AdminUser } from '../../api/admin';
 import BaseInput from '../../components/atomic/BaseInput.vue';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 // State
 const teams = ref<AdminTeam[]>([]);
@@ -163,9 +164,9 @@ async function createTeam() {
         });
         showCreateTeamModal.value = false;
         await fetchTeams();
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Failed to create team', e);
-        alert(e?.response?.data?.message || 'Failed to create team');
+        alert(getApiErrorMessage(e) || 'Failed to create team');
     }
 }
 
@@ -185,9 +186,9 @@ async function updateTeam() {
             const { data } = await adminApi.getTeam(selectedTeam.value.id);
             selectedTeam.value = data;
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Failed to update team', e);
-        alert(e?.response?.data?.message || 'Failed to update team');
+        alert(getApiErrorMessage(e) || 'Failed to update team');
     }
 }
 

@@ -2,10 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Plus, Trash2, GripVertical, CheckSquare, Save, ArrowLeft, X } from 'lucide-vue-next'
-import { usePlaybookStore } from '../../stores/playbooks'
+import { usePlaybookStore } from '../../features/playbooks/stores/playbookStore'
 import BaseButton from '../atomic/BaseButton.vue'
 import { useToast } from '../../composables/useToast'
 import { type ChecklistWithTasks, playbooksApi } from '../../api/playbooks'
+import { getErrorMessage } from '@/core/errors/errorUtils'
 
 const router = useRouter()
 const route = useRoute()
@@ -175,8 +176,8 @@ async function save() {
         
         toast.success('Saved', 'Playbook saved successfully')
         router.push('/playbooks')
-    } catch (e: any) {
-        toast.error('Error', e.message || 'Failed to save playbook')
+    } catch (e: unknown) {
+        toast.error('Error', getErrorMessage(e, 'Failed to save playbook'))
     } finally {
         saving.value = false
     }

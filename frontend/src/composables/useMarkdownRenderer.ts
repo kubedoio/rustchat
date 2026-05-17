@@ -78,7 +78,7 @@ function renderMarkdownSync(markdown: string, highlightMentions?: string): strin
       'p', 'br', 'strong', 'em', 'code', 'pre', 'span', 'ul', 'ol', 'li',
       'blockquote', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
     ],
-    ALLOWED_ATTR: ['href', 'target', 'class', 'style', 'rel']
+    ALLOWED_ATTR: ['href', 'target', 'class', 'rel']
   })
 
   // Step 3: Post-process for Mentions (Interactive)

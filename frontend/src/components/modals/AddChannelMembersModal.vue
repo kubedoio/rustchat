@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { X, Search, User, UserPlus } from 'lucide-vue-next';
-import { useTeamStore } from '../../stores/teams';
-import { useAuthStore } from '../../stores/auth';
+import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import BaseButton from '../atomic/BaseButton.vue';
 import { channelRepository } from '../../features/channels/repositories/channelRepository';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const props = defineProps<{
     show: boolean
@@ -80,8 +81,8 @@ async function addMember(member: any) {
         setTimeout(() => {
             success.value = ''
         }, 2000)
-    } catch (e: any) {
-        error.value = e.response?.data?.message || `Failed to add ${member.username}`
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || `Failed to add ${member.username}`
     } finally {
         addingMembers.value.delete(member.user_id)
     }

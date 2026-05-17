@@ -306,7 +306,7 @@ export interface UpdateSsoConfigRequest {
 export const adminApi = {
     // Config
     getConfig: () => api.get<ServerConfig>('/admin/config'),
-    updateConfig: (category: string, data: any) =>
+    updateConfig: (category: string, data: Record<string, unknown>) =>
         api.patch(`/admin/config/${category}`, data),
 
     // Users

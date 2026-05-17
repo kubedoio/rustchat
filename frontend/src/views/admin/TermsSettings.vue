@@ -1,22 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { FileText, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Users, Eye, X, Save, AlertTriangle } from 'lucide-vue-next';
-import { HttpClient } from '../../api/http/HttpClient';
-
-// Create v4 API client
-const v4Api = new HttpClient({
-    baseURL: '/api/v4',
-    requestInterceptor: (config) => {
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-            config.headers = {
-                ...config.headers,
-                Authorization: `Bearer ${token}`,
-            };
-        }
-        return config;
-    },
-});
+import { v4Api } from '../../api/client';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 interface TermsOfService {
     id: string;
@@ -78,8 +64,8 @@ async function fetchTermsList() {
         const { data } = await v4Api.get('/terms_of_service');
         termsList.value = data;
         currentTerms.value = data.find((t: TermsOfService) => t.is_active) || null;
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to load terms';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to load terms';
     } finally {
         loading.value = false;
     }
@@ -98,7 +84,7 @@ async function fetchTermsStats() {
             pendingUsers.value = data.pending_users || [];
             currentTerms.value = data.current_terms;
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Failed to load stats', e);
     }
 }
@@ -145,8 +131,8 @@ async function createTerms() {
         showCreateModal.value = false;
         resetForm();
         await fetchTermsList();
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to create terms';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to create terms';
     }
 }
 
@@ -162,8 +148,8 @@ async function updateTerms() {
         showEditModal.value = false;
         resetForm();
         await fetchTermsList();
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to update terms';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to update terms';
     }
 }
 
@@ -175,8 +161,8 @@ async function activateTerms(terms: TermsOfService) {
         await v4Api.post(`/terms_of_service/${terms.id}/activate`);
         await fetchTermsList();
         await fetchTermsStats();
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to activate terms';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to activate terms';
     }
 }
 
@@ -191,8 +177,8 @@ async function deleteTerms(terms: TermsOfService) {
     try {
         await v4Api.delete(`/terms_of_service/${terms.id}`);
         await fetchTermsList();
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to delete terms';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to delete terms';
     }
 }
 

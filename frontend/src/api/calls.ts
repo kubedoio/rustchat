@@ -1,24 +1,7 @@
 // Mattermost Calls Plugin API Client
 // Routes are mounted under /api/v4/plugins/com.mattermost.calls
 
-import { HttpClient } from './http/HttpClient'
-import { useAuthStore } from '../stores/auth'
-
-// Create HttpClient for v4 API calls
-// (the default client uses /api/v1 as base)
-const apiClient = new HttpClient({
-    baseURL: '/api/v4',
-    requestInterceptor: (config) => {
-        const authStore = useAuthStore()
-        if (authStore.token) {
-            config.headers = {
-                ...config.headers,
-                Authorization: `Bearer ${authStore.token}`,
-            }
-        }
-        return config
-    },
-})
+import { v4Api } from './client'
 
 // Types from Mattermost Calls
 export interface CallsConfig {
@@ -252,7 +235,7 @@ function normalizeCallState(channelId: string, raw: CallStateWire): CallState {
 }
 
 async function fetchCallForChannel(channelId: string): Promise<CallChannelState> {
-    const response = await apiClient.get<CallStateWire>(`${CALLS_ROUTE}/calls/${channelId}?mobilev2=true`)
+    const response = await v4Api.get<CallStateWire>(`${CALLS_ROUTE}/calls/${channelId}?mobilev2=true`)
     if (!response.data) {
         return {
             channel_id: channelId,
@@ -270,7 +253,7 @@ export default {
     // Check if calls plugin is enabled
     async getEnabled(): Promise<boolean> {
         try {
-            await apiClient.get(`${CALLS_ROUTE}/version`)
+            await v4Api.get(`${CALLS_ROUTE}/version`)
             return true
         } catch (e) {
             return false
@@ -279,12 +262,12 @@ export default {
 
     // Get calls plugin version
     getVersion() {
-        return apiClient.get<CallsVersionInfo>(`${CALLS_ROUTE}/version`)
+        return v4Api.get<CallsVersionInfo>(`${CALLS_ROUTE}/version`)
     },
 
     // Get calls config (ICE servers, etc)
     async getConfig() {
-        const response = await apiClient.get<CallsConfigWire>(`${CALLS_ROUTE}/config`)
+        const response = await v4Api.get<CallsConfigWire>(`${CALLS_ROUTE}/config`)
         return {
             ...response,
             data: normalizeConfig(response.data),
@@ -293,12 +276,12 @@ export default {
 
     // Get ephemeral TURN credentials
     async getTurnCredentials() {
-        return apiClient.get<RTCIceServer[]>(`${CALLS_ROUTE}/turn-credentials`)
+        return v4Api.get<RTCIceServer[]>(`${CALLS_ROUTE}/turn-credentials`)
     },
 
     // Get all active calls
     async getCalls() {
-        const response = await apiClient.get<ChannelStateWire[]>(`${CALLS_ROUTE}/channels?mobilev2=true`)
+        const response = await v4Api.get<ChannelStateWire[]>(`${CALLS_ROUTE}/channels?mobilev2=true`)
         const channels: CallChannelState[] = []
 
         for (const channel of response.data || []) {
@@ -345,61 +328,61 @@ export default {
 
     // Start a new call in a channel
     startCall(channelId: string) {
-        return apiClient.post<StartCallResponse>(`${CALLS_ROUTE}/calls/${channelId}/start`)
+        return v4Api.post<StartCallResponse>(`${CALLS_ROUTE}/calls/${channelId}/start`)
     },
 
     // Join an existing call
     joinCall(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/join`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/join`)
     },
 
     // Leave a call
     leaveCall(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/leave`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/leave`)
     },
 
     // End a call (host only)
     endCall(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/end`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/end`)
     },
 
     // Mute self
     mute(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/mute`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/mute`)
     },
 
     // Unmute self
     unmute(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/unmute`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/unmute`)
     },
 
     // Raise hand
     raiseHand(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/raise-hand`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/raise-hand`)
     },
 
     // Lower hand
     lowerHand(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/lower-hand`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/lower-hand`)
     },
 
     // Send reaction
     sendReaction(channelId: string, emoji: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/react`, { emoji })
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/react`, { emoji })
     },
 
     // Toggle screen share
     toggleScreenShare(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/screen-share`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/screen-share`)
     },
 
     // WebRTC Signaling
     sendOffer(channelId: string, sdp: string) {
-        return apiClient.post<{ sdp: string; type_: string }>(`${CALLS_ROUTE}/calls/${channelId}/offer`, { sdp })
+        return v4Api.post<{ sdp: string; type_: string }>(`${CALLS_ROUTE}/calls/${channelId}/offer`, { sdp })
     },
 
     sendIceCandidate(channelId: string, candidate: string, sdpMid?: string, sdpMLineIndex?: number) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/ice`, {
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/ice`, {
             candidate,
             sdp_mid: sdpMid,
             sdp_mline_index: sdpMLineIndex
@@ -408,50 +391,50 @@ export default {
 
     // Host controls
     hostMakeHost(channelId: string, newHostId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/make`, { new_host_id: newHostId })
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/make`, { new_host_id: newHostId })
     },
 
     hostMute(channelId: string, sessionId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/mute`, { session_id: sessionId })
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/mute`, { session_id: sessionId })
     },
 
     hostMuteOthers(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/mute-others`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/mute-others`)
     },
 
     hostScreenOff(channelId: string, sessionId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/screen-off`, { session_id: sessionId })
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/screen-off`, { session_id: sessionId })
     },
 
     hostLowerHand(channelId: string, sessionId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/lower-hand`, { session_id: sessionId })
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/lower-hand`, { session_id: sessionId })
     },
 
     hostRemove(channelId: string, sessionId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/remove`, { session_id: sessionId })
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/host/remove`, { session_id: sessionId })
     },
 
     // Ringing
     ringUsers(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/ring`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/ring`)
     },
 
     dismissNotification(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/dismiss-notification`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/dismiss-notification`)
     },
 
     // Recording
     startRecording(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/recording/start`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/recording/start`)
     },
 
     stopRecording(channelId: string) {
-        return apiClient.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/recording/stop`)
+        return v4Api.post<ApiResp>(`${CALLS_ROUTE}/calls/${channelId}/recording/stop`)
     },
 
     // Enable/disable calls in channel (admin)
     enableChannelCalls(channelId: string, enable: boolean) {
-        return apiClient.post<CallChannelState>(`${CALLS_ROUTE}/${channelId}`, { enabled: enable })
+        return v4Api.post<CallChannelState>(`${CALLS_ROUTE}/${channelId}`, { enabled: enable })
     },
 
 

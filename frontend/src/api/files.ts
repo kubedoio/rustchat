@@ -27,7 +27,7 @@ export interface PresignedUploadUrl {
 }
 
 export const filesApi = {
-    upload: (file: File, channelId?: string, onProgress?: (progressEvent: any) => void) => {
+    upload: (file: File, channelId?: string, onProgress?: (progressEvent: { loaded: number; total: number }) => void) => {
         const formData = new FormData()
         formData.append('file', file)
         return api.post<FileUploadResponse>('/files', formData, {

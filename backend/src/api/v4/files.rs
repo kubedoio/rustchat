@@ -1,5 +1,6 @@
 use axum::{
-    extract::{Multipart, Path, State},
+    body::Body,
+    extract::{Multipart, Path, Query, State},
     http::{header, StatusCode},
     response::IntoResponse,
     routing::{get, post},
@@ -9,6 +10,7 @@ use chrono::Utc;
 use image::{GenericImageView, ImageFormat};
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
+use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
@@ -19,6 +21,7 @@ use crate::mattermost_compat::{
     models as mm,
 };
 use crate::models::FileInfo;
+use crate::repositories::{ChannelRepository, FileRepository};
 
 /// Verify the requesting user can access a file (must be member of the file's channel).
 /// Files without a channel_id (e.g. profile photos) are accessible to any authenticated user.
@@ -26,13 +29,8 @@ async fn check_file_access(state: &AppState, file: &FileInfo, user_id: Uuid) -> 
     let Some(channel_id) = file.channel_id else {
         return Ok(());
     };
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    let is_member = repo.is_channel_member(channel_id, user_id).await?;
     if !is_member {
         return Err(AppError::Forbidden(
             "You do not have access to this file".to_string(),
@@ -59,66 +57,6 @@ fn filename_extension(filename: &str) -> Option<&str> {
         .and_then(|(_, ext)| if ext.is_empty() { None } else { Some(ext) })
 }
 
-fn image_mime_and_extension_from_bytes(data: &[u8]) -> Option<(&'static str, &'static str)> {
-    let format = image::guess_format(data).ok()?;
-    match format {
-        ImageFormat::Png => Some(("image/png", "png")),
-        ImageFormat::Jpeg => Some(("image/jpeg", "jpg")),
-        ImageFormat::Gif => Some(("image/gif", "gif")),
-        ImageFormat::WebP => Some(("image/webp", "webp")),
-        ImageFormat::Bmp => Some(("image/bmp", "bmp")),
-        ImageFormat::Tiff => Some(("image/tiff", "tiff")),
-        _ => None,
-    }
-}
-
-fn extension_from_mime(mime_type: &str) -> Option<&'static str> {
-    match mime_type {
-        "image/jpeg" => Some("jpg"),
-        "image/png" => Some("png"),
-        "image/gif" => Some("gif"),
-        "image/webp" => Some("webp"),
-        "image/bmp" => Some("bmp"),
-        "image/tiff" => Some("tiff"),
-        _ => None,
-    }
-}
-
-fn normalize_uploaded_file_metadata(
-    filename: &str,
-    declared_content_type: &str,
-    data: &[u8],
-) -> (String, String, String) {
-    let declared = declared_content_type.trim().to_ascii_lowercase();
-    let declared_is_generic = declared.is_empty() || declared == "application/octet-stream";
-    let mut normalized_filename = filename.to_string();
-    let mut mime_type = if declared.is_empty() {
-        "application/octet-stream".to_string()
-    } else {
-        declared
-    };
-
-    if let Some((detected_mime, detected_ext)) = image_mime_and_extension_from_bytes(data) {
-        if declared_is_generic || !mime_type.starts_with("image/") {
-            mime_type = detected_mime.to_string();
-        }
-
-        if filename_extension(&normalized_filename).is_none() {
-            normalized_filename = format!("{}.{}", normalized_filename, detected_ext);
-        }
-    } else if filename_extension(&normalized_filename).is_none() {
-        if let Some(ext) = extension_from_mime(&mime_type) {
-            normalized_filename = format!("{}.{}", normalized_filename, ext);
-        }
-    }
-
-    let extension = filename_extension(&normalized_filename)
-        .unwrap_or_default()
-        .to_string();
-
-    (normalized_filename, mime_type, extension)
-}
-
 async fn upload_file(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -127,15 +65,25 @@ async fn upload_file(
     let mut channel_id: Option<Uuid> = None;
     let mut client_ids: Vec<String> = Vec::new();
 
+    struct TempFile(std::path::PathBuf);
+    impl Drop for TempFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
     struct PendingFile {
         filename: String,
         content_type: String,
-        data: Vec<u8>,
+        temp_path: std::path::PathBuf,
+        size: u64,
+        hash: String,
+        head: Vec<u8>,
     }
 
     let mut pending_files: Vec<PendingFile> = Vec::new();
 
-    while let Some(field) = multipart
+    while let Some(mut field) = multipart
         .next_field()
         .await
         .map_err(|e| AppError::BadRequest(format!("Multipart error: {}", e)))?
@@ -159,16 +107,41 @@ async fn upload_file(
                     .content_type()
                     .unwrap_or("application/octet-stream")
                     .to_string();
-                let data = field
-                    .bytes()
+
+                let temp_path =
+                    std::env::temp_dir().join(format!("rustchat_upload_{}", Uuid::new_v4()));
+                let mut file = tokio::fs::File::create(&temp_path)
+                    .await
+                    .map_err(|e| AppError::Internal(format!("temp file create error: {}", e)))?;
+                let mut hasher = Sha256::new();
+                let mut size = 0u64;
+                let mut head = Vec::with_capacity(8192);
+
+                while let Some(chunk) = field
+                    .chunk()
                     .await
                     .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
-                    .to_vec();
+                {
+                    let bytes = chunk.as_ref();
+                    if head.len() < 8192 {
+                        let remaining = 8192 - head.len();
+                        let to_copy = bytes.len().min(remaining);
+                        head.extend_from_slice(&bytes[..to_copy]);
+                    }
+                    hasher.update(bytes);
+                    size += bytes.len() as u64;
+                    file.write_all(bytes)
+                        .await
+                        .map_err(|e| AppError::Internal(format!("temp file write error: {}", e)))?;
+                }
 
                 pending_files.push(PendingFile {
                     filename,
                     content_type,
-                    data,
+                    temp_path,
+                    size,
+                    hash: hex::encode(hasher.finalize()),
+                    head,
                 });
             }
         }
@@ -176,13 +149,8 @@ async fn upload_file(
 
     // Enforce channel membership before associating files with a channel
     if let Some(cid) = channel_id {
-        let is_member: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-        )
-        .bind(cid)
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+        let repo = ChannelRepository::new(&state.db);
+        let is_member = repo.is_channel_member(cid, auth.user_id).await?;
         if !is_member {
             return Err(AppError::Forbidden(
                 "You are not a member of this channel".to_string(),
@@ -193,8 +161,18 @@ async fn upload_file(
     let mut file_infos: Vec<mm::FileInfo> = Vec::new();
 
     for file in pending_files {
-        let (filename, content_type, extension) =
-            normalize_uploaded_file_metadata(&file.filename, &file.content_type, &file.data);
+        let filename = file.filename.clone();
+        let (content_type, extension) =
+            crate::api::file_validation::validate_file_upload_head(&filename, &file.head, file.size as usize)?;
+
+        // Full validation for SVG/text files that require entire file content
+        if matches!(extension.as_str(), "svg" | "txt" | "md") {
+            let data = tokio::fs::read(&file.temp_path)
+                .await
+                .map_err(|e| AppError::Internal(format!("Read temp file: {}", e)))?;
+            let _ = crate::api::file_validation::validate_file_upload(&filename, &data)?;
+        }
+
         let file_id = Uuid::new_v4();
         let key = if extension.is_empty() {
             format!("files/{}/{}", auth.user_id, file_id)
@@ -202,22 +180,21 @@ async fn upload_file(
             format!("files/{}/{}.{}", auth.user_id, file_id, extension)
         };
 
-        let mut hasher = Sha256::new();
-        hasher.update(&file.data);
-        let hash = hex::encode(hasher.finalize());
-        let size = file.data.len() as i64;
+        let hash = file.hash;
+        let size = file.size as i64;
 
+        let mut temp_guard = TempFile(file.temp_path);
         state
             .s3_client
-            .upload(&key, file.data.clone(), &content_type)
+            .upload_file(&key, &temp_guard.0, &content_type)
             .await?;
 
         // Image processing (Blocking offloaded)
         let (width, height, thumbnail_data, preview_data) = if content_type.starts_with("image/") {
-            let data_clone = file.data.clone();
-
+            let path = std::mem::take(&mut temp_guard.0);
+            std::mem::forget(temp_guard);
             tokio::task::spawn_blocking(move || {
-                if let Ok(img) = image::load_from_memory(&data_clone) {
+                let result = if let Ok(img) = image::open(&path) {
                     let (w, h) = img.dimensions();
                     let w_out = Some(w as i32);
                     let h_out = Some(h as i32);
@@ -226,7 +203,6 @@ async fn upload_file(
                     let thumb_data = if w > 400 || h > 400 {
                         let thumb = img.thumbnail(400, 400);
                         let mut buf = Vec::new();
-                        // Use JPEG format for mobile compatibility (Mattermost expects image/jpeg)
                         if thumb
                             .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
                             .is_ok()
@@ -252,7 +228,6 @@ async fn upload_file(
                     let preview_data = if w > 1024 || h > 1024 {
                         let preview = img.thumbnail(1024, 1024);
                         let mut buf = Vec::new();
-                        // Use JPEG format for mobile compatibility (Mattermost expects image/jpeg)
                         if preview
                             .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
                             .is_ok()
@@ -277,7 +252,9 @@ async fn upload_file(
                     (w_out, h_out, thumb_data, preview_data)
                 } else {
                     (None, None, None, None)
-                }
+                };
+                let _ = std::fs::remove_file(&path);
+                result
             })
             .await
             .unwrap_or((None, None, None, None))
@@ -307,27 +284,21 @@ async fn upload_file(
 
         let has_thumbnail = thumbnail_key.is_some();
 
-        let _file_info: FileInfo = sqlx::query_as(
-            r#"
-            INSERT INTO files (id, uploader_id, channel_id, name, key, mime_type, size, sha256, width, height, has_thumbnail, thumbnail_key)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            RETURNING *
-            "#,
-        )
-        .bind(file_id)
-        .bind(auth.user_id)
-        .bind(channel_id)
-        .bind(&filename)
-        .bind(&key)
-        .bind(&content_type)
-        .bind(size)
-        .bind(&hash)
-        .bind(width)
-        .bind(height)
-        .bind(has_thumbnail)
-        .bind(thumbnail_key)
-        .fetch_one(&state.db)
-        .await?;
+        let file_repo = FileRepository::new(&state.db);
+        let _file_info = file_repo.create_full(
+            file_id,
+            auth.user_id,
+            channel_id,
+            &filename,
+            &key,
+            &content_type,
+            size,
+            &hash,
+            width,
+            height,
+            has_thumbnail,
+            thumbnail_key.as_deref(),
+        ).await?;
 
         file_infos.push(mm::FileInfo {
             id: encode_mm_id(file_id),
@@ -364,14 +335,12 @@ async fn get_file(
 ) -> ApiResult<impl IntoResponse> {
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
-    let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
-        .bind(file_id)
-        .fetch_optional(&state.db)
-        .await?
+    let file_repo = FileRepository::new(&state.db);
+    let file = file_repo.get_by_id(file_id).await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
-    let data = state.s3_client.download(&file.key).await?;
+    let stream = state.s3_client.download_stream(&file.key).await?;
 
     Ok((
         [
@@ -398,7 +367,7 @@ async fn get_file(
                 "Frame-ancestors 'none'".to_string(),
             ),
         ],
-        data,
+        Body::new(stream.into_inner()),
     ))
 }
 
@@ -410,10 +379,8 @@ async fn get_file_info(
 ) -> ApiResult<Json<mm::FileInfo>> {
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
-    let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
-        .bind(file_id)
-        .fetch_optional(&state.db)
-        .await?
+    let file_repo = FileRepository::new(&state.db);
+    let file = file_repo.get_by_id(file_id).await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -448,16 +415,14 @@ async fn get_thumbnail(
 ) -> ApiResult<impl IntoResponse> {
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
-    let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
-        .bind(file_id)
-        .fetch_optional(&state.db)
-        .await?
+    let file_repo = FileRepository::new(&state.db);
+    let file = file_repo.get_by_id(file_id).await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
     if file.has_thumbnail {
         if let Some(key) = file.thumbnail_key {
-            let data = state.s3_client.download(&key).await?;
+            let stream = state.s3_client.download_stream(&key).await?;
             let content_type = if key.ends_with(".webp") {
                 "image/webp"
             } else {
@@ -480,7 +445,7 @@ async fn get_thumbnail(
                         "nosniff".to_string(),
                     ),
                 ],
-                data,
+                Body::new(stream.into_inner()),
             )
                 .into_response());
         }
@@ -498,17 +463,15 @@ async fn get_preview(
 ) -> ApiResult<impl IntoResponse> {
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
-    let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
-        .bind(file_id)
-        .fetch_optional(&state.db)
-        .await?
+    let file_repo = FileRepository::new(&state.db);
+    let file = file_repo.get_by_id(file_id).await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
     if file.mime_type.starts_with("image/") {
         // Derive preview key from convention (now using .jpg for JPEG format)
         let preview_key = format!("previews/{}/{}.jpg", file.uploader_id, file.id);
-        if let Ok(data) = state.s3_client.download(&preview_key).await {
+        if let Ok(Some(stream)) = state.s3_client.download_stream_optional(&preview_key).await {
             return Ok((
                 [
                     // Use image/jpeg for Mattermost mobile compatibility
@@ -527,14 +490,14 @@ async fn get_preview(
                         "nosniff".to_string(),
                     ),
                 ],
-                data,
+                Body::new(stream.into_inner()),
             )
                 .into_response());
         }
 
         // If preview not found but thumbnail exists, try to serve thumbnail as fallback
         if let Some(thumb_key) = &file.thumbnail_key {
-            if let Ok(data) = state.s3_client.download(thumb_key).await {
+            if let Ok(Some(stream)) = state.s3_client.download_stream_optional(thumb_key).await {
                 let content_type = if thumb_key.ends_with(".webp") {
                     "image/webp"
                 } else {
@@ -556,7 +519,7 @@ async fn get_preview(
                             "nosniff".to_string(),
                         ),
                     ],
-                    data,
+                    Body::new(stream.into_inner()),
                 )
                     .into_response());
             }
@@ -577,10 +540,8 @@ async fn get_link(
 ) -> ApiResult<Json<serde_json::Value>> {
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
-    let file: FileInfo = sqlx::query_as("SELECT * FROM files WHERE id = $1")
-        .bind(file_id)
-        .fetch_optional(&state.db)
-        .await?
+    let file_repo = FileRepository::new(&state.db);
+    let file = file_repo.get_by_id(file_id).await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -634,36 +595,11 @@ async fn search_files_impl(
 ) -> ApiResult<Json<FileSearchResult>> {
     let search_pattern = format!("%{}%", terms);
 
-    let files: Vec<FileInfo> = if let Some(tid) = team_id {
-        sqlx::query_as(
-            r#"
-            SELECT f.* FROM files f
-            JOIN channels c ON f.channel_id = c.id
-            JOIN channel_members cm ON c.id = cm.channel_id
-            WHERE cm.user_id = $1 AND c.team_id = $2 AND f.name ILIKE $3
-            ORDER BY f.created_at DESC
-            LIMIT 100
-            "#,
-        )
-        .bind(user_id)
-        .bind(tid)
-        .bind(&search_pattern)
-        .fetch_all(&state.db)
-        .await?
+    let file_repo = FileRepository::new(&state.db);
+    let files = if let Some(tid) = team_id {
+        file_repo.search_for_team(user_id, tid, &search_pattern).await?
     } else {
-        sqlx::query_as(
-            r#"
-            SELECT f.* FROM files f
-            JOIN channel_members cm ON f.channel_id = cm.channel_id
-            WHERE cm.user_id = $1 AND f.name ILIKE $2
-            ORDER BY f.created_at DESC
-            LIMIT 100
-            "#,
-        )
-        .bind(user_id)
-        .bind(&search_pattern)
-        .fetch_all(&state.db)
-        .await?
+        file_repo.search(user_id, &search_pattern).await?
     };
 
     let mut order = Vec::new();

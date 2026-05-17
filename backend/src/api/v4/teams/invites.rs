@@ -14,19 +14,14 @@ use crate::mattermost_compat::{
     id::{encode_mm_id, parse_mm_or_uuid},
     models as mm,
 };
-use crate::models::{Team, TeamMember};
+use crate::models::TeamMember;
+use crate::repositories::team_repository::TeamInviteTokenRow;
+use crate::repositories::TeamRepository;
 
 #[derive(Deserialize)]
 pub struct AddTeamMemberByInviteQuery {
     token: Option<String>,
     invite_id: Option<String>,
-}
-
-#[derive(sqlx::FromRow)]
-struct TeamInviteTokenRow {
-    team_id: Uuid,
-    expires_at: chrono::DateTime<chrono::Utc>,
-    used_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 pub async fn add_team_member_by_invite(
@@ -45,20 +40,14 @@ pub async fn add_team_member_by_invite(
         .map(str::trim)
         .filter(|s| !s.is_empty());
 
+    let repo = TeamRepository::new(&state.db);
+
     let team_id = if let Some(token_value) = token {
         let mut tx = state.db.begin().await?;
-        let token_row: TeamInviteTokenRow = sqlx::query_as(
-            r#"
-            SELECT team_id, expires_at, used_at
-            FROM team_invite_tokens
-            WHERE token = $1
-            FOR UPDATE
-            "#,
-        )
-        .bind(token_value)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| AppError::BadRequest("Invalid invitation token".to_string()))?;
+        let token_row = repo
+            .get_team_invite_token_for_update(token_value, &mut tx)
+            .await?
+            .ok_or_else(|| AppError::BadRequest("Invalid invitation token".to_string()))?;
 
         if token_row.used_at.is_some() || token_row.expires_at <= chrono::Utc::now() {
             return Err(AppError::BadRequest(
@@ -66,30 +55,15 @@ pub async fn add_team_member_by_invite(
             ));
         }
 
-        let team: Team = sqlx::query_as("SELECT * FROM teams WHERE id = $1")
-            .bind(token_row.team_id)
-            .fetch_optional(&mut *tx)
+        let team = repo
+            .get_team_by_id(token_row.team_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
 
-        sqlx::query(
-            r#"
-            INSERT INTO team_members (team_id, user_id, role)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (team_id, user_id)
-            DO UPDATE SET role = EXCLUDED.role
-            "#,
-        )
-        .bind(team.id)
-        .bind(auth.user_id)
-        .bind("member")
-        .execute(&mut *tx)
-        .await?;
-
-        sqlx::query("UPDATE team_invite_tokens SET used_at = NOW() WHERE token = $1")
-            .bind(token_value)
-            .execute(&mut *tx)
+        repo.upsert_team_member_in_tx(team.id, auth.user_id, "member", &mut tx)
             .await?;
+
+        repo.mark_invite_token_used(token_value, &mut tx).await?;
 
         tx.commit().await?;
         team.id
@@ -100,9 +74,8 @@ pub async fn add_team_member_by_invite(
             ));
         }
 
-        let team: Team = sqlx::query_as("SELECT * FROM teams WHERE invite_id = $1")
-            .bind(invite_value)
-            .fetch_optional(&state.db)
+        let team = repo
+            .get_team_by_invite_id(invite_value)
             .await?
             .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
 
@@ -112,19 +85,8 @@ pub async fn add_team_member_by_invite(
             ));
         }
 
-        sqlx::query(
-            r#"
-            INSERT INTO team_members (team_id, user_id, role)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (team_id, user_id)
-            DO UPDATE SET role = EXCLUDED.role
-            "#,
-        )
-        .bind(team.id)
-        .bind(auth.user_id)
-        .bind("member")
-        .execute(&state.db)
-        .await?;
+        repo.upsert_team_member(team.id, auth.user_id, "member")
+            .await?;
 
         team.id
     } else {
@@ -193,6 +155,7 @@ pub async fn invite_users_to_team(
 
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
+    let repo = TeamRepository::new(&state.db);
     let expires_at = chrono::Utc::now() + chrono::Duration::days(7);
     let mut responses = Vec::new();
 
@@ -202,56 +165,29 @@ pub async fn invite_users_to_team(
             Err(_) => continue,
         };
 
-        // Verify the user exists
-        let user_exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL)",
-        )
-        .bind(user_id)
-        .fetch_one(&state.db)
-        .await?;
-        if !user_exists {
+        if !repo.user_exists(user_id).await? {
             continue;
         }
 
-        // Skip if already a team member
-        let already_member: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
-        )
-        .bind(team_id)
-        .bind(user_id)
-        .fetch_one(&state.db)
-        .await?;
-        if already_member {
+        if repo.is_team_member(team_id, user_id).await? {
             continue;
         }
 
-        // Check for existing active invitation
-        let existing: Option<(String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
-            "SELECT token, expires_at FROM team_invitations \
-             WHERE team_id = $1 AND user_id = $2 AND used = false AND expires_at > NOW()",
-        )
-        .bind(team_id)
-        .bind(user_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let existing = repo
+            .get_active_team_invitation_by_user(team_id, user_id)
+            .await?;
 
         let (token, inv_expires_at) = if let Some((t, ea)) = existing {
             (t, ea)
         } else {
             let token = generate_invite_token();
-            sqlx::query(
-                "INSERT INTO team_invitations \
-                 (team_id, user_id, invited_by, token, invitation_type, expires_at) \
-                 VALUES ($1, $2, $3, $4, 'member', $5) \
-                 ON CONFLICT (team_id, user_id) WHERE used = false \
-                 DO UPDATE SET token = EXCLUDED.token, expires_at = EXCLUDED.expires_at, updated_at = NOW()",
+            repo.upsert_team_invitation_for_user(
+                team_id,
+                user_id,
+                auth.user_id,
+                &token,
+                expires_at,
             )
-            .bind(team_id)
-            .bind(user_id)
-            .bind(auth.user_id)
-            .bind(&token)
-            .bind(expires_at)
-            .execute(&state.db)
             .await?;
             (token, expires_at)
         };
@@ -299,6 +235,7 @@ pub async fn invite_guests_to_team(
     let _ = &input.channels;
     let _ = &input.message;
 
+    let repo = TeamRepository::new(&state.db);
     let expires_at = chrono::Utc::now() + chrono::Duration::days(7);
     let mut responses = Vec::new();
 
@@ -307,33 +244,22 @@ pub async fn invite_guests_to_team(
             continue;
         }
 
-        // Check for existing active invitation for this email
-        let existing: Option<(String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
-            "SELECT token, expires_at FROM team_invitations \
-             WHERE team_id = $1 AND email = $2 AND used = false AND expires_at > NOW()",
-        )
-        .bind(team_id)
-        .bind(email)
-        .fetch_optional(&state.db)
-        .await?;
+        let existing = repo
+            .get_active_team_invitation_by_email(team_id, email)
+            .await?;
 
         let (token, inv_expires_at) = if let Some((t, ea)) = existing {
             (t, ea)
         } else {
             let token = generate_invite_token();
-            sqlx::query(
-                "INSERT INTO team_invitations \
-                 (team_id, user_id, invited_by, email, token, invitation_type, expires_at) \
-                 VALUES ($1, NULL, $2, $3, $4, 'guest', $5) \
-                 ON CONFLICT (team_id, email) WHERE used = false \
-                 DO UPDATE SET token = EXCLUDED.token, expires_at = EXCLUDED.expires_at, updated_at = NOW()",
+            repo.upsert_team_invitation_for_email(
+                team_id,
+                auth.user_id,
+                email,
+                &token,
+                "guest",
+                expires_at,
             )
-            .bind(team_id)
-            .bind(auth.user_id)
-            .bind(email)
-            .bind(&token)
-            .bind(expires_at)
-            .execute(&state.db)
             .await?;
             (token, expires_at)
         };
@@ -364,6 +290,7 @@ pub async fn invite_users_to_team_by_email(
 
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
+    let repo = TeamRepository::new(&state.db);
     let expires_at = chrono::Utc::now() + chrono::Duration::days(7);
     let mut responses = Vec::new();
 
@@ -373,33 +300,22 @@ pub async fn invite_users_to_team_by_email(
             continue;
         }
 
-        // Check for existing active invitation
-        let existing: Option<(String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
-            "SELECT token, expires_at FROM team_invitations \
-             WHERE team_id = $1 AND email = $2 AND used = false AND expires_at > NOW()",
-        )
-        .bind(team_id)
-        .bind(email)
-        .fetch_optional(&state.db)
-        .await?;
+        let existing = repo
+            .get_active_team_invitation_by_email(team_id, email)
+            .await?;
 
         let (token, inv_expires_at) = if let Some((t, ea)) = existing {
             (t, ea)
         } else {
             let token = generate_invite_token();
-            sqlx::query(
-                "INSERT INTO team_invitations \
-                 (team_id, user_id, invited_by, email, token, invitation_type, expires_at) \
-                 VALUES ($1, NULL, $2, $3, $4, 'member', $5) \
-                 ON CONFLICT (team_id, email) WHERE used = false \
-                 DO UPDATE SET token = EXCLUDED.token, expires_at = EXCLUDED.expires_at, updated_at = NOW()",
+            repo.upsert_team_invitation_for_email(
+                team_id,
+                auth.user_id,
+                email,
+                &token,
+                "member",
+                expires_at,
             )
-            .bind(team_id)
-            .bind(auth.user_id)
-            .bind(email)
-            .bind(&token)
-            .bind(expires_at)
-            .execute(&state.db)
             .await?;
             (token, expires_at)
         };
@@ -419,9 +335,9 @@ pub async fn get_team_by_invite(
     _auth: MmAuthUser,
     Path(invite_id): Path<String>,
 ) -> ApiResult<Json<mm::Team>> {
-    let team: Team = sqlx::query_as("SELECT * FROM teams WHERE invite_id = $1")
-        .bind(invite_id)
-        .fetch_optional(&state.db)
+    let repo = TeamRepository::new(&state.db);
+    let team = repo
+        .get_team_by_invite_id(&invite_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
     Ok(Json(team.into()))
@@ -436,18 +352,11 @@ pub async fn regenerate_team_invite_id(
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
 
-    let invite_id: String = sqlx::query_scalar(
-        r#"
-        UPDATE teams
-        SET invite_id = replace(gen_random_uuid()::text, '-', '')
-        WHERE id = $1
-        RETURNING invite_id
-        "#,
-    )
-    .bind(team_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+    let repo = TeamRepository::new(&state.db);
+    let invite_id = repo
+        .regenerate_team_invite_id(team_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
 
     Ok(Json(serde_json::json!({"invite_id": invite_id})))
 }

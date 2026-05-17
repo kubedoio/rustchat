@@ -1,77 +1,66 @@
-// Channel Store - Pure state management for channels
-// No business logic - just state and simple mutations
-
 import { defineStore } from 'pinia'
-import { ref, computed, readonly } from 'vue'
-import type { Channel, ChannelId, ChannelType } from '../../../core/entities/Channel'
+import { ref, computed } from 'vue'
+import { useStorage } from '@vueuse/core'
+import { channelsApi, type Channel, type CreateChannelRequest, type ChannelNotifyProps } from '../../../api/channels'
+import type { ChannelId } from '../../../core/entities/Channel'
 import type { TeamId } from '../../../core/entities/Team'
-import type { ChannelUnreadCounts } from '../repositories/channelRepository'
+import type { UserId } from '../../../core/entities/User'
+import { getApiErrorMessage } from '../../../core/errors/errorUtils'
 
 export const useChannelStore = defineStore('channelStore', () => {
-  // State
-  const channels = ref<Map<ChannelId, Channel>>(new Map())
+  // Internal Map for feature architecture compatibility
+  const _channelsMap = ref<Map<ChannelId, Channel>>(new Map())
   const joinableChannels = ref<Channel[]>([])
   const currentChannelId = ref<ChannelId | null>(null)
+  const lastChannelByTeam = useStorage<Record<string, string>>('last_channel_by_team', {})
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // Getters
-  const allChannels = computed(() => Array.from(channels.value.values()))
+  // Legacy-compatible computed: channels as Array
+  const channels = computed(() => Array.from(_channelsMap.value.values()))
 
-  const currentChannel = computed(() => {
-    if (!currentChannelId.value) return null
-    return channels.value.get(currentChannelId.value) || null
-  })
-
-  const publicChannels = computed(() => 
-    allChannels.value.filter(c => c.type === 'public')
+  const currentChannel = computed(() =>
+    channels.value.find(c => c.id === currentChannelId.value) || null
   )
 
-  const privateChannels = computed(() => 
-    allChannels.value.filter(c => c.type === 'private')
+  const publicChannels = computed(() =>
+    channels.value.filter(c => c.channel_type === 'public' || (c as any).type === 'public')
   )
 
-  const directMessages = computed(() => 
-    allChannels.value.filter(c => c.type === 'direct' || c.type === 'group')
+  const privateChannels = computed(() =>
+    channels.value.filter(c => c.channel_type === 'private' || (c as any).type === 'private')
   )
 
-  const channelsByTeam = computed(() => (teamId: TeamId) => 
-    allChannels.value.filter(c => c.teamId === teamId)
+  const directMessages = computed(() =>
+    channels.value.filter(c =>
+      c.channel_type === 'direct' || c.channel_type === 'group' ||
+      (c as any).type === 'direct' || (c as any).type === 'group'
+    )
   )
 
-  function getChannelById(channelId: ChannelId): Channel | undefined {
-    return channels.value.get(channelId)
-  }
-
-  function getChannelsByType(type: ChannelType): Channel[] {
-    return allChannels.value.filter(c => c.type === type)
-  }
-
-  // Actions - Simple state mutations only
+  // Feature actions
   function setChannels(items: Channel[]) {
-    channels.value.clear()
+    _channelsMap.value.clear()
     for (const channel of items) {
-      channels.value.set(channel.id, channel)
+      _channelsMap.value.set(channel.id, channel)
     }
   }
 
   function addChannel(channel: Channel) {
-    channels.value.set(channel.id, channel)
+    _channelsMap.value.set(channel.id, channel)
   }
 
   function updateChannel(channel: Channel) {
-    const existing = channels.value.get(channel.id)
+    const existing = _channelsMap.value.get(channel.id)
     if (existing) {
-      channels.value.set(channel.id, { ...existing, ...channel })
+      _channelsMap.value.set(channel.id, { ...existing, ...channel })
     }
   }
 
   function removeChannel(channelId: ChannelId) {
-    channels.value.delete(channelId)
-    
-    // If we removed the current channel, clear it
+    _channelsMap.value.delete(channelId)
     if (currentChannelId.value === channelId) {
-      currentChannelId.value = null
+      currentChannelId.value = channels.value[0]?.id || null
     }
   }
 
@@ -83,10 +72,9 @@ export const useChannelStore = defineStore('channelStore', () => {
     joinableChannels.value = items
   }
 
-  // Unread/mention counts
-  function setUnreadCounts(counts: ChannelUnreadCounts[]) {
+  function setUnreadCounts(counts: { channelId: ChannelId; unreadCount: number; mentionCount: number }[]) {
     for (const { channelId, unreadCount, mentionCount } of counts) {
-      const channel = channels.value.get(channelId)
+      const channel = _channelsMap.value.get(channelId)
       if (channel) {
         channel.unreadCount = unreadCount
         channel.mentionCount = mentionCount
@@ -95,28 +83,27 @@ export const useChannelStore = defineStore('channelStore', () => {
   }
 
   function incrementUnread(channelId: ChannelId) {
-    const channel = channels.value.get(channelId)
+    const channel = _channelsMap.value.get(channelId)
     if (channel) {
       channel.unreadCount = (channel.unreadCount || 0) + 1
     }
   }
 
   function incrementMention(channelId: ChannelId) {
-    const channel = channels.value.get(channelId)
+    const channel = _channelsMap.value.get(channelId)
     if (channel) {
       channel.mentionCount = (channel.mentionCount || 0) + 1
     }
   }
 
   function clearCounts(channelId: ChannelId) {
-    const channel = channels.value.get(channelId)
+    const channel = _channelsMap.value.get(channelId)
     if (channel) {
       channel.unreadCount = 0
       channel.mentionCount = 0
     }
   }
 
-  // Loading state
   function setLoading(value: boolean) {
     loading.value = value
   }
@@ -130,30 +117,127 @@ export const useChannelStore = defineStore('channelStore', () => {
   }
 
   function clearChannels() {
-    channels.value.clear()
+    _channelsMap.value.clear()
     currentChannelId.value = null
     joinableChannels.value = []
   }
 
-  return {
-    // State (readonly)
-    channels: readonly(channels),
-    joinableChannels: readonly(joinableChannels),
-    currentChannelId: readonly(currentChannelId),
-    loading: readonly(loading),
-    error: readonly(error),
+  function getChannelById(channelId: ChannelId): Channel | undefined {
+    return _channelsMap.value.get(channelId)
+  }
 
-    // Getters
-    allChannels,
+  // Legacy async methods
+  async function fetchChannels(teamId: string) {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await channelsApi.list(teamId)
+      _channelsMap.value.clear()
+      for (const channel of response.data) {
+        _channelsMap.value.set(channel.id, channel)
+      }
+
+      // Try to restore last selected channel for this team
+      const lastId = lastChannelByTeam.value[teamId]
+      if (lastId && channels.value.some(c => c.id === lastId)) {
+        currentChannelId.value = lastId
+      } else {
+        // Auto-select general channel if none selected or last not found
+        const general = channels.value.find(c => c.name === 'general')
+        currentChannelId.value = general?.id || channels.value[0]?.id || null
+
+        // Save this default selection
+        if (currentChannelId.value) {
+          lastChannelByTeam.value[teamId] = currentChannelId.value
+        }
+      }
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to fetch channels'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function createChannel(data: CreateChannelRequest) {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await channelsApi.create(data)
+      const channel = response.data
+
+      addChannel(channel)
+
+      return channel
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to create channel'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function joinChannel(channelId: string) {
+    // Use a simple user id approach - legacy didn't pass userId here consistently
+    try {
+      await channelsApi.join(channelId, 'me')
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to join channel'
+      throw e
+    }
+  }
+
+  async function leaveChannel(channelId: string, userId: string) {
+    try {
+      await channelsApi.removeMember(channelId, userId)
+      removeChannel(channelId)
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to leave channel'
+      throw e
+    }
+  }
+
+  function selectChannel(channelId: string) {
+    currentChannelId.value = channelId
+    const channel = _channelsMap.value.get(channelId)
+    if (channel && (channel as any).team_id) {
+      lastChannelByTeam.value[(channel as any).team_id] = channelId
+    }
+  }
+
+  async function fetchJoinableChannels(teamId: string) {
+    loading.value = true
+    try {
+      const response = await channelsApi.listJoinable(teamId)
+      joinableChannels.value = response.data
+    } catch (e: unknown) {
+      console.error('Failed to fetch joinable channels', e)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateNotifyProps(channelId: string, _userId: string, props: ChannelNotifyProps) {
+    try {
+      await channelsApi.updateNotifyProps(channelId, _userId, props)
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to update notification settings'
+      throw e
+    }
+  }
+
+  return {
+    // State
+    channels,
+    joinableChannels,
+    currentChannelId,
     currentChannel,
     publicChannels,
     privateChannels,
     directMessages,
-    channelsByTeam,
-    getChannelById,
-    getChannelsByType,
+    loading,
+    error,
 
-    // Actions
+    // Feature actions
     setChannels,
     addChannel,
     updateChannel,
@@ -167,6 +251,16 @@ export const useChannelStore = defineStore('channelStore', () => {
     setLoading,
     setError,
     clearError,
-    clearChannels
+    clearChannels,
+    getChannelById,
+
+    // Legacy actions
+    fetchChannels,
+    fetchJoinableChannels,
+    createChannel,
+    joinChannel,
+    leaveChannel,
+    selectChannel,
+    updateNotifyProps
   }
 })

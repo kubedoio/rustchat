@@ -137,26 +137,31 @@ pub async fn login(
     let mm_user: mm::User = user.into();
 
     let mut headers = axum::http::HeaderMap::new();
-    headers.insert("Token", axum::http::HeaderValue::from_str(&token).unwrap());
-    headers.insert("token", axum::http::HeaderValue::from_str(&token).unwrap());
+    let token_header = axum::http::HeaderValue::from_str(&token)
+        .map_err(|_| AppError::Internal("Invalid token characters".into()))?;
+    headers.insert("Token", token_header.clone());
+    headers.insert("token", token_header);
+    let auth_header = axum::http::HeaderValue::from_str(&format!("Token {}", token))
+        .map_err(|_| AppError::Internal("Invalid token characters".into()))?;
     headers.insert(
         axum::http::header::AUTHORIZATION,
-        axum::http::HeaderValue::from_str(&format!("Token {}", token)).unwrap(),
+        auth_header,
     );
     let max_age = state.jwt_expiry_hours.saturating_mul(3600);
+    let cookie_header = axum::http::HeaderValue::from_str(&format!(
+        "MMAUTHTOKEN={}; Path=/; Max-Age={}; HttpOnly{}; SameSite=Lax",
+        token,
+        max_age,
+        if state.config.is_production() {
+            "; Secure"
+        } else {
+            ""
+        }
+    ))
+    .map_err(|_| AppError::Internal("Invalid cookie characters".into()))?;
     headers.insert(
         axum::http::header::SET_COOKIE,
-        axum::http::HeaderValue::from_str(&format!(
-            "MMAUTHTOKEN={}; Path=/; Max-Age={}; HttpOnly{}; SameSite=Lax",
-            token,
-            max_age,
-            if state.config.is_production() {
-                "; Secure"
-            } else {
-                ""
-            }
-        ))
-        .unwrap(),
+        cookie_header,
     );
 
     Ok((headers, Json(mm_user)))

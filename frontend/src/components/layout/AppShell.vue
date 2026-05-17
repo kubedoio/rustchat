@@ -4,8 +4,8 @@ import GlobalHeader from './GlobalHeader.vue';
 import TeamRail from './TeamRail.vue';
 import ChannelSidebar from './ChannelSidebar.vue';
 import RightSidebar from './RightSidebar.vue';
-import { useUIStore } from '../../stores/ui';
-import { useChannelStore } from '../../stores/channels';
+import { useUIStore } from '../../features/ui/stores/uiStore';
+import { useChannelStore } from '../../features/channels/stores/channelStore';
 import { useBreakpoints } from '../../composables/useBreakpoints';
 
 const emit = defineEmits<{

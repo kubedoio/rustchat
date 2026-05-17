@@ -14,6 +14,7 @@ import membershipPoliciesApi, {
 } from '../../api/membershipPolicies';
 import PolicyEditorModal from '../../components/admin/PolicyEditorModal.vue';
 import PolicyPreviewModal from '../../components/admin/PolicyPreviewModal.vue';
+import { getApiErrorMessage, getErrorMessage } from '@/core/errors/errorUtils';
 
 const toast = useToast();
 
@@ -44,8 +45,8 @@ async function fetchPolicies() {
         
         const response = await membershipPoliciesApi.listPolicies(query);
         policies.value = response.data;
-    } catch (error: any) {
-        toast.error('Failed to load policies', error.response?.data?.message || error.message);
+    } catch (error: unknown) {
+        toast.error('Failed to load policies', getApiErrorMessage(error) || getErrorMessage(error));
     } finally {
         loading.value = false;
     }
@@ -93,8 +94,8 @@ async function viewAudit(policy: PolicyWithTargets) {
     try {
         const response = await membershipPoliciesApi.getPolicyAudit(policy.id, { limit: 50 });
         auditLogs.value = response.data;
-    } catch (error: any) {
-        toast.error('Failed to load audit logs', error.response?.data?.message || error.message);
+    } catch (error: unknown) {
+        toast.error('Failed to load audit logs', getApiErrorMessage(error) || getErrorMessage(error));
     } finally {
         auditLoading.value = false;
     }
@@ -106,8 +107,8 @@ async function togglePolicy(policy: PolicyWithTargets) {
         await membershipPoliciesApi.updatePolicy(policy.id, { enabled: !policy.enabled });
         policy.enabled = !policy.enabled;
         toast.success(`Policy ${policy.enabled ? 'enabled' : 'disabled'}`);
-    } catch (error: any) {
-        toast.error('Failed to update policy', error.response?.data?.message || error.message);
+    } catch (error: unknown) {
+        toast.error('Failed to update policy', getApiErrorMessage(error) || getErrorMessage(error));
     }
 }
 
@@ -121,8 +122,8 @@ async function deletePolicy(policy: PolicyWithTargets) {
         await membershipPoliciesApi.deletePolicy(policy.id);
         policies.value = policies.value.filter(p => p.id !== policy.id);
         toast.success('Policy deleted');
-    } catch (error: any) {
-        toast.error('Failed to delete policy', error.response?.data?.message || error.message);
+    } catch (error: unknown) {
+        toast.error('Failed to delete policy', getApiErrorMessage(error) || getErrorMessage(error));
     }
 }
 

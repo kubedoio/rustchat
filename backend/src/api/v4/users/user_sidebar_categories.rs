@@ -16,6 +16,7 @@ use crate::mattermost_compat::{
     models as mm,
 };
 use crate::models::channel::ChannelType;
+use crate::repositories::{CategoryRepository, CategoryRow, SidebarCandidateChannel, TeamRepository};
 
 #[derive(Deserialize)]
 pub struct CategoriesPath {
@@ -25,21 +26,14 @@ pub struct CategoriesPath {
 /// Resolves a team identifier to a UUID.
 /// First tries to parse as UUID/mm-id, then falls back to looking up by team name.
 async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<Uuid> {
-    // First try to parse as UUID or Mattermost ID
     if let Some(team_id) = parse_mm_or_uuid(team_id_str) {
         return Ok(team_id);
     }
 
-    // Fall back to looking up by team name
-    let team: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM teams WHERE name = $1")
-        .bind(team_id_str)
-        .fetch_optional(&state.db)
-        .await?;
-
-    match team {
-        Some((id,)) => Ok(id),
-        None => Err(AppError::NotFound("Team not found".to_string())),
-    }
+    let repo = TeamRepository::new(&state.db);
+    let id = repo.get_id_by_name(team_id_str).await?
+        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+    Ok(id)
 }
 
 pub async fn get_categories(
@@ -135,17 +129,22 @@ pub(crate) async fn get_categories_internal(
     user_id: Uuid,
     team_id: Uuid,
 ) -> ApiResult<Json<mm::SidebarCategories>> {
-    ensure_team_exists(&state, team_id).await?;
-    ensure_team_member(&state, user_id, team_id).await?;
+    let team_repo = TeamRepository::new(&state.db);
+    let exists = team_repo.get_team_by_id(team_id).await?.is_some();
+    if !exists {
+        return Err(AppError::NotFound("Team not found".to_string()));
+    }
+    let is_member = team_repo.is_team_member(team_id, user_id).await?;
+    if !is_member {
+        return Err(AppError::Forbidden(
+            "User is not a member of the team".to_string(),
+        ));
+    }
+
+    let cat_repo = CategoryRepository::new(&state.db);
 
     // Fetch categories
-    let categories_rows: Vec<CategoryRow> = sqlx::query_as(
-        "SELECT * FROM channel_categories WHERE user_id = $1 AND team_id = $2 AND delete_at = 0",
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_all(&state.db)
-    .await?;
+    let categories_rows = cat_repo.list_for_user(user_id, team_id).await?;
 
     if categories_rows.is_empty() {
         return Ok(Json(
@@ -160,12 +159,7 @@ pub(crate) async fn get_categories_internal(
     sort_category_rows(&mut sorted_rows);
 
     for row in sorted_rows {
-        let channel_ids: Vec<Uuid> = sqlx::query_scalar(
-            "SELECT channel_id FROM channel_category_channels WHERE category_id = $1 ORDER BY sort_order ASC"
-        )
-        .bind(row.id)
-        .fetch_all(&state.db)
-        .await?;
+        let channel_ids = cat_repo.get_channel_ids(row.id).await?;
 
         for channel_id in &channel_ids {
             assigned_channel_ids.insert(*channel_id);
@@ -193,7 +187,7 @@ pub(crate) async fn get_categories_internal(
 
     // Mattermost backfills channels that are not explicitly mapped to any category so the
     // mobile sidebar never renders empty due to stale mappings.
-    let sidebar_channels = get_sidebar_candidate_channels(&state, user_id, team_id).await?;
+    let sidebar_channels = cat_repo.get_sidebar_candidate_channels(user_id, team_id).await?;
     backfill_orphaned_channels(
         &mut categories,
         &sidebar_channels,
@@ -201,23 +195,6 @@ pub(crate) async fn get_categories_internal(
     );
 
     Ok(Json(mm::SidebarCategories { categories, order }))
-}
-
-#[derive(sqlx::FromRow, Clone)]
-struct CategoryRow {
-    id: Uuid,
-    team_id: Uuid,
-    user_id: Uuid,
-    #[sqlx(rename = "type")]
-    type_field: String,
-    display_name: String,
-    sorting: String,
-    muted: bool,
-    collapsed: bool,
-    sort_order: i32,
-    create_at: i64,
-    update_at: i64,
-    delete_at: i64,
 }
 
 fn sort_category_rows(rows: &mut [CategoryRow]) {
@@ -240,70 +217,7 @@ fn sort_category_rows(rows: &mut [CategoryRow]) {
     }
 }
 
-async fn ensure_team_exists(state: &AppState, team_id: Uuid) -> ApiResult<()> {
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM teams WHERE id = $1)")
-        .bind(team_id)
-        .fetch_one(&state.db)
-        .await?;
 
-    if !exists {
-        return Err(AppError::NotFound("Team not found".to_string()));
-    }
-
-    Ok(())
-}
-
-async fn ensure_team_member(state: &AppState, user_id: Uuid, team_id: Uuid) -> ApiResult<()> {
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM team_members WHERE user_id = $1 AND team_id = $2)",
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_one(&state.db)
-    .await?;
-
-    if !is_member {
-        return Err(AppError::Forbidden(
-            "User is not a member of the team".to_string(),
-        ));
-    }
-
-    Ok(())
-}
-
-#[derive(sqlx::FromRow, Clone, Copy)]
-struct SidebarCandidateChannel {
-    id: Uuid,
-    #[sqlx(rename = "type")]
-    channel_type: ChannelType,
-}
-
-async fn get_sidebar_candidate_channels(
-    state: &AppState,
-    user_id: Uuid,
-    team_id: Uuid,
-) -> ApiResult<Vec<SidebarCandidateChannel>> {
-    let channels = sqlx::query_as(
-        r#"
-        SELECT c.id, c.type
-        FROM channels c
-        JOIN channel_members cm ON c.id = cm.channel_id
-        WHERE cm.user_id = $1
-          AND c.is_archived = false
-          AND (
-            (c.type IN ('public', 'private') AND c.team_id = $2)
-            OR c.type IN ('direct', 'group')
-          )
-        ORDER BY COALESCE(c.display_name, c.name) ASC
-        "#,
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_all(&state.db)
-    .await?;
-
-    Ok(channels)
-}
 
 fn category_index_by_type_or_name(
     categories: &[mm::SidebarCategory],
@@ -384,7 +298,8 @@ async fn get_default_categories(
     user_id: Uuid,
     team_id: Uuid,
 ) -> ApiResult<mm::SidebarCategories> {
-    let channels = get_sidebar_candidate_channels(state, user_id, team_id).await?;
+    let cat_repo = CategoryRepository::new(&state.db);
+    let channels = cat_repo.get_sidebar_candidate_channels(user_id, team_id).await?;
     let now = Utc::now().timestamp_millis();
     let channel_ids = channels
         .into_iter()
@@ -412,8 +327,17 @@ pub(crate) async fn create_category_internal(
     team_id: Uuid,
     input: CreateCategoryRequest,
 ) -> ApiResult<Json<mm::SidebarCategory>> {
-    ensure_team_exists(&state, team_id).await?;
-    ensure_team_member(&state, user_id, team_id).await?;
+    let team_repo = TeamRepository::new(&state.db);
+    let exists = team_repo.get_team_by_id(team_id).await?.is_some();
+    if !exists {
+        return Err(AppError::NotFound("Team not found".to_string()));
+    }
+    let is_member = team_repo.is_team_member(team_id, user_id).await?;
+    if !is_member {
+        return Err(AppError::Forbidden(
+            "User is not a member of the team".to_string(),
+        ));
+    }
 
     if let Some(input_user_id) = input.user_id.as_deref() {
         let parsed = parse_mm_or_uuid(input_user_id)
@@ -440,28 +364,12 @@ pub(crate) async fn create_category_internal(
     let category_type = input.category_type.unwrap_or_else(|| "custom".to_string());
     let sorting = input.sorting.unwrap_or_else(|| "alpha".to_string());
 
-    let next_order: i32 = sqlx::query_scalar(
-        "SELECT (COALESCE(MAX(sort_order), -1) + 1)::INT FROM channel_categories WHERE user_id = $1 AND team_id = $2",
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_one(&state.db)
-    .await?;
+    let cat_repo = CategoryRepository::new(&state.db);
+    let next_order = cat_repo.get_next_sort_order(user_id, team_id).await?;
 
-    sqlx::query(
-        "INSERT INTO channel_categories (id, team_id, user_id, type, display_name, sorting, sort_order, create_at, update_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
-    )
-    .bind(id)
-    .bind(team_id)
-    .bind(user_id)
-    .bind(&category_type)
-    .bind(&input.display_name)
-    .bind(&sorting)
-    .bind(next_order)
-    .bind(now)
-    .bind(now)
-    .execute(&state.db)
-    .await?;
+    cat_repo.create(
+        id, team_id, user_id, &category_type, &input.display_name, &sorting, next_order, now,
+    ).await?;
 
     Ok(Json(mm::SidebarCategory {
         id: encode_mm_id(id),
@@ -507,12 +415,22 @@ pub(crate) async fn update_categories_internal(
     team_id: Uuid,
     input: UpdateCategoriesRequest,
 ) -> ApiResult<Json<Vec<mm::SidebarCategory>>> {
-    ensure_team_exists(&state, team_id).await?;
-    ensure_team_member(&state, user_id, team_id).await?;
+    let team_repo = TeamRepository::new(&state.db);
+    let exists = team_repo.get_team_by_id(team_id).await?.is_some();
+    if !exists {
+        return Err(AppError::NotFound("Team not found".to_string()));
+    }
+    let is_member = team_repo.is_team_member(team_id, user_id).await?;
+    if !is_member {
+        return Err(AppError::Forbidden(
+            "User is not a member of the team".to_string(),
+        ));
+    }
 
     let now = Utc::now().timestamp_millis();
     let mut updated_categories = Vec::new();
 
+    let cat_repo = CategoryRepository::new(&state.db);
     let mut tx = state.db.begin().await?;
 
     for cat in input.categories {
@@ -535,36 +453,19 @@ pub(crate) async fn update_categories_internal(
             ));
         }
 
-        sqlx::query(
-            "UPDATE channel_categories SET display_name = $1, sorting = $2, muted = $3, collapsed = $4, update_at = $5 WHERE id = $6 AND user_id = $7 AND team_id = $8"
-        )
-        .bind(&cat.display_name)
-        .bind(&cat.sorting)
-        .bind(cat.muted)
-        .bind(cat.collapsed)
-        .bind(now)
-        .bind(cat_uuid)
-        .bind(user_id)
-        .bind(team_id)
-        .execute(&mut *tx)
-        .await?;
+        cat_repo.update_fields_in_tx(
+            &mut tx, cat_uuid, user_id, team_id,
+            &cat.display_name, &cat.sorting, cat.muted, cat.collapsed, now,
+        ).await?;
 
         // Update channels
-        sqlx::query("DELETE FROM channel_category_channels WHERE category_id = $1")
-            .bind(cat_uuid)
-            .execute(&mut *tx)
-            .await?;
+        cat_repo.delete_channel_associations_in_tx(&mut tx, cat_uuid).await?;
 
         let mut parsed_channel_ids = Vec::new();
         for (i, channel_id_str) in cat.channel_ids.iter().enumerate() {
             let channel_uuid = parse_mm_or_uuid(channel_id_str)
                 .ok_or_else(|| AppError::BadRequest("Invalid channel ID".to_string()))?;
-            sqlx::query("INSERT INTO channel_category_channels (category_id, channel_id, sort_order) VALUES ($1, $2, $3)")
-                .bind(cat_uuid)
-                .bind(channel_uuid)
-                .bind(i as i32)
-                .execute(&mut *tx)
-                .await?;
+            cat_repo.insert_channel_association_in_tx(&mut tx, cat_uuid, channel_uuid, i as i32).await?;
             parsed_channel_ids.push(channel_uuid);
         }
 
@@ -588,23 +489,25 @@ pub(crate) async fn update_category_order_internal(
     team_id: Uuid,
     order: Vec<String>,
 ) -> ApiResult<Json<Vec<String>>> {
-    ensure_team_exists(&state, team_id).await?;
-    ensure_team_member(&state, user_id, team_id).await?;
+    let team_repo = TeamRepository::new(&state.db);
+    let exists = team_repo.get_team_by_id(team_id).await?.is_some();
+    if !exists {
+        return Err(AppError::NotFound("Team not found".to_string()));
+    }
+    let is_member = team_repo.is_team_member(team_id, user_id).await?;
+    if !is_member {
+        return Err(AppError::Forbidden(
+            "User is not a member of the team".to_string(),
+        ));
+    }
 
+    let cat_repo = CategoryRepository::new(&state.db);
     let mut tx = state.db.begin().await?;
 
     for (i, cat_id_str) in order.iter().enumerate() {
         let cat_uuid = parse_mm_or_uuid(cat_id_str)
             .unwrap_or_else(|| Uuid::new_v5(&Uuid::NAMESPACE_OID, cat_id_str.as_bytes()));
-        sqlx::query(
-            "UPDATE channel_categories SET sort_order = $1 WHERE id = $2 AND user_id = $3 AND team_id = $4"
-        )
-        .bind(i as i32)
-        .bind(cat_uuid)
-        .bind(user_id)
-        .bind(team_id)
-        .execute(&mut *tx)
-        .await?;
+        cat_repo.update_sort_order_in_tx(&mut tx, cat_uuid, user_id, team_id, i as i32).await?;
     }
 
     tx.commit().await?;

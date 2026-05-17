@@ -12,6 +12,7 @@ import membershipPoliciesApi, {
     type PolicyMetadata
 } from '../../api/membershipPolicies';
 import { adminApi, type AdminGroup } from '../../api/admin';
+import { getApiErrorMessage, getErrorMessage } from '@/core/errors/errorUtils';
 import { useToast } from '../../composables/useToast';
 
 const props = defineProps<{
@@ -126,8 +127,8 @@ async function loadOptions() {
         // Load groups for group selection
         const groupsRes = await adminApi.listGroups();
         groups.value = groupsRes.data;
-    } catch (error: any) {
-        toast.error('Failed to load options', error.message);
+    } catch (error: unknown) {
+        toast.error('Failed to load options', getErrorMessage(error));
     } finally {
         loadingOptions.value = false;
     }
@@ -284,8 +285,8 @@ async function savePolicy() {
         }
 
         emit('saved', response.data);
-    } catch (error: any) {
-        toast.error('Failed to save policy', error.response?.data?.message || error.message);
+    } catch (error: unknown) {
+        toast.error('Failed to save policy', getApiErrorMessage(error) || getErrorMessage(error));
     } finally {
         saving.value = false;
     }
@@ -513,7 +514,7 @@ onMounted(() => {
                         <div v-if="targets.length > 0" class="space-y-2">
                             <div
                                 v-for="(target, index) in targets"
-                                :key="index"
+                                :key="`${target.target_type}-${target.target_id}`"
                                 class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                             >
                                 <div class="flex items-center space-x-3">

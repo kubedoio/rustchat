@@ -3,6 +3,10 @@ use crate::auth::policy::permissions;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use crate::models::channel::ChannelType;
+use crate::repositories::GroupRepository;
+use crate::repositories::group_repository::{
+    ChannelMetaRow, GroupListRow, GroupRow, GroupSyncableRow, TeamMetaRow, TrackedMembershipRow,
+};
 use axum::{
     extract::{Path, State},
     routing::{get, post, put},
@@ -11,7 +15,6 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use sqlx::FromRow;
 use std::collections::HashSet;
 use uuid::Uuid;
 
@@ -39,75 +42,6 @@ impl SyncableKind {
             Self::Channel => "Channel",
         }
     }
-}
-
-#[derive(Debug, Clone, FromRow)]
-struct GroupRow {
-    id: Uuid,
-    name: Option<String>,
-    display_name: String,
-    description: String,
-    source: String,
-    remote_id: Option<String>,
-    allow_reference: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    deleted_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, FromRow)]
-struct GroupListRow {
-    id: Uuid,
-    name: Option<String>,
-    display_name: String,
-    description: String,
-    source: String,
-    remote_id: Option<String>,
-    allow_reference: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    deleted_at: Option<DateTime<Utc>>,
-    has_syncables: bool,
-    member_count: i64,
-}
-
-#[derive(Debug, Clone, FromRow)]
-struct GroupSyncableRow {
-    group_id: Uuid,
-    syncable_type: String,
-    syncable_id: Uuid,
-    auto_add: bool,
-    scheme_admin: bool,
-    create_at: DateTime<Utc>,
-    update_at: DateTime<Utc>,
-    delete_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, FromRow)]
-struct TeamMetaRow {
-    id: Uuid,
-    name: String,
-    display_name: Option<String>,
-    is_public: bool,
-}
-
-#[derive(Debug, Clone, FromRow)]
-struct ChannelMetaRow {
-    id: Uuid,
-    name: String,
-    display_name: Option<String>,
-    channel_type: ChannelType,
-    team_id: Uuid,
-    team_name: String,
-    team_display_name: Option<String>,
-    team_is_public: bool,
-}
-
-#[derive(Debug, Clone, FromRow, PartialEq, Eq, Hash)]
-struct TrackedMembershipRow {
-    target_type: String,
-    target_id: Uuid,
-    user_id: Uuid,
 }
 
 #[derive(Debug, Deserialize)]
@@ -361,38 +295,18 @@ fn require_system_groups_write(auth: &crate::api::v4::extractors::MmAuthUser) ->
 }
 
 async fn fetch_group_for_syncable(state: &AppState, group_id: Uuid) -> ApiResult<GroupRow> {
-    let group: GroupRow = sqlx::query_as(
-        r#"
-        SELECT id, name, display_name, description, source, remote_id, allow_reference, created_at, updated_at, deleted_at
-        FROM groups
-        WHERE id = $1
-          AND deleted_at IS NULL
-        "#,
-    )
-    .bind(group_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+    let group = GroupRepository::new(&state.db)
+        .get_group_row_by_id(group_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
 
     Ok(group)
 }
 
 async fn is_team_admin_or_owner(state: &AppState, team_id: Uuid, user_id: Uuid) -> ApiResult<bool> {
-    let is_admin: bool = sqlx::query_scalar(
-        r#"
-        SELECT EXISTS(
-            SELECT 1
-            FROM team_members
-            WHERE team_id = $1
-              AND user_id = $2
-              AND role IN ('admin', 'owner', 'team_admin')
-        )
-        "#,
-    )
-    .bind(team_id)
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let is_admin = GroupRepository::new(&state.db)
+        .is_team_admin_or_owner(team_id, user_id)
+        .await?;
 
     Ok(is_admin)
 }
@@ -402,29 +316,16 @@ async fn can_manage_channel_syncable(
     channel_id: Uuid,
     user_id: Uuid,
 ) -> ApiResult<bool> {
-    let is_channel_admin: bool = sqlx::query_scalar(
-        r#"
-        SELECT EXISTS(
-            SELECT 1
-            FROM channel_members
-            WHERE channel_id = $1
-              AND user_id = $2
-              AND role IN ('admin', 'channel_admin')
-        )
-        "#,
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let is_channel_admin = GroupRepository::new(&state.db)
+        .is_channel_admin(channel_id, user_id)
+        .await?;
 
     if is_channel_admin {
         return Ok(true);
     }
 
-    let team_id: Option<Uuid> = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-        .bind(channel_id)
-        .fetch_optional(&state.db)
+    let team_id = GroupRepository::new(&state.db)
+        .get_channel_team_id(channel_id)
         .await?;
 
     let Some(team_id) = team_id else {
@@ -491,23 +392,13 @@ async fn ensure_syncable_exists(
 ) -> ApiResult<()> {
     match kind {
         SyncableKind::Team => {
-            let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM teams WHERE id = $1 AND deleted_at IS NULL)",
-            )
-            .bind(syncable_id)
-            .fetch_one(&state.db)
-            .await?;
+            let exists = GroupRepository::new(&state.db).team_exists(syncable_id).await?;
             if !exists {
                 return Err(AppError::NotFound("Team not found".to_string()));
             }
         }
         SyncableKind::Channel => {
-            let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM channels WHERE id = $1 AND deleted_at IS NULL)",
-            )
-            .bind(syncable_id)
-            .fetch_one(&state.db)
-            .await?;
+            let exists = GroupRepository::new(&state.db).channel_exists(syncable_id).await?;
             if !exists {
                 return Err(AppError::NotFound("Channel not found".to_string()));
             }
@@ -534,43 +425,20 @@ async fn syncable_payload(
 
     match kind {
         SyncableKind::Team => {
-            let team: TeamMetaRow = sqlx::query_as(
-                r#"
-                SELECT id, name, display_name, is_public
-                FROM teams
-                WHERE id = $1
-                "#,
-            )
-            .bind(row.syncable_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+            let team = GroupRepository::new(&state.db)
+                .get_team_meta(row.syncable_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
 
             payload["team_id"] = json!(encode_mm_id(team.id));
             payload["team_display_name"] = json!(team.display_name.unwrap_or(team.name));
             payload["team_type"] = json!(team_type_value(team.is_public));
         }
         SyncableKind::Channel => {
-            let channel: ChannelMetaRow = sqlx::query_as(
-                r#"
-                SELECT
-                    c.id,
-                    c.name,
-                    c.display_name,
-                    c.type as channel_type,
-                    t.id as team_id,
-                    t.name as team_name,
-                    t.display_name as team_display_name,
-                    t.is_public as team_is_public
-                FROM channels c
-                JOIN teams t ON t.id = c.team_id
-                WHERE c.id = $1
-                "#,
-            )
-            .bind(row.syncable_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+            let channel = GroupRepository::new(&state.db)
+                .get_channel_meta(row.syncable_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
 
             payload["channel_id"] = json!(encode_mm_id(channel.id));
             payload["channel_display_name"] = json!(channel.display_name.unwrap_or(channel.name));
@@ -599,18 +467,9 @@ async fn load_group_syncables(
     state: &AppState,
     group_id: Uuid,
 ) -> ApiResult<Vec<GroupSyncableRow>> {
-    let rows: Vec<GroupSyncableRow> = sqlx::query_as(
-        r#"
-        SELECT group_id, syncable_type, syncable_id, auto_add, scheme_admin, create_at, update_at, delete_at
-        FROM group_syncables
-        WHERE group_id = $1
-          AND delete_at IS NULL
-        ORDER BY create_at ASC
-        "#,
-    )
-    .bind(group_id)
-    .fetch_all(&state.db)
-    .await?;
+    let rows = GroupRepository::new(&state.db)
+        .list_group_syncables(group_id)
+        .await?;
 
     Ok(rows)
 }
@@ -672,58 +531,32 @@ async fn cleanup_tracking_membership(
     syncable_id: Uuid,
     tracked: &TrackedMembershipRow,
 ) -> ApiResult<()> {
-    sqlx::query(
-        r#"
-        DELETE FROM group_syncable_memberships
-        WHERE group_id = $1
-          AND syncable_type = $2
-          AND syncable_id = $3
-          AND target_type = $4
-          AND target_id = $5
-          AND user_id = $6
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .bind(syncable_id)
-    .bind(&tracked.target_type)
-    .bind(tracked.target_id)
-    .bind(tracked.user_id)
-    .execute(&state.db)
-    .await?;
-
-    let kept_by_other_syncable: bool = sqlx::query_scalar(
-        r#"
-        SELECT EXISTS(
-            SELECT 1
-            FROM group_syncable_memberships
-            WHERE target_type = $1
-              AND target_id = $2
-              AND user_id = $3
+    GroupRepository::new(&state.db)
+        .delete_group_syncable_membership(
+            group_id,
+            kind.as_db_str(),
+            syncable_id,
+            &tracked.target_type,
+            tracked.target_id,
+            tracked.user_id,
         )
-        "#,
-    )
-    .bind(&tracked.target_type)
-    .bind(tracked.target_id)
-    .bind(tracked.user_id)
-    .fetch_one(&state.db)
-    .await?;
+        .await?;
+
+    let kept_by_other_syncable = GroupRepository::new(&state.db)
+        .has_other_syncable_memberships(&tracked.target_type, tracked.target_id, tracked.user_id)
+        .await?;
 
     if kept_by_other_syncable {
         return Ok(());
     }
 
     if tracked.target_type == "team" {
-        sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
-            .bind(tracked.target_id)
-            .bind(tracked.user_id)
-            .execute(&state.db)
+        GroupRepository::new(&state.db)
+            .remove_team_member(tracked.target_id, tracked.user_id)
             .await?;
     } else {
-        sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(tracked.target_id)
-            .bind(tracked.user_id)
-            .execute(&state.db)
+        GroupRepository::new(&state.db)
+            .remove_channel_member(tracked.target_id, tracked.user_id)
             .await?;
     }
 
@@ -740,21 +573,13 @@ async fn ensure_membership(
     let role = if scheme_admin { "admin" } else { "member" };
 
     let rows_affected = if target_type == "team" {
-        sqlx::query("INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (team_id, user_id) DO NOTHING")
-            .bind(target_id)
-            .bind(user_id)
-            .bind(role)
-            .execute(&state.db)
+        GroupRepository::new(&state.db)
+            .ensure_team_member(target_id, user_id, role)
             .await?
-            .rows_affected()
     } else {
-        sqlx::query("INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (channel_id, user_id) DO NOTHING")
-            .bind(target_id)
-            .bind(user_id)
-            .bind(role)
-            .execute(&state.db)
+        GroupRepository::new(&state.db)
+            .ensure_channel_member(target_id, user_id, role)
             .await?
-            .rows_affected()
     };
 
     Ok(rows_affected > 0)
@@ -766,31 +591,17 @@ async fn reconcile_group_syncable(
     kind: SyncableKind,
     syncable_id: Uuid,
 ) -> ApiResult<()> {
-    let syncable: Option<GroupSyncableRow> = sqlx::query_as(
-        r#"
-        SELECT group_id, syncable_type, syncable_id, auto_add, scheme_admin, create_at, update_at, delete_at
-        FROM group_syncables
-        WHERE group_id = $1
-          AND syncable_type = $2
-          AND syncable_id = $3
-          AND delete_at IS NULL
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .bind(syncable_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let syncable = GroupRepository::new(&state.db)
+        .get_group_syncable(group_id, kind.as_db_str(), syncable_id)
+        .await?;
 
     let Some(syncable) = syncable else {
         return Ok(());
     };
 
-    let group_user_ids: Vec<Uuid> =
-        sqlx::query_scalar("SELECT user_id FROM group_members WHERE group_id = $1")
-            .bind(group_id)
-            .fetch_all(&state.db)
-            .await?;
+    let group_user_ids = GroupRepository::new(&state.db)
+        .list_group_user_ids(group_id)
+        .await?;
 
     let mut desired = HashSet::new();
 
@@ -806,12 +617,10 @@ async fn reconcile_group_syncable(
                 }
             }
             SyncableKind::Channel => {
-                let channel_team_id: Uuid =
-                    sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-                        .bind(syncable_id)
-                        .fetch_optional(&state.db)
-                        .await?
-                        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+                let channel_team_id = GroupRepository::new(&state.db)
+                    .get_channel_team_id(syncable_id)
+                    .await?
+                    .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
 
                 for user_id in &group_user_ids {
                     desired.insert(DesiredMembership {
@@ -829,20 +638,9 @@ async fn reconcile_group_syncable(
         }
     }
 
-    let existing_tracked: Vec<TrackedMembershipRow> = sqlx::query_as(
-        r#"
-        SELECT target_type, target_id, user_id
-        FROM group_syncable_memberships
-        WHERE group_id = $1
-          AND syncable_type = $2
-          AND syncable_id = $3
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .bind(syncable_id)
-    .fetch_all(&state.db)
-    .await?;
+    let existing_tracked = GroupRepository::new(&state.db)
+        .list_group_syncable_memberships(group_id, kind.as_db_str(), syncable_id)
+        .await?;
 
     let mut tracked_set: HashSet<TrackedMembershipRow> = existing_tracked.iter().cloned().collect();
 
@@ -867,22 +665,16 @@ async fn reconcile_group_syncable(
         .await?;
 
         if inserted {
-            sqlx::query(
-                r#"
-                INSERT INTO group_syncable_memberships
-                    (group_id, syncable_type, syncable_id, target_type, target_id, user_id)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT DO NOTHING
-                "#,
-            )
-            .bind(group_id)
-            .bind(kind.as_db_str())
-            .bind(syncable_id)
-            .bind(&desired_membership.target_type)
-            .bind(desired_membership.target_id)
-            .bind(desired_membership.user_id)
-            .execute(&state.db)
-            .await?;
+            GroupRepository::new(&state.db)
+                .insert_group_syncable_membership(
+                    group_id,
+                    kind.as_db_str(),
+                    syncable_id,
+                    &desired_membership.target_type,
+                    desired_membership.target_id,
+                    desired_membership.user_id,
+                )
+                .await?;
 
             tracked_set.insert(key);
         }
@@ -909,20 +701,9 @@ async fn cleanup_unlinked_syncable(
     kind: SyncableKind,
     syncable_id: Uuid,
 ) -> ApiResult<()> {
-    let tracked_rows: Vec<TrackedMembershipRow> = sqlx::query_as(
-        r#"
-        SELECT target_type, target_id, user_id
-        FROM group_syncable_memberships
-        WHERE group_id = $1
-          AND syncable_type = $2
-          AND syncable_id = $3
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .bind(syncable_id)
-    .fetch_all(&state.db)
-    .await?;
+    let tracked_rows = GroupRepository::new(&state.db)
+        .list_group_syncable_memberships(group_id, kind.as_db_str(), syncable_id)
+        .await?;
 
     for tracked in tracked_rows {
         cleanup_tracking_membership(state, group_id, kind, syncable_id, &tracked).await?;
@@ -938,37 +719,7 @@ async fn get_groups(
 ) -> ApiResult<Json<Vec<Value>>> {
     require_system_groups_read(&auth)?;
 
-    let groups: Vec<GroupListRow> = sqlx::query_as(
-        r#"
-        SELECT
-            g.id,
-            g.name,
-            g.display_name,
-            g.description,
-            g.source,
-            g.remote_id,
-            g.allow_reference,
-            g.created_at,
-            g.updated_at,
-            g.deleted_at,
-            EXISTS(
-                SELECT 1
-                FROM group_syncables gs
-                WHERE gs.group_id = g.id
-                  AND gs.delete_at IS NULL
-            ) AS has_syncables,
-            (
-                SELECT COUNT(*)
-                FROM group_members gm
-                WHERE gm.group_id = g.id
-            ) AS member_count
-        FROM groups g
-        WHERE g.deleted_at IS NULL
-        ORDER BY g.display_name ASC
-        "#,
-    )
-    .fetch_all(&state.db)
-    .await?;
+    let groups = GroupRepository::new(&state.db).list_groups().await?;
 
     Ok(Json(groups.iter().map(group_json).collect()))
 }
@@ -1019,34 +770,16 @@ async fn create_group(
 
     let user_ids = parse_user_ids(group.user_ids.as_deref().unwrap_or(&[]))?;
 
-    let mut tx = state.db.begin().await?;
-
-    let created: GroupRow = sqlx::query_as(
-        r#"
-        INSERT INTO groups (name, display_name, description, source, remote_id, allow_reference)
-        VALUES ($1, $2, $3, $4, NULL, $5)
-        RETURNING id, name, display_name, description, source, remote_id, allow_reference, created_at, updated_at, deleted_at
-        "#,
-    )
-    .bind(group.name.as_deref().map(str::trim).filter(|value| !value.is_empty()))
-    .bind(display_name)
-    .bind(group.description.unwrap_or_default())
-    .bind(source)
-    .bind(allow_reference)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    for user_id in user_ids {
-        sqlx::query(
-            "INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT (group_id, user_id) DO NOTHING",
+    let created = GroupRepository::new(&state.db)
+        .create_group_with_members(
+            group.name.as_deref().map(str::trim).filter(|value| !value.is_empty()),
+            display_name,
+            group.description.unwrap_or_default(),
+            source,
+            allow_reference,
+            user_ids,
         )
-        .bind(created.id)
-        .bind(user_id)
-        .execute(&mut *tx)
         .await?;
-    }
-
-    tx.commit().await?;
 
     let row = GroupListRow {
         id: created.id,
@@ -1079,38 +812,10 @@ async fn get_group(
     let group_id = parse_mm_or_uuid(&group_id)
         .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
 
-    let group: GroupListRow = sqlx::query_as(
-        r#"
-        SELECT
-            g.id,
-            g.name,
-            g.display_name,
-            g.description,
-            g.source,
-            g.remote_id,
-            g.allow_reference,
-            g.created_at,
-            g.updated_at,
-            g.deleted_at,
-            EXISTS(
-                SELECT 1
-                FROM group_syncables gs
-                WHERE gs.group_id = g.id
-                  AND gs.delete_at IS NULL
-            ) AS has_syncables,
-            (
-                SELECT COUNT(*)
-                FROM group_members gm
-                WHERE gm.group_id = g.id
-            ) AS member_count
-        FROM groups g
-        WHERE g.id = $1
-        "#,
-    )
-    .bind(group_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+    let group = GroupRepository::new(&state.db)
+        .get_group_list_by_id(group_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
 
     Ok(Json(group_json(&group)))
 }
@@ -1127,17 +832,10 @@ async fn patch_group(
     let group_id = parse_mm_or_uuid(&group_id)
         .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
 
-    let current: GroupRow = sqlx::query_as(
-        r#"
-        SELECT id, name, display_name, description, source, remote_id, allow_reference, created_at, updated_at, deleted_at
-        FROM groups
-        WHERE id = $1
-        "#,
-    )
-    .bind(group_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+    let current = GroupRepository::new(&state.db)
+        .get_group_row_by_id_unchecked(group_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
 
     if current.source == GROUP_SOURCE_CUSTOM && patch.allow_reference == Some(false) {
         return Err(AppError::BadRequest(
@@ -1145,60 +843,24 @@ async fn patch_group(
         ));
     }
 
-    let updated: GroupListRow = sqlx::query_as(
-        r#"
-        UPDATE groups
-        SET
-            name = COALESCE($2, name),
-            display_name = COALESCE($3, display_name),
-            description = COALESCE($4, description),
-            allow_reference = COALESCE($5, allow_reference),
-            updated_at = NOW()
-        WHERE id = $1
-        RETURNING
-            id,
-            name,
-            display_name,
-            description,
-            source,
-            remote_id,
-            allow_reference,
-            created_at,
-            updated_at,
-            deleted_at,
-            EXISTS(
-                SELECT 1
-                FROM group_syncables gs
-                WHERE gs.group_id = groups.id
-                  AND gs.delete_at IS NULL
-            ) AS has_syncables,
-            (
-                SELECT COUNT(*)
-                FROM group_members gm
-                WHERE gm.group_id = groups.id
-            ) AS member_count
-        "#,
-    )
-    .bind(group_id)
-    .bind(
-        patch
-            .name
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty()),
-    )
-    .bind(
-        patch
-            .display_name
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty()),
-    )
-    .bind(patch.description)
-    .bind(patch.allow_reference)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+    let updated = GroupRepository::new(&state.db)
+        .update_group(
+            group_id,
+            patch
+                .name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty()),
+            patch
+                .display_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty()),
+            patch.description,
+            patch.allow_reference,
+        )
+        .await?
+        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
 
     emit_received_group_event(&state, &updated).await;
 
@@ -1216,39 +878,10 @@ async fn delete_group(
     let group_id = parse_mm_or_uuid(&group_id)
         .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
 
-    let deleted_group: GroupListRow = sqlx::query_as(
-        r#"
-        UPDATE groups
-        SET deleted_at = NOW(), updated_at = NOW()
-        WHERE id = $1
-        RETURNING
-            id,
-            name,
-            display_name,
-            description,
-            source,
-            remote_id,
-            allow_reference,
-            created_at,
-            updated_at,
-            deleted_at,
-            EXISTS(
-                SELECT 1
-                FROM group_syncables gs
-                WHERE gs.group_id = groups.id
-                  AND gs.delete_at IS NULL
-            ) AS has_syncables,
-            (
-                SELECT COUNT(*)
-                FROM group_members gm
-                WHERE gm.group_id = groups.id
-            ) AS member_count
-        "#,
-    )
-    .bind(group_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+    let deleted_group = GroupRepository::new(&state.db)
+        .soft_delete_group(group_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
 
     emit_received_group_event(&state, &deleted_group).await;
 
@@ -1266,39 +899,10 @@ async fn restore_group(
     let group_id = parse_mm_or_uuid(&group_id)
         .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
 
-    let group: GroupListRow = sqlx::query_as(
-        r#"
-        UPDATE groups
-        SET deleted_at = NULL, updated_at = NOW()
-        WHERE id = $1
-        RETURNING
-            id,
-            name,
-            display_name,
-            description,
-            source,
-            remote_id,
-            allow_reference,
-            created_at,
-            updated_at,
-            deleted_at,
-            EXISTS(
-                SELECT 1
-                FROM group_syncables gs
-                WHERE gs.group_id = groups.id
-                  AND gs.delete_at IS NULL
-            ) AS has_syncables,
-            (
-                SELECT COUNT(*)
-                FROM group_members gm
-                WHERE gm.group_id = groups.id
-            ) AS member_count
-        "#,
-    )
-    .bind(group_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+    let group = GroupRepository::new(&state.db)
+        .restore_group(group_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
 
     emit_received_group_event(&state, &group).await;
 
@@ -1323,26 +927,15 @@ async fn link_group_syncable_by_kind(
     ensure_syncable_exists(&state, kind, syncable_id).await?;
     verify_link_unlink_permission(&state, &auth, &group, kind, syncable_id).await?;
 
-    let syncable: GroupSyncableRow = sqlx::query_as(
-        r#"
-        INSERT INTO group_syncables (group_id, syncable_type, syncable_id, auto_add, scheme_admin, delete_at)
-        VALUES ($1, $2, $3, $4, $5, NULL)
-        ON CONFLICT (group_id, syncable_type, syncable_id)
-        DO UPDATE SET
-            auto_add = EXCLUDED.auto_add,
-            scheme_admin = EXCLUDED.scheme_admin,
-            update_at = NOW(),
-            delete_at = NULL
-        RETURNING group_id, syncable_type, syncable_id, auto_add, scheme_admin, create_at, update_at, delete_at
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .bind(syncable_id)
-    .bind(patch.auto_add.unwrap_or(false))
-    .bind(patch.scheme_admin.unwrap_or(false))
-    .fetch_one(&state.db)
-    .await?;
+    let syncable = GroupRepository::new(&state.db)
+        .upsert_group_syncable(
+            group_id,
+            kind.as_db_str(),
+            syncable_id,
+            patch.auto_add.unwrap_or(false),
+            patch.scheme_admin.unwrap_or(false),
+        )
+        .await?;
 
     spawn_reconcile_syncable(state.clone(), group_id, kind, syncable_id);
     emit_group_syncable_event(&state, kind, syncable_id, group_id, true).await;
@@ -1369,20 +962,9 @@ async fn unlink_group_syncable_by_kind(
     ensure_syncable_exists(&state, kind, syncable_id).await?;
     verify_link_unlink_permission(&state, &auth, &group, kind, syncable_id).await?;
 
-    let deleted = sqlx::query(
-        r#"
-        DELETE FROM group_syncables
-        WHERE group_id = $1
-          AND syncable_type = $2
-          AND syncable_id = $3
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .bind(syncable_id)
-    .execute(&state.db)
-    .await?
-    .rows_affected();
+    let deleted = GroupRepository::new(&state.db)
+        .delete_group_syncable(group_id, kind.as_db_str(), syncable_id)
+        .await?;
 
     if deleted == 0 {
         return Err(AppError::NotFound("Group syncable not found".to_string()));
@@ -1421,22 +1003,10 @@ async fn get_group_syncable_by_kind(
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
 
-    let row: GroupSyncableRow = sqlx::query_as(
-        r#"
-        SELECT group_id, syncable_type, syncable_id, auto_add, scheme_admin, create_at, update_at, delete_at
-        FROM group_syncables
-        WHERE group_id = $1
-          AND syncable_type = $2
-          AND syncable_id = $3
-          AND delete_at IS NULL
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .bind(syncable_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Group syncable not found".to_string()))?;
+    let row = GroupRepository::new(&state.db)
+        .get_group_syncable(group_id, kind.as_db_str(), syncable_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Group syncable not found".to_string()))?;
 
     Ok(Json(syncable_payload(&state, &row, kind).await?))
 }
@@ -1452,20 +1022,9 @@ async fn get_group_syncables_by_kind(
     let group_id = parse_mm_or_uuid(&group_id)
         .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
 
-    let rows: Vec<GroupSyncableRow> = sqlx::query_as(
-        r#"
-        SELECT group_id, syncable_type, syncable_id, auto_add, scheme_admin, create_at, update_at, delete_at
-        FROM group_syncables
-        WHERE group_id = $1
-          AND syncable_type = $2
-          AND delete_at IS NULL
-        ORDER BY create_at ASC
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .fetch_all(&state.db)
-    .await?;
+    let rows = GroupRepository::new(&state.db)
+        .list_group_syncables_by_type(group_id, kind.as_db_str())
+        .await?;
 
     let mut response = Vec::with_capacity(rows.len());
     for row in rows {
@@ -1492,28 +1051,16 @@ async fn patch_group_syncable_by_kind(
     ensure_syncable_exists(&state, kind, syncable_id).await?;
     verify_link_unlink_permission(&state, &auth, &group, kind, syncable_id).await?;
 
-    let row: GroupSyncableRow = sqlx::query_as(
-        r#"
-        UPDATE group_syncables
-        SET
-            auto_add = COALESCE($4, auto_add),
-            scheme_admin = COALESCE($5, scheme_admin),
-            update_at = NOW()
-        WHERE group_id = $1
-          AND syncable_type = $2
-          AND syncable_id = $3
-          AND delete_at IS NULL
-        RETURNING group_id, syncable_type, syncable_id, auto_add, scheme_admin, create_at, update_at, delete_at
-        "#,
-    )
-    .bind(group_id)
-    .bind(kind.as_db_str())
-    .bind(syncable_id)
-    .bind(patch.auto_add)
-    .bind(patch.scheme_admin)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Group syncable not found".to_string()))?;
+    let row = GroupRepository::new(&state.db)
+        .patch_group_syncable(
+            group_id,
+            kind.as_db_str(),
+            syncable_id,
+            patch.auto_add,
+            patch.scheme_admin,
+        )
+        .await?
+        .ok_or_else(|| AppError::NotFound("Group syncable not found".to_string()))?;
 
     spawn_reconcile_syncable(state.clone(), group_id, kind, syncable_id);
 
@@ -1641,9 +1188,8 @@ async fn get_group_stats(
     let group_id = parse_mm_or_uuid(&group_id)
         .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
 
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM group_members WHERE group_id = $1")
-        .bind(group_id)
-        .fetch_one(&state.db)
+    let count = GroupRepository::new(&state.db)
+        .count_group_members(group_id)
         .await?;
 
     Ok(Json(json!({
@@ -1663,12 +1209,9 @@ async fn get_group_members(
     let group_id = parse_mm_or_uuid(&group_id)
         .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
 
-    let rows: Vec<(Uuid, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT user_id, created_at FROM group_members WHERE group_id = $1 ORDER BY created_at ASC",
-    )
-    .bind(group_id)
-    .fetch_all(&state.db)
-    .await?;
+    let rows = GroupRepository::new(&state.db)
+        .list_group_members(group_id)
+        .await?;
 
     let members: Vec<Value> = rows
         .iter()
@@ -1698,18 +1241,9 @@ async fn add_group_members(
 
     let mut added = Vec::new();
     for user_id in user_ids {
-        let inserted: Option<DateTime<Utc>> = sqlx::query_scalar(
-            r#"
-            INSERT INTO group_members (group_id, user_id)
-            VALUES ($1, $2)
-            ON CONFLICT (group_id, user_id) DO NOTHING
-            RETURNING created_at
-            "#,
-        )
-        .bind(group_id)
-        .bind(user_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let inserted = GroupRepository::new(&state.db)
+            .add_group_member(group_id, user_id)
+            .await?;
 
         if let Some(created_at) = inserted {
             let payload = group_member_json(group_id, user_id, created_at, 0);
@@ -1741,18 +1275,9 @@ async fn delete_group_members(
     let mut deleted = Vec::new();
     let now_ms = Utc::now().timestamp_millis();
     for user_id in user_ids {
-        let deleted_row: Option<DateTime<Utc>> = sqlx::query_scalar(
-            r#"
-            DELETE FROM group_members
-            WHERE group_id = $1
-              AND user_id = $2
-            RETURNING created_at
-            "#,
-        )
-        .bind(group_id)
-        .bind(user_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let deleted_row = GroupRepository::new(&state.db)
+            .remove_group_member(group_id, user_id)
+            .await?;
 
         if let Some(created_at) = deleted_row {
             let payload = group_member_json(group_id, user_id, created_at, now_ms);
@@ -1778,39 +1303,9 @@ async fn get_groups_by_names(
         return Ok(Json(Vec::new()));
     }
 
-    let rows: Vec<GroupListRow> = sqlx::query_as(
-        r#"
-        SELECT
-            g.id,
-            g.name,
-            g.display_name,
-            g.description,
-            g.source,
-            g.remote_id,
-            g.allow_reference,
-            g.created_at,
-            g.updated_at,
-            g.deleted_at,
-            EXISTS(
-                SELECT 1
-                FROM group_syncables gs
-                WHERE gs.group_id = g.id
-                  AND gs.delete_at IS NULL
-            ) AS has_syncables,
-            (
-                SELECT COUNT(*)
-                FROM group_members gm
-                WHERE gm.group_id = g.id
-            ) AS member_count
-        FROM groups g
-        WHERE g.deleted_at IS NULL
-          AND g.name = ANY($1)
-        ORDER BY g.display_name ASC
-        "#,
-    )
-    .bind(names)
-    .fetch_all(&state.db)
-    .await?;
+    let rows = GroupRepository::new(&state.db)
+        .list_groups_by_names(names)
+        .await?;
 
     Ok(Json(rows.iter().map(group_json).collect()))
 }

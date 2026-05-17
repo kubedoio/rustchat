@@ -13,7 +13,7 @@ import type {
 } from '../../../core/entities/Call'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
-import { useAuthStore } from '../../../stores/auth'
+import { useAuthStore } from '../../auth/stores/authStore'
 
 export const useCallStore = defineStore('callStore', () => {
   // State

@@ -5,15 +5,17 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::Deserialize;
 use uuid::Uuid;
 
 use super::MmAuthUser;
 use crate::api::AppState;
 use crate::auth::policy::permissions;
+use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE};
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
+use crate::repositories::{BookmarkRow, ChannelGroupRow, ChannelRepository};
 
 /// Bookmark with optional file info for API responses
 #[derive(serde::Serialize)]
@@ -42,25 +44,6 @@ pub struct ChannelBookmarkResponse {
     parent_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     file: Option<serde_json::Value>,
-}
-
-#[derive(sqlx::FromRow)]
-struct BookmarkRow {
-    id: Uuid,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    deleted_at: Option<DateTime<Utc>>,
-    channel_id: Uuid,
-    owner_id: Uuid,
-    file_id: Option<Uuid>,
-    display_name: String,
-    sort_order: i64,
-    link_url: Option<String>,
-    image_url: Option<String>,
-    emoji: Option<String>,
-    bookmark_type: String,
-    original_id: Option<Uuid>,
-    parent_id: Option<Uuid>,
 }
 
 impl From<BookmarkRow> for ChannelBookmarkResponse {
@@ -101,15 +84,10 @@ pub(super) async fn get_channel_bookmarks(
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
 
-    // Verify channel membership
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
 
+    // Verify channel membership
+    let is_member = repo.is_channel_member(channel_id, auth.user_id).await?;
     if !is_member {
         return Err(AppError::Forbidden(
             "Not a member of this channel".to_string(),
@@ -117,23 +95,7 @@ pub(super) async fn get_channel_bookmarks(
     }
 
     let since = query.bookmarks_since.unwrap_or(0);
-
-    let bookmarks: Vec<BookmarkRow> = sqlx::query_as(
-        r#"
-        SELECT id, created_at, updated_at, deleted_at, channel_id, owner_id, file_id,
-               display_name, sort_order, link_url, image_url, emoji, bookmark_type,
-               original_id, parent_id
-        FROM channel_bookmarks
-        WHERE channel_id = $1
-          AND ($2 <= 0 OR updated_at >= to_timestamp($2::double precision / 1000.0))
-          AND deleted_at IS NULL
-        ORDER BY sort_order ASC, created_at ASC
-        "#,
-    )
-    .bind(channel_id)
-    .bind(since)
-    .fetch_all(&state.db)
-    .await?;
+    let bookmarks = repo.list_channel_bookmarks(channel_id, since).await?;
 
     Ok(Json(bookmarks.into_iter().map(Into::into).collect()))
 }
@@ -160,15 +122,10 @@ pub(super) async fn create_channel_bookmark(
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
 
-    // Verify channel membership
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
 
+    // Verify channel membership
+    let is_member = repo.is_channel_member(channel_id, auth.user_id).await?;
     if !is_member {
         return Err(AppError::Forbidden(
             "Not a member of this channel".to_string(),
@@ -195,39 +152,22 @@ pub(super) async fn create_channel_bookmark(
     let file_id = req.file_id.as_ref().and_then(|id| parse_mm_or_uuid(id));
 
     // Get max sort order for this channel
-    let max_order: Option<i64> =
-        sqlx::query_scalar("SELECT MAX(sort_order) FROM channel_bookmarks WHERE channel_id = $1")
-            .bind(channel_id)
-            .fetch_one(&state.db)
-            .await?;
-
+    let max_order = repo.get_max_bookmark_sort_order(channel_id).await?;
     let sort_order = max_order.unwrap_or(0) + 1;
     let now = Utc::now();
 
-    let bookmark: BookmarkRow = sqlx::query_as(
-        r#"
-        INSERT INTO channel_bookmarks (
-            channel_id, owner_id, file_id, display_name, sort_order,
-            link_url, image_url, emoji, bookmark_type, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
-        RETURNING id, created_at, updated_at, deleted_at, channel_id, owner_id, file_id,
-                  display_name, sort_order, link_url, image_url, emoji, bookmark_type,
-                  original_id, parent_id
-        "#,
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .bind(file_id)
-    .bind(&req.display_name)
-    .bind(sort_order)
-    .bind(&req.link_url)
-    .bind(&req.image_url)
-    .bind(&req.emoji)
-    .bind(&req.bookmark_type)
-    .bind(now)
-    .fetch_one(&state.db)
-    .await?;
+    let bookmark = repo.create_channel_bookmark(
+        channel_id,
+        auth.user_id,
+        file_id,
+        &req.display_name,
+        sort_order,
+        req.link_url.as_deref(),
+        req.image_url.as_deref(),
+        req.emoji.as_deref(),
+        &req.bookmark_type,
+        now,
+    ).await?;
 
     Ok(Json(bookmark.into()))
 }
@@ -262,15 +202,10 @@ pub(super) async fn patch_channel_bookmark(
     let bookmark_id = parse_mm_or_uuid(&bookmark_id)
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark_id".to_string()))?;
 
-    // Verify channel membership
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
 
+    // Verify channel membership
+    let is_member = repo.is_channel_member(channel_id, auth.user_id).await?;
     if !is_member {
         return Err(AppError::Forbidden(
             "Not a member of this channel".to_string(),
@@ -282,32 +217,16 @@ pub(super) async fn patch_channel_bookmark(
 
     let file_id = req.file_id.as_ref().and_then(|id| parse_mm_or_uuid(id));
 
-    let bookmark: BookmarkRow = sqlx::query_as(
-        r#"
-        UPDATE channel_bookmarks SET
-            display_name = COALESCE($3, display_name),
-            link_url = COALESCE($4, link_url),
-            image_url = COALESCE($5, image_url),
-            emoji = COALESCE($6, emoji),
-            file_id = COALESCE($7, file_id),
-            sort_order = COALESCE($8, sort_order),
-            updated_at = NOW()
-        WHERE id = $1 AND channel_id = $2 AND deleted_at IS NULL
-        RETURNING id, created_at, updated_at, deleted_at, channel_id, owner_id, file_id,
-                  display_name, sort_order, link_url, image_url, emoji, bookmark_type,
-                  original_id, parent_id
-        "#,
-    )
-    .bind(bookmark_id)
-    .bind(channel_id)
-    .bind(&req.display_name)
-    .bind(&req.link_url)
-    .bind(&req.image_url)
-    .bind(&req.emoji)
-    .bind(file_id)
-    .bind(req.sort_order)
-    .fetch_optional(&state.db)
-    .await?
+    let bookmark = repo.update_channel_bookmark(
+        bookmark_id,
+        channel_id,
+        req.display_name.as_deref(),
+        req.link_url.as_deref(),
+        req.image_url.as_deref(),
+        req.emoji.as_deref(),
+        file_id,
+        req.sort_order,
+    ).await?
     .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     Ok(Json(UpdateBookmarkResponse {
@@ -329,15 +248,10 @@ pub(super) async fn update_channel_bookmark_sort_order(
     let bookmark_id = parse_mm_or_uuid(&bookmark_id)
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark_id".to_string()))?;
 
-    // Verify channel membership
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
 
+    // Verify channel membership
+    let is_member = repo.is_channel_member(channel_id, auth.user_id).await?;
     if !is_member {
         return Err(AppError::Forbidden(
             "Not a member of this channel".to_string(),
@@ -347,29 +261,10 @@ pub(super) async fn update_channel_bookmark_sort_order(
     let new_order: i64 = serde_json::from_slice(&body)
         .map_err(|_| AppError::BadRequest("Invalid sort order".to_string()))?;
 
-    sqlx::query(
-        "UPDATE channel_bookmarks SET sort_order = $3, updated_at = NOW() WHERE id = $1 AND channel_id = $2",
-    )
-    .bind(bookmark_id)
-    .bind(channel_id)
-    .bind(new_order)
-    .execute(&state.db)
-    .await?;
+    repo.update_bookmark_sort_order(bookmark_id, channel_id, new_order).await?;
 
     // Return all bookmarks for this channel
-    let bookmarks: Vec<BookmarkRow> = sqlx::query_as(
-        r#"
-        SELECT id, created_at, updated_at, deleted_at, channel_id, owner_id, file_id,
-               display_name, sort_order, link_url, image_url, emoji, bookmark_type,
-               original_id, parent_id
-        FROM channel_bookmarks
-        WHERE channel_id = $1 AND deleted_at IS NULL
-        ORDER BY sort_order ASC, created_at ASC
-        "#,
-    )
-    .bind(channel_id)
-    .fetch_all(&state.db)
-    .await?;
+    let bookmarks = repo.list_channel_bookmarks(channel_id, 0).await?;
 
     Ok(Json(bookmarks.into_iter().map(Into::into).collect()))
 }
@@ -385,15 +280,10 @@ pub(super) async fn delete_channel_bookmark(
     let bookmark_id = parse_mm_or_uuid(&bookmark_id)
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark_id".to_string()))?;
 
-    // Verify channel membership
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
 
+    // Verify channel membership
+    let is_member = repo.is_channel_member(channel_id, auth.user_id).await?;
     if !is_member {
         return Err(AppError::Forbidden(
             "Not a member of this channel".to_string(),
@@ -401,20 +291,8 @@ pub(super) async fn delete_channel_bookmark(
     }
 
     // Soft delete
-    let bookmark: BookmarkRow = sqlx::query_as(
-        r#"
-        UPDATE channel_bookmarks SET deleted_at = NOW(), updated_at = NOW()
-        WHERE id = $1 AND channel_id = $2 AND deleted_at IS NULL
-        RETURNING id, created_at, updated_at, deleted_at, channel_id, owner_id, file_id,
-                  display_name, sort_order, link_url, image_url, emoji, bookmark_type,
-                  original_id, parent_id
-        "#,
-    )
-    .bind(bookmark_id)
-    .bind(channel_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
+    let bookmark = repo.soft_delete_channel_bookmark(bookmark_id, channel_id).await?
+        .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     Ok(Json(bookmark.into()))
 }
@@ -500,53 +378,8 @@ pub(super) async fn get_channel_groups(
     let filter_allow_reference = should_filter_allow_reference(&auth, &query);
     let (paginate, offset, per_page) = pagination_from_group_query(&query);
 
-    let rows: Vec<ChannelGroupRow> = sqlx::query_as(
-        r#"
-        SELECT
-            g.id,
-            g.name,
-            g.display_name,
-            g.description,
-            g.source,
-            g.remote_id,
-            g.allow_reference,
-            g.created_at,
-            g.updated_at,
-            g.deleted_at,
-            gs.scheme_admin,
-            EXISTS(
-                SELECT 1
-                FROM group_syncables gs2
-                WHERE gs2.group_id = g.id
-                  AND gs2.delete_at IS NULL
-            ) AS has_syncables,
-            (
-                SELECT COUNT(*)
-                FROM group_members gm
-                WHERE gm.group_id = g.id
-            ) AS member_count
-        FROM groups g
-        JOIN group_syncables gs
-          ON gs.group_id = g.id
-         AND gs.syncable_type = 'channel'
-         AND gs.syncable_id = $1
-         AND gs.delete_at IS NULL
-        WHERE g.deleted_at IS NULL
-          AND ($2 = FALSE OR g.allow_reference = TRUE)
-          AND (
-                $3 = ''
-                OR LOWER(COALESCE(g.name, '')) LIKE $4
-                OR LOWER(g.display_name) LIKE $4
-          )
-        ORDER BY g.display_name ASC
-        "#,
-    )
-    .bind(channel_id)
-    .bind(filter_allow_reference)
-    .bind(&search_term)
-    .bind(format!("%{}%", search_term))
-    .fetch_all(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    let rows = repo.list_channel_groups(channel_id, filter_allow_reference, &search_term).await?;
 
     let total_group_count = rows.len();
     let paged_rows = if paginate {
@@ -573,23 +406,6 @@ pub(super) async fn get_channel_access_control_attributes(
     Ok(Json(serde_json::json!({})))
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
-struct ChannelGroupRow {
-    id: Uuid,
-    name: Option<String>,
-    display_name: String,
-    description: String,
-    source: String,
-    remote_id: Option<String>,
-    allow_reference: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    deleted_at: Option<DateTime<Utc>>,
-    scheme_admin: bool,
-    has_syncables: bool,
-    member_count: i64,
-}
-
 #[derive(Debug, Deserialize, Default)]
 pub(super) struct GroupAssociationQuery {
     q: Option<String>,
@@ -598,12 +414,6 @@ pub(super) struct GroupAssociationQuery {
     page: Option<i64>,
     per_page: Option<i64>,
     paginate: Option<bool>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct ChannelGroupAccessRow {
-    team_id: Option<Uuid>,
-    channel_type: String,
 }
 
 async fn enforce_channel_group_read_permission(
@@ -617,22 +427,14 @@ async fn enforce_channel_group_read_permission(
         return Ok(());
     }
 
-    let channel: ChannelGroupAccessRow =
-        sqlx::query_as("SELECT team_id, type::text AS channel_type FROM channels WHERE id = $1")
-            .bind(channel_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+    let repo = ChannelRepository::new(&state.db);
 
-    let is_channel_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let (team_id, channel_type) = repo.get_channel_type_and_team(channel_id).await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
 
-    if channel.channel_type == "private" {
+    let is_channel_member = repo.is_channel_member(channel_id, auth.user_id).await?;
+
+    if channel_type == "private" {
         if !is_channel_member {
             return Err(AppError::Forbidden(
                 "Missing permission to view groups for this private channel".to_string(),
@@ -641,15 +443,9 @@ async fn enforce_channel_group_read_permission(
         return Ok(());
     }
 
-    if channel.channel_type == "public" {
-        if let Some(team_id) = channel.team_id {
-            let is_team_member: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
-            )
-            .bind(team_id)
-            .bind(auth.user_id)
-            .fetch_one(&state.db)
-            .await?;
+    if channel_type == "public" {
+        if let Some(team_id) = team_id {
+            let is_team_member = repo.is_team_member(team_id, auth.user_id).await?;
             if !is_team_member {
                 return Err(AppError::Forbidden(
                     "Missing permission to view groups for this public channel".to_string(),
@@ -679,7 +475,7 @@ fn pagination_from_group_query(query: &GroupAssociationQuery) -> (bool, usize, u
     let _ = query.include_member_count.unwrap_or(false);
     let paginate = query.paginate.unwrap_or(true);
     let page = query.page.unwrap_or(0).max(0) as usize;
-    let per_page = query.per_page.unwrap_or(60).clamp(1, 200) as usize;
+    let per_page = query.per_page.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE) as usize;
     let offset = page.saturating_mul(per_page);
     (paginate, offset, per_page)
 }

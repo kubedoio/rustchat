@@ -6,6 +6,7 @@ use axum::{
 use serde_json::json;
 
 use super::{encode_mm_id, parse_mm_or_uuid, ApiResult, AppState, MmAuthUser};
+use crate::repositories::{ChannelRepository, PostRepository, UserRepository};
 
 /// GET /channels/{channel_id}/unread - Get unread counts for a channel
 pub async fn get_channel_unread(
@@ -16,85 +17,45 @@ pub async fn get_channel_unread(
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
 
-    let member: Option<crate::models::ChannelMember> =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
+    let channel_repo = ChannelRepository::new(&state.db);
+    let post_repo = PostRepository::new(state.db.clone());
+    let user_repo = UserRepository::new(&state.db);
+
+    channel_repo
+        .is_channel_member(channel_id, auth.user_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+        .then_some(())
+        .ok_or_else(|| {
+            crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+        })?;
+
+    let team_id = channel_repo
+        .get_team_id(channel_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+        .ok_or_else(|| crate::error::AppError::NotFound("Channel not found".to_string()))?;
+
+    let username = user_repo
+        .get_username(auth.user_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+        .unwrap_or_default();
+
+    let last_read_message_id = post_repo
+        .get_channel_read(auth.user_id, channel_id)
+        .await?
+        .unwrap_or(0);
+
+    let (msg_count, mention_count, mention_count_root, urgent_mention_count, msg_count_root) =
+        post_repo
+            .compute_channel_unread_counts(
+                channel_id,
+                last_read_message_id,
+                &username,
+                state.config.unread.post_priority_enabled,
+            )
             .await?;
-
-    let _member = member.ok_or_else(|| {
-        crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-    })?;
-
-    let team_id: uuid::Uuid = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-        .bind(channel_id)
-        .fetch_one(&state.db)
-        .await?;
-
-    let username: Option<String> = sqlx::query_scalar("SELECT username FROM users WHERE id = $1")
-        .bind(auth.user_id)
-        .fetch_optional(&state.db)
-        .await?;
-    let username = username.unwrap_or_default();
-
-    let last_read_message_id: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(last_read_message_id, 0) FROM channel_reads WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .unwrap_or(0);
-
-    let (msg_count, mention_count, mention_count_root, mut urgent_mention_count, msg_count_root): (
-        i64,
-        i64,
-        i64,
-        i64,
-        i64,
-    ) = sqlx::query_as(
-        r#"
-        SELECT
-            COUNT(*) FILTER (
-                WHERE p.deleted_at IS NULL
-                  AND p.seq > $2
-            )::BIGINT AS msg_count,
-            COUNT(*) FILTER (
-                WHERE p.deleted_at IS NULL
-                  AND p.seq > $2
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-            )::BIGINT AS mention_count,
-            COUNT(*) FILTER (
-                WHERE p.deleted_at IS NULL
-                  AND p.seq > $2
-                  AND p.root_post_id IS NULL
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-            )::BIGINT AS mention_count_root,
-            COUNT(*) FILTER (
-                WHERE p.deleted_at IS NULL
-                  AND p.seq > $2
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-                  AND p.message LIKE '%@here%'
-            )::BIGINT AS urgent_mention_count,
-            COUNT(*) FILTER (
-                WHERE p.deleted_at IS NULL
-                  AND p.seq > $2
-                  AND p.root_post_id IS NULL
-            )::BIGINT AS msg_count_root
-        FROM posts p
-        WHERE p.channel_id = $1
-        "#,
-    )
-    .bind(channel_id)
-    .bind(last_read_message_id)
-    .bind(&username)
-    .fetch_one(&state.db)
-    .await?;
-
-    if !state.config.unread.post_priority_enabled {
-        urgent_mention_count = 0;
-    }
 
     Ok(Json(serde_json::json!({
         "team_id": encode_mm_id(team_id),
@@ -130,39 +91,22 @@ pub async fn mark_channel_as_read(
         ));
     }
 
+    let channel_repo = ChannelRepository::new(&state.db);
+
     // Verify membership
-    let _membership: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+    channel_repo
+        .is_channel_member(channel_id, auth.user_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+        .then_some(())
+        .ok_or_else(|| {
+            crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+        })?;
 
-    // Update last_viewed_at to mark all messages as read
-    sqlx::query(
-        "UPDATE channel_members SET last_viewed_at = NOW(), manually_unread = false, last_update_at = NOW() WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .execute(&state.db)
-    .await?;
-
-    // Also update channel_reads table
-    sqlx::query(
-        r#"
-        INSERT INTO channel_reads (user_id, channel_id, last_read_message_id, last_read_at)
-        VALUES ($1, $2, (SELECT MAX(seq) FROM posts WHERE channel_id = $2), NOW())
-        ON CONFLICT (user_id, channel_id)
-        DO UPDATE SET last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = NOW()
-        "#,
-    )
-    .bind(auth.user_id)
-    .bind(channel_id)
-    .execute(&state.db)
-    .await?;
+    channel_repo
+        .mark_channel_read(auth.user_id, channel_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     // Broadcast channel viewed event
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -207,47 +151,36 @@ pub async fn mark_channel_as_unread(
         ));
     }
 
+    let channel_repo = ChannelRepository::new(&state.db);
+    let post_repo = PostRepository::new(state.db.clone());
+
     // Verify membership
-    let _membership: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+    channel_repo
+        .is_channel_member(channel_id, auth.user_id)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+        .then_some(())
+        .ok_or_else(|| {
+            crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+        })?;
 
     // Get the oldest post in the channel to set as unread point
-    // Or use a time far in the past to ensure all messages are marked as unread
-    let oldest_post_time: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
-        "SELECT MIN(created_at) FROM posts WHERE channel_id = $1 AND deleted_at IS NULL",
-    )
-    .bind(channel_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let oldest_post_time = post_repo
+        .get_oldest_post_time(channel_id)
+        .await?;
 
     // Set last_viewed_at to the oldest post time, or epoch if no posts
     let mark_time = oldest_post_time.unwrap_or(chrono::DateTime::UNIX_EPOCH);
 
-    sqlx::query(
-        "UPDATE channel_members SET last_viewed_at = $3, manually_unread = true, last_update_at = NOW() WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .bind(mark_time)
-    .execute(&state.db)
-    .await?;
+    channel_repo
+        .mark_channel_unread(auth.user_id, channel_id, mark_time)
+        .await
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     // Also update channel_reads table
-    sqlx::query(
-        "UPDATE channel_reads SET last_read_message_id = 0, last_read_at = $3 WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .bind(mark_time)
-    .execute(&state.db)
-    .await?;
+    post_repo
+        .reset_channel_read(auth.user_id, channel_id, mark_time)
+        .await?;
 
     // Broadcast unread update
     let broadcast = crate::realtime::WsEnvelope::event(

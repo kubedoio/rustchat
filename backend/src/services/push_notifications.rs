@@ -14,6 +14,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+use hmac::{Hmac, Mac};
+use sha2::{Sha256, Digest};
 
 use crate::api::AppState;
 use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, RetryConfig};
@@ -262,11 +264,35 @@ async fn send_via_push_proxy(
         },
     };
 
+    let body = serde_json::to_vec(&payload)
+        .map_err(|e| PushNotificationError::ProxyError(format!("JSON serialization error: {}", e)))?;
+    let body_hash = hex::encode(sha2::Sha256::digest(&body));
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let nonce = uuid::Uuid::new_v4().to_string();
+
+    let sig_input = format!("{}:{}:{}", timestamp, nonce, body_hash);
+
     let client = reqwest::Client::new();
-    let mut request = client.post(&url).json(&payload);
+    let mut request = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .body(body);
+
     if let Ok(auth_key) = std::env::var("PUSH_PROXY_AUTH_KEY") {
         if !auth_key.is_empty() {
-            request = request.header("x-push-proxy-key", auth_key);
+            let mut mac = Hmac::<Sha256>::new_from_slice(auth_key.as_bytes())
+                .expect("HMAC can take key of any size");
+            mac.update(sig_input.as_bytes());
+            let signature = hex::encode(mac.finalize().into_bytes());
+
+            request = request
+                .header("x-push-proxy-signature", signature)
+                .header("x-push-proxy-timestamp", timestamp.to_string())
+                .header("x-push-proxy-nonce", nonce);
         }
     }
     let retry_config = outbound_retry_config();

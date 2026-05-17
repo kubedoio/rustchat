@@ -58,7 +58,7 @@ class PlaybookService {
   async updatePlaybook(id: string, data: Partial<CreatePlaybookRequest>): Promise<Playbook> {
     try {
       const playbook = await playbookRepository.update(id, data)
-      this.store.updatePlaybook(playbook)
+      this.store.updatePlaybookInList(playbook)
       return playbook
     } catch (error) {
       this.store.setError(

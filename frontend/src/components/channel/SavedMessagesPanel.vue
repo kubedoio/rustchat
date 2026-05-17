@@ -2,8 +2,8 @@
 import { ref, watch } from 'vue'
 import { X, Bookmark, ExternalLink } from 'lucide-vue-next'
 import { format } from 'date-fns'
-import type { Message } from '../../stores/messages'
-import { useMessageStore } from '../../stores/messages'
+import type { Message } from '../../features/messages/stores/messageStore'
+import { useMessageStore } from '../../features/messages/stores/messageStore'
 
 const props = defineProps<{
     show: boolean

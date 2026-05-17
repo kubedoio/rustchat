@@ -58,7 +58,7 @@ async function fetchProviders() {
         const { data } = await api.get('/admin/email/providers');
         providers.value = data;
         defaultProvider.value = data.find((p: MailProvider) => p.is_default) || data[0] || null;
-    } catch (e: any) {
+    } catch (e: unknown) {
         saveError.value = extractUiErrorMessage(e, 'Failed to load email providers');
     } finally {
         loading.value = false;
@@ -124,7 +124,7 @@ const saveProvider = async () => {
         showAddModal.value = false;
         resetForm();
         setTimeout(() => saveSuccess.value = false, 3000);
-    } catch (e: any) {
+    } catch (e: unknown) {
         saveError.value = extractUiErrorMessage(e, 'Failed to save email provider');
     } finally {
         saving.value = false;
@@ -136,7 +136,7 @@ const deleteProvider = async (id: string) => {
     try {
         await api.delete(`/admin/email/providers/${id}`);
         await fetchProviders();
-    } catch (e: any) {
+    } catch (e: unknown) {
         saveError.value = extractUiErrorMessage(e, 'Failed to delete provider');
     }
 };
@@ -145,7 +145,7 @@ const setDefault = async (id: string) => {
     try {
         await api.post(`/admin/email/providers/${id}/default`);
         await fetchProviders();
-    } catch (e: any) {
+    } catch (e: unknown) {
         saveError.value = extractUiErrorMessage(e, 'Failed to set default provider');
     }
 };
@@ -171,7 +171,7 @@ const sendTestEmail = async () => {
         }
         testSuccess.value = true;
         setTimeout(() => testSuccess.value = false, 5000);
-    } catch (e: any) {
+    } catch (e: unknown) {
         testError.value = extractUiErrorMessage(e, 'Failed to send test email');
     } finally {
         testing.value = false;

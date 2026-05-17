@@ -146,25 +146,15 @@ async fn register(
         return Err(AppError::Validation("Invalid email format".to_string()));
     }
 
-    // Check if email already exists
-    let existing: Option<User> =
-        sqlx::query_as("SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL")
-            .bind(&input.email)
-            .fetch_optional(&state.db)
-            .await?;
+    let repo = UserRepository::new(&state.db);
 
-    if existing.is_some() {
+    // Check if email already exists
+    if repo.get_by_email(&input.email).await?.is_some() {
         return Err(AppError::Conflict("Email already registered".to_string()));
     }
 
     // Check if username already exists
-    let existing_username: Option<User> =
-        sqlx::query_as("SELECT * FROM users WHERE username = $1 AND deleted_at IS NULL")
-            .bind(&input.username)
-            .fetch_optional(&state.db)
-            .await?;
-
-    if existing_username.is_some() {
+    if repo.get_by_username(&input.username).await?.is_some() {
         return Err(AppError::Conflict("Username already taken".to_string()));
     }
 
@@ -185,24 +175,19 @@ async fn register(
     let is_active = has_password;
 
     // Insert user (email_verified defaults to false, password_hash may be NULL for passwordless)
-    let user: User = sqlx::query_as(
-        r#"
-        INSERT INTO users (username, email, password_hash, display_name, org_id, role, is_active, email_verified)
-        VALUES ($1, $2, $3, $4, $5, 'member', $6, false)
-        RETURNING *
-        "#,
-    )
-    .bind(&input.username)
-    .bind(&input.email)
-    .bind(&password_hash)
-    .bind(&input.display_name)
-    .bind(input.org_id)
-    .bind(is_active)
-    .fetch_one(&state.db)
-    .await?;
+    let user: User = repo
+        .create_user(
+            &input.username,
+            &input.email,
+            &password_hash,
+            &input.display_name,
+            input.org_id,
+            is_active,
+        )
+        .await?;
 
     // Seed default preferences for the new user
-    seed_default_preferences(&state.db, user.id).await?;
+    repo.seed_default_preferences(user.id).await?;
 
     // Apply auto-membership policies for the new user (global policies that add to teams/channels)
     match apply_auto_membership_for_new_user(&state, user.id).await {
@@ -230,13 +215,14 @@ async fn register(
     }
 
     // Fetch site_url from server_config
-    let site_url: Option<String> =
-        sqlx::query_scalar("SELECT site->>'site_url' FROM server_config WHERE id = 'default'")
-            .fetch_optional(&state.db)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|url: String| if url.is_empty() { None } else { Some(url) });
+    let site_url = SystemRepository::new(&state.db)
+        .get_server_config()
+        .await
+        .ok()
+        .and_then(|cfg| {
+            let url = cfg.site.0.site_url;
+            if url.is_empty() { None } else { Some(url) }
+        });
 
     if let Some(site_url) = site_url {
         if has_password {
@@ -345,13 +331,10 @@ async fn login(
     Json(input): Json<LoginRequest>,
 ) -> ApiResult<Json<AuthResponse>> {
     // Find user by email
-    let user: User = sqlx::query_as(
-        "SELECT * FROM users WHERE email = $1 AND is_active = true AND deleted_at IS NULL",
-    )
-    .bind(&input.email)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Unauthorized("Invalid email or password".to_string()))?;
+    let user = UserRepository::new(&state.db)
+        .get_active_by_email(&input.email)
+        .await?
+        .ok_or_else(|| AppError::Unauthorized("Invalid email or password".to_string()))?;
 
     enforce_password_login_allowed(&state, &user.email).await?;
 
@@ -390,10 +373,7 @@ async fn login(
     }
 
     // Update last login
-    sqlx::query("UPDATE users SET last_login_at = NOW() WHERE id = $1")
-        .bind(user.id)
-        .execute(&state.db)
-        .await?;
+    UserRepository::new(&state.db).update_last_login(user.id).await?;
 
     // Generate token
     let token = create_token_with_policy(
@@ -467,12 +447,9 @@ async fn resend_verification(
     Json(input): Json<ResendVerificationRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Find user by email
-    let user: Option<User> = sqlx::query_as(
-        "SELECT * FROM users WHERE email = $1 AND is_active = true AND deleted_at IS NULL",
-    )
-    .bind(&input.email)
-    .fetch_optional(&state.db)
-    .await?;
+    let user = UserRepository::new(&state.db)
+        .get_active_by_email(&input.email)
+        .await?;
 
     let user = match user {
         Some(u) => u,
@@ -494,13 +471,14 @@ async fn resend_verification(
 
     // Send verification email
     // Fetch site_url from server_config
-    let site_url: Option<String> =
-        sqlx::query_scalar("SELECT site->>'site_url' FROM server_config WHERE id = 'default'")
-            .fetch_optional(&state.db)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|url: String| if url.is_empty() { None } else { Some(url) });
+    let site_url = SystemRepository::new(&state.db)
+        .get_server_config()
+        .await
+        .ok()
+        .and_then(|cfg| {
+            let url = cfg.site.0.site_url;
+            if url.is_empty() { None } else { Some(url) }
+        });
 
     let verification_result = if let Some(site_url) = site_url {
         let verification_base_url = format!("{}/verify-email", site_url);
@@ -531,10 +509,10 @@ async fn resend_verification(
 
 /// Get current authenticated user
 async fn me(State(state): State<AppState>, auth: AuthUser) -> ApiResult<Json<UserResponse>> {
-    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL")
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+    let user = UserRepository::new(&state.db)
+        .get_by_id(auth.user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     Ok(Json(UserResponse::from(user)))
 }
@@ -694,104 +672,9 @@ async fn validate_token_handler(
 
 /// Seed default preferences for a new user
 async fn seed_default_preferences(db: &sqlx::PgPool, user_id: uuid::Uuid) -> ApiResult<()> {
-    // Build theme JSON using serde_json to avoid raw string issues with #" sequences
-    let default_theme = serde_json::json!({
-        "type": "RustChat",
-        "sidebarBg": "#1A1A18",
-        "sidebarText": "#ffffff",
-        "sidebarUnreadText": "#ffffff",
-        "sidebarTextHoverBg": "#25262a",
-        "sidebarTextActiveBorder": "#00FFC2",
-        "sidebarTextActiveColor": "#ffffff",
-        "sidebarHeaderBg": "#121213",
-        "sidebarHeaderTextColor": "#ffffff",
-        "sidebarTeamBarBg": "#121213",
-        "onlineIndicator": "#00FFC2",
-        "awayIndicator": "#ffbc1f",
-        "dndIndicator": "#d24b4e",
-        "mentionBg": "#ffffff",
-        "mentionColor": "#1A1A18",
-        "centerChannelBg": "#121213",
-        "centerChannelColor": "#e3e4e8",
-        "newMessageSeparator": "#00FFC2",
-        "linkColor": "#00FFC2",
-        "buttonBg": "#00FFC2",
-        "buttonColor": "#121213",
-        "errorTextColor": "#da6c6e",
-        "mentionHighlightBg": "#0d6e6e",
-        "mentionHighlightLink": "#a4f4f4",
-        "codeTheme": "monokai"
-    })
-    .to_string();
-
-    // Theme preference
-    sqlx::query(
-        r#"
-        INSERT INTO mattermost_preferences (user_id, category, name, value)
-        VALUES ($1, 'theme', '', $2)
-        ON CONFLICT (user_id, category, name) DO NOTHING
-        "#,
-    )
-    .bind(user_id)
-    .bind(default_theme)
-    .execute(db)
-    .await?;
-
-    // Display settings
-    let display_prefs = [
-        ("use_military_time", "false"),
-        ("timezone", "Auto"),
-        ("collapsed_reply_threads", "on"),
-    ];
-
-    for (name, value) in display_prefs {
-        sqlx::query(
-            r#"
-            INSERT INTO mattermost_preferences (user_id, category, name, value)
-            VALUES ($1, 'display_settings', $2, $3)
-            ON CONFLICT (user_id, category, name) DO NOTHING
-            "#,
-        )
-        .bind(user_id)
-        .bind(name)
-        .bind(value)
-        .execute(db)
-        .await?;
-    }
-
-    // Notification settings
-    let notify_prefs = [
-        ("desktop", "mention"),
-        ("push", "mention"),
-        ("email", "true"),
-    ];
-
-    for (name, value) in notify_prefs {
-        sqlx::query(
-            r#"
-            INSERT INTO mattermost_preferences (user_id, category, name, value)
-            VALUES ($1, 'notifications', $2, $3)
-            ON CONFLICT (user_id, category, name) DO NOTHING
-            "#,
-        )
-        .bind(user_id)
-        .bind(name)
-        .bind(value)
-        .execute(db)
-        .await?;
-    }
-
-    // Sidebar settings
-    sqlx::query(
-        r#"
-        INSERT INTO mattermost_preferences (user_id, category, name, value)
-        VALUES ($1, 'sidebar_settings', 'show_unread_section', 'true')
-        ON CONFLICT (user_id, category, name) DO NOTHING
-        "#,
-    )
-    .bind(user_id)
-    .execute(db)
-    .await?;
-
+    UserRepository::new(db)
+        .seed_default_preferences(user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(())
 }

@@ -15,6 +15,7 @@ use super::users::{
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::parse_mm_or_uuid, models as mm};
+use crate::repositories::{CategoryRepository, CategoryRow, TeamRepository};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -98,21 +99,14 @@ async fn update_category_order(
 /// Resolves a team identifier to a UUID.
 /// First tries to parse as UUID/mm-id, then falls back to looking up by team name.
 async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<Uuid> {
-    // First try to parse as UUID or Mattermost ID
     if let Some(team_id) = parse_mm_or_uuid(team_id_str) {
         return Ok(team_id);
     }
 
-    // Fall back to looking up by team name
-    let team: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM teams WHERE name = $1")
-        .bind(team_id_str)
-        .fetch_optional(&state.db)
-        .await?;
-
-    match team {
-        Some((id,)) => Ok(id),
-        None => Err(AppError::NotFound("Team not found".to_string())),
-    }
+    let repo = TeamRepository::new(&state.db);
+    let id = repo.get_id_by_name(team_id_str).await?
+        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+    Ok(id)
 }
 
 #[derive(Deserialize)]
@@ -120,24 +114,6 @@ struct SingleCategoryPath {
     user_id: String,
     team_id: String,
     category_id: String,
-}
-
-/// Row struct for fetching categories from channel_categories table
-#[derive(sqlx::FromRow)]
-struct CategoryRow {
-    id: uuid::Uuid,
-    team_id: uuid::Uuid,
-    user_id: uuid::Uuid,
-    #[sqlx(rename = "type")]
-    type_field: String,
-    display_name: String,
-    sorting: String,
-    muted: bool,
-    collapsed: bool,
-    sort_order: i32,
-    create_at: i64,
-    update_at: i64,
-    delete_at: i64,
 }
 
 /// GET /users/{user_id}/teams/{team_id}/channels/categories/{category_id}
@@ -152,27 +128,14 @@ async fn get_category(
         uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_OID, params.category_id.as_bytes())
     });
 
-    // Fetch the specific category
-    let category: Option<CategoryRow> = sqlx::query_as(
-        "SELECT * FROM channel_categories WHERE id = $1 AND user_id = $2 AND team_id = $3 AND delete_at = 0"
-    )
-    .bind(category_id)
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let cat_repo = CategoryRepository::new(&state.db);
 
-    let category = category
+    // Fetch the specific category
+    let category = cat_repo.get(category_id, user_id, team_id).await?
         .ok_or_else(|| crate::error::AppError::NotFound("Category not found".to_string()))?;
 
     // Get channels for this category
-    let channel_ids: Vec<uuid::Uuid> = sqlx::query_scalar(
-        "SELECT channel_id FROM channel_category_channels WHERE category_id = $1 ORDER BY sort_order"
-    )
-    .bind(category_id)
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
+    let channel_ids = cat_repo.get_channel_ids(category_id).await.unwrap_or_default();
 
     let channel_ids: Vec<String> = channel_ids
         .into_iter()
@@ -225,59 +188,33 @@ async fn update_category(
 
     let now = chrono::Utc::now().timestamp_millis();
 
+    let cat_repo = CategoryRepository::new(&state.db);
+
     // Update the category
-    let category: CategoryRow = sqlx::query_as(
-        r#"UPDATE channel_categories SET
-            display_name = COALESCE($4, display_name),
-            sorting = COALESCE($5, sorting),
-            muted = COALESCE($6, muted),
-            collapsed = COALESCE($7, collapsed),
-            update_at = $8
-        WHERE id = $1 AND user_id = $2 AND team_id = $3 AND delete_at = 0
-        RETURNING *"#,
-    )
-    .bind(category_id)
-    .bind(user_id)
-    .bind(team_id)
-    .bind(&input.display_name)
-    .bind(&input.sorting)
-    .bind(input.muted)
-    .bind(input.collapsed)
-    .bind(now)
-    .fetch_one(&state.db)
-    .await?;
+    let category = cat_repo.update_returning(
+        category_id, user_id, team_id,
+        input.display_name.as_deref(),
+        input.sorting.as_deref(),
+        input.muted,
+        input.collapsed,
+        now,
+    ).await?;
 
     // Update channel assignments if provided
     if let Some(new_channel_ids) = &input.channel_ids {
         // Delete existing channel associations
-        sqlx::query("DELETE FROM channel_category_channels WHERE category_id = $1")
-            .bind(category_id)
-            .execute(&state.db)
-            .await?;
+        cat_repo.delete_channel_associations(category_id).await?;
 
         // Insert new associations
         for (idx, ch_id_str) in new_channel_ids.iter().enumerate() {
             if let Some(ch_id) = parse_mm_or_uuid(ch_id_str) {
-                sqlx::query(
-                    "INSERT INTO channel_category_channels (category_id, channel_id, sort_order) VALUES ($1, $2, $3)"
-                )
-                .bind(category_id)
-                .bind(ch_id)
-                .bind(idx as i32)
-                .execute(&state.db)
-                .await?;
+                cat_repo.insert_channel_association(category_id, ch_id, idx as i32).await?;
             }
         }
     }
 
     // Get current channel_ids
-    let channel_ids: Vec<uuid::Uuid> = sqlx::query_scalar(
-        "SELECT channel_id FROM channel_category_channels WHERE category_id = $1 ORDER BY sort_order"
-    )
-    .bind(category_id)
-    .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
+    let channel_ids = cat_repo.get_channel_ids(category_id).await.unwrap_or_default();
 
     let channel_ids: Vec<String> = channel_ids
         .into_iter()
@@ -313,17 +250,10 @@ async fn delete_category(
         uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_OID, params.category_id.as_bytes())
     });
 
-    // First check category exists
-    let category: Option<CategoryRow> = sqlx::query_as(
-        "SELECT * FROM channel_categories WHERE id = $1 AND user_id = $2 AND team_id = $3 AND delete_at = 0"
-    )
-    .bind(category_id)
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let cat_repo = CategoryRepository::new(&state.db);
 
-    let category = category
+    // First check category exists
+    let category = cat_repo.get(category_id, user_id, team_id).await?
         .ok_or_else(|| crate::error::AppError::NotFound("Category not found".to_string()))?;
 
     // Don't allow deleting default categories
@@ -339,35 +269,18 @@ async fn delete_category(
     let now = chrono::Utc::now().timestamp_millis();
 
     // Find default category to move channels to
-    let default_category_id: Option<uuid::Uuid> = sqlx::query_scalar(
-        "SELECT id FROM channel_categories WHERE user_id = $1 AND team_id = $2 AND type = 'channels' AND delete_at = 0"
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let default_category_id = cat_repo.find_default_category(user_id, team_id).await?;
 
     // Move channels to default category if it exists
     if let Some(default_id) = default_category_id {
-        sqlx::query("UPDATE channel_category_channels SET category_id = $1 WHERE category_id = $2")
-            .bind(default_id)
-            .bind(category_id)
-            .execute(&state.db)
-            .await?;
+        cat_repo.migrate_channels_to_category(category_id, default_id).await?;
     } else {
         // If no default category, just delete the channel associations
-        sqlx::query("DELETE FROM channel_category_channels WHERE category_id = $1")
-            .bind(category_id)
-            .execute(&state.db)
-            .await?;
+        cat_repo.delete_channel_associations(category_id).await?;
     }
 
-    // Soft delete the category (set delete_at)
-    sqlx::query("UPDATE channel_categories SET delete_at = $2 WHERE id = $1")
-        .bind(category_id)
-        .bind(now)
-        .execute(&state.db)
-        .await?;
+    // Soft delete the category
+    cat_repo.soft_delete(category_id, now).await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }

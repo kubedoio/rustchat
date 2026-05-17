@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Check } from 'lucide-vue-next'
-import { THEME_OPTIONS, getThemeColors, type Theme } from '../../../stores/theme'
+import { THEME_OPTIONS, getThemeColors, type Theme } from '../../../features/theme/stores/themeStore'
 
 const props = defineProps<{
   modelValue: Theme

@@ -10,6 +10,7 @@ use uuid::Uuid;
 use super::utils::ensure_channel_admin_or_system_manage;
 use super::utils::{fetch_channel_member_compat_rows, row_to_mm_channel_member};
 use super::{mm, parse_mm_or_uuid, ApiResult, AppError, AppState, Channel, MmAuthUser};
+use crate::repositories::ChannelRepository;
 use serde_json::json;
 
 #[derive(Deserialize)]
@@ -40,16 +41,11 @@ pub async fn get_channel_members(
 ) -> ApiResult<Json<Vec<mm::ChannelMember>>> {
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    // Verify membership
-    let _membership: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+
+    let repo = ChannelRepository::new(&state.db);
+    repo.require_member(channel_id, auth.user_id)
+        .await
+        .map_err(|_| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     let rows = fetch_channel_member_compat_rows(&state, channel_id, None).await?;
     let mm_members = rows
@@ -93,12 +89,14 @@ pub async fn add_channel_member(
     let user_id = parse_mm_or_uuid(&input.user_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?;
 
+    let repo = ChannelRepository::new(&state.db);
+
     // Get channel to check type and verify caller can add members
-    let channel: Option<Channel> = sqlx::query_as("SELECT * FROM channels WHERE id = $1")
-        .bind(channel_id)
-        .fetch_optional(&state.db)
-        .await?;
-    let channel = channel.ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+    let channel = repo
+        .get_by_id_optional(channel_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
 
     // For private channels, only channel admins or system admins may add members.
     // Public channels allow any member to add others.
@@ -106,30 +104,22 @@ pub async fn add_channel_member(
         ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
     } else {
         // For public/direct/group channels, verify caller is a member
-        let _caller_member: crate::models::ChannelMember =
-            sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-                .bind(channel_id)
-                .bind(auth.user_id)
-                .fetch_optional(&state.db)
-                .await?
-                .ok_or_else(|| {
-                    crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-                })?;
+        repo.require_member(channel_id, auth.user_id)
+            .await
+            .map_err(|_| {
+                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+            })?;
     }
 
     // Add the user
-    sqlx::query(
-        "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .execute(&state.db)
-    .await?;
+    repo.add_member(channel_id, user_id, "member")
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let team_id: Option<Uuid> = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-        .bind(channel_id)
-        .fetch_optional(&state.db)
-        .await?;
+    let team_id = repo
+        .get_team_id(channel_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let broadcast = crate::realtime::WsEnvelope::event(
         crate::realtime::EventType::MemberAdded,
@@ -177,17 +167,17 @@ pub async fn remove_channel_member(
         ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
     }
 
-    let team_id: Option<Uuid> = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-        .bind(channel_id)
-        .fetch_optional(&state.db)
-        .await?;
+    let repo = ChannelRepository::new(&state.db);
+
+    let team_id = repo
+        .get_team_id(channel_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Remove the user
-    sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-        .bind(channel_id)
-        .bind(user_id)
-        .execute(&state.db)
-        .await?;
+    repo.remove_member(channel_id, user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let broadcast = crate::realtime::WsEnvelope::event(
         crate::realtime::EventType::MemberRemoved,
@@ -220,15 +210,10 @@ pub async fn get_channel_member_by_id(
     let user_id = parse_mm_or_uuid(&path.user_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?;
 
-    let _caller_member: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+    let repo = ChannelRepository::new(&state.db);
+    repo.require_member(channel_id, auth.user_id)
+        .await
+        .map_err(|_| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     let rows = fetch_channel_member_compat_rows(&state, channel_id, Some(&[user_id])).await?;
     let row = rows
@@ -252,15 +237,10 @@ pub async fn get_channel_members_by_ids(
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
 
-    let _caller_member: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+    let repo = ChannelRepository::new(&state.db);
+    repo.require_member(channel_id, auth.user_id)
+        .await
+        .map_err(|_| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
 
     let input: ChannelMemberIdsRequest =
         super::utils::parse_body(&headers, &body, "Invalid ids body")?;
@@ -304,12 +284,10 @@ pub async fn update_channel_member_roles(
         "member"
     };
 
-    sqlx::query("UPDATE channel_members SET role = $1 WHERE channel_id = $2 AND user_id = $3")
-        .bind(role)
-        .bind(channel_id)
-        .bind(user_id)
-        .execute(&state.db)
-        .await?;
+    ChannelRepository::new(&state.db)
+        .update_member_role(channel_id, user_id, role)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let rows = fetch_channel_member_compat_rows(&state, channel_id, Some(&[user_id])).await?;
     let row = rows
@@ -340,14 +318,10 @@ pub async fn update_channel_member_notify_props(
         ));
     }
 
-    sqlx::query(
-        "UPDATE channel_members SET notify_props = $1 WHERE channel_id = $2 AND user_id = $3",
-    )
-    .bind(&input)
-    .bind(channel_id)
-    .bind(user_id)
-    .execute(&state.db)
-    .await?;
+    ChannelRepository::new(&state.db)
+        .update_member_notify_props(channel_id, user_id, &input)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(json!({"status": "OK"})))
 }
@@ -382,12 +356,10 @@ pub async fn update_channel_member_scheme_roles(
         "member"
     };
 
-    sqlx::query("UPDATE channel_members SET role = $3 WHERE channel_id = $1 AND user_id = $2")
-        .bind(channel_id)
-        .bind(target_user_id)
-        .bind(new_role)
-        .execute(&state.db)
-        .await?;
+    ChannelRepository::new(&state.db)
+        .update_member_role(channel_id, target_user_id, new_role)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(json!({"status": "OK"})))
 }

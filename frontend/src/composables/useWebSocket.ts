@@ -1,10 +1,10 @@
 import { ref } from 'vue'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../features/auth/stores/authStore'
 import { useMessageStore, postToMessage, type Message } from '../stores/messages'
 import { usePresenceStore } from '../features/presence'
 import type { PresenceStatus } from '../core/entities/User'
 import { useUnreadStore } from '../stores/unreads'
-import { useChannelStore } from '../stores/channels'
+import { useChannelStore } from '../features/channels/stores/channelStore'
 import { useToast } from './useToast'
 import { postsApi, type ChannelUnreadAt, type Post } from '../api/posts'
 import type { Channel } from '../api/channels'
@@ -43,7 +43,7 @@ export interface ClientEnvelope {
 const ws = ref<WebSocket | null>(null)
 const connected = ref(false)
 const reconnectAttempts = ref(0)
-const maxReconnectAttempts = 10
+const maxReconnectAttempts = MAX_RECONNECT_ATTEMPTS
 const subscriptions = ref<Set<string>>(new Set())
 const listeners = ref<Record<string, Set<WsListener>>>({})
 let actionSeq = 1
@@ -57,12 +57,9 @@ const nextRetryIn = ref(0)
 const connectionError = ref<string | null>(null)
 
 // Constants
-const MAX_RECONNECT_ATTEMPTS = 10
-const RECONNECT_DELAY_BASE = 1000
-const RECONNECT_DELAY_MAX = 10000
 const STATE_TRANSITION_MS = {
-  TO_DISCONNECTED: 5000,   // 5 seconds
-  TO_FAILED: 30000         // 30 seconds
+  TO_DISCONNECTED: WS_DISCONNECTED_TIMEOUT,
+  TO_FAILED: WS_FAILED_TIMEOUT,
 }
 
 // Countdown timer
@@ -71,8 +68,8 @@ let countdownTimer: ReturnType<typeof setInterval> | null = null
 function startCountdown() {
   stopCountdown()
   nextRetryIn.value = Math.min(
-    RECONNECT_DELAY_BASE * Math.pow(1.5, reconnectAttempt.value),
-    RECONNECT_DELAY_MAX
+    RECONNECT_DELAY_BASE_MS * Math.pow(1.5, reconnectAttempt.value),
+    RECONNECT_DELAY_MAX_MS
   ) / 1000
 
   countdownTimer = setInterval(() => {

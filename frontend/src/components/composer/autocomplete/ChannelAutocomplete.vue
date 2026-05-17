@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useChannelStore } from '../../../stores/channels'
+import { useChannelStore } from '../../../features/channels/stores/channelStore'
 import { Hash, Lock } from 'lucide-vue-next'
 
 const props = defineProps<{

@@ -421,23 +421,23 @@ class CallService {
     this.store.removeSpeakingParticipant(sessionId)
   }
 
-  handleSignalingEvent(data: any): void {
+  handleSignalingEvent(data: Record<string, unknown>): void {
     const currentCall = this.store.currentCall
     if (!currentCall?.peerConnection) return
 
-    const channelId = data.channel_id_raw || data.channel_id
+    const channelId = (data.channel_id_raw || data.channel_id) as string | undefined
     if (channelId !== currentCall.channelId) return
 
-    const signal = data.signal
+    const signal = data.signal as Record<string, unknown> | undefined
     if (!signal?.type) return
 
     const pc = currentCall.peerConnection
 
     if (signal.type === 'ice-candidate' && signal.candidate) {
       void pc.addIceCandidate({
-        candidate: signal.candidate,
-        sdpMid: signal.sdp_mid ?? null,
-        sdpMLineIndex: signal.sdp_mline_index ?? null
+        candidate: signal.candidate as string,
+        sdpMid: (signal.sdp_mid ?? null) as string | null,
+        sdpMLineIndex: (signal.sdp_mline_index ?? null) as number | null
       }).catch(error => {
         console.error('Failed to handle signaling event', error)
       })

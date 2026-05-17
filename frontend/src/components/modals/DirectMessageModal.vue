@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { X, Search } from 'lucide-vue-next';
-import { useTeamStore } from '../../stores/teams';
-import { useChannelStore } from '../../stores/channels';
-import { useAuthStore } from '../../stores/auth';
+import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import BaseButton from '../atomic/BaseButton.vue';
 import RcAvatar from '../ui/RcAvatar.vue';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const props = defineProps<{
     show: boolean
@@ -67,8 +68,8 @@ async function startDM(member: any) {
         // Select the new/existing channel
         channelStore.selectChannel(channel.id);
         handleClose();
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to start direct message';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to start direct message';
     } finally {
         loading.value = false;
     }

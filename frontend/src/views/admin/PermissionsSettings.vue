@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { Shield, Save, RefreshCw, Check, AlertTriangle } from 'lucide-vue-next';
 import adminApi, { type Permission } from '../../api/admin';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const roles = [
     { value: 'system_admin', label: 'System Admin', description: 'Full system access' },
@@ -53,8 +54,8 @@ async function loadPermissions() {
     try {
         const res = await adminApi.listPermissions();
         permissions.value = res.data;
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to load permissions';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to load permissions';
     } finally {
         loading.value = false;
     }
@@ -68,8 +69,8 @@ async function loadRole(role: string) {
         const res = await adminApi.getRolePermissions(role);
         selected.value = new Set(res.data);
         originalSelected.value = new Set(res.data);
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to load role permissions';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to load role permissions';
     } finally {
         loading.value = false;
     }
@@ -84,8 +85,8 @@ async function saveRole() {
         originalSelected.value = new Set(selected.value);
         saveSuccess.value = true;
         setTimeout(() => saveSuccess.value = false, 3000);
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to save permissions';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to save permissions';
     } finally {
         saving.value = false;
     }

@@ -94,7 +94,7 @@ class AdminService {
   ): Promise<AdminUser> {
     try {
       const user = await adminRepository.updateUser(id, data)
-      this.store.updateUser(user)
+      this.store.updateUserInStore(user)
       return user
     } catch (error) {
       this.store.setError(

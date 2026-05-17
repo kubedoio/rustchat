@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { adminApi, type CallsPluginConfig } from '../../../api/admin';
 import { Phone, Server, Globe, AlertCircle, CheckCircle, Save, TestTube } from 'lucide-vue-next';
+import { getApiErrorMessage, getErrorMessage } from '@/core/errors/errorUtils';
 
 const loading = ref(true);
 const saving = ref(false);
@@ -33,7 +34,7 @@ onMounted(async () => {
             ice_host_override: data.settings.ice_host_override || '',
             turn_server_credential: data.settings.turn_server_credential || ''
         };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Failed to load Calls Plugin config", e);
         saveError.value = 'Failed to load configuration';
     } finally {
@@ -64,8 +65,8 @@ async function saveSettings() {
         config.value = data.settings;
         saveSuccess.value = true;
         setTimeout(() => saveSuccess.value = false, 3000);
-    } catch (e: any) {
-        saveError.value = e.response?.data?.message || 'Failed to save configuration';
+    } catch (e: unknown) {
+        saveError.value = getApiErrorMessage(e) || 'Failed to save configuration';
         console.error(e);
     } finally {
         saving.value = false;
@@ -93,9 +94,9 @@ async function testConfiguration() {
         const { data } = await adminApi.getCallsPluginConfig();
         testSuccess.value = true;
         testResult.value = `Configuration saved successfully. Plugin ${data.settings.enabled ? 'enabled' : 'disabled'}.`;
-    } catch (e: any) {
+    } catch (e: unknown) {
         testSuccess.value = false;
-        testResult.value = e.response?.data?.message || e.message || 'Test failed';
+        testResult.value = getApiErrorMessage(e) || getErrorMessage(e, 'Test failed');
     } finally {
         testing.value = false;
     }
@@ -240,7 +241,7 @@ function removeStunServer(index: number) {
                 <div class="space-y-2">
                     <div
                         v-for="(_, index) in config.stun_servers"
-                        :key="index"
+                        :key="config.stun_servers[index]"
                         class="flex items-center gap-2"
                     >
                         <input

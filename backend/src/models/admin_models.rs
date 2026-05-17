@@ -265,3 +265,22 @@ pub struct SsoTestResult {
     pub message: String,
     pub details: Option<serde_json::Value>,
 }
+
+/// Admin team response with aggregated counts
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct AdminTeamResponse {
+    #[serde(flatten)]
+    #[sqlx(flatten)]
+    pub team: crate::models::Team,
+    pub members_count: i64,
+    pub channels_count: i64,
+}
+
+/// Admin channel response with aggregated member count
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct AdminChannelResponse {
+    #[serde(flatten)]
+    #[sqlx(flatten)]
+    pub channel: crate::models::Channel,
+    pub members_count: i64,
+}

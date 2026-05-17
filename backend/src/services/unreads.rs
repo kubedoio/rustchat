@@ -913,76 +913,75 @@ pub async fn increment_unreads(
     let last_msg_key = format!("rc:channel:{}:last_msg_id", channel_id);
     let _: () = conn.set(last_msg_key, message_seq).await.unwrap_or(());
 
-    for mid in members {
-        if mid == author_id {
-            continue;
-        }
+    let non_author_members: Vec<Uuid> =
+        members.into_iter().filter(|m| *m != author_id).collect();
 
-        let unread_key = legacy_unread_key(mid, channel_id);
-        let team_unread_key = legacy_team_unread_key(mid, team_id);
-        let _: () = conn.incr(&unread_key, 1).await.unwrap_or(());
-        let _: () = conn.incr(&team_unread_key, 1).await.unwrap_or(());
+    if non_author_members.is_empty() {
+        return Ok(());
+    }
 
-        let channel_hash_key = v2_channel_unread_key(mid, channel_id);
-        let _: () = redis::cmd("HINCRBY")
+    // Batch all per-member Redis writes and the final GET for each
+    // unread count into a single pipeline.
+    let mut pipe = redis::pipe();
+    for mid in &non_author_members {
+        let unread_key = legacy_unread_key(*mid, channel_id);
+        let team_unread_key = legacy_team_unread_key(*mid, team_id);
+        let channel_hash_key = v2_channel_unread_key(*mid, channel_id);
+        let team_hash_key = v2_team_unread_key(*mid, team_id);
+        let dirty_key = v2_dirty_key(*mid);
+        let marker = format!("channel:{}", channel_id);
+
+        pipe.cmd("INCR").arg(&unread_key).arg(1).ignore();
+        pipe.cmd("INCR").arg(&team_unread_key).arg(1).ignore();
+        pipe.cmd("HINCRBY")
             .arg(&channel_hash_key)
             .arg("msg_count")
             .arg(1)
-            .query_async(&mut conn)
-            .await
-            .unwrap_or(());
-        let _: () = redis::cmd("HINCRBY")
+            .ignore();
+        pipe.cmd("HINCRBY")
             .arg(&channel_hash_key)
             .arg("msg_count_root")
             .arg(1)
-            .query_async(&mut conn)
-            .await
-            .unwrap_or(());
-        let _: () = redis::cmd("HSET")
+            .ignore();
+        pipe.cmd("HSET")
             .arg(&channel_hash_key)
             .arg("version")
             .arg(V2_SCHEMA_VERSION)
-            .query_async(&mut conn)
-            .await
-            .unwrap_or(());
-
-        let team_hash_key = v2_team_unread_key(mid, team_id);
-        let _: () = redis::cmd("HINCRBY")
+            .ignore();
+        pipe.cmd("HINCRBY")
             .arg(&team_hash_key)
             .arg("msg_count")
             .arg(1)
-            .query_async(&mut conn)
-            .await
-            .unwrap_or(());
-        let _: () = redis::cmd("HINCRBY")
+            .ignore();
+        pipe.cmd("HINCRBY")
             .arg(&team_hash_key)
             .arg("msg_count_root")
             .arg(1)
-            .query_async(&mut conn)
-            .await
-            .unwrap_or(());
-        let _: () = redis::cmd("HSET")
+            .ignore();
+        pipe.cmd("HSET")
             .arg(&team_hash_key)
             .arg("version")
             .arg(V2_SCHEMA_VERSION)
-            .query_async(&mut conn)
-            .await
-            .unwrap_or(());
+            .ignore();
+        pipe.cmd("SADD").arg(&dirty_key).arg(&marker).ignore();
+        pipe.cmd("GET").arg(&unread_key);
+    }
 
-        let _ = mark_dirty_with_conn(&mut conn, mid, &format!("channel:{}", channel_id)).await;
+    let counts: Vec<Option<i64>> =
+        pipe.query_async(&mut conn).await.unwrap_or_default();
 
-        let count: i64 = conn.get(&unread_key).await.unwrap_or(0);
+    for (mid, count) in non_author_members.iter().zip(counts.iter()) {
         let broadcast = crate::realtime::WsEnvelope::event(
             crate::realtime::EventType::UnreadCountsUpdated,
             serde_json::json!({
                 "channel_id": channel_id,
                 "team_id": team_id,
-                "unread_count": count
+                "unread_count": count.unwrap_or(0)
             }),
             None,
         )
         .with_broadcast(crate::realtime::WsBroadcast {
-            user_id: Some(mid),
+            user_id: Some(*mid),
             channel_id: None,
             team_id: None,
             exclude_user_id: None,

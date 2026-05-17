@@ -4,7 +4,7 @@ import { channelService } from '../services/channelService'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
 
-interface WebSocketChannelEvent {
+export interface WebSocketChannelEvent {
   event: string
   data: string
   broadcast: {
@@ -37,20 +37,20 @@ export function handleChannelWebSocketEvent(event: WebSocketChannelEvent) {
 }
 
 // Helper to read event data safely
-function readEventData(event: WebSocketChannelEvent): any {
+function readEventData(event: WebSocketChannelEvent): Record<string, unknown> {
   try {
-    return JSON.parse(event.data)
+    return JSON.parse(event.data) as Record<string, unknown>
   } catch {
     return {}
   }
 }
 
-function readEventChannelId(data: any): ChannelId | undefined {
-  return (data?.channel_id || data?.channel_id_raw) as ChannelId | undefined
+function readEventChannelId(data: Record<string, unknown>): ChannelId | undefined {
+  return ((data.channel_id || data.channel_id_raw) as string | undefined) as ChannelId | undefined
 }
 
-function readEventUserId(data: any): UserId | undefined {
-  return (data?.user_id || data?.user_id_raw) as UserId | undefined
+function readEventUserId(data: Record<string, unknown>): UserId | undefined {
+  return ((data.user_id || data.user_id_raw) as string | undefined) as UserId | undefined
 }
 
 // Event handlers
@@ -120,9 +120,9 @@ function handleChannelViewed(event: WebSocketChannelEvent) {
 }
 
 // Normalize WebSocket channel data to domain entity
-function normalizeChannel(data: any): any {
+function normalizeChannel(data: Record<string, unknown>): Record<string, unknown> {
   // Handle both full channel objects and event data with channel_id
-  const channelData = data.channel || data;
+  const channelData = (data.channel as Record<string, unknown> | undefined) || data;
   
   return {
     id: channelData.id || channelData.channel_id || data.channel_id,
@@ -133,11 +133,11 @@ function normalizeChannel(data: any): any {
     purpose: channelData.purpose,
     header: channelData.header,
     creatorId: channelData.creator_id || data.creator_id,
-    createdAt: channelData.created_at ? new Date(channelData.created_at) : 
-               channelData.create_at ? new Date(channelData.create_at) : new Date(),
-    updatedAt: channelData.updated_at ? new Date(channelData.updated_at) : 
-               channelData.update_at ? new Date(channelData.update_at) : new Date(),
-    isArchived: (channelData.deleted_at || channelData.delete_at) ? true : false,
+    createdAt: channelData.created_at ? new Date(channelData.created_at as string | number) : 
+               channelData.create_at ? new Date(channelData.create_at as string | number) : new Date(),
+    updatedAt: channelData.updated_at ? new Date(channelData.updated_at as string | number) : 
+               channelData.update_at ? new Date(channelData.update_at as string | number) : new Date(),
+    isArchived: Boolean(channelData.deleted_at || channelData.delete_at),
     memberCount: channelData.member_count || data.member_count
   }
 }

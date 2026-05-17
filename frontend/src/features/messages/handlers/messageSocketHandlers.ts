@@ -5,7 +5,7 @@ import { messageService } from '../services/messageService'
 import type { Message, MessageId } from '../../../core/entities/Message'
 import type { ChannelId } from '../../../core/entities/Channel'
 
-interface WebSocketMessageEvent {
+export interface WebSocketMessageEvent {
   event: 'posted' | 'post_edited' | 'post_deleted' | 'reaction_added' | 'reaction_removed'
   data: string // JSON stringified data
   broadcast: {
@@ -106,51 +106,61 @@ function handleReactionRemoved(event: WebSocketMessageEvent) {
 }
 
 // Normalize WebSocket post format to our Message entity
-function normalizePost(post: any): Message {
+function normalizePost(post: unknown): Message {
+  const p = post as Record<string, unknown>
   return {
-    id: post.id,
-    channelId: post.channel_id,
-    userId: post.user_id,
-    content: post.message,
-    rootId: post.root_id,
-    replyCount: post.reply_count ?? 0,
-    reactions: normalizeReactions(post.reactions),
-    files: normalizeFiles(post.metadata?.files || post.files || []),
-    isPinned: post.is_pinned ?? false,
-    isSaved: post.is_saved ?? false,
+    id: p.id as string,
+    channelId: p.channel_id as string,
+    userId: p.user_id as string,
+    content: p.message as string,
+    rootId: p.root_id as string | undefined,
+    replyCount: (p.reply_count as number | undefined) ?? 0,
+    reactions: normalizeReactions(p.reactions),
+    files: normalizeFiles(((p.metadata as Record<string, unknown> | undefined)?.files || p.files || []) as unknown[]),
+    isPinned: (p.is_pinned as boolean | undefined) ?? false,
+    isSaved: (p.is_saved as boolean | undefined) ?? false,
     status: 'delivered',
-    clientId: post.props?.client_msg_id,
-    createdAt: new Date(post.create_at),
-    updatedAt: post.update_at ? new Date(post.update_at) : undefined,
-    props: post.props
+    clientId: ((p.props as Record<string, unknown> | undefined)?.client_msg_id) as string | undefined,
+    createdAt: new Date(p.create_at as string | number),
+    updatedAt: p.update_at ? new Date(p.update_at as string | number) : undefined,
+    props: p.props as Record<string, unknown> | undefined
   }
 }
 
-function normalizeReactions(reactions: any): { emoji: string; count: number; users: string[] }[] {
+function normalizeReactions(reactions: unknown): { emoji: string; count: number; users: string[] }[] {
   if (!reactions) return []
   
   if (Array.isArray(reactions)) {
-    return reactions.map(r => ({
-      emoji: r.emoji_name,
-      count: r.count,
-      users: r.users || []
-    }))
+    return reactions.map(r => {
+      const reaction = r as Record<string, unknown>
+      return {
+        emoji: reaction.emoji_name as string,
+        count: reaction.count as number,
+        users: (reaction.users as string[] | undefined) || []
+      }
+    })
   }
 
   // Handle object format
-  return Object.entries(reactions).map(([emoji, data]: [string, any]) => ({
-    emoji,
-    count: data.count || 0,
-    users: data.users || []
-  }))
+  return Object.entries(reactions as Record<string, unknown>).map(([emoji, data]) => {
+    const d = data as Record<string, unknown>
+    return {
+      emoji,
+      count: (d.count as number | undefined) || 0,
+      users: (d.users as string[] | undefined) || []
+    }
+  })
 }
 
-function normalizeFiles(files: any[]): any[] {
-  return files.map(f => ({
-    id: f.id,
-    name: f.name,
-    url: f.url,
-    size: f.size,
-    mimeType: f.mime_type || f.mimeType
-  }))
+function normalizeFiles(files: unknown[]): Record<string, unknown>[] {
+  return files.map(f => {
+    const file = f as Record<string, unknown>
+    return {
+      id: file.id as string,
+      name: file.name as string,
+      url: file.url as string,
+      size: file.size as number,
+      mimeType: (file.mime_type || file.mimeType) as string
+    }
+  })
 }

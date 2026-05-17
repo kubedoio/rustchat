@@ -3,8 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { AlertTriangle, ExternalLink, Lightbulb, Pencil } from 'lucide-vue-next'
 import api from '../../../api/client'
 import SettingItemMax from '../SettingItemMax.vue'
-import { useAuthStore } from '../../../stores/auth'
-import { usePreferencesStore } from '../../../stores/preferences'
+import { useAuthStore } from '../../../features/auth/stores/authStore'
+import { usePreferencesStore } from '../../../features/preferences/stores/preferencesStore'
 import { useToast } from '../../../composables/useToast'
 
 const preferencesStore = usePreferencesStore()

@@ -12,13 +12,14 @@ import MentionAutocomplete from './MentionAutocomplete.vue'
 import EmojiAutocomplete from './autocomplete/EmojiAutocomplete.vue'
 import ChannelAutocomplete from './autocomplete/ChannelAutocomplete.vue'
 import CommandAutocomplete from './autocomplete/CommandAutocomplete.vue'
-import { useTeamStore } from '../../stores/teams'
-import { useCallsStore } from '../../stores/calls'
-import { useChannelStore } from '../../stores/channels'
-import { usePreferencesStore } from '../../stores/preferences'
+import { useTeamStore } from '../../features/teams/stores/teamStore'
+import { useCallsStore } from '../../features/calls/stores/callStore'
+import { useChannelStore } from '../../features/channels/stores/channelStore'
+import { usePreferencesStore } from '../../features/preferences/stores/preferencesStore'
 import { searchEmojis } from '../../utils/emoji'
 import { useCodeFormatting } from '../../composables/useCodeFormatting'
 import { useWebSocket } from '../../composables/useWebSocket'
+import { getErrorMessage } from '@/core/errors/errorUtils'
 
 const emit = defineEmits(['send', 'typing', 'stopTyping', 'startAudioCall'])
 
@@ -270,8 +271,8 @@ async function handleCommandAction(command: string, args: string[]): Promise<boo
         try {
           await callsStore.startCall(channelId)
           toast.success('Call started', 'You are now in a call')
-        } catch (error: any) {
-          toast.error('Failed to start call', error.message || 'Unknown error')
+        } catch (error: unknown) {
+          toast.error('Failed to start call', getErrorMessage(error, 'Unknown error'))
         }
         return true
       }
@@ -279,8 +280,8 @@ async function handleCommandAction(command: string, args: string[]): Promise<boo
       if (subCommand === 'join') {
         try {
           await callsStore.joinCall(channelId)
-        } catch (error: any) {
-          toast.error('Failed to join call', error.message || 'Unknown error')
+        } catch (error: unknown) {
+          toast.error('Failed to join call', getErrorMessage(error, 'Unknown error'))
         }
         return true
       }
@@ -752,8 +753,8 @@ async function handleFiles(files: File[]) {
         }
       }
       toast.success('File uploaded', file.name)
-    } catch (error: any) {
-      toast.error('Upload failed', error.message || 'Unknown error')
+    } catch (error: unknown) {
+      toast.error('Upload failed', getErrorMessage(error, 'Unknown error'))
       attachedFiles.value = attachedFiles.value.filter((fileItem) => fileItem !== attachment)
     }
   }
@@ -849,7 +850,7 @@ onUnmounted(() => {
       <div v-if="attachedFiles.length > 0" class="flex flex-wrap gap-2 border-b border-border-1 bg-bg-surface-2/30 px-3 py-2">
         <div
           v-for="(attachment, index) in attachedFiles"
-          :key="index"
+          :key="attachment.file.name"
           class="relative flex min-w-[200px] max-w-[300px] items-center gap-2 rounded-r-1 border border-border-1 bg-bg-surface-1 px-3 py-2"
         >
           <FileIcon class="h-4 w-4 shrink-0 text-text-3" />

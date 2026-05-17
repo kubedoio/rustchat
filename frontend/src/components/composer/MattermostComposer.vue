@@ -691,7 +691,7 @@ const canSend = computed(() => {
             <div v-if="attachedFiles.length > 0" class="flex flex-wrap gap-2 p-3 border-b border-border-1">
                 <div 
                     v-for="(file, index) in attachedFiles"
-                    :key="index"
+                    :key="file.file.name"
                     class="relative flex items-center gap-2 bg-bg-surface-2 border border-border-1 rounded-r-1 px-2 py-1.5 text-sm"
                 >
                     <FileIcon class="w-4 h-4 text-text-3" />

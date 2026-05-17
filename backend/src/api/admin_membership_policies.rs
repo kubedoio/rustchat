@@ -3,13 +3,15 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
-use crate::error::ApiResult;
+use crate::error::{ApiResult, AppError};
+use crate::api::admin::require_admin;
 use crate::services::membership_policies::{
     AutoMembershipPolicyAudit, CreatePolicyRequest, PolicyRepository, PolicyWithTargets,
     UpdatePolicyRequest,
@@ -444,4 +446,60 @@ pub fn router() -> Router<AppState> {
             "/admin/membership-policies/metadata",
             get(get_policy_metadata),
         )
+        .route("/admin/groups", get(list_admin_groups))
+}
+// ============================================================================
+// Groups Management (for Membership Policies)
+// ============================================================================
+
+#[derive(Debug, serde::Serialize, FromRow)]
+pub struct AdminGroupResponse {
+    pub id: Uuid,
+    pub name: Option<String>,
+    pub display_name: String,
+    pub description: String,
+    pub source: String,
+    pub remote_id: Option<String>,
+    pub member_count: i64,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct ListGroupsQuery {
+    pub source: Option<String>,
+    pub search: Option<String>,
+}
+
+/// List all groups for membership policy configuration
+pub async fn list_admin_groups(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Query(query): Query<ListGroupsQuery>,
+) -> ApiResult<Json<Vec<AdminGroupResponse>>> {
+    require_admin(&auth)?;
+
+    let groups: Vec<AdminGroupResponse> = sqlx::query_as(
+        r#"
+        SELECT 
+            g.id,
+            g.name,
+            g.display_name,
+            g.description,
+            g.source,
+            g.remote_id,
+            (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count
+        FROM groups g
+        WHERE g.deleted_at IS NULL
+          AND ($1::VARCHAR IS NULL OR g.source = $1)
+          AND ($2::VARCHAR IS NULL OR 
+               g.display_name ILIKE '%' || $2 || '%' OR 
+               g.name ILIKE '%' || $2 || '%')
+        ORDER BY g.display_name
+        "#,
+    )
+    .bind(&query.source)
+    .bind(&query.search)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(groups))
 }

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Clock, Play } from 'lucide-vue-next'
-import { usePlaybookStore } from '../../stores/playbooks'
+import { usePlaybookStore } from '../../features/playbooks/stores/playbookStore'
 import BaseButton from '../atomic/BaseButton.vue'
 
 const router = useRouter()

@@ -4,6 +4,7 @@ import { teamsApi } from '../../../api/teams'
 import type { Team, TeamMember, TeamId } from '../../../core/entities/Team'
 import type { UserId } from '../../../core/entities/User'
 import { withRetry } from '../../../core/services/retry'
+import { isNotFoundError } from '../../../core/errors/errorUtils'
 
 export interface CreateTeamRequest {
   name: string
@@ -34,8 +35,8 @@ export const teamRepository = {
       try {
         const response = await teamsApi.get(teamId)
         return normalizeTeam(response.data)
-      } catch (error: any) {
-        if (error?.response?.status === 404) return null
+      } catch (error: unknown) {
+        if (isNotFoundError(error)) return null
         throw error
       }
     })
@@ -89,23 +90,25 @@ export const teamRepository = {
   }
 }
 
-function normalizeTeam(raw: any): Team {
+function normalizeTeam(raw: unknown): Team {
+  const r = raw as Record<string, unknown>
   return {
-    id: raw.id as TeamId,
-    name: raw.name,
-    displayName: raw.display_name,
-    description: raw.description,
-    createdAt: new Date(raw.created_at || Date.now()),
-    updatedAt: new Date(raw.updated_at || raw.created_at || Date.now()),
-    isArchived: raw.delete_at ? true : false
+    id: r.id as TeamId,
+    name: r.name as string,
+    displayName: r.display_name as string,
+    description: r.description as string | undefined,
+    createdAt: new Date((r.created_at || Date.now()) as string | number),
+    updatedAt: new Date((r.updated_at || r.created_at || Date.now()) as string | number),
+    isArchived: Boolean(r.delete_at)
   }
 }
 
-function normalizeTeamMember(raw: any): TeamMember {
+function normalizeTeamMember(raw: unknown): TeamMember {
+  const r = raw as Record<string, unknown>
   return {
-    teamId: raw.team_id as TeamId,
-    userId: raw.user_id as UserId,
-    roles: raw.roles || [],
-    joinedAt: new Date(raw.joined_at || Date.now())
+    teamId: r.team_id as TeamId,
+    userId: r.user_id as UserId,
+    roles: (r.roles as string[] | undefined) || [],
+    joinedAt: new Date((r.joined_at || Date.now()) as string | number)
   }
 }

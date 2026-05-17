@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { Bell, Moon, Monitor } from 'lucide-vue-next'
-import { usePreferencesStore } from '../../stores/preferences'
+import { usePreferencesStore } from '../../features/preferences/stores/preferencesStore'
 import { useToast } from '../../composables/useToast'
 import BaseButton from '../atomic/BaseButton.vue'
 
