@@ -1,11 +1,10 @@
 //! Admin plugin configuration endpoints
 
 use axum::{
-    extract::{Path, State},
-    routing::{get, put},
+    extract::State,
+    routing::get,
     Json, Router,
 };
-use uuid::Uuid;
 
 use crate::api::admin::require_admin;
 use crate::api::AppState;

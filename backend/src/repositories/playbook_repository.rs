@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
     Playbook, PlaybookChecklist, PlaybookFull, PlaybookRun, PlaybookTask, ChecklistWithTasks,
-    RunStatusUpdate, RunTask, RunWithTasks, RunProgress,
+    RunStatusUpdate, RunTask, RunProgress,
 };
 
 /// Repository for playbook-related database operations

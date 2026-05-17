@@ -4,7 +4,6 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::{
     encode_mm_id, json, mm, parse_mm_or_uuid, reactions_for_posts, status_ok, ApiResult, AppError,
@@ -62,12 +61,12 @@ pub(super) async fn get_posts_around_unread(
 
     let (limit_before, limit_after) = clamp_unread_limits(&query);
 
-    let last_read_seq: i64 = PostRepository::new(&state.db)
+    let last_read_seq: i64 = PostRepository::new(state.db.clone())
         .get_last_read_seq(user_id, channel_id)
         .await?
         .unwrap_or(0);
 
-    let mut posts = PostRepository::new(&state.db)
+    let mut posts = PostRepository::new(state.db.clone())
         .get_posts_around_unread(channel_id, last_read_seq, limit_before, limit_after)
         .await?;
 
@@ -128,7 +127,7 @@ pub(super) async fn save_acknowledgement_for_post(
     let post_id = parse_mm_or_uuid(&path.post_id)
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
 
-    let channel_id = PostRepository::new(&state.db)
+    let channel_id = PostRepository::new(state.db.clone())
         .get_post_channel_id_optional(post_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
@@ -139,7 +138,7 @@ pub(super) async fn save_acknowledgement_for_post(
 
     let now = chrono::Utc::now();
 
-    PostRepository::new(&state.db)
+    PostRepository::new(state.db.clone())
         .acknowledge_post(user_id, post_id, now)
         .await?;
 
@@ -163,7 +162,7 @@ pub(super) async fn delete_acknowledgement_for_post(
     let post_id = parse_mm_or_uuid(&path.post_id)
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
 
-    let ack_time = PostRepository::new(&state.db)
+    let ack_time = PostRepository::new(state.db.clone())
         .get_acknowledgement(user_id, post_id)
         .await?;
 
@@ -179,7 +178,7 @@ pub(super) async fn delete_acknowledgement_for_post(
         return Err(AppError::NotFound("Acknowledgement not found".to_string()));
     }
 
-    PostRepository::new(&state.db)
+    PostRepository::new(state.db.clone())
         .delete_acknowledgement(user_id, post_id)
         .await?;
 

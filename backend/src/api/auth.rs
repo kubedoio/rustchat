@@ -13,6 +13,7 @@ use crate::auth::{create_token_with_policy, hash_password, verify_password, Auth
 use crate::error::{ApiResult, AppError};
 use crate::middleware::rate_limit::{self, RateLimitConfig};
 use crate::models::{AuthResponse, CreateUser, LoginRequest, User, UserResponse};
+use crate::repositories::{SystemRepository, UserRepository};
 use crate::services::membership_policies::apply_auto_membership_for_new_user;
 use crate::services::password_reset::{
     request_password_reset, reset_password, validate_token, PasswordResetError,
@@ -221,7 +222,11 @@ async fn register(
         .ok()
         .and_then(|cfg| {
             let url = cfg.site.0.site_url;
-            if url.is_empty() { None } else { Some(url) }
+            if url.is_empty() {
+                None
+            } else {
+                Some(url)
+            }
         });
 
     if let Some(site_url) = site_url {
@@ -373,7 +378,9 @@ async fn login(
     }
 
     // Update last login
-    UserRepository::new(&state.db).update_last_login(user.id).await?;
+    UserRepository::new(&state.db)
+        .update_last_login(user.id)
+        .await?;
 
     // Generate token
     let token = create_token_with_policy(
@@ -477,7 +484,11 @@ async fn resend_verification(
         .ok()
         .and_then(|cfg| {
             let url = cfg.site.0.site_url;
-            if url.is_empty() { None } else { Some(url) }
+            if url.is_empty() {
+                None
+            } else {
+                Some(url)
+            }
         });
 
     let verification_result = if let Some(site_url) = site_url {
@@ -668,13 +679,4 @@ async fn validate_token_handler(
             Err(AppError::Internal("Failed to validate token".to_string()))
         }
     }
-}
-
-/// Seed default preferences for a new user
-async fn seed_default_preferences(db: &sqlx::PgPool, user_id: uuid::Uuid) -> ApiResult<()> {
-    UserRepository::new(db)
-        .seed_default_preferences(user_id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(())
 }

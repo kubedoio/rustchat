@@ -597,10 +597,7 @@ impl<'a> TeamRepository<'a> {
     pub async fn restore_team(&self, id: Uuid) -> Result<Option<Team>, sqlx::Error> {
         sqlx::query_as::<_, Team>("UPDATE teams SET deleted_at = NULL WHERE id = $1 RETURNING *")
             .bind(id)
-            .execute(self.pool)
-            .await?;
-
-        // Fetch the restored team
-        self.get_team_by_id(id).await
+            .fetch_optional(self.pool)
+            .await
     }
 }

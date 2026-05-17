@@ -1,11 +1,12 @@
-use axum::{extract::State, Json};
-use serde::{Deserialize, Serialize};
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
+use axum::{extract::State, Json};
+use serde::Serialize;
 
 use super::turn::{TurnCredentialGenerator, TurnServerConfig};
 
+#[derive(Debug, Serialize)]
 pub(crate) struct VersionResponse {
     version: String,
     rtcd: bool,
@@ -150,7 +151,9 @@ async fn load_effective_calls_config(state: &AppState) -> EffectiveCallsConfig {
         stun_servers: state.config.calls.stun_servers.clone(),
     }
 }
-pub(crate) async fn get_version(State(_state): State<AppState>) -> ApiResult<Json<VersionResponse>> {
+pub(crate) async fn get_version(
+    State(_state): State<AppState>,
+) -> ApiResult<Json<VersionResponse>> {
     Ok(Json(VersionResponse {
         version: "0.28.0".to_string(),
         rtcd: false, // We're using integrated mode

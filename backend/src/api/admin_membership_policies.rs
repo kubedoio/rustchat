@@ -3,14 +3,14 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
-use crate::error::{ApiResult, AppError};
+use crate::error::ApiResult;
 use crate::api::admin::require_admin;
 use crate::services::membership_policies::{
     AutoMembershipPolicyAudit, CreatePolicyRequest, PolicyRepository, PolicyWithTargets,

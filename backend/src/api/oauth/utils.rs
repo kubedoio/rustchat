@@ -6,8 +6,8 @@ use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, Re
 use crate::repositories::OAuthRepository;
 
 use super::{
-    DEFAULT_APP_CUSTOM_URL_SCHEMES, DEFAULT_OAUTH_REDIRECT_PATH,
-    OAUTH_EXCHANGE_COOKIE, OAUTH_EXCHANGE_COOKIE_MAX_AGE_SECONDS, OAUTH_STATE_PREFIX,
+    DEFAULT_APP_CUSTOM_URL_SCHEMES, DEFAULT_OAUTH_REDIRECT_PATH, OAUTH_EXCHANGE_COOKIE,
+    OAUTH_EXCHANGE_COOKIE_MAX_AGE_SECONDS, OAUTH_STATE_PREFIX,
 };
 
 /// Generate Redis key for OAuth state
@@ -20,7 +20,7 @@ pub fn sanitize_redirect_path(redirect_uri: Option<String>) -> String {
     match redirect_uri {
         Some(path) => {
             // URL-decode before validation to catch encoded bypasses like %2e%2e or %2f%2f
-            let decoded = urlencoding::decode(&path).unwrap_or_else(|_| path.into());
+            let decoded = urlencoding::decode(&path).unwrap_or_else(|_| path.as_str().into());
             let decoded = decoded.as_ref();
             // Must start with / and not be // or contain ..
             if decoded.starts_with('/')
@@ -133,7 +133,11 @@ pub async fn get_site_url(db: &sqlx::PgPool) -> String {
         .flatten()
         .and_then(|site| {
             let url = site.site_url;
-            if url.is_empty() { None } else { Some(url) }
+            if url.is_empty() {
+                None
+            } else {
+                Some(url)
+            }
         });
 
     // Fall back to environment variable if not set in database
@@ -142,7 +146,10 @@ pub async fn get_site_url(db: &sqlx::PgPool) -> String {
     })
 }
 
-pub fn validate_mobile_redirect_to(redirect_to: &str, allowed_schemes: &[String]) -> ApiResult<String> {
+pub fn validate_mobile_redirect_to(
+    redirect_to: &str,
+    allowed_schemes: &[String],
+) -> ApiResult<String> {
     let trimmed = redirect_to.trim();
     if trimmed.is_empty() {
         return Err(AppError::BadRequest(
@@ -195,7 +202,9 @@ pub async fn get_mobile_custom_url_schemes(db: &sqlx::PgPool) -> Vec<String> {
         .ok()
         .flatten();
 
-    let schemes = config.map(|site| site.app_custom_url_schemes).unwrap_or_default();
+    let schemes = config
+        .map(|site| site.app_custom_url_schemes)
+        .unwrap_or_default();
 
     if schemes.is_empty() {
         DEFAULT_APP_CUSTOM_URL_SCHEMES
@@ -226,7 +235,10 @@ mod tests {
     #[test]
     fn read_cookie_value_returns_none_when_missing() {
         let mut headers = HeaderMap::new();
-        headers.insert(header::COOKIE, axum::http::HeaderValue::from_static("foo=bar; baz=qux"));
+        headers.insert(
+            header::COOKIE,
+            axum::http::HeaderValue::from_static("foo=bar; baz=qux"),
+        );
 
         let value = read_cookie_value(&headers, "RCOAUTHCODE");
         assert!(value.is_none());

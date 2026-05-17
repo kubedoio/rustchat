@@ -8,7 +8,6 @@ use axum::{
     Json, Router,
 };
 use chrono::Utc;
-use uuid::Uuid;
 
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;

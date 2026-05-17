@@ -4,15 +4,14 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
-use crate::mattermost_compat::id::encode_mm_id;
 
 use super::helpers::resolve_channel_id;
 use super::lifecycle::StatusResponse;
+use super::sfu::signaling::SignalingMessage;
 use super::signaling::{send_signaling_event, spawn_signaling_forwarder};
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 

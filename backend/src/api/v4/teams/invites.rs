@@ -15,7 +15,6 @@ use crate::mattermost_compat::{
     models as mm,
 };
 use crate::models::TeamMember;
-use crate::repositories::team_repository::TeamInviteTokenRow;
 use crate::repositories::TeamRepository;
 
 #[derive(Deserialize)]

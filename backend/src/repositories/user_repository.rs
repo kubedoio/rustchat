@@ -16,32 +16,26 @@ impl<'a> UserRepository<'a> {
 
     /// Get a user by ID that has not been soft-deleted.
     pub async fn get_by_id(&self, id: Uuid) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL"
-        )
-        .bind(id)
-        .fetch_optional(self.pool)
-        .await
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await
     }
 
     /// Get a user by ID without checking deleted_at.
     pub async fn get_by_id_unchecked(&self, id: Uuid) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE id = $1"
-        )
-        .bind(id)
-        .fetch_optional(self.pool)
-        .await
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await
     }
 
     /// Get a user by exact username match.
     pub async fn get_by_username(&self, username: &str) -> Result<Option<User>, sqlx::Error> {
-        sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE username = $1"
-        )
-        .bind(username)
-        .fetch_optional(self.pool)
-        .await
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = $1")
+            .bind(username)
+            .fetch_optional(self.pool)
+            .await
     }
 
     /// Get a user by email.
@@ -108,12 +102,10 @@ impl<'a> UserRepository<'a> {
 
     /// Get multiple users by IDs that have not been soft-deleted.
     pub async fn get_by_ids(&self, ids: &[Uuid]) -> Result<Vec<User>, sqlx::Error> {
-        sqlx::query_as::<_, User>(
-            "SELECT * FROM users WHERE id = ANY($1) AND deleted_at IS NULL"
-        )
-        .bind(ids)
-        .fetch_all(self.pool)
-        .await
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ANY($1) AND deleted_at IS NULL")
+            .bind(ids)
+            .fetch_all(self.pool)
+            .await
     }
 
     /// List users with optional org filter and optional search term.
@@ -200,7 +192,7 @@ impl<'a> UserRepository<'a> {
               AND u.is_active = true
             ORDER BY u.username ASC
             LIMIT $3
-            "#
+            "#,
         )
         .bind(team_id)
         .bind(like)
@@ -227,7 +219,7 @@ impl<'a> UserRepository<'a> {
               AND u.is_active = true
             ORDER BY u.username ASC
             LIMIT $3
-            "#
+            "#,
         )
         .bind(channel_id)
         .bind(like)
@@ -247,7 +239,11 @@ impl<'a> UserRepository<'a> {
     }
 
     /// Update a user's custom status JSON.
-    pub async fn update_custom_status(&self, id: Uuid, custom_status: &str) -> Result<(), sqlx::Error> {
+    pub async fn update_custom_status(
+        &self,
+        id: Uuid,
+        custom_status: &serde_json::Value,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query("UPDATE users SET custom_status = $1 WHERE id = $2")
             .bind(custom_status)
             .bind(id)
@@ -257,7 +253,11 @@ impl<'a> UserRepository<'a> {
     }
 
     /// Update a user's display name.
-    pub async fn update_display_name(&self, id: Uuid, display_name: &str) -> Result<(), sqlx::Error> {
+    pub async fn update_display_name(
+        &self,
+        id: Uuid,
+        display_name: &str,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query("UPDATE users SET display_name = $1 WHERE id = $2")
             .bind(display_name)
             .bind(id)
@@ -277,7 +277,11 @@ impl<'a> UserRepository<'a> {
     }
 
     /// Update a user's password hash.
-    pub async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> Result<(), sqlx::Error> {
+    pub async fn update_password_hash(
+        &self,
+        id: Uuid,
+        password_hash: &str,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
             .bind(password_hash)
             .bind(id)
@@ -327,7 +331,7 @@ impl<'a> UserRepository<'a> {
             UPDATE users
             SET presence = $2, presence_manual = $3
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(id)
         .bind(presence)
@@ -355,7 +359,7 @@ impl<'a> UserRepository<'a> {
                 custom_status = $5,
                 updated_at = NOW()
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(id)
         .bind(status_text)
@@ -382,7 +386,17 @@ impl<'a> UserRepository<'a> {
     pub async fn clear_status_returning(
         &self,
         id: Uuid,
-    ) -> Result<(String, bool, Option<chrono::DateTime<Utc>>, Option<String>, Option<String>, Option<chrono::DateTime<Utc>>), sqlx::Error> {
+    ) -> Result<
+        (
+            String,
+            bool,
+            Option<chrono::DateTime<Utc>>,
+            Option<String>,
+            Option<String>,
+            Option<chrono::DateTime<Utc>>,
+        ),
+        sqlx::Error,
+    > {
         sqlx::query_as::<_, (String, bool, Option<chrono::DateTime<Utc>>, Option<String>, Option<String>, Option<chrono::DateTime<Utc>>)>(
             "UPDATE users SET status_text = NULL, status_emoji = NULL, status_expires_at = NULL, custom_status = 'null'::jsonb, updated_at = NOW() WHERE id = $1 RETURNING presence, COALESCE(presence_manual, false), last_login_at, status_text, status_emoji, status_expires_at"
         )
@@ -395,7 +409,17 @@ impl<'a> UserRepository<'a> {
     pub async fn get_user_status_fields(
         &self,
         id: Uuid,
-    ) -> Result<Option<(String, bool, Option<chrono::DateTime<Utc>>, Option<String>, Option<String>, Option<chrono::DateTime<Utc>>)>, sqlx::Error> {
+    ) -> Result<
+        Option<(
+            String,
+            bool,
+            Option<chrono::DateTime<Utc>>,
+            Option<String>,
+            Option<String>,
+            Option<chrono::DateTime<Utc>>,
+        )>,
+        sqlx::Error,
+    > {
         sqlx::query_as::<_, (String, bool, Option<chrono::DateTime<Utc>>, Option<String>, Option<String>, Option<chrono::DateTime<Utc>>)>(
             "SELECT presence, COALESCE(presence_manual, false), last_login_at, status_text, status_emoji, status_expires_at FROM users WHERE id = $1"
         )
@@ -405,13 +429,16 @@ impl<'a> UserRepository<'a> {
     }
 
     /// Get presence values for multiple users by IDs.
-    pub async fn get_presences_by_ids(&self, ids: &[Uuid]) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
+    pub async fn get_presences_by_ids(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
         sqlx::query_as::<_, (Uuid, String)>(
             r#"
             SELECT id, presence
             FROM users
             WHERE id = ANY($1)
-            "#
+            "#,
         )
         .bind(ids)
         .fetch_all(self.pool)
@@ -445,9 +472,12 @@ impl<'a> UserRepository<'a> {
     // ============ Preferences ============
 
     /// Get or create user preferences.
-    pub async fn get_or_create_preferences(&self, user_id: Uuid) -> Result<crate::models::UserPreferences, sqlx::Error> {
+    pub async fn get_or_create_preferences(
+        &self,
+        user_id: Uuid,
+    ) -> Result<crate::models::UserPreferences, sqlx::Error> {
         let prefs = sqlx::query_as::<_, crate::models::UserPreferences>(
-            "SELECT * FROM user_preferences WHERE user_id = $1"
+            "SELECT * FROM user_preferences WHERE user_id = $1",
         )
         .bind(user_id)
         .fetch_optional(self.pool)
@@ -457,7 +487,7 @@ impl<'a> UserRepository<'a> {
             Some(p) => Ok(p),
             None => {
                 sqlx::query_as::<_, crate::models::UserPreferences>(
-                    r#"INSERT INTO user_preferences (user_id) VALUES ($1) RETURNING *"#
+                    r#"INSERT INTO user_preferences (user_id) VALUES ($1) RETURNING *"#,
                 )
                 .bind(user_id)
                 .fetch_one(self.pool)
@@ -564,7 +594,10 @@ impl<'a> UserRepository<'a> {
     // ============ Status Presets ============
 
     /// List status presets for a user (including defaults).
-    pub async fn list_status_presets(&self, user_id: Uuid) -> Result<Vec<crate::models::StatusPreset>, sqlx::Error> {
+    pub async fn list_status_presets(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<crate::models::StatusPreset>, sqlx::Error> {
         sqlx::query_as::<_, crate::models::StatusPreset>(
             "SELECT * FROM status_presets WHERE user_id IS NULL OR user_id = $1 ORDER BY is_default DESC, sort_order"
         )
@@ -597,13 +630,19 @@ impl<'a> UserRepository<'a> {
     }
 
     /// Delete a custom status preset.
-    pub async fn delete_status_preset(&self, preset_id: Uuid, user_id: Uuid) -> Result<u64, sqlx::Error> {
-        sqlx::query("DELETE FROM status_presets WHERE id = $1 AND user_id = $2 AND is_default = false")
-            .bind(preset_id)
-            .bind(user_id)
-            .execute(self.pool)
-            .await
-            .map(|r| r.rows_affected())
+    pub async fn delete_status_preset(
+        &self,
+        preset_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<u64, sqlx::Error> {
+        sqlx::query(
+            "DELETE FROM status_presets WHERE id = $1 AND user_id = $2 AND is_default = false",
+        )
+        .bind(preset_id)
+        .bind(user_id)
+        .execute(self.pool)
+        .await
+        .map(|r| r.rows_affected())
     }
 
     // ============ Channel Notifications ============
@@ -615,7 +654,7 @@ impl<'a> UserRepository<'a> {
         channel_id: Uuid,
     ) -> Result<Option<crate::models::ChannelNotificationSetting>, sqlx::Error> {
         sqlx::query_as::<_, crate::models::ChannelNotificationSetting>(
-            "SELECT * FROM channel_notification_settings WHERE user_id = $1 AND channel_id = $2"
+            "SELECT * FROM channel_notification_settings WHERE user_id = $1 AND channel_id = $2",
         )
         .bind(user_id)
         .bind(channel_id)
@@ -778,7 +817,10 @@ impl<'a> UserRepository<'a> {
     }
 
     /// Clear expired custom status for a single user if needed. Returns whether a row was updated.
-    pub async fn clear_expired_custom_status_if_needed(&self, id: Uuid) -> Result<bool, sqlx::Error> {
+    pub async fn clear_expired_custom_status_if_needed(
+        &self,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
             UPDATE users

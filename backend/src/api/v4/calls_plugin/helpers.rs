@@ -1,7 +1,6 @@
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
-use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::api::AppState;
@@ -10,7 +9,7 @@ use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 
 use super::lifecycle::{CallSessionResponse, CallStateResponse};
 use super::posts::ensure_call_thread_id;
-use super::state::{CallState, Participant};
+use super::state::CallState;
 
 pub(crate) static CHANNEL_CALLS_ENABLED: Lazy<DashMap<Uuid, bool>> = Lazy::new(DashMap::new);
 

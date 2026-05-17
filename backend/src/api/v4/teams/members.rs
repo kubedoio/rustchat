@@ -3,7 +3,6 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::{ensure_team_admin_or_system_manage, ensure_team_member, map_team_member};
 use crate::api::v4::extractors::MmAuthUser;
@@ -122,7 +121,7 @@ pub async fn remove_team_member(
     let user_id = parse_mm_or_uuid(&user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
     TeamRepository::new(&state.db)
-        .remove_member(team_id, user_id)
+        .remove_team_member(team_id, user_id)
         .await?;
     Ok(status_ok())
 }

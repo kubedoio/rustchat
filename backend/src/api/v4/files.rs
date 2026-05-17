@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    extract::{Multipart, Path, Query, State},
+    extract::{Multipart, Path, State},
     http::{header, StatusCode},
     response::IntoResponse,
     routing::{get, post},
@@ -74,7 +74,6 @@ async fn upload_file(
 
     struct PendingFile {
         filename: String,
-        content_type: String,
         temp_path: std::path::PathBuf,
         size: u64,
         hash: String,
@@ -103,10 +102,6 @@ async fn upload_file(
             // React Native network client may use different field names
             if field.file_name().is_some() || field.content_type().is_some() {
                 let filename = field.file_name().unwrap_or("unknown").to_string();
-                let content_type = field
-                    .content_type()
-                    .unwrap_or("application/octet-stream")
-                    .to_string();
 
                 let temp_path =
                     std::env::temp_dir().join(format!("rustchat_upload_{}", Uuid::new_v4()));
@@ -137,7 +132,6 @@ async fn upload_file(
 
                 pending_files.push(PendingFile {
                     filename,
-                    content_type,
                     temp_path,
                     size,
                     hash: hex::encode(hasher.finalize()),
@@ -162,8 +156,11 @@ async fn upload_file(
 
     for file in pending_files {
         let filename = file.filename.clone();
-        let (content_type, extension) =
-            crate::api::file_validation::validate_file_upload_head(&filename, &file.head, file.size as usize)?;
+        let (content_type, extension) = crate::api::file_validation::validate_file_upload_head(
+            &filename,
+            &file.head,
+            file.size as usize,
+        )?;
 
         // Full validation for SVG/text files that require entire file content
         if matches!(extension.as_str(), "svg" | "txt" | "md") {
@@ -285,20 +282,22 @@ async fn upload_file(
         let has_thumbnail = thumbnail_key.is_some();
 
         let file_repo = FileRepository::new(&state.db);
-        let _file_info = file_repo.create_full(
-            file_id,
-            auth.user_id,
-            channel_id,
-            &filename,
-            &key,
-            &content_type,
-            size,
-            &hash,
-            width,
-            height,
-            has_thumbnail,
-            thumbnail_key.as_deref(),
-        ).await?;
+        let _file_info = file_repo
+            .create_full(
+                file_id,
+                auth.user_id,
+                channel_id,
+                &filename,
+                &key,
+                &content_type,
+                size,
+                &hash,
+                width,
+                height,
+                has_thumbnail,
+                thumbnail_key.as_deref(),
+            )
+            .await?;
 
         file_infos.push(mm::FileInfo {
             id: encode_mm_id(file_id),
@@ -336,7 +335,9 @@ async fn get_file(
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
     let file_repo = FileRepository::new(&state.db);
-    let file = file_repo.get_by_id(file_id).await?
+    let file = file_repo
+        .get_by_id(file_id)
+        .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -380,7 +381,9 @@ async fn get_file_info(
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
     let file_repo = FileRepository::new(&state.db);
-    let file = file_repo.get_by_id(file_id).await?
+    let file = file_repo
+        .get_by_id(file_id)
+        .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -416,7 +419,9 @@ async fn get_thumbnail(
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
     let file_repo = FileRepository::new(&state.db);
-    let file = file_repo.get_by_id(file_id).await?
+    let file = file_repo
+        .get_by_id(file_id)
+        .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -464,7 +469,9 @@ async fn get_preview(
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
     let file_repo = FileRepository::new(&state.db);
-    let file = file_repo.get_by_id(file_id).await?
+    let file = file_repo
+        .get_by_id(file_id)
+        .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -541,7 +548,9 @@ async fn get_link(
     let file_id = parse_mm_or_uuid(&file_id)
         .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
     let file_repo = FileRepository::new(&state.db);
-    let file = file_repo.get_by_id(file_id).await?
+    let file = file_repo
+        .get_by_id(file_id)
+        .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -597,7 +606,9 @@ async fn search_files_impl(
 
     let file_repo = FileRepository::new(&state.db);
     let files = if let Some(tid) = team_id {
-        file_repo.search_for_team(user_id, tid, &search_pattern).await?
+        file_repo
+            .search_for_team(user_id, tid, &search_pattern)
+            .await?
     } else {
         file_repo.search(user_id, &search_pattern).await?
     };

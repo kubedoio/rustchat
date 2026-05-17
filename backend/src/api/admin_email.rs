@@ -12,19 +12,82 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::Deserialize;
 use tracing::info;
-use sqlx::FromRow;
 use uuid::Uuid;
 
-use crate::api::{admin::insert_admin_audit_log, admin::require_admin, AppState};
+use crate::api::{admin::require_admin, AppState};
 use crate::error::{ApiResult, AppError};
 use crate::models::email::*;
 use crate::repositories::AdminRepository;
 use crate::services::email_provider::{EmailAddress, EmailContent, MailProvider, SmtpProvider};
 use crate::services::email_service::{EmailService, EnqueueOptions, OutboxFilters};
 use crate::services::template_renderer::TemplateRenderer;
+
+fn auth_org_id(auth: &crate::auth::AuthUser) -> ApiResult<Uuid> {
+    auth.org_id
+        .ok_or_else(|| AppError::Forbidden("Organization context is required".to_string()))
+}
+
+fn classify_email_error(error: &str) -> (&'static str, &'static str) {
+    let lower = error.to_ascii_lowercase();
+    if lower.contains("auth") || lower.contains("credential") || lower.contains("password") {
+        ("authentication", "Check the SMTP username and password.")
+    } else if lower.contains("tls") || lower.contains("certificate") || lower.contains("ssl") {
+        ("tls", "Check TLS mode and certificate settings.")
+    } else if lower.contains("timeout") || lower.contains("timed out") {
+        (
+            "timeout",
+            "Check SMTP host, port, and network reachability.",
+        )
+    } else if lower.contains("connection") || lower.contains("connect") {
+        ("connection", "Check SMTP host and port.")
+    } else {
+        ("smtp", "Check the provider logs for details.")
+    }
+}
+
+async fn record_provider_email_test_event(
+    state: &AppState,
+    user_id: Uuid,
+    provider: &MailProviderSettings,
+    recipient: &str,
+    success: bool,
+    message: Option<String>,
+    error_category: Option<&str>,
+) {
+    let event_type = if success { "sent" } else { "failed" };
+    let provider_response = success.then(|| {
+        sqlx::types::Json(serde_json::json!({
+            "server_response": message.clone().unwrap_or_default()
+        }))
+    });
+
+    let result = sqlx::query(
+        r#"
+        INSERT INTO email_events (
+            tenant_id, workflow_key, event_type, recipient_email, recipient_user_id,
+            provider_id, error_category, error_message, provider_response
+        )
+        VALUES ($1, 'provider_test', $2, $3, $4, $5, $6, $7, $8)
+        "#,
+    )
+    .bind(provider.tenant_id)
+    .bind(event_type)
+    .bind(recipient)
+    .bind(user_id)
+    .bind(provider.id)
+    .bind(error_category)
+    .bind(if success { None } else { message.as_deref() })
+    .bind(provider_response)
+    .execute(&state.db)
+    .await;
+
+    if let Err(error) = result {
+        tracing::warn!(%error, "failed to record provider email test event");
+    }
+}
 
 /// Build admin email routes
 pub fn router() -> Router<AppState> {
@@ -227,7 +290,8 @@ async fn update_provider(
 
     // If setting as default, clear others
     if body.is_default == Some(true) && !existing.is_default {
-        repo.clear_default_mail_providers(existing.tenant_id).await?;
+        repo.clear_default_mail_providers(existing.tenant_id)
+            .await?;
     }
 
     let provider = repo
@@ -290,7 +354,8 @@ async fn set_default_provider(
         .ok_or_else(|| AppError::NotFound("Provider not found".to_string()))?;
 
     // Clear other defaults for this tenant
-    repo.clear_default_mail_providers(provider.tenant_id).await?;
+    repo.clear_default_mail_providers(provider.tenant_id)
+        .await?;
 
     // Set this one as default
     let provider = repo.set_default_mail_provider(id).await?;
@@ -375,7 +440,9 @@ async fn list_workflows(
     require_admin(&auth)?;
 
     let repo = AdminRepository::new(&state.db);
-    let workflows = repo.list_notification_workflows(auth.org_id).await?;
+    let workflows = repo
+        .list_notification_workflows(auth_org_id(&auth)?)
+        .await?;
 
     let responses: Vec<WorkflowResponse> = workflows.into_iter().map(Into::into).collect();
     Ok(Json(responses))
@@ -448,7 +515,9 @@ async fn list_template_families(
     require_admin(&auth)?;
 
     let repo = AdminRepository::new(&state.db);
-    let families = repo.list_email_template_families(auth.org_id).await?;
+    let families = repo
+        .list_email_template_families(auth_org_id(&auth)?)
+        .await?;
 
     Ok(Json(families))
 }
@@ -735,7 +804,10 @@ async fn send_preview_email(
         .await
         .map_err(|e| AppError::ExternalService(format!("Provider error: {}", e)))?;
 
-    let from = EmailAddress::with_name(&provider_settings.from_address, &provider_settings.from_name);
+    let from = EmailAddress::with_name(
+        &provider_settings.from_address,
+        &provider_settings.from_name,
+    );
     let to = EmailAddress::new(&body.to_email);
     let content = EmailContent {
         subject: format!("[PREVIEW] {}", rendered.subject),
@@ -1035,7 +1107,6 @@ pub struct TestEmailRequest {
     pub to_email: Option<String>,
 }
 
-
 pub async fn test_email_config(
     State(state): State<AppState>,
     auth: crate::auth::AuthUser,
@@ -1046,15 +1117,12 @@ pub async fn test_email_config(
     let repo = AdminRepository::new(&state.db);
 
     // Get default provider from the new provider system
-    let provider_settings = repo
-        .get_default_mail_provider()
-        .await?
-        .ok_or_else(|| {
-            AppError::Config(
-                "No default mail provider configured. Please configure an email provider first."
-                    .to_string(),
-            )
-        })?;
+    let provider_settings = repo.get_default_mail_provider().await?.ok_or_else(|| {
+        AppError::Config(
+            "No default mail provider configured. Please configure an email provider first."
+                .to_string(),
+        )
+    })?;
 
     // Check if SMTP is configured
     if provider_settings.host.trim().is_empty() {

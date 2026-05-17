@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::crypto;
-use crate::error::{ApiResult, AppError};
+use crate::error::AppError;
 use crate::models::SsoConfig;
 use crate::repositories::OAuthRepository;
 use crate::services::membership_policies::apply_auto_membership_for_new_user;
@@ -16,14 +16,12 @@ use crate::services::oauth_token_exchange::{
     create_exchange_code, create_exchange_code_with_sso, SsoExchangeChallenge,
 };
 
-use super::{
-    OAuthCallbackQuery, OAuthStatePayload, UserInfo, OAUTH_STATE_TTL_SECONDS,
-};
 use super::providers::{exchange_github_token, exchange_oidc_token};
 use super::utils::{
-    append_query_param, build_exchange_code_cookie, clear_exchange_code_cookie, get_site_url,
+    append_query_param, build_exchange_code_cookie, get_site_url,
     oauth_state_key,
 };
+use super::{OAuthCallbackQuery, OAuthStatePayload, UserInfo, OAUTH_STATE_TTL_SECONDS};
 
 /// Handle OAuth callback from provider
 pub async fn oauth_callback(
@@ -94,10 +92,12 @@ pub async fn oauth_callback(
     let config = OAuthRepository::new(&state.db)
         .get_active_sso_config_by_provider_key(&provider_key)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("OAuth provider '{}' not found", provider_key)))?;
+        .ok_or_else(|| {
+            AppError::NotFound(format!("OAuth provider '{}' not found", provider_key))
+        })?;
 
-    let provider_type =
-        crate::models::SsoProviderType::from_str(&config.provider_type).ok_or_else(|| {
+    let provider_type = crate::models::SsoProviderType::from_str(&config.provider_type)
+        .ok_or_else(|| {
             AppError::Internal(format!("Unknown provider type: {}", config.provider_type))
         })?;
 
@@ -284,8 +284,6 @@ async fn find_or_create_user(
     config: &SsoConfig,
     provider_key: &str,
 ) -> Result<crate::models::User, AppError> {
-    use crate::models::User;
-
     let desired_role = determine_user_role(config, user_info);
     let external_id = user_info
         .external_id
@@ -314,7 +312,8 @@ async fn find_or_create_user(
         let current_link = repo.get_user_auth_link_by_id(user.id).await?;
 
         if let Some(existing_external_id) = current_link.as_ref().and_then(|l| l.1.as_deref()) {
-            let same_provider = current_link.as_ref().and_then(|l| l.0.as_deref()) == Some(provider_key);
+            let same_provider =
+                current_link.as_ref().and_then(|l| l.0.as_deref()) == Some(provider_key);
             let same_external = external_id == Some(existing_external_id);
             if !same_provider || !same_external {
                 return Err(AppError::Conflict(
@@ -323,7 +322,8 @@ async fn find_or_create_user(
             }
         }
 
-        let should_link = external_id.is_some() && current_link.as_ref().and_then(|l| l.1.as_ref()).is_none();
+        let should_link =
+            external_id.is_some() && current_link.as_ref().and_then(|l| l.1.as_ref()).is_none();
         let should_sync_role = config.provider_type == "oidc" && !desired_role.is_empty();
         let updated_user = repo
             .update_user_login_and_link(
@@ -387,7 +387,7 @@ async fn find_or_create_user(
             &role,
             provider_key,
             external_id,
-            config.org_id,
+            Some(config.org_id),
         )
         .await
         .map_err(|e| AppError::Internal(format!("Failed to create user: {}", e)))?;
@@ -442,5 +442,3 @@ async fn generate_unique_username(
         .to_string();
     Ok(format!("{}_{}", base_username, unique_suffix))
 }
-
-

@@ -17,6 +17,18 @@ pub enum ChannelType {
     Group,
 }
 
+impl std::fmt::Display for ChannelType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            ChannelType::Public => "public",
+            ChannelType::Private => "private",
+            ChannelType::Direct => "direct",
+            ChannelType::Group => "group",
+        };
+        f.write_str(value)
+    }
+}
+
 /// Channel entity
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub struct Channel {

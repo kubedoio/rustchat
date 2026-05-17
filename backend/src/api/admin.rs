@@ -10,7 +10,7 @@ use super::AppState;
 use crate::auth::policy::{permissions as policy_permissions, AuthzResult, PolicyEngine};
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
-use crate::models::{AuditLog, AuditLogQuery, ServerConfig, ServerConfigResponse};
+use crate::models::{AuditLog, AuditLogQuery, ServerConfigResponse};
 use crate::repositories::AdminRepository;
 
 /// Build admin routes
