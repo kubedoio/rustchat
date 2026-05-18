@@ -9,6 +9,14 @@ export interface FullConfig {
     authentication: AuthConfig
 }
 
+function asConfigUpdate(data: unknown): { category?: unknown; config?: unknown } {
+    return data && typeof data === 'object' ? data as { category?: unknown; config?: unknown } : {}
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' ? value as Record<string, unknown> : {}
+}
+
 export const useConfigStore = defineStore('config', () => {
     const siteConfig = ref<PublicConfig>({
         site_name: 'RustChat',
@@ -85,14 +93,15 @@ export const useConfigStore = defineStore('config', () => {
     function initSync() {
         const { onEvent } = useWebSocket()
 
-        onEvent('config_updated', (data: Record<string, unknown>) => {
-            if (data.category === 'site') {
+        onEvent('config_updated', (data) => {
+            const update = asConfigUpdate(data)
+            if (update.category === 'site') {
                 siteConfig.value = {
                     ...siteConfig.value,
-                    ...data.config,
-                }
-            } else if (data.category === 'authentication') {
-                authConfig.value = { ...authConfig.value, ...data.config }
+                    ...asObject(update.config),
+                } as PublicConfig
+            } else if (update.category === 'authentication' && authConfig.value) {
+                authConfig.value = { ...authConfig.value, ...asObject(update.config) } as AuthConfig
             }
         })
     }
