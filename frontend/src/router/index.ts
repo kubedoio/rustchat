@@ -193,7 +193,7 @@ router.beforeEach(async (to, _from, next) => {
     }
 
     // Rehydrate user if token exists but user is null
-    if (auth.isAuthenticated && !auth.user) {
+    if (auth.token && !auth.user) {
         await auth.fetchMe()
     }
 
