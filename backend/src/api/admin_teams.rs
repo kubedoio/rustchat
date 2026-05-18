@@ -2,10 +2,9 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post, patch},
+    routing::{get, patch},
     Json, Router,
 };
-use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::{admin::require_admin, AppState};
@@ -72,7 +71,9 @@ pub async fn list_admin_teams(
     let offset = (page - 1) * per_page;
 
     let repo = AdminRepository::new(&state.db);
-    let teams = repo.list_teams(query.search.as_deref(), per_page, offset).await?;
+    let teams = repo
+        .list_teams(query.search.as_deref(), per_page, offset)
+        .await?;
     let total = repo.count_teams().await?;
 
     Ok(Json(AdminTeamsListResponse { teams, total }))
@@ -95,7 +96,7 @@ pub async fn get_admin_team(
 }
 
 #[derive(Debug, serde::Deserialize)]
-struct UpdateTeamRequest {
+pub(crate) struct UpdateTeamRequest {
     display_name: Option<String>,
     description: Option<String>,
 }
@@ -109,8 +110,12 @@ pub async fn update_admin_team(
     require_admin(&auth)?;
 
     let repo = AdminRepository::new(&state.db);
-    repo.update_team(id, payload.display_name.as_deref(), payload.description.as_deref())
-        .await?;
+    repo.update_team(
+        id,
+        payload.display_name.as_deref(),
+        payload.description.as_deref(),
+    )
+    .await?;
 
     let team = repo
         .get_team_by_id(id)

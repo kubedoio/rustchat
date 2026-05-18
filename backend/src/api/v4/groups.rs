@@ -5,7 +5,7 @@ use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use crate::models::channel::ChannelType;
 use crate::repositories::GroupRepository;
 use crate::repositories::group_repository::{
-    ChannelMetaRow, GroupListRow, GroupRow, GroupSyncableRow, TeamMetaRow, TrackedMembershipRow,
+    GroupListRow, GroupRow, GroupSyncableRow, TrackedMembershipRow,
 };
 use axum::{
     extract::{Path, State},

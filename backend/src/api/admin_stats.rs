@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use crate::api::admin::require_admin;
 use crate::api::AppState;
 use crate::auth::AuthUser;
-use crate::error::{ApiResult, AppError};
+use crate::error::ApiResult;
 
 pub fn router() -> Router<AppState> {
     Router::new()

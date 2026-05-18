@@ -12,11 +12,11 @@ use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    ChecklistWithTasks, CreateChecklist, CreatePlaybook, CreateStatusUpdate, CreateTask, Playbook,
-    PlaybookChecklist, PlaybookFull, PlaybookRun, PlaybookTask, RunProgress, RunStatusUpdate,
+    CreateChecklist, CreatePlaybook, CreateStatusUpdate, CreateTask, Playbook,
+    PlaybookChecklist, PlaybookFull, PlaybookRun, PlaybookTask, RunStatusUpdate,
     RunTask, RunWithTasks, StartRun, UpdatePlaybook, UpdateRun, UpdateRunTask,
 };
-use crate::repositories::PlaybookRepository;
+use crate::repositories::{calculate_progress, PlaybookRepository};
 
 #[derive(serde::Deserialize)]
 pub struct TeamQuery {

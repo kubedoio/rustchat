@@ -8,17 +8,20 @@ use uuid::Uuid;
 
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
-use crate::error::{ApiResult, AppError};
+use crate::error::ApiResult;
 use crate::mattermost_compat::id::encode_mm_id;
 
 use super::broadcast::broadcast_call_event;
-use super::helpers::{build_call_state_response, channel_calls_enabled, check_channel_permission, resolve_channel_id, CHANNEL_CALLS_ENABLED};
+use super::helpers::{
+    build_call_state_response, channel_calls_enabled, check_channel_permission, resolve_channel_id,
+    CHANNEL_CALLS_ENABLED,
+};
+use super::lifecycle::CallStateResponse;
 use super::state::CallState;
 #[derive(Debug, Deserialize)]
-struct ChannelEnableRequest {
+pub(crate) struct ChannelEnableRequest {
     enabled: bool,
 }
-
 
 pub(crate) async fn get_channels(
     State(state): State<AppState>,
@@ -59,6 +62,7 @@ pub(crate) async fn get_channels(
 
     Ok(Json(channels))
 }
+#[derive(Debug, Serialize)]
 pub(crate) struct CallChannelInfo {
     channel_id: String,
     channel_id_raw: String,

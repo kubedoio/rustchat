@@ -5,11 +5,10 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::utils::ensure_channel_admin_or_system_manage;
 use super::utils::{fetch_channel_member_compat_rows, row_to_mm_channel_member};
-use super::{mm, parse_mm_or_uuid, ApiResult, AppError, AppState, Channel, MmAuthUser};
+use super::{mm, parse_mm_or_uuid, ApiResult, AppError, AppState, MmAuthUser};
 use crate::repositories::ChannelRepository;
 use serde_json::json;
 

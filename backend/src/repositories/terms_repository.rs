@@ -1,7 +1,7 @@
 //! Terms of Service repository for centralized query patterns
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::error::ApiResult;
@@ -37,12 +37,11 @@ impl<'a> TermsRepository<'a> {
 
     /// Get terms by ID
     pub async fn get_terms_by_id(&self, id: Uuid) -> ApiResult<Option<TermsOfService>> {
-        let terms = sqlx::query_as::<_, TermsOfService>(
-            "SELECT * FROM terms_of_service WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_optional(self.pool)
-        .await?;
+        let terms =
+            sqlx::query_as::<_, TermsOfService>("SELECT * FROM terms_of_service WHERE id = $1")
+                .bind(id)
+                .fetch_optional(self.pool)
+                .await?;
 
         Ok(terms)
     }
@@ -60,12 +59,11 @@ impl<'a> TermsRepository<'a> {
 
     /// Check if a terms version already exists
     pub async fn version_exists(&self, version: &str) -> ApiResult<bool> {
-        let exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM terms_of_service WHERE version = $1)",
-        )
-        .bind(version)
-        .fetch_one(self.pool)
-        .await?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM terms_of_service WHERE version = $1)")
+                .bind(version)
+                .fetch_one(self.pool)
+                .await?;
 
         Ok(exists)
     }

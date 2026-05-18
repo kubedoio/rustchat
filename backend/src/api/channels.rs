@@ -35,14 +35,18 @@ async fn is_channel_creator_or_admin(
     }
 
     // Check if user is channel creator
-    let creator_id: Option<Uuid> = ChannelRepository::new(&state.db).get_creator_id(channel_id).await?;
+    let creator_id: Option<Uuid> = ChannelRepository::new(&state.db)
+        .get_creator_id(channel_id)
+        .await?;
 
     if creator_id == Some(user_id) {
         return Ok(true);
     }
 
     // Check if user is channel admin
-    let role: Option<String> = ChannelRepository::new(&state.db).get_member_role(channel_id, user_id).await?;
+    let role: Option<String> = ChannelRepository::new(&state.db)
+        .get_member_role(channel_id, user_id)
+        .await?;
 
     let is_admin = matches!(
         role.as_deref(),
@@ -139,7 +143,10 @@ async fn list_channels(
 
     if available_to_join {
         // First check if user is a member of the team
-        if !ChannelRepository::new(&state.db).is_team_member(query.team_id, auth.user_id).await? {
+        if !ChannelRepository::new(&state.db)
+            .is_team_member(query.team_id, auth.user_id)
+            .await?
+        {
             return Err(AppError::Forbidden("Not a member of this team".to_string()));
         }
 
@@ -194,7 +201,10 @@ async fn create_channel(
         }
 
         // Validate target user exists in the team
-        if !ChannelRepository::new(&state.db).is_team_member(input.team_id, target_id).await? {
+        if !ChannelRepository::new(&state.db)
+            .is_team_member(input.team_id, target_id)
+            .await?
+        {
             return Err(AppError::Forbidden(
                 "Target user is not a member of this team".to_string(),
             ));
@@ -209,7 +219,7 @@ async fn create_channel(
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(|value| value.to_string())
-            .or(teammate_display_name)
+            .or(Some(teammate_display_name))
             .unwrap_or_else(|| "Direct Message".to_string());
 
         // Create DM channel
@@ -261,7 +271,10 @@ async fn create_channel(
     }
 
     // Check if team exists and user is member
-    if !ChannelRepository::new(&state.db).is_team_member(input.team_id, auth.user_id).await? {
+    if !ChannelRepository::new(&state.db)
+        .is_team_member(input.team_id, auth.user_id)
+        .await?
+    {
         return Err(AppError::Forbidden("Not a member of this team".to_string()));
     }
 
@@ -321,9 +334,7 @@ async fn get_channel(
         .require_member(id, auth.user_id)
         .await?;
 
-    let mut channel = ChannelRepository::new(&state.db)
-        .get_by_id(id)
-        .await?;
+    let mut channel = ChannelRepository::new(&state.db).get_by_id(id).await?;
 
     hydrate_direct_channel_display_name(&state, auth.user_id, &mut channel).await?;
 
@@ -490,9 +501,7 @@ async fn add_member(
         .await?;
 
     // Announce join in public channels
-    let channel = ChannelRepository::new(&state.db)
-        .get_by_id(id)
-        .await?;
+    let channel = ChannelRepository::new(&state.db).get_by_id(id).await?;
 
     if channel.channel_type == crate::models::ChannelType::Public {
         let username = UserRepository::new(&state.db)
@@ -574,10 +583,11 @@ async fn mark_channel_member_as_read(
 
     // Update last_viewed_at to mark all messages as read
     let repo = ChannelRepository::new(&state.db);
-    repo.mark_channel_read(channel_id, auth.user_id).await?;
+    repo.mark_channel_read(auth.user_id, channel_id).await?;
 
     // Also update channel_reads table
-    repo.update_channel_reads_to_latest(auth.user_id, channel_id).await?;
+    repo.update_channel_reads_to_latest(auth.user_id, channel_id)
+        .await?;
 
     // Broadcast channel viewed event
     let broadcast = WsEnvelope::event(

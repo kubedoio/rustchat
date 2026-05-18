@@ -36,48 +36,64 @@ pub async fn get_posts(
     let repo = PostRepository::new(state.db.clone());
 
     // Check channel membership first
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     let per_page = pagination.per_page.unwrap_or(60).min(200) as i64;
 
     // Determine query type based on pagination params
-    let mut posts: Vec<PostResponse> = if let Some(since) = pagination.since {
-        // Incremental sync: get posts created or edited since timestamp
-        let since_time =
-            chrono::DateTime::from_timestamp_millis(since).unwrap_or_else(chrono::Utc::now);
+    let mut posts: Vec<PostResponse> =
+        if let Some(since) = pagination.since {
+            // Incremental sync: get posts created or edited since timestamp
+            let since_time =
+                chrono::DateTime::from_timestamp_millis(since).unwrap_or_else(chrono::Utc::now);
 
-        repo.list_since(channel_id, since_time, per_page).await?
-    } else if let Some(before) = &pagination.before {
-        // Cursor pagination: get posts before a specific post
-        let before_id = parse_mm_or_uuid(before).ok_or_else(|| {
-            crate::error::AppError::BadRequest("Invalid before post_id".to_string())
-        })?;
+            repo.list_since(channel_id, since_time, per_page)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        } else if let Some(before) = &pagination.before {
+            // Cursor pagination: get posts before a specific post
+            let before_id = parse_mm_or_uuid(before).ok_or_else(|| {
+                crate::error::AppError::BadRequest("Invalid before post_id".to_string())
+            })?;
 
-        let before_time = repo
-            .get_post_created_at(before_id)
-            .await?
-            .ok_or_else(|| crate::error::AppError::NotFound("Before post not found".to_string()))?;
+            let before_time = repo.get_post_created_at(before_id).await?.ok_or_else(|| {
+                crate::error::AppError::NotFound("Before post not found".to_string())
+            })?;
 
-        repo.list_before(channel_id, before_time, per_page).await?
-    } else if let Some(after) = &pagination.after {
-        // Cursor pagination: get posts after a specific post
-        let after_id = parse_mm_or_uuid(after).ok_or_else(|| {
-            crate::error::AppError::BadRequest("Invalid after post_id".to_string())
-        })?;
+            repo.list_before(channel_id, before_time, per_page)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        } else if let Some(after) = &pagination.after {
+            // Cursor pagination: get posts after a specific post
+            let after_id = parse_mm_or_uuid(after).ok_or_else(|| {
+                crate::error::AppError::BadRequest("Invalid after post_id".to_string())
+            })?;
 
-        let after_time = repo
-            .get_post_created_at(after_id)
-            .await?
-            .ok_or_else(|| crate::error::AppError::NotFound("After post not found".to_string()))?;
+            let after_time = repo.get_post_created_at(after_id).await?.ok_or_else(|| {
+                crate::error::AppError::NotFound("After post not found".to_string())
+            })?;
 
-        repo.list_after(channel_id, after_time, per_page).await?
-    } else {
-        // Standard page-based pagination
-        let page = pagination.page.unwrap_or(0);
-        let offset = (page * per_page as u64) as i64;
+            repo.list_after(channel_id, after_time, per_page)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        } else {
+            // Standard page-based pagination
+            let page = pagination.page.unwrap_or(0);
+            let offset = (page * per_page as u64) as i64;
 
-        repo.list_by_channel(channel_id, per_page, offset).await?
-    };
+            repo.list_by_channel(channel_id, per_page, offset)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        };
 
     crate::services::posts::populate_files(&state, &mut posts).await?;
 
@@ -152,7 +168,8 @@ pub async fn get_pinned_posts(
     let repo = PostRepository::new(state.db.clone());
 
     // Verify membership
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     let per_page = query.per_page.unwrap_or(100).min(100) as i64;
     let page = query.page.unwrap_or(0) as i64;
@@ -224,7 +241,8 @@ pub async fn pin_post(
     let repo = PostRepository::new(state.db.clone());
 
     // Verify membership
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     // Pin the post
     repo.pin_post(post_id).await?;
@@ -246,7 +264,8 @@ pub async fn unpin_post(
     let repo = PostRepository::new(state.db.clone());
 
     // Verify membership
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     // Unpin the post
     repo.unpin_post(post_id).await?;

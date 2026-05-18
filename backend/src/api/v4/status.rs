@@ -72,16 +72,6 @@ pub struct UserStatusSnapshot {
     pub expires_at: Option<i64>,
 }
 
-#[derive(Debug, sqlx::FromRow)]
-struct UserStatusSnapshotRow {
-    presence: String,
-    manual: bool,
-    last_login_at: Option<DateTime<Utc>>,
-    text: Option<String>,
-    emoji: Option<String>,
-    expires_at: Option<DateTime<Utc>>,
-}
-
 /// Custom status duration options (Mattermost-compatible)
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]

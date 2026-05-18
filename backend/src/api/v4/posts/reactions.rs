@@ -28,7 +28,7 @@ fn reaction_event_payload(mm_reaction: &mm::Reaction) -> serde_json::Value {
 
 /// Verify the caller is a member of the channel containing the post.
 async fn check_channel_membership(state: &AppState, post_id: Uuid, user_id: Uuid) -> ApiResult<()> {
-    let is_member = PostRepository::new(&state.db)
+    let is_member = PostRepository::new(state.db.clone())
         .check_channel_membership(post_id, user_id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -69,7 +69,7 @@ pub(super) async fn add_reaction(
         return Err(AppError::BadRequest("Invalid emoji name".to_string()));
     }
 
-    let repo = PostRepository::new(&state.db);
+    let repo = PostRepository::new(state.db.clone());
 
     if !crate::mattermost_compat::emoji_data::is_system_emoji(&emoji_name) {
         let exists = repo
@@ -89,11 +89,8 @@ pub(super) async fn add_reaction(
     let channel_id = repo.get_post_channel_id(post_id).await?;
 
     // Create reaction activity for the post author
-    if let Some((post_user_id, team_id)) = repo
-        .get_post_author_and_team(post_id)
-        .await
-        .ok()
-        .flatten()
+    if let Some((post_user_id, team_id)) =
+        repo.get_post_author_and_team(post_id).await.ok().flatten()
     {
         if post_user_id != auth.user_id {
             let _ = crate::services::activity::create_reaction_activity(
@@ -144,7 +141,7 @@ pub(crate) async fn reactions_for_posts(
         return Ok(HashMap::new());
     }
 
-    let reactions = PostRepository::new(&state.db)
+    let reactions = PostRepository::new(state.db.clone())
         .get_reactions_with_channel_for_posts(post_ids)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -219,7 +216,7 @@ async fn remove_reaction_internal(
 ) -> ApiResult<()> {
     let emoji_name = crate::mattermost_compat::emoji_data::get_short_name_for_emoji(emoji_name);
 
-    let repo = PostRepository::new(&state.db);
+    let repo = PostRepository::new(state.db.clone());
 
     if let Some(r) = repo
         .get_reaction(user_id, post_id, &emoji_name)
@@ -267,7 +264,7 @@ pub(super) async fn get_reactions(
     // Verify the caller is a member of the channel that owns this post.
     check_channel_membership(&state, post_id, auth.user_id).await?;
 
-    let reactions = PostRepository::new(&state.db)
+    let reactions = PostRepository::new(state.db.clone())
         .get_reactions_with_channel_for_post(post_id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;

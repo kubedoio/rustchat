@@ -13,7 +13,6 @@ mod utils;
 
 use axum::{
     middleware,
-    response::Redirect,
     routing::{get, post},
     Router,
 };

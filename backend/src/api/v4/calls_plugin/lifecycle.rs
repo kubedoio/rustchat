@@ -1,13 +1,13 @@
 use axum::{
     extract::{Path, State},
-    response::Response,
+    response::{IntoResponse, Response},
     Json,
 };
 use chrono::Utc;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::api::v4::extractors::MmAuthUser;
@@ -16,67 +16,73 @@ use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::encode_mm_id;
 
 use super::broadcast::{broadcast_call_event, broadcast_call_state_event, broadcast_ringing_event};
-use super::helpers::{build_call_state_response, channel_calls_enabled, check_channel_permission, resolve_channel_id};
+use super::helpers::{
+    build_call_state_response, channel_calls_enabled, check_channel_permission, resolve_channel_id,
+};
 use super::posts::ensure_call_thread_id;
 use super::signaling::spawn_signaling_forwarder;
 use super::state::{CallState, Participant};
-use super::state_helpers::{can_manage_call, end_call, is_host_session_active, normalize_call_host_if_stale, reconcile_after_participant_left, schedule_empty_call_timeout, schedule_unanswered_call_timeout};
+use super::state_helpers::{
+    can_manage_call, end_call, is_host_session_active, normalize_call_host_if_stale,
+    reconcile_after_participant_left, schedule_empty_call_timeout,
+    schedule_unanswered_call_timeout, EMPTY_CALL_TIMEOUT_SECS,
+};
 
 #[derive(Debug, Serialize)]
 pub(crate) struct StartCallResponse {
-    id: String,
-    id_raw: String,
-    channel_id: String,
-    channel_id_raw: String,
-    start_at: i64,
-    owner_id: String,
-    owner_id_raw: String,
-    host_id: String,
-    host_id_raw: String,
+    pub(crate) id: String,
+    pub(crate) id_raw: String,
+    pub(crate) channel_id: String,
+    pub(crate) channel_id_raw: String,
+    pub(crate) start_at: i64,
+    pub(crate) owner_id: String,
+    pub(crate) owner_id_raw: String,
+    pub(crate) host_id: String,
+    pub(crate) host_id_raw: String,
 }
 #[derive(Debug, Serialize)]
 pub(crate) struct CallStateResponse {
-    id: String,
-    id_raw: String,
-    channel_id: String,
-    channel_id_raw: String,
-    start_at: i64,
-    owner_id: String,
-    owner_id_raw: String,
-    host_id: String,
-    host_id_raw: String,
-    participants: Vec<String>,
-    participants_raw: Vec<String>,
-    sessions: HashMap<String, CallSessionResponse>,
+    pub(crate) id: String,
+    pub(crate) id_raw: String,
+    pub(crate) channel_id: String,
+    pub(crate) channel_id_raw: String,
+    pub(crate) start_at: i64,
+    pub(crate) owner_id: String,
+    pub(crate) owner_id_raw: String,
+    pub(crate) host_id: String,
+    pub(crate) host_id_raw: String,
+    pub(crate) participants: Vec<String>,
+    pub(crate) participants_raw: Vec<String>,
+    pub(crate) sessions: HashMap<String, CallSessionResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    screen_sharing_id: Option<String>,
+    pub(crate) screen_sharing_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    screen_sharing_id_raw: Option<String>,
+    pub(crate) screen_sharing_id_raw: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    screen_sharing_session_id: Option<String>,
+    pub(crate) screen_sharing_session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    screen_sharing_session_id_raw: Option<String>,
-    thread_id: Option<String>,
+    pub(crate) screen_sharing_session_id_raw: Option<String>,
+    pub(crate) thread_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    recording: Option<Value>,
+    pub(crate) recording: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    dismissed_notification: Option<HashMap<String, bool>>,
+    pub(crate) dismissed_notification: Option<HashMap<String, bool>>,
 }
 #[derive(Debug, Serialize)]
 pub(crate) struct CallSessionResponse {
-    session_id: String,
-    session_id_raw: String,
-    user_id: String,
-    user_id_raw: String,
-    username: String,
-    display_name: String,
-    unmuted: bool,
-    raised_hand: i32,
+    pub(crate) session_id: String,
+    pub(crate) session_id_raw: String,
+    pub(crate) user_id: String,
+    pub(crate) user_id_raw: String,
+    pub(crate) username: String,
+    pub(crate) display_name: String,
+    pub(crate) unmuted: bool,
+    pub(crate) raised_hand: i32,
 }
 
 #[derive(Debug, Serialize)]
 pub(crate) struct StatusResponse {
-    status: String,
+    pub(crate) status: String,
 }
 /// POST /plugins/com.mattermost.calls/calls/{channel_id}/start
 /// Starts a new call in a channel

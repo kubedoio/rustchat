@@ -18,7 +18,7 @@ use crate::mattermost_compat::{
     id::{encode_mm_id, parse_mm_or_uuid},
     models as mm,
 };
-use crate::models::{CreatePost, FileInfo};
+use crate::models::CreatePost;
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 use crate::repositories::PostRepository;
 use crate::services::posts;

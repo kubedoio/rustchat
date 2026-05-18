@@ -2,16 +2,15 @@
 
 use axum::{
     extract::{Path, State},
-    routing::{get, put},
+    routing::get,
     Json, Router,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 
 use crate::api::admin::require_admin;
 use crate::api::AppState;
 use crate::auth::AuthUser;
-use crate::error::{ApiResult, AppError};
+use crate::error::ApiResult;
 use crate::models::Permission;
 use crate::repositories::AdminRepository;
 
@@ -32,9 +31,7 @@ pub async fn list_permissions(
 ) -> ApiResult<Json<Vec<Permission>>> {
     require_admin(&auth)?;
 
-    let permissions = AdminRepository::new(&state.db)
-        .list_permissions()
-        .await?;
+    let permissions = AdminRepository::new(&state.db).list_permissions().await?;
 
     Ok(Json(permissions))
 }
@@ -54,7 +51,7 @@ pub async fn get_role_permissions(
 }
 
 #[derive(Deserialize)]
-struct RolePermissionsUpdate {
+pub(crate) struct RolePermissionsUpdate {
     permissions: Vec<String>,
 }
 

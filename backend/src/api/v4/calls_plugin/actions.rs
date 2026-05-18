@@ -3,20 +3,22 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use serde::Deserialize;
+use tracing::info;
 
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::encode_mm_id;
 
-use super::broadcast::{broadcast_call_event, broadcast_raise_hand_event, broadcast_screen_share_event};
+use super::broadcast::{
+    broadcast_call_event, broadcast_raise_hand_event, broadcast_screen_share_event,
+};
 use super::helpers::resolve_channel_id;
 use super::lifecycle::StatusResponse;
 
 #[derive(Debug, Deserialize)]
-struct ReactionRequest {
+pub(crate) struct ReactionRequest {
     emoji: String,
 }
 /// POST /plugins/com.mattermost.calls/calls/{channel_id}/react

@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::error::{ApiResult, AppError};
+use crate::error::ApiResult;
 use crate::models::FileInfo;
 
 pub struct FileRepository<'a> {

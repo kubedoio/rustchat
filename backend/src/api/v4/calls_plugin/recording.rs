@@ -2,7 +2,6 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use uuid::Uuid;
 
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;

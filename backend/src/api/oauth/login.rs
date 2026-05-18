@@ -8,17 +8,17 @@ use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
-use crate::models::{OAuthProviderInfo, SsoConfig, SsoProviderType};
+use crate::models::{OAuthProviderInfo, SsoProviderType};
 use crate::repositories::OAuthRepository;
 use crate::services::oidc_discovery::OidcDiscoveryService;
 
-use super::{
-    LegacyOAuthLoginQuery, LegacyOAuthMobileLoginQuery, OAuthLoginQuery,
-    OAuthStatePayload, GITHUB_AUTH_URL, OAUTH_STATE_PREFIX, OAUTH_STATE_TTL_SECONDS,
-};
 use super::utils::{
     generate_code_challenge, generate_code_verifier, generate_nonce, get_mobile_custom_url_schemes,
     get_site_url, oauth_state_key, sanitize_redirect_path, validate_mobile_redirect_to,
+};
+use super::{
+    LegacyOAuthLoginQuery, LegacyOAuthMobileLoginQuery, OAuthLoginQuery, OAuthStatePayload,
+    GITHUB_AUTH_URL, OAUTH_STATE_TTL_SECONDS,
 };
 
 pub async fn oauth_login(
@@ -264,8 +264,9 @@ async fn resolve_legacy_service_provider_key(state: &AppState, service: &str) ->
         return Err(AppError::BadRequest("Invalid OAuth service".to_string()));
     }
 
-    let providers: Vec<LegacyProviderRow> =
-        OAuthRepository::new(&state.db).list_legacy_providers().await?;
+    let providers: Vec<LegacyProviderRow> = OAuthRepository::new(&state.db)
+        .list_legacy_providers()
+        .await?;
 
     if let Some(exact) = providers.iter().find(|provider| {
         provider.provider_key.eq_ignore_ascii_case(&normalized)
@@ -305,73 +306,10 @@ async fn resolve_legacy_service_provider_key(state: &AppState, service: &str) ->
     )))
 }
 
-fn validate_mobile_redirect_to(redirect_to: &str, allowed_schemes: &[String]) -> ApiResult<String> {
-    let trimmed = redirect_to.trim();
-    if trimmed.is_empty() {
-        return Err(AppError::BadRequest(
-            "Invalid mobile redirect URL".to_string(),
-        ));
-    }
-
-    let parsed = url::Url::parse(trimmed)
-        .map_err(|_| AppError::BadRequest("Invalid mobile redirect URL".to_string()))?;
-
-    let normalized = trimmed.to_ascii_lowercase();
-    let effective_schemes: Vec<String> = if allowed_schemes.is_empty() {
-        super::DEFAULT_APP_CUSTOM_URL_SCHEMES
-            .iter()
-            .map(|value| value.to_string())
-            .collect()
-    } else {
-        allowed_schemes.to_vec()
-    };
-
-    let is_allowed_scheme = effective_schemes
-        .iter()
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-        .any(|value| normalized.starts_with(&value.to_ascii_lowercase()));
-
-    if !is_allowed_scheme {
-        return Err(AppError::BadRequest(
-            "Invalid mobile redirect URL scheme".to_string(),
-        ));
-    }
-
-    if parsed.host_str().unwrap_or_default() != "callback"
-        || !parsed.path().is_empty()
-        || parsed.query().is_some()
-        || parsed.fragment().is_some()
-    {
-        return Err(AppError::BadRequest(
-            "Invalid mobile redirect callback host".to_string(),
-        ));
-    }
-
-    Ok(trimmed.to_string())
-}
-
-async fn get_mobile_custom_url_schemes(db: &sqlx::PgPool) -> Vec<String> {
-    let config = OAuthRepository::new(db)
-        .get_site_config()
-        .await
-        .ok()
-        .flatten();
-
-    let schemes = config.map(|site| site.app_custom_url_schemes).unwrap_or_default();
-
-    if schemes.is_empty() {
-        super::DEFAULT_APP_CUSTOM_URL_SCHEMES
-            .iter()
-            .map(|value| value.to_string())
-            .collect()
-    } else {
-        schemes
-    }
-}
-
 /// List available OAuth providers for login
-pub async fn list_providers(State(state): State<AppState>) -> ApiResult<Json<Vec<OAuthProviderInfo>>> {
+pub async fn list_providers(
+    State(state): State<AppState>,
+) -> ApiResult<Json<Vec<OAuthProviderInfo>>> {
     // Check if SSO is enabled globally
     let sso_enabled = OAuthRepository::new(&state.db)
         .get_authentication_config()

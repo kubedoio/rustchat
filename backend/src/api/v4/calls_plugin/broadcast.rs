@@ -1,5 +1,4 @@
 use chrono::Utc;
-use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -7,11 +6,9 @@ use tracing::{debug, info, warn};
 
 use crate::api::AppState;
 use crate::mattermost_compat::id::encode_mm_id;
-use crate::realtime::{WsBroadcast, WsEnvelope};
+use crate::realtime::WsEnvelope;
 
 use super::helpers::build_call_state_response;
-use super::lifecycle::CallStateResponse;
-use super::state::CallState;
 use super::VoiceEvent;
 
 pub(crate) async fn broadcast_screen_share_event(

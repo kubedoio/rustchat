@@ -1,20 +1,23 @@
 use chrono::Utc;
 use flate2::read::ZlibDecoder;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
-use uuid::Uuid;
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 use crate::api::AppState;
-use crate::error::AppError;
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
+use crate::realtime::{WsBroadcast, WsEnvelope};
+use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 
 use super::broadcast::{broadcast_call_event, broadcast_call_state_event, broadcast_ringing_event};
-use super::helpers::{channel_calls_enabled, check_channel_permission, resolve_channel_id};
+use super::helpers::{channel_calls_enabled, check_channel_permission};
 use super::posts::ensure_call_thread_id;
 use super::state::{CallState, Participant};
-use super::state_helpers::{reconcile_after_participant_left, schedule_empty_call_timeout, schedule_unanswered_call_timeout};
+use super::state_helpers::{
+    reconcile_after_participant_left, schedule_empty_call_timeout, schedule_unanswered_call_timeout,
+};
 
 /// Handle websocket actions used by Mattermost mobile calls.
 /// Returns `true` when the action is recognized and handled.

@@ -10,7 +10,7 @@ use crate::error::{ApiResult, AppError};
 use crate::services::oauth_token_exchange::{exchange_code, ExchangeError};
 
 use super::{ExchangeRequest, ExchangeResponse, OAUTH_EXCHANGE_COOKIE};
-use super::utils::{build_exchange_code_cookie, clear_exchange_code_cookie, read_cookie_value};
+use super::utils::{clear_exchange_code_cookie, read_cookie_value};
 
 /// Exchange a one-time code for a JWT token
 pub async fn exchange_token(

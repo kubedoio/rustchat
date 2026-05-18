@@ -1,20 +1,22 @@
 use chrono::Utc;
 use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
-use uuid::Uuid;
 use tracing::{debug, info, warn};
+use uuid::Uuid;
 
+use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::auth::policy::permissions;
 use crate::mattermost_compat::id::encode_mm_id;
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 
-use super::broadcast::{broadcast_call_event, broadcast_call_state_event, broadcast_host_changed_event};
+use super::broadcast::{
+    broadcast_call_event, broadcast_call_state_event, broadcast_host_changed_event,
+};
 use super::posts::mark_call_thread_post_ended;
 use super::state::{CallState, Participant};
 pub(crate) const UNANSWERED_CALL_TIMEOUT_SECS: u64 = 20;
 pub(crate) const EMPTY_CALL_TIMEOUT_SECS: u64 = 10;
-
 
 pub(crate) fn can_manage_call(auth: &MmAuthUser, call: &CallState) -> bool {
     call.host_id == auth.user_id || auth.has_permission(&permissions::ADMIN_FULL)

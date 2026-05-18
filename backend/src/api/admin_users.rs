@@ -2,10 +2,9 @@
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post},
+    routing::{get, patch},
     Json, Router,
 };
-use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::admin::{insert_admin_audit_log, require_admin, require_global_admin};
@@ -68,17 +67,26 @@ pub async fn list_users(
     };
 
     let users = AdminRepository::new(&state.db)
-        .list_users(status, query.role.as_deref(), query.search.as_deref(), include_deleted, per_page, offset)
+        .list_users(
+            status,
+            query.role.as_deref(),
+            query.search.as_deref(),
+            include_deleted,
+            per_page,
+            offset,
+        )
         .await?;
 
     let total = AdminRepository::new(&state.db)
-        .count_users(status, query.role.as_deref(), query.search.as_deref(), include_deleted)
+        .count_users(
+            status,
+            query.role.as_deref(),
+            query.search.as_deref(),
+            include_deleted,
+        )
         .await?;
 
-    Ok(Json(UsersListResponse {
-        users,
-        total: total.0,
-    }))
+    Ok(Json(UsersListResponse { users, total }))
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -101,7 +109,13 @@ pub async fn create_admin_user(
     let role = input.role.unwrap_or_else(|| "member".to_string());
 
     let user = AdminRepository::new(&state.db)
-        .insert_user(&input.username, &input.email, &password_hash, &role, input.display_name.as_deref())
+        .insert_user(
+            &input.username,
+            &input.email,
+            &password_hash,
+            &role,
+            input.display_name.as_deref(),
+        )
         .await?;
 
     // Apply auto-membership policies for the new user
@@ -155,9 +169,7 @@ pub async fn deactivate_user(
 ) -> ApiResult<Json<serde_json::Value>> {
     require_admin(&auth)?;
 
-    AdminRepository::new(&state.db)
-        .deactivate_user(id)
-        .await?;
+    AdminRepository::new(&state.db).deactivate_user(id).await?;
 
     Ok(Json(serde_json::json!({"status": "deactivated"})))
 }
@@ -169,9 +181,7 @@ pub async fn reactivate_user(
 ) -> ApiResult<Json<serde_json::Value>> {
     require_admin(&auth)?;
 
-    AdminRepository::new(&state.db)
-        .reactivate_user(id)
-        .await?;
+    AdminRepository::new(&state.db).reactivate_user(id).await?;
 
     Ok(Json(serde_json::json!({"status": "reactivated"})))
 }
@@ -295,9 +305,7 @@ pub async fn wipe_user(
         )));
     }
 
-    AdminRepository::new(&state.db)
-        .wipe_user(id)
-        .await?;
+    AdminRepository::new(&state.db).wipe_user(id).await?;
 
     // Log the wipe action
     insert_admin_audit_log(

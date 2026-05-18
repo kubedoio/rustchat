@@ -247,7 +247,7 @@ pub async fn send_email_verification(
 ) -> ApiResult<Json<serde_json::Value>> {
     // Find user by email
     let user = UserRepository::new(&state.db)
-        .get_by_email_active(&input.email)
+        .get_by_email(&input.email)
         .await?;
 
     if let Some(user) = user {

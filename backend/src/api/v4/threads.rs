@@ -16,7 +16,6 @@ use axum::{
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;

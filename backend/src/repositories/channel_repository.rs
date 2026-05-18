@@ -85,22 +85,18 @@ impl<'a> ChannelRepository<'a> {
 
     /// Get a channel by ID that has not been soft-deleted
     pub async fn get_by_id(&self, id: Uuid) -> Result<Channel, sqlx::Error> {
-        sqlx::query_as::<_, Channel>(
-            "SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL"
-        )
-        .bind(id)
-        .fetch_one(self.pool)
-        .await
+        sqlx::query_as::<_, Channel>("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_one(self.pool)
+            .await
     }
 
     /// Get a channel by ID (optional, not found returns None instead of error).
     pub async fn get_by_id_optional(&self, id: Uuid) -> Result<Option<Channel>, sqlx::Error> {
-        sqlx::query_as::<_, Channel>(
-            "SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL"
-        )
-        .bind(id)
-        .fetch_optional(self.pool)
-        .await
+        sqlx::query_as::<_, Channel>("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await
     }
 
     /// Get channel creator ID
@@ -134,7 +130,7 @@ impl<'a> ChannelRepository<'a> {
         name: &str,
     ) -> Result<Option<Channel>, sqlx::Error> {
         sqlx::query_as::<_, Channel>(
-            "SELECT * FROM channels WHERE team_id = $1 AND name = $2 AND deleted_at IS NULL"
+            "SELECT * FROM channels WHERE team_id = $1 AND name = $2 AND deleted_at IS NULL",
         )
         .bind(team_id)
         .bind(name)
@@ -149,7 +145,7 @@ impl<'a> ChannelRepository<'a> {
         user_id: Uuid,
     ) -> Result<Option<String>, sqlx::Error> {
         sqlx::query_scalar(
-            "SELECT role FROM channel_members WHERE channel_id = $1 AND user_id = $2"
+            "SELECT role FROM channel_members WHERE channel_id = $1 AND user_id = $2",
         )
         .bind(channel_id)
         .bind(user_id)
@@ -171,7 +167,7 @@ impl<'a> ChannelRepository<'a> {
                 INNER JOIN channel_members cm ON cm.channel_id = c.id
                 WHERE c.team_id = $1 AND cm.user_id = $2 AND c.deleted_at IS NULL
                 ORDER BY c.name
-                "#
+                "#,
             )
             .bind(team_id)
             .bind(user_id)
@@ -210,7 +206,7 @@ impl<'a> ChannelRepository<'a> {
                 SELECT channel_id FROM channel_members WHERE user_id = $2
             )
             ORDER BY c.name
-            "#
+            "#,
         )
         .bind(team_id)
         .bind(user_id)
@@ -235,7 +231,7 @@ impl<'a> ChannelRepository<'a> {
               AND deleted_at IS NULL
             ORDER BY created_at ASC
             LIMIT 1
-            "#
+            "#,
         )
         .bind(team_id)
         .bind(name_a)
@@ -245,13 +241,9 @@ impl<'a> ChannelRepository<'a> {
     }
 
     /// Check if a user is a member of a team
-    pub async fn is_team_member(
-        &self,
-        team_id: Uuid,
-        user_id: Uuid,
-    ) -> ApiResult<bool> {
+    pub async fn is_team_member(&self, team_id: Uuid, user_id: Uuid) -> ApiResult<bool> {
         let exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)"
+            "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
         )
         .bind(team_id)
         .bind(user_id)
@@ -284,14 +276,12 @@ impl<'a> ChannelRepository<'a> {
         channel_id: Uuid,
         user_id: Uuid,
     ) -> Result<ChannelMember, AppError> {
-        sqlx::query_as(
-            "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-        )
-        .bind(channel_id)
-        .bind(user_id)
-        .fetch_optional(self.pool)
-        .await?
-        .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))
+        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(channel_id)
+            .bind(user_id)
+            .fetch_optional(self.pool)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))
     }
 
     /// Update a channel with optional fields (COALESCE pattern)
@@ -334,10 +324,7 @@ impl<'a> ChannelRepository<'a> {
     }
 
     /// List channel members with user details
-    pub async fn list_members(
-        &self,
-        channel_id: Uuid,
-    ) -> Result<Vec<ChannelMember>, sqlx::Error> {
+    pub async fn list_members(&self, channel_id: Uuid) -> Result<Vec<ChannelMember>, sqlx::Error> {
         sqlx::query_as(
             r#"
             SELECT cm.*, u.username, u.display_name, u.avatar_url, u.presence
@@ -345,7 +332,7 @@ impl<'a> ChannelRepository<'a> {
             INNER JOIN users u ON cm.user_id = u.id
             WHERE cm.channel_id = $1
             ORDER BY u.username ASC
-            "#
+            "#,
         )
         .bind(channel_id)
         .fetch_all(self.pool)
@@ -397,21 +384,19 @@ impl<'a> ChannelRepository<'a> {
         user_id: Uuid,
         notify_props: &serde_json::Value,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE channel_members SET notify_props = $1 WHERE channel_id = $2 AND user_id = $3")
-            .bind(notify_props)
-            .bind(channel_id)
-            .bind(user_id)
-            .execute(self.pool)
-            .await
-            .map(|_| ())
+        sqlx::query(
+            "UPDATE channel_members SET notify_props = $1 WHERE channel_id = $2 AND user_id = $3",
+        )
+        .bind(notify_props)
+        .bind(channel_id)
+        .bind(user_id)
+        .execute(self.pool)
+        .await
+        .map(|_| ())
     }
 
     /// Remove a member from a channel
-    pub async fn remove_member(
-        &self,
-        channel_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn remove_member(&self, channel_id: Uuid, user_id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
             .bind(channel_id)
             .bind(user_id)
@@ -425,13 +410,9 @@ impl<'a> ChannelRepository<'a> {
     // ========================================================================
 
     /// Check if a user is a member of a channel
-    pub async fn is_channel_member(
-        &self,
-        channel_id: Uuid,
-        user_id: Uuid,
-    ) -> ApiResult<bool> {
+    pub async fn is_channel_member(&self, channel_id: Uuid, user_id: Uuid) -> ApiResult<bool> {
         let exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)"
+            "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
         )
         .bind(channel_id)
         .bind(user_id)
@@ -456,7 +437,7 @@ impl<'a> ChannelRepository<'a> {
               AND ($2 <= 0 OR updated_at >= to_timestamp($2::double precision / 1000.0))
               AND deleted_at IS NULL
             ORDER BY sort_order ASC, created_at ASC
-            "#
+            "#,
         )
         .bind(channel_id)
         .bind(since)
@@ -466,12 +447,9 @@ impl<'a> ChannelRepository<'a> {
     }
 
     /// Get the maximum sort order for bookmarks in a channel
-    pub async fn get_max_bookmark_sort_order(
-        &self,
-        channel_id: Uuid,
-    ) -> ApiResult<Option<i64>> {
+    pub async fn get_max_bookmark_sort_order(&self, channel_id: Uuid) -> ApiResult<Option<i64>> {
         let max_order: Option<i64> = sqlx::query_scalar(
-            "SELECT MAX(sort_order) FROM channel_bookmarks WHERE channel_id = $1"
+            "SELECT MAX(sort_order) FROM channel_bookmarks WHERE channel_id = $1",
         )
         .bind(channel_id)
         .fetch_one(self.pool)
@@ -504,7 +482,7 @@ impl<'a> ChannelRepository<'a> {
             RETURNING id, created_at, updated_at, deleted_at, channel_id, owner_id, file_id,
                       display_name, sort_order, link_url, image_url, emoji, bookmark_type,
                       original_id, parent_id
-            "#
+            "#,
         )
         .bind(channel_id)
         .bind(owner_id)
@@ -547,7 +525,7 @@ impl<'a> ChannelRepository<'a> {
             RETURNING id, created_at, updated_at, deleted_at, channel_id, owner_id, file_id,
                       display_name, sort_order, link_url, image_url, emoji, bookmark_type,
                       original_id, parent_id
-            "#
+            "#,
         )
         .bind(bookmark_id)
         .bind(channel_id)
@@ -593,7 +571,7 @@ impl<'a> ChannelRepository<'a> {
             RETURNING id, created_at, updated_at, deleted_at, channel_id, owner_id, file_id,
                       display_name, sort_order, link_url, image_url, emoji, bookmark_type,
                       original_id, parent_id
-            "#
+            "#,
         )
         .bind(bookmark_id)
         .bind(channel_id)
@@ -649,7 +627,7 @@ impl<'a> ChannelRepository<'a> {
                 )
             ORDER BY c.created_at ASC
             LIMIT $4 OFFSET $5
-            "#
+            "#,
         )
         .bind(include_deleted)
         .bind(exclude_default_channels)
@@ -685,7 +663,7 @@ impl<'a> ChannelRepository<'a> {
                           AND gs.syncable_id = c.id
                     )
                 )
-            "#
+            "#,
         )
         .bind(include_deleted)
         .bind(exclude_default_channels)
@@ -765,12 +743,11 @@ impl<'a> ChannelRepository<'a> {
         &self,
         channel_id: Uuid,
     ) -> ApiResult<Option<(Option<Uuid>, String)>> {
-        let row: Option<(Option<Uuid>, String)> = sqlx::query_as(
-            "SELECT team_id, type::text FROM channels WHERE id = $1"
-        )
-        .bind(channel_id)
-        .fetch_optional(self.pool)
-        .await?;
+        let row: Option<(Option<Uuid>, String)> =
+            sqlx::query_as("SELECT team_id, type::text FROM channels WHERE id = $1")
+                .bind(channel_id)
+                .fetch_optional(self.pool)
+                .await?;
         Ok(row)
     }
 
@@ -820,7 +797,7 @@ impl<'a> ChannelRepository<'a> {
                     OR LOWER(g.display_name) LIKE $4
               )
             ORDER BY g.display_name ASC
-            "#
+            "#,
         )
         .bind(channel_id)
         .bind(filter_allow_reference)
@@ -832,7 +809,11 @@ impl<'a> ChannelRepository<'a> {
     }
 
     /// Mark a channel as read for a user (updates channel_members and channel_reads).
-    pub async fn mark_channel_read(&self, user_id: Uuid, channel_id: Uuid) -> Result<(), sqlx::Error> {
+    pub async fn mark_channel_read(
+        &self,
+        user_id: Uuid,
+        channel_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query(
             "UPDATE channel_members SET last_viewed_at = NOW(), manually_unread = false, last_update_at = NOW() WHERE channel_id = $1 AND user_id = $2",
         )
@@ -975,23 +956,6 @@ impl<'a> ChannelRepository<'a> {
         .bind(viewer_id)
         .fetch_optional(self.pool)
         .await
-    }
-
-    /// Mark a channel as read for a user (update last_viewed_at and clear manually_unread).
-    pub async fn mark_channel_read(
-        &self,
-        channel_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE channel_members SET last_viewed_at = NOW(), manually_unread = false, last_update_at = NOW() WHERE channel_id = $1 AND user_id = $2",
-        )
-        .bind(channel_id)
-        .bind(user_id)
-        .execute(self.pool)
-        .await?;
-
-        Ok(())
     }
 
     /// Update channel_reads for a user, setting last_read to the latest post seq.

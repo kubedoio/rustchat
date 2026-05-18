@@ -5,7 +5,6 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::utils::ensure_channel_admin_or_system_manage;
 use super::utils::resolve_direct_channel_display_name;

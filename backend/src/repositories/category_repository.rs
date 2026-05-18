@@ -1,7 +1,7 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::error::{ApiResult, AppError};
+use crate::error::ApiResult;
 use crate::models::channel::ChannelType;
 
 /// Row struct for channel_categories table (Mattermost-compat, millis timestamps).
