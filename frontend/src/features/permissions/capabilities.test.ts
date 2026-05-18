@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 
-import { reactive, ref } from 'vue'
+import { reactive } from 'vue'
 
 const getMembersMock = vi.fn()
 
