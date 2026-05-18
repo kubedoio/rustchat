@@ -5,10 +5,11 @@ import BaseButton from '../atomic/BaseButton.vue'
 import BaseInput from '../atomic/BaseInput.vue'
 import { teamsApi, type Team } from '../../api/teams'
 import { usersApi, type User } from '../../api/users'
-import { useTeamStore } from '../../stores/teams'
+import { useTeamStore } from '../../features/teams/stores/teamStore'
 import { useToast } from '../../composables/useToast'
-import { useAuthStore } from '../../stores/auth'
+import { useAuthStore } from '../../features/auth/stores/authStore'
 import { useCurrentTeamManagementPermission } from '../../features/permissions/capabilities'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const props = defineProps<{
   isOpen: boolean
@@ -93,8 +94,8 @@ async function handleSave() {
     toast.success('Team updated', 'Settings saved successfully')
     emit('updated', response.data)
     emit('close')
-  } catch (e: any) {
-    toast.error('Update failed', e.response?.data?.message || 'Could not update team')
+  } catch (e: unknown) {
+    toast.error('Update failed', getApiErrorMessage(e) || 'Could not update team')
   } finally {
     loading.value = false
   }
@@ -110,8 +111,8 @@ async function handleDelete() {
     toast.success('Team deleted', `${props.team.display_name || props.team.name} has been removed`)
     emit('deleted')
     emit('close')
-  } catch (e: any) {
-    toast.error('Delete failed', e.response?.data?.message || 'Could not delete team')
+  } catch (e: unknown) {
+    toast.error('Delete failed', getApiErrorMessage(e) || 'Could not delete team')
   } finally {
     deleting.value = false
   }
@@ -126,8 +127,8 @@ async function handleLeave() {
     await teamStore.leaveTeam(props.team.id)
     toast.success('Left team', `You have left ${props.team.display_name || props.team.name}`)
     emit('close')
-  } catch (e: any) {
-    toast.error('Failed to leave', e.response?.data?.message || 'Could not leave team')
+  } catch (e: unknown) {
+    toast.error('Failed to leave', getApiErrorMessage(e) || 'Could not leave team')
   } finally {
     leaving.value = false
   }
@@ -181,8 +182,8 @@ async function addMember(user: User) {
     // Remove from search results
     searchResults.value = searchResults.value.filter(u => u.id !== user.id)
     toast.success('Member added', `${user.display_name || user.username} added to the team`)
-  } catch (e: any) {
-    toast.error('Failed to add member', e.response?.data?.message)
+  } catch (e: unknown) {
+    toast.error('Failed to add member', getApiErrorMessage(e))
   } finally {
     addingMember.value = null
   }
@@ -199,8 +200,8 @@ async function removeMember(userId: string) {
     await teamsApi.removeMember(props.team.id, userId)
     await teamStore.fetchMembers(props.team.id)
     toast.success('Member removed', 'User removed from the team')
-  } catch (e: any) {
-    toast.error('Failed to remove member', e.response?.data?.message)
+  } catch (e: unknown) {
+    toast.error('Failed to remove member', getApiErrorMessage(e))
   } finally {
     removingMember.value = null
   }

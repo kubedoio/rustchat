@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useCallsStore } from '../../stores/calls'
-import { useAuthStore } from '../../stores/auth'
-import { useChannelStore } from '../../stores/channels'
+import { useCallsStore } from '../../features/calls/stores/callStore'
+import { useAuthStore } from '../../features/auth/stores/authStore'
+import { useChannelStore } from '../../features/channels/stores/channelStore'
 import { computed, ref, watchEffect } from 'vue'
 import { 
     Maximize2, 

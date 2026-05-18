@@ -127,5 +127,11 @@ impl IntoResponse for AppError {
     }
 }
 
+impl From<serde_json::Error> for AppError {
+    fn from(err: serde_json::Error) -> Self {
+        AppError::Internal(format!("Serialization error: {}", err))
+    }
+}
+
 /// Result type alias for API handlers
 pub type ApiResult<T> = Result<T, AppError>;

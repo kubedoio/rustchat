@@ -11,6 +11,7 @@ use axum::{
 };
 use chrono::{DateTime, Datelike, Duration, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::api::v4::extractors::MmAuthUser;
@@ -19,6 +20,7 @@ use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use crate::mattermost_compat::models as mm;
 use crate::realtime::WsEnvelope;
+use crate::repositories::UserRepository;
 
 /// Build status routes
 pub fn router() -> Router<AppState> {
@@ -68,16 +70,6 @@ pub struct UserStatusSnapshot {
     pub emoji: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<i64>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct UserStatusSnapshotRow {
-    presence: String,
-    manual: bool,
-    last_login_at: Option<DateTime<Utc>>,
-    text: Option<String>,
-    emoji: Option<String>,
-    expires_at: Option<DateTime<Utc>>,
 }
 
 /// Custom status duration options (Mattermost-compatible)
@@ -384,18 +376,10 @@ async fn update_user_status_internal(
     let manual = status != "online";
 
     // Update user presence
-    sqlx::query(
-        r#"
-        UPDATE users
-        SET presence = $2, presence_manual = $3
-        WHERE id = $1
-        "#,
-    )
-    .bind(user_id)
-    .bind(&status)
-    .bind(manual)
-    .execute(&state.db)
-    .await?;
+    let repo = UserRepository::new(&state.db);
+    repo.update_presence(user_id, &status, manual)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     if broadcast {
         broadcast_status_change(state, user_id).await?;
@@ -411,6 +395,8 @@ pub async fn update_custom_status_internal(
     custom_status: Option<CustomStatus>,
     broadcast: bool,
 ) -> ApiResult<()> {
+    let repo = UserRepository::new(&state.db);
+
     let (text, emoji, expires_at, json_status) = if let Some(ref cs) = custom_status {
         let json = serde_json::json!({
             "emoji": cs.emoji,
@@ -419,37 +405,23 @@ pub async fn update_custom_status_internal(
             "expires_at": cs.expires_at.map(|t| t.to_rfc3339()),
         });
         (
-            Some(cs.text.clone()),
-            Some(cs.emoji.clone()),
+            Some(cs.text.as_str()),
+            Some(cs.emoji.as_str()),
             cs.expires_at,
             json,
         )
     } else {
         (
-            None::<String>,
-            None::<String>,
+            None::<&str>,
+            None::<&str>,
             None::<DateTime<Utc>>,
-            serde_json::json!(null),
+            Value::Null,
         )
     };
 
-    sqlx::query(
-        r#"
-        UPDATE users
-        SET status_text = $2,
-            status_emoji = $3,
-            status_expires_at = $4,
-            custom_status = $5
-        WHERE id = $1
-        "#,
-    )
-    .bind(user_id)
-    .bind(text)
-    .bind(emoji)
-    .bind(expires_at)
-    .bind(json_status)
-    .execute(&state.db)
-    .await?;
+    repo.update_status_fields(user_id, text, emoji, expires_at, json_status)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Add to recent custom statuses (stored in user preferences)
     if let Some(cs) = custom_status {
@@ -469,19 +441,16 @@ async fn add_to_recent_custom_statuses(
     user_id: Uuid,
     custom_status: &CustomStatus,
 ) -> ApiResult<()> {
+    let repo = UserRepository::new(&state.db);
+
     // Get existing recent statuses from preferences
-    let existing: Option<serde_json::Value> = sqlx::query_scalar(
-        r#"
-        SELECT value FROM mattermost_preferences
-        WHERE user_id = $1 AND category = 'display_settings' AND name = 'recent_custom_status'
-        "#,
-    )
-    .bind(user_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let existing = repo
+        .get_recent_custom_status_value(user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut recent: Vec<CustomStatus> = existing
-        .and_then(|v| serde_json::from_str(v.as_str()?).ok())
+        .and_then(|v| serde_json::from_str(&v).ok())
         .unwrap_or_default();
 
     // Remove duplicate if exists
@@ -495,17 +464,9 @@ async fn add_to_recent_custom_statuses(
 
     // Save back to preferences
     let json_str = serde_json::to_string(&recent).unwrap_or_default();
-    sqlx::query(
-        r#"
-        INSERT INTO mattermost_preferences (user_id, category, name, value)
-        VALUES ($1, 'display_settings', 'recent_custom_status', $2)
-        ON CONFLICT (user_id, category, name) DO UPDATE SET value = $2
-        "#,
-    )
-    .bind(user_id)
-    .bind(json_str)
-    .execute(&state.db)
-    .await?;
+    repo.save_recent_custom_status_value(user_id, &json_str)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(())
 }
@@ -592,15 +553,11 @@ async fn get_recent_custom_statuses(
         ));
     }
 
-    let recent: Option<String> = sqlx::query_scalar(
-        r#"
-        SELECT value FROM mattermost_preferences
-        WHERE user_id = $1 AND category = 'display_settings' AND name = 'recent_custom_status'
-        "#,
-    )
-    .bind(target_user_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let repo = UserRepository::new(&state.db);
+    let recent = repo
+        .get_recent_custom_status_value(target_user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let statuses: Vec<CustomStatus> = recent
         .and_then(|v| serde_json::from_str(&v).ok())
@@ -626,16 +583,13 @@ async fn delete_recent_custom_status(
         ));
     }
 
+    let repo = UserRepository::new(&state.db);
+
     // Get existing recent statuses
-    let existing: Option<String> = sqlx::query_scalar(
-        r#"
-        SELECT value FROM mattermost_preferences
-        WHERE user_id = $1 AND category = 'display_settings' AND name = 'recent_custom_status'
-        "#,
-    )
-    .bind(target_user_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let existing = repo
+        .get_recent_custom_status_value(target_user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut recent: Vec<CustomStatus> = existing
         .and_then(|v| serde_json::from_str(&v).ok())
@@ -646,17 +600,9 @@ async fn delete_recent_custom_status(
 
     // Save back
     let json_str = serde_json::to_string(&recent).unwrap_or_default();
-    sqlx::query(
-        r#"
-        INSERT INTO mattermost_preferences (user_id, category, name, value)
-        VALUES ($1, 'display_settings', 'recent_custom_status', $2)
-        ON CONFLICT (user_id, category, name) DO UPDATE SET value = $2
-        "#,
-    )
-    .bind(target_user_id)
-    .bind(json_str)
-    .execute(&state.db)
-    .await?;
+    repo.save_recent_custom_status_value(target_user_id, &json_str)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
@@ -683,16 +629,11 @@ async fn get_statuses_by_ids(
         user_ids.push(parsed);
     }
 
-    let statuses: Vec<(Uuid, String, bool, Option<chrono::DateTime<Utc>>)> = sqlx::query_as(
-        r#"
-        SELECT id, presence, COALESCE(presence_manual, false), last_login_at
-        FROM users
-        WHERE id = ANY($1)
-        "#,
-    )
-    .bind(&user_ids)
-    .fetch_all(&state.db)
-    .await?;
+    let repo = UserRepository::new(&state.db);
+    let statuses = repo
+        .get_statuses_by_ids(&user_ids)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let result = statuses
         .into_iter()
@@ -739,23 +680,10 @@ pub async fn clear_expired_custom_status_if_needed(
     state: &AppState,
     user_id: Uuid,
 ) -> ApiResult<bool> {
-    let result = sqlx::query(
-        r#"
-        UPDATE users
-        SET status_text = NULL,
-            status_emoji = NULL,
-            status_expires_at = NULL,
-            custom_status = 'null'::jsonb
-        WHERE id = $1
-          AND status_expires_at IS NOT NULL
-          AND status_expires_at <= NOW()
-        "#,
-    )
-    .bind(user_id)
-    .execute(&state.db)
-    .await?;
-
-    Ok(result.rows_affected() > 0)
+    UserRepository::new(&state.db)
+        .clear_expired_custom_status_if_needed(user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))
 }
 
 pub async fn clear_expired_custom_statuses_for_users(
@@ -766,42 +694,17 @@ pub async fn clear_expired_custom_statuses_for_users(
         return Ok(0);
     }
 
-    let result = sqlx::query(
-        r#"
-        UPDATE users
-        SET status_text = NULL,
-            status_emoji = NULL,
-            status_expires_at = NULL,
-            custom_status = 'null'::jsonb
-        WHERE id = ANY($1)
-          AND status_expires_at IS NOT NULL
-          AND status_expires_at <= NOW()
-        "#,
-    )
-    .bind(user_ids)
-    .execute(&state.db)
-    .await?;
-
-    Ok(result.rows_affected() as i64)
+    UserRepository::new(&state.db)
+        .clear_expired_custom_statuses_for_users(user_ids)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))
 }
 
 pub async fn clear_expired_custom_statuses(state: &AppState) -> ApiResult<Vec<Uuid>> {
-    let cleared_rows: Vec<(Uuid,)> = sqlx::query_as(
-        r#"
-        UPDATE users
-        SET status_text = NULL,
-            status_emoji = NULL,
-            status_expires_at = NULL,
-            custom_status = 'null'::jsonb
-        WHERE status_expires_at IS NOT NULL
-          AND status_expires_at <= NOW()
-        RETURNING id
-        "#,
-    )
-    .fetch_all(&state.db)
-    .await?;
-
-    Ok(cleared_rows.into_iter().map(|(user_id,)| user_id).collect())
+    UserRepository::new(&state.db)
+        .clear_expired_custom_statuses()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))
 }
 
 pub async fn fetch_user_status_snapshot(
@@ -810,37 +713,27 @@ pub async fn fetch_user_status_snapshot(
 ) -> ApiResult<UserStatusSnapshot> {
     let _ = clear_expired_custom_status_if_needed(state, user_id).await?;
 
-    let result: UserStatusSnapshotRow = sqlx::query_as(
-        r#"
-        SELECT presence,
-               COALESCE(presence_manual, false) AS manual,
-               last_login_at,
-               status_text AS text,
-               status_emoji AS emoji,
-               status_expires_at AS expires_at
-        FROM users
-        WHERE id = $1
-        "#,
-    )
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = UserRepository::new(&state.db);
+    let result = repo
+        .get_user_status_fields(user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    let (presence, manual, last_login_at, text, emoji, expires_at) = result;
 
     Ok(UserStatusSnapshot {
         user_id: encode_mm_id(user_id),
-        status: if result.presence.is_empty() {
+        status: if presence.is_empty() {
             "offline".to_string()
         } else {
-            result.presence
+            presence
         },
-        manual: result.manual,
-        last_activity_at: result
-            .last_login_at
-            .map(|t| t.timestamp_millis())
-            .unwrap_or(0),
-        text: result.text,
-        emoji: result.emoji,
-        expires_at: result.expires_at.map(|t| t.timestamp_millis()),
+        manual,
+        last_activity_at: last_login_at.map(|t| t.timestamp_millis()).unwrap_or(0),
+        text,
+        emoji,
+        expires_at: expires_at.map(|t| t.timestamp_millis()),
     })
 }
 

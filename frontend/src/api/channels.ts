@@ -1,22 +1,5 @@
 import api from './client'
-import { HttpClient } from './http/HttpClient'
-import { useAuthStore } from '../stores/auth'
-
-// Create v4 API client for MM-compatible endpoints
-// (the default client uses /api/v1 as base)
-const v4Api = new HttpClient({
-    baseURL: '/api/v4',
-    requestInterceptor: (config) => {
-        const authStore = useAuthStore()
-        if (authStore.token) {
-            config.headers = {
-                ...config.headers,
-                Authorization: `Bearer ${authStore.token}`,
-            }
-        }
-        return config
-    },
-})
+import { v4Api } from './client'
 
 export type ChannelType = 'public' | 'private' | 'direct' | 'group'
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter, useRoute, RouterView } from 'vue-router';
-import { useAuthStore } from '../../stores/auth';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import { 
     LayoutDashboard, Users, Building2, Settings, Shield, 
     Puzzle, Scale, Mail, Activity, ArrowLeft,
@@ -11,7 +11,7 @@ import { computed } from 'vue';
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
-import { useConfigStore } from '../../stores/config';
+import { useConfigStore } from '../../features/config/stores/configStore';
 const configStore = useConfigStore();
 
 const navItems = [

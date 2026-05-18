@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useStorage } from '@vueuse/core';
-import { useChannelStore } from '../../stores/channels';
-import { useTeamStore } from '../../stores/teams';
+import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useTeamStore } from '../../features/teams/stores/teamStore';
 import BreadcrumbBar from '../../components/navigation/BreadcrumbBar.vue';
 import type { BreadcrumbSegment } from '../../components/navigation/BreadcrumbBar.vue';
 
-import { useMessageStore } from '../../stores/messages';
-import { useUnreadStore } from '../../stores/unreads';
+import { useMessageStore } from '../../features/messages/stores/messageStore';
+import { useUnreadStore } from '../../features/unreads/stores/unreadStore';
 import { useCallsStore } from '../../stores/calls';
 import { useWebSocket } from '../../composables/useWebSocket';
 import AppShell from '../../components/layout/AppShell.vue';
@@ -20,7 +20,7 @@ import UserProfileModal from '../../components/modals/UserProfileModal.vue';
 import TypingIndicator from '../../components/channel/TypingIndicator.vue';
 import ActiveCall from '../../components/calls/ActiveCall.vue';
 import IncomingCallModal from '../../components/calls/IncomingCallModal.vue';
-import { useUIStore, type RhsView } from '../../stores/ui';
+import { useUIStore, type RhsView } from '../../features/ui/stores/uiStore';
 import { useThreadStore } from '../../features/messages';
 
 const channelStore = useChannelStore();

@@ -4,12 +4,12 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::{
     encode_mm_id, json, mm, parse_mm_or_uuid, reactions_for_posts, status_ok, ApiResult, AppError,
     AppState, MmAuthUser,
 };
+use crate::repositories::{ChannelRepository, PostRepository};
 
 #[derive(Deserialize)]
 pub(super) struct PostsUnreadQuery {
@@ -55,63 +55,20 @@ pub(super) async fn get_posts_around_unread(
     let channel_id = parse_mm_or_uuid(&path.channel_id)
         .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
 
-    let _: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _ = ChannelRepository::new(&state.db)
+        .require_member(channel_id, user_id)
+        .await?;
 
     let (limit_before, limit_after) = clamp_unread_limits(&query);
 
-    let last_read_seq: Option<i64> = sqlx::query_scalar(
-        "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
-    )
-    .bind(user_id)
-    .bind(channel_id)
-    .fetch_optional(&state.db)
-    .await?
-    .flatten();
+    let last_read_seq: i64 = PostRepository::new(state.db.clone())
+        .get_last_read_seq(user_id, channel_id)
+        .await?
+        .unwrap_or(0);
 
-    let last_read_seq = last_read_seq.unwrap_or(0);
-
-    let mut posts: Vec<crate::models::post::PostResponse> = sqlx::query_as(
-        r#"
-        (
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 AND p.seq <= $2 AND p.deleted_at IS NULL
-            ORDER BY p.seq DESC
-            LIMIT $3
-        )
-        UNION ALL
-        (
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 AND p.seq > $2 AND p.deleted_at IS NULL
-            ORDER BY p.seq ASC
-            LIMIT $4
-        )
-        ORDER BY seq DESC
-        "#,
-    )
-    .bind(channel_id)
-    .bind(last_read_seq)
-    .bind(limit_before)
-    .bind(limit_after)
-    .fetch_all(&state.db)
-    .await?;
+    let mut posts = PostRepository::new(state.db.clone())
+        .get_posts_around_unread(channel_id, last_read_seq, limit_before, limit_after)
+        .await?;
 
     crate::services::posts::populate_files(&state, &mut posts).await?;
 
@@ -170,35 +127,20 @@ pub(super) async fn save_acknowledgement_for_post(
     let post_id = parse_mm_or_uuid(&path.post_id)
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
 
-    let channel_id: Uuid =
-        sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1 AND deleted_at IS NULL")
-            .bind(post_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let channel_id = PostRepository::new(state.db.clone())
+        .get_post_channel_id_optional(post_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
-    let _: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _ = ChannelRepository::new(&state.db)
+        .require_member(channel_id, user_id)
+        .await?;
 
     let now = chrono::Utc::now();
 
-    sqlx::query(
-        r#"
-        INSERT INTO post_acknowledgements (user_id, post_id, acknowledged_at)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, post_id) DO UPDATE SET acknowledged_at = $3
-        "#,
-    )
-    .bind(user_id)
-    .bind(post_id)
-    .bind(now)
-    .execute(&state.db)
-    .await?;
+    PostRepository::new(state.db.clone())
+        .acknowledge_post(user_id, post_id, now)
+        .await?;
 
     Ok(Json(mm::PostAcknowledgement {
         user_id: encode_mm_id(user_id),
@@ -220,14 +162,9 @@ pub(super) async fn delete_acknowledgement_for_post(
     let post_id = parse_mm_or_uuid(&path.post_id)
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
 
-    let ack_time: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
-        "SELECT acknowledged_at FROM post_acknowledgements WHERE user_id = $1 AND post_id = $2",
-    )
-    .bind(user_id)
-    .bind(post_id)
-    .fetch_optional(&state.db)
-    .await?
-    .flatten();
+    let ack_time = PostRepository::new(state.db.clone())
+        .get_acknowledgement(user_id, post_id)
+        .await?;
 
     if let Some(ack_time) = ack_time {
         let now = chrono::Utc::now();
@@ -241,10 +178,8 @@ pub(super) async fn delete_acknowledgement_for_post(
         return Err(AppError::NotFound("Acknowledgement not found".to_string()));
     }
 
-    sqlx::query("DELETE FROM post_acknowledgements WHERE user_id = $1 AND post_id = $2")
-        .bind(user_id)
-        .bind(post_id)
-        .execute(&state.db)
+    PostRepository::new(state.db.clone())
+        .delete_acknowledgement(user_id, post_id)
         .await?;
 
     Ok(status_ok())

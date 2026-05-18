@@ -1,7 +1,7 @@
 import { computed, ref, watchEffect } from 'vue'
 import { channelsApi } from '../../api/channels'
-import { useAuthStore } from '../../stores/auth'
-import { useTeamStore } from '../../stores/teams'
+import { useAuthStore } from '../../features/auth/stores/authStore'
+import { useTeamStore } from '../../features/teams/stores/teamStore'
 
 const TEAM_MANAGER_ROLES = new Set([
     'system_admin',
@@ -142,7 +142,7 @@ async function ensureChannelPermissionLoaded(channelId: string, userId: string) 
     try {
         const response = await channelsApi.getMembers(channelId)
         const members = Array.isArray(response.data) ? response.data : []
-        const currentMember = members.find((member: any) => member.user_id === userId)
+        const currentMember = members.find((member) => member.user_id === userId)
 
         setChannelPermissionSnapshot(channelId, {
             membershipRole: currentMember?.role ?? null,

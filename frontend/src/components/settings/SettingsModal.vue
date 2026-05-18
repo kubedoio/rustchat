@@ -7,8 +7,8 @@ import AdvancedTab from './advanced/AdvancedTab.vue'
 import CallsTab from './calls/CallsTab.vue'
 import NotificationsTab from './notifications/NotificationsTab.vue'
 import ProfileTab from './profile/ProfileTab.vue'
-import { useAuthStore } from '../../stores/auth'
-import { useUIStore, type SettingsTab } from '../../stores/ui'
+import { useAuthStore } from '../../features/auth/stores/authStore'
+import { useUIStore, type SettingsTab } from '../../features/ui/stores/uiStore'
 
 const props = defineProps<{
   isOpen: boolean

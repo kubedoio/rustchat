@@ -2,13 +2,13 @@ use crate::api::AppState;
 use crate::auth::policy::permissions;
 use crate::error::{ApiResult, AppError};
 use crate::models::terms::*;
+use crate::repositories::TermsRepository;
 use axum::{
     extract::{Path, State},
     routing::{get, post},
     Json, Router,
 };
 use chrono::Utc;
-use sqlx::Row;
 use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
@@ -35,17 +35,8 @@ pub fn router() -> Router<AppState> {
 async fn get_current_terms(
     State(state): State<AppState>,
 ) -> ApiResult<Json<Option<TermsOfService>>> {
-    let terms = sqlx::query_as::<_, TermsOfService>(
-        r#"
-        SELECT * FROM terms_of_service 
-        WHERE is_active = true 
-        ORDER BY effective_date DESC 
-        LIMIT 1
-        "#,
-    )
-    .fetch_optional(&state.db)
-    .await?;
-
+    let repo = TermsRepository::new(&state.db);
+    let terms = repo.get_current_terms().await?;
     Ok(Json(terms))
 }
 
@@ -53,17 +44,10 @@ async fn get_terms_status(
     State(state): State<AppState>,
     auth_user: MmAuthUser,
 ) -> ApiResult<Json<TermsStatusResponse>> {
+    let repo = TermsRepository::new(&state.db);
+
     // Get current active terms
-    let current_terms = sqlx::query_as::<_, TermsOfService>(
-        r#"
-        SELECT * FROM terms_of_service 
-        WHERE is_active = true 
-        ORDER BY effective_date DESC 
-        LIMIT 1
-        "#,
-    )
-    .fetch_optional(&state.db)
-    .await?;
+    let current_terms = repo.get_current_terms().await?;
 
     let Some(ref terms) = current_terms else {
         return Ok(Json(TermsStatusResponse {
@@ -75,18 +59,7 @@ async fn get_terms_status(
     };
 
     // Check if user has accepted
-    let accepted: bool = sqlx::query_scalar(
-        r#"
-        SELECT EXISTS(
-            SELECT 1 FROM user_terms_acceptance 
-            WHERE user_id = $1 AND terms_id = $2
-        )
-        "#,
-    )
-    .bind(auth_user.user_id)
-    .bind(terms.id)
-    .fetch_one(&state.db)
-    .await?;
+    let accepted = repo.has_user_accepted(auth_user.user_id, terms.id).await?;
 
     // Get accepted version if any
     let accepted_version = if accepted {
@@ -108,30 +81,17 @@ async fn accept_terms(
     auth_user: MmAuthUser,
     Json(req): Json<TermsAcceptanceRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // Verify terms exist and are active
-    let terms =
-        sqlx::query_as::<_, TermsOfService>(r#"SELECT * FROM terms_of_service WHERE id = $1"#)
-            .bind(req.terms_id)
-            .fetch_optional(&state.db)
-            .await?;
+    let repo = TermsRepository::new(&state.db);
 
-    let Some(_) = terms else {
+    // Verify terms exist
+    let terms = repo.get_terms_by_id(req.terms_id).await?;
+    if terms.is_none() {
         return Err(AppError::NotFound("Terms not found".to_string()));
-    };
+    }
 
     // Insert acceptance
-    sqlx::query(
-        r#"
-        INSERT INTO user_terms_acceptance (user_id, terms_id, accepted_at)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, terms_id) DO UPDATE SET accepted_at = $3
-        "#,
-    )
-    .bind(auth_user.user_id)
-    .bind(req.terms_id)
-    .bind(Utc::now())
-    .execute(&state.db)
-    .await?;
+    repo.accept_terms(auth_user.user_id, req.terms_id, Utc::now())
+        .await?;
 
     Ok(Json(serde_json::json!({
         "success": true,
@@ -145,19 +105,11 @@ async fn list_terms(
     State(state): State<AppState>,
     auth_user: MmAuthUser,
 ) -> ApiResult<Json<Vec<TermsOfService>>> {
-    // Check admin permission
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
-    let terms = sqlx::query_as::<_, TermsOfService>(
-        r#"
-        SELECT * FROM terms_of_service 
-        ORDER BY created_at DESC
-        "#,
-    )
-    .fetch_all(&state.db)
-    .await?;
-
+    let repo = TermsRepository::new(&state.db);
+    let terms = repo.list_terms().await?;
     Ok(Json(terms))
 }
 
@@ -166,20 +118,16 @@ async fn get_terms(
     auth_user: MmAuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<TermsOfService>> {
-    // Check admin permission
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
-    let terms =
-        sqlx::query_as::<_, TermsOfService>(r#"SELECT * FROM terms_of_service WHERE id = $1"#)
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await?;
+    let repo = TermsRepository::new(&state.db);
+    let terms = repo
+        .get_terms_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Terms not found".to_string()))?;
 
-    match terms {
-        Some(t) => Ok(Json(t)),
-        None => Err(AppError::NotFound("Terms not found".to_string())),
-    }
+    Ok(Json(terms))
 }
 
 async fn create_terms(
@@ -187,38 +135,27 @@ async fn create_terms(
     auth_user: MmAuthUser,
     Json(req): Json<CreateTermsRequest>,
 ) -> ApiResult<Json<TermsOfService>> {
-    // Check admin permission
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
-    // Validate version uniqueness
-    let existing = sqlx::query_scalar::<_, bool>(
-        r#"SELECT EXISTS(SELECT 1 FROM terms_of_service WHERE version = $1)"#,
-    )
-    .bind(&req.version)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = TermsRepository::new(&state.db);
 
+    // Validate version uniqueness
+    let existing = repo.version_exists(&req.version).await?;
     if existing {
         return Err(AppError::Validation("Version already exists".to_string()));
     }
 
-    let terms = sqlx::query_as::<_, TermsOfService>(
-        r#"
-        INSERT INTO terms_of_service 
-        (version, title, content, summary, is_active, effective_date, created_by)
-        VALUES ($1, $2, $3, $4, false, $5, $6)
-        RETURNING *
-        "#,
-    )
-    .bind(&req.version)
-    .bind(&req.title)
-    .bind(&req.content)
-    .bind(&req.summary)
-    .bind(req.effective_date)
-    .bind(auth_user.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let terms = repo
+        .create_terms(
+            &req.version,
+            &req.title,
+            &req.content,
+            &req.summary,
+            req.effective_date,
+            auth_user.user_id,
+        )
+        .await?;
 
     Ok(Json(terms))
 }
@@ -229,39 +166,19 @@ async fn update_terms(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateTermsRequest>,
 ) -> ApiResult<Json<TermsOfService>> {
-    // Check admin permission
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
-    let terms =
-        sqlx::query_as::<_, TermsOfService>(r#"SELECT * FROM terms_of_service WHERE id = $1"#)
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await?;
+    let repo = TermsRepository::new(&state.db);
 
+    let terms = repo.get_terms_by_id(id).await?;
     if terms.is_none() {
         return Err(AppError::NotFound("Terms not found".to_string()));
     }
 
-    let updated = sqlx::query_as::<_, TermsOfService>(
-        r#"
-        UPDATE terms_of_service 
-        SET 
-            title = COALESCE($1, title),
-            content = COALESCE($2, content),
-            summary = COALESCE($3, summary),
-            effective_date = COALESCE($4, effective_date)
-        WHERE id = $5
-        RETURNING *
-        "#,
-    )
-    .bind(req.title)
-    .bind(req.content)
-    .bind(req.summary)
-    .bind(req.effective_date)
-    .bind(id)
-    .fetch_one(&state.db)
-    .await?;
+    let updated = repo
+        .update_terms(id, &req.title, &req.content, &req.summary, &req.effective_date)
+        .await?;
 
     Ok(Json(updated))
 }
@@ -271,27 +188,20 @@ async fn delete_terms(
     auth_user: MmAuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // Check admin permission
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
-    // Check if terms is active
-    let is_active =
-        sqlx::query_scalar::<_, bool>(r#"SELECT is_active FROM terms_of_service WHERE id = $1"#)
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await?;
+    let repo = TermsRepository::new(&state.db);
 
+    // Check if terms is active
+    let is_active = repo.is_terms_active(id).await?;
     if is_active == Some(true) {
         return Err(AppError::Validation(
             "Cannot delete active terms. Deactivate first.".to_string(),
         ));
     }
 
-    sqlx::query(r#"DELETE FROM terms_of_service WHERE id = $1"#)
-        .bind(id)
-        .execute(&state.db)
-        .await?;
+    repo.delete_terms(id).await?;
 
     Ok(Json(serde_json::json!({ "success": true })))
 }
@@ -301,26 +211,16 @@ async fn activate_terms(
     auth_user: MmAuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<TermsOfService>> {
-    // Check admin permission
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
-    let terms = sqlx::query_as::<_, TermsOfService>(
-        r#"
-        UPDATE terms_of_service 
-        SET is_active = true 
-        WHERE id = $1
-        RETURNING *
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?;
+    let repo = TermsRepository::new(&state.db);
+    let terms = repo
+        .activate_terms(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Terms not found".to_string()))?;
 
-    match terms {
-        Some(t) => Ok(Json(t)),
-        None => Err(AppError::NotFound("Terms not found".to_string())),
-    }
+    Ok(Json(terms))
 }
 
 async fn get_terms_stats(
@@ -328,59 +228,25 @@ async fn get_terms_stats(
     auth_user: MmAuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<TermsStats>> {
-    // Check admin permission
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
-    let row = sqlx::query(
-        r#"
-        SELECT 
-            (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) as total_users,
-            COUNT(DISTINCT uta.user_id) as accepted_count
-        FROM user_terms_acceptance uta
-        WHERE uta.terms_id = $1
-        "#,
-    )
-    .bind(id)
-    .fetch_one(&state.db)
-    .await?;
-
-    let total_users: i64 = row.try_get("total_users")?;
-    let accepted_count: i64 = row.try_get("accepted_count")?;
-    let pending_count = total_users - accepted_count;
-    let acceptance_rate = if total_users > 0 {
-        (accepted_count as f64 / total_users as f64) * 100.0
-    } else {
-        0.0
-    };
-
-    Ok(Json(TermsStats {
-        total_users,
-        accepted_count,
-        pending_count,
-        acceptance_rate,
-    }))
+    let repo = TermsRepository::new(&state.db);
+    let stats = repo.get_terms_stats(id).await?;
+    Ok(Json(stats))
 }
 
 async fn get_all_terms_stats(
     State(state): State<AppState>,
     auth_user: MmAuthUser,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // Check admin permission
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
+    let repo = TermsRepository::new(&state.db);
+
     // Get current active terms
-    let current_terms = sqlx::query_as::<_, TermsOfService>(
-        r#"
-        SELECT * FROM terms_of_service 
-        WHERE is_active = true 
-        ORDER BY effective_date DESC 
-        LIMIT 1
-        "#,
-    )
-    .fetch_optional(&state.db)
-    .await?;
+    let current_terms = repo.get_current_terms().await?;
 
     let Some(terms) = current_terms else {
         return Ok(Json(serde_json::json!({
@@ -394,46 +260,9 @@ async fn get_all_terms_stats(
     };
 
     // Get stats
-    let row = sqlx::query(
-        r#"
-        SELECT 
-            COUNT(*) as total_users
-        FROM users 
-        WHERE deleted_at IS NULL
-        "#,
-    )
-    .fetch_one(&state.db)
-    .await?;
-
-    let total_users: i64 = row.try_get("total_users")?;
-
-    let accepted_count = sqlx::query_scalar::<_, i64>(
-        r#"
-        SELECT COUNT(DISTINCT user_id) 
-        FROM user_terms_acceptance 
-        WHERE terms_id = $1
-        "#,
-    )
-    .bind(terms.id)
-    .fetch_one(&state.db)
-    .await?;
-
-    // Get pending users list
-    let pending_users = sqlx::query_as::<_, crate::models::user::User>(
-        r#"
-        SELECT u.* FROM users u
-        WHERE u.deleted_at IS NULL
-        AND NOT EXISTS (
-            SELECT 1 FROM user_terms_acceptance uta 
-            WHERE uta.user_id = u.id AND uta.terms_id = $1
-        )
-        ORDER BY u.created_at DESC
-        LIMIT 50
-        "#,
-    )
-    .bind(terms.id)
-    .fetch_all(&state.db)
-    .await?;
+    let total_users = repo.count_active_users().await?;
+    let accepted_count = repo.count_accepted_users(terms.id).await?;
+    let pending_users = repo.get_pending_users(terms.id, 50).await?;
 
     let pending_count = total_users - accepted_count;
     let acceptance_rate = if total_users > 0 {

@@ -2,25 +2,9 @@
  * Activity Repository - API layer for activity feed
  */
 
-import { HttpClient } from '../../../api/http/HttpClient'
-import { useAuthStore } from '../../../stores/auth'
+import { v4Api } from '../../../api/client'
 import type { Activity, ActivityFeedResponse, ActivityQueryParams } from '../types'
 import { ActivityType } from '../types'
-
-// Create HttpClient for v4 API (activity endpoints are under /api/v4)
-const v4Client = new HttpClient({
-  baseURL: '/api/v4',
-  requestInterceptor: (config) => {
-    const authStore = useAuthStore()
-    if (authStore.token) {
-      config.headers = {
-        ...config.headers,
-        Authorization: `Bearer ${authStore.token}`,
-      }
-    }
-    return config
-  },
-})
 
 function transformActivity(apiActivity: Record<string, unknown>): Activity {
   return {
@@ -52,7 +36,7 @@ export const activityRepository = {
 
     const qs = queryParams.toString()
     const url = `/users/${userId}/activity${qs ? `?${qs}` : ''}`
-    const response = await v4Client.get(url)
+    const response = await v4Api.get(url)
 
     const activities: Record<string, Activity> = {}
     for (const [id, activity] of Object.entries(response.data.activities || {})) {
@@ -68,14 +52,14 @@ export const activityRepository = {
   },
 
   async markRead(userId: string, activityIds: string[]): Promise<number> {
-    const response = await v4Client.post(`/users/${userId}/activity/read`, {
+    const response = await v4Api.post(`/users/${userId}/activity/read`, {
       activity_ids: activityIds
     })
     return response.data.updated
   },
 
   async markAllRead(userId: string): Promise<number> {
-    const response = await v4Client.post(`/users/${userId}/activity/read-all`)
+    const response = await v4Api.post(`/users/${userId}/activity/read-all`)
     return response.data.updated
   }
 }

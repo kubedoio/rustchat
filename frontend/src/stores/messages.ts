@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, type ComputedRef } from 'vue'
 import { postsApi, type Post } from '../api/posts'
 import { useChannelStore } from './channels'
 import { useUnreadStore } from './unreads'
@@ -7,6 +7,8 @@ import { useAuthStore } from './auth'
 import { useTeamStore } from './teams'
 import { normalizeEntityId } from '../utils/idCompat'
 import { getPreferredEmojiName, getReactionEmojiKey } from '../utils/emoji'
+import { DEFAULT_MESSAGE_LIMIT } from '../constants'
+import { getApiErrorMessage, getErrorMessage } from '../core/errors/errorUtils'
 
 export interface MessageReaction {
     emoji: string
@@ -66,6 +68,22 @@ function comparableId(value: unknown): string | undefined {
         return undefined
     }
     return normalizeEntityId(value) ?? value
+}
+
+function optionalString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+    return typeof value === 'boolean' ? value : undefined
+}
+
+function optionalNumber(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' ? value as Record<string, unknown> : {}
 }
 
 function idsMatch(left: unknown, right: unknown): boolean {
@@ -138,18 +156,19 @@ function mergeReaction(target: MessageReaction, incoming: MessageReaction): Mess
     }
 }
 
-function normalizeReaction(rawReaction: any): MessageReaction | null {
-    if (!rawReaction || typeof rawReaction !== 'object' || typeof rawReaction.emoji !== 'string') {
+function normalizeReaction(rawReaction: unknown): MessageReaction | null {
+    const r = rawReaction as Record<string, unknown>
+    if (!r || typeof r !== 'object' || typeof r.emoji !== 'string') {
         return null
     }
 
-    const emoji = getReactionEmojiKey(rawReaction.emoji)
-    const users = normalizeReactionUsers(rawReaction.users)
-    const numericCount = Number(rawReaction.count)
+    const emoji = getReactionEmojiKey(r.emoji)
+    const users = normalizeReactionUsers(r.users)
+    const numericCount = Number(r.count)
 
     return {
         emoji,
-        apiKey: getPreferredEmojiName(rawReaction.emoji),
+        apiKey: getPreferredEmojiName(r.emoji),
         users,
         count: users.length > 0
             ? users.length
@@ -226,8 +245,17 @@ export const useMessageStore = defineStore('messages', () => {
     const isLoadingOlder = ref(false)
     const error = ref<string | null>(null)
 
+    // Cache computed refs per channelId so Vue can cache reactivity across callers
+    const messagesCache = new Map<string, ComputedRef<Message[]>>()
+
     function getMessages(channelId: string) {
-        return computed(() => messagesByChannel.value[channelId] || [])
+        if (!messagesCache.has(channelId)) {
+            messagesCache.set(
+                channelId,
+                computed(() => messagesByChannel.value[channelId] || [])
+            )
+        }
+        return messagesCache.get(channelId)!
     }
 
     const hasMoreOlder = computed(() => (channelId: string) => hasMoreOlderByChannel.value[channelId] ?? true)
@@ -259,7 +287,7 @@ export const useMessageStore = defineStore('messages', () => {
         error.value = null
         try {
             const unreadStore = useUnreadStore()
-            const response = await postsApi.list(channelId, { limit: 50 })
+            const response = await postsApi.list(channelId, { limit: DEFAULT_MESSAGE_LIMIT })
             const messages = response.data.messages
                 .filter(p => !p.root_post_id)
                 .map(postToMessage)
@@ -272,10 +300,10 @@ export const useMessageStore = defineStore('messages', () => {
             }
 
             // If we got fewer than 50, we probably reached the end
-            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= 50
-        } catch (e: any) {
+            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
+        } catch (e: unknown) {
             console.error(`Failed to fetch messages for channel ${channelId}:`, e);
-            error.value = e.response?.data?.message || e.message || 'Failed to fetch messages'
+            error.value = getApiErrorMessage(e) || getErrorMessage(e) || 'Failed to fetch messages'
         } finally {
             loading.value = false
         }
@@ -296,7 +324,7 @@ export const useMessageStore = defineStore('messages', () => {
         loading.value = true
         isLoadingOlder.value = true
         try {
-            const response = await postsApi.list(channelId, { before, limit: 50 })
+            const response = await postsApi.list(channelId, { before, limit: DEFAULT_MESSAGE_LIMIT })
             const olderMessages = response.data.messages
                 .filter(p => !p.root_post_id)
                 .map(postToMessage)
@@ -306,8 +334,8 @@ export const useMessageStore = defineStore('messages', () => {
                 messagesByChannel.value[channelId] = [...olderMessages, ...currentMessages]
             }
 
-            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= 50
-        } catch (e: any) {
+            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
+        } catch (e: unknown) {
             console.error('Failed to fetch older messages:', e)
         } finally {
             loading.value = false
@@ -326,9 +354,9 @@ export const useMessageStore = defineStore('messages', () => {
                 .filter((post): post is Post => post !== undefined)
                 .map(postToMessage)
             repliesByThread.value[rootId] = replies
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(`Failed to fetch thread ${rootId}:`, e);
-            error.value = e.response?.data?.message || e.message || 'Failed to fetch thread'
+            error.value = getApiErrorMessage(e) || getErrorMessage(e) || 'Failed to fetch thread'
         } finally {
             loading.value = false
         }
@@ -442,8 +470,10 @@ export const useMessageStore = defineStore('messages', () => {
     function clearMessages(channelId?: string) {
         if (channelId) {
             delete messagesByChannel.value[channelId]
+            messagesCache.delete(channelId)
         } else {
             messagesByChannel.value = {}
+            messagesCache.clear()
         }
     }
 
@@ -454,6 +484,7 @@ export const useMessageStore = defineStore('messages', () => {
         loading.value = false
         isLoadingOlder.value = false
         error.value = null
+        messagesCache.clear()
     }
 
     async function pinMessage(messageId: string, channelId: string) {
@@ -464,7 +495,7 @@ export const useMessageStore = defineStore('messages', () => {
             if (message) {
                 message.isPinned = true
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to pin message'
             throw e
         }
@@ -478,7 +509,7 @@ export const useMessageStore = defineStore('messages', () => {
             if (message) {
                 message.isPinned = false
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to unpin message'
             throw e
         }
@@ -492,7 +523,7 @@ export const useMessageStore = defineStore('messages', () => {
             if (message) {
                 message.isSaved = true
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to save message'
             throw e
         }
@@ -506,7 +537,7 @@ export const useMessageStore = defineStore('messages', () => {
             if (message) {
                 message.isSaved = false
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to unsave message'
             throw e
         }
@@ -518,7 +549,7 @@ export const useMessageStore = defineStore('messages', () => {
         try {
             const response = await postsApi.list(channelId, { q: query })
             return response.data.messages.map(postToMessage)
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to search messages'
             throw e
         } finally {
@@ -532,7 +563,7 @@ export const useMessageStore = defineStore('messages', () => {
         try {
             const response = await postsApi.list(channelId, { is_pinned: true })
             return response.data.messages.map(postToMessage)
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to fetch pinned messages'
             throw e
         } finally {
@@ -545,7 +576,7 @@ export const useMessageStore = defineStore('messages', () => {
         try {
             const response = await postsApi.getSaved()
             return response.data.map(postToMessage)
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to fetch saved messages'
             throw e
         } finally {
@@ -553,7 +584,8 @@ export const useMessageStore = defineStore('messages', () => {
         }
     }
 
-    function handleMessageUpdate(data: any) {
+    function handleMessageUpdate(rawData: unknown) {
+        const data = asRecord(rawData)
         if (!data.id) return
 
         // 1. Update in main channels
@@ -566,14 +598,15 @@ export const useMessageStore = defineStore('messages', () => {
                 const msg = messages[index]
                 if (!msg) continue
 
-                if (data.message !== undefined) msg.content = data.message
-                if (data.is_pinned !== undefined) msg.isPinned = data.is_pinned
-                if (data.reply_count !== undefined) msg.threadCount = data.reply_count
+                if (data.message !== undefined) msg.content = optionalString(data.message) ?? msg.content
+                if (data.is_pinned !== undefined) msg.isPinned = optionalBoolean(data.is_pinned) ?? msg.isPinned
+                if (data.reply_count !== undefined) msg.threadCount = optionalNumber(data.reply_count)
                 if (data.edited_at !== undefined || data.edit_at !== undefined) {
                     msg.editedAt = toOptionalIsoTimestamp(data.edited_at ?? data.edit_at)
                 }
-                if (data.reply_count_inc) {
-                    msg.threadCount = (msg.threadCount || 0) + data.reply_count_inc
+                const replyCountInc = optionalNumber(data.reply_count_inc)
+                if (replyCountInc) {
+                    msg.threadCount = (msg.threadCount || 0) + replyCountInc
                 }
             }
         }
@@ -588,8 +621,8 @@ export const useMessageStore = defineStore('messages', () => {
                 const msg = replies[index]
                 if (!msg) continue
 
-                if (data.message !== undefined) msg.content = data.message
-                if (data.is_pinned !== undefined) msg.isPinned = data.is_pinned
+                if (data.message !== undefined) msg.content = optionalString(data.message) ?? msg.content
+                if (data.is_pinned !== undefined) msg.isPinned = optionalBoolean(data.is_pinned) ?? msg.isPinned
                 if (data.edited_at !== undefined || data.edit_at !== undefined) {
                     msg.editedAt = toOptionalIsoTimestamp(data.edited_at ?? data.edit_at)
                 }
@@ -621,19 +654,23 @@ export const useMessageStore = defineStore('messages', () => {
         }
     }
 
-    function handleReactionAdded(data: any) {
-        const reactionKey = getReactionEmojiKey(data.emoji_name)
-        const apiKey = getPreferredEmojiName(data.emoji_name)
+    function handleReactionAdded(rawData: unknown) {
+        const data = asRecord(rawData)
+        const reactionKey = getReactionEmojiKey(optionalString(data.emoji_name) ?? '')
+        const apiKey = getPreferredEmojiName(optionalString(data.emoji_name) ?? '')
+        const postId = optionalString(data.post_id)
+        const userId = optionalString(data.user_id)
+        if (!postId || !userId) return
 
         visitLoadedMessages((message) => {
-            if (message.id !== data.post_id) {
+            if (message.id !== postId) {
                 return
             }
 
             const existingReaction = message.reactions.find((reaction) => reaction.emoji === reactionKey)
             if (existingReaction) {
-                if (!existingReaction.users.includes(data.user_id)) {
-                    existingReaction.users.push(data.user_id)
+                if (!existingReaction.users.includes(userId)) {
+                    existingReaction.users.push(userId)
                 }
                 existingReaction.count = existingReaction.users.length || existingReaction.count + 1
                 existingReaction.apiKey = existingReaction.apiKey || apiKey
@@ -642,17 +679,21 @@ export const useMessageStore = defineStore('messages', () => {
                     emoji: reactionKey,
                     apiKey,
                     count: 1,
-                    users: [data.user_id],
+                    users: [userId],
                 })
             }
         })
     }
 
-    function handleReactionRemoved(data: any) {
-        const reactionKey = getReactionEmojiKey(data.emoji_name)
+    function handleReactionRemoved(rawData: unknown) {
+        const data = asRecord(rawData)
+        const reactionKey = getReactionEmojiKey(optionalString(data.emoji_name) ?? '')
+        const postId = optionalString(data.post_id)
+        const userId = optionalString(data.user_id)
+        if (!postId || !userId) return
 
         visitLoadedMessages((message) => {
-            if (message.id !== data.post_id) {
+            if (message.id !== postId) {
                 return
             }
 
@@ -666,7 +707,7 @@ export const useMessageStore = defineStore('messages', () => {
                 return
             }
 
-            const userIndex = reaction.users.indexOf(data.user_id)
+            const userIndex = reaction.users.indexOf(userId)
             if (userIndex !== -1) {
                 reaction.users.splice(userIndex, 1)
             }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { useAdminStore } from '../../stores/admin';
+import { useAdminStore } from '../../features/admin/stores/adminStore';
 import { Activity, Database, HardDrive, Wifi, Server, CheckCircle, AlertCircle, Clock, MemoryStick, FolderOpen } from 'lucide-vue-next';
 
 const adminStore = useAdminStore();

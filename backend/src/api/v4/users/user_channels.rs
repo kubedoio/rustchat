@@ -4,9 +4,11 @@ use uuid::Uuid;
 
 use super::MmAuthUser;
 use crate::api::AppState;
+use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE};
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::parse_mm_or_uuid, models as mm};
 use crate::models::channel::Channel;
+use crate::repositories::{ChannelRepository, TeamRepository};
 
 /// Resolves a team identifier to a UUID.
 /// First tries to parse as UUID/mm-id, then falls back to looking up by team name.
@@ -17,15 +19,12 @@ pub async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<U
     }
 
     // Fall back to looking up by team name
-    let team: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM teams WHERE name = $1")
-        .bind(team_id_str)
-        .fetch_optional(&state.db)
-        .await?;
+    let id = TeamRepository::new(&state.db)
+        .get_id_by_name(team_id_str)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
 
-    match team {
-        Some((id,)) => Ok(id),
-        None => Err(AppError::NotFound("Team not found".to_string())),
-    }
+    Ok(id)
 }
 
 pub async fn hydrate_direct_channel_display_name(
@@ -39,21 +38,9 @@ pub async fn hydrate_direct_channel_display_name(
         return Ok(());
     }
 
-    let display_name: Option<String> = sqlx::query_scalar(
-        r#"
-        SELECT COALESCE(NULLIF(u.display_name, ''), u.username)
-        FROM channel_members cm
-        JOIN users u ON u.id = cm.user_id
-        WHERE cm.channel_id = $1
-          AND cm.user_id <> $2
-        ORDER BY u.username ASC
-        LIMIT 1
-        "#,
-    )
-    .bind(channel.id)
-    .bind(viewer_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let display_name = ChannelRepository::new(&state.db)
+        .get_dm_display_name(channel.id, viewer_id)
+        .await?;
 
     channel.display_name = display_name.or_else(|| Some("Direct Message".to_string()));
     Ok(())
@@ -86,48 +73,15 @@ pub async fn my_team_channels(
     // 2. If last_delete_at > 0: return non-deleted channels AND channels deleted since last_delete_at
     //    This allows mobile clients to sync deleted channels for cache invalidation
     // 3. Default: only return non-deleted channels
-    let mut channels: Vec<Channel> = if query.include_deleted {
-        // Return all channels including deleted ones
-        sqlx::query_as(
-            r#"
-            SELECT c.* FROM channels c
-            JOIN channel_members cm ON c.id = cm.channel_id
-            WHERE c.team_id = $1 AND cm.user_id = $2
-            "#,
-        )
-        .bind(team_id)
-        .bind(auth.user_id)
-        .fetch_all(&state.db)
-        .await?
-    } else if query.last_delete_at > 0 {
-        let ts = chrono::DateTime::from_timestamp_millis(query.last_delete_at).unwrap_or_default();
-        sqlx::query_as(
-            r#"
-            SELECT c.* FROM channels c
-            JOIN channel_members cm ON c.id = cm.channel_id
-            WHERE c.team_id = $1 AND cm.user_id = $2
-              AND (c.deleted_at IS NULL OR c.deleted_at >= $3)
-            "#,
-        )
-        .bind(team_id)
-        .bind(auth.user_id)
-        .bind(ts)
-        .fetch_all(&state.db)
-        .await?
+    let last_delete_ts = if query.last_delete_at > 0 {
+        Some(chrono::DateTime::from_timestamp_millis(query.last_delete_at).unwrap_or_default())
     } else {
-        // Default: only return non-deleted channels
-        sqlx::query_as(
-            r#"
-            SELECT c.* FROM channels c
-            JOIN channel_members cm ON c.id = cm.channel_id
-            WHERE c.team_id = $1 AND cm.user_id = $2 AND c.deleted_at IS NULL
-            "#,
-        )
-        .bind(team_id)
-        .bind(auth.user_id)
-        .fetch_all(&state.db)
-        .await?
+        None
     };
+
+    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_team_channels_for_user(team_id, auth.user_id, query.include_deleted, last_delete_ts)
+        .await?;
 
     tracing::debug!(
         user_id = %auth.user_id,
@@ -151,17 +105,9 @@ pub async fn get_team_channels_for_user(
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
     let user_id = super::user_sidebar_categories::resolve_user_id(&user_id, &auth)?;
     let team_id = resolve_team_id(&state, &team_id).await?;
-    let mut channels: Vec<Channel> = sqlx::query_as(
-        r#"
-        SELECT c.* FROM channels c
-        JOIN channel_members cm ON c.id = cm.channel_id
-        WHERE c.team_id = $1 AND cm.user_id = $2
-        "#,
-    )
-    .bind(team_id)
-    .bind(user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_team_channels_for_user(team_id, user_id, true, None)
+        .await?;
 
     for channel in &mut channels {
         hydrate_direct_channel_display_name(&state, user_id, channel).await?;
@@ -182,31 +128,15 @@ pub async fn my_channels(
     auth: MmAuthUser,
     axum::extract::Query(query): axum::extract::Query<MyChannelsQuery>,
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
-    let mut channels: Vec<Channel> = if query.since > 0 {
-        let ts = chrono::DateTime::from_timestamp_millis(query.since).unwrap_or_default();
-        sqlx::query_as(
-            r#"
-            SELECT c.* FROM channels c
-            JOIN channel_members cm ON c.id = cm.channel_id
-            WHERE cm.user_id = $1 AND c.updated_at >= $2
-            "#,
-        )
-        .bind(auth.user_id)
-        .bind(ts)
-        .fetch_all(&state.db)
-        .await?
+    let since = if query.since > 0 {
+        Some(chrono::DateTime::from_timestamp_millis(query.since).unwrap_or_default())
     } else {
-        sqlx::query_as(
-            r#"
-            SELECT c.* FROM channels c
-            JOIN channel_members cm ON c.id = cm.channel_id
-            WHERE cm.user_id = $1
-            "#,
-        )
-        .bind(auth.user_id)
-        .fetch_all(&state.db)
-        .await?
+        None
     };
+
+    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_user_channels(auth.user_id, since)
+        .await?;
 
     for channel in &mut channels {
         hydrate_direct_channel_display_name(&state, auth.user_id, channel).await?;
@@ -222,16 +152,9 @@ pub async fn get_channels_for_user(
     axum::extract::Path(user_id): axum::extract::Path<String>,
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
     let user_id = super::user_sidebar_categories::resolve_user_id(&user_id, &auth)?;
-    let mut channels: Vec<Channel> = sqlx::query_as(
-        r#"
-        SELECT c.* FROM channels c
-        JOIN channel_members cm ON c.id = cm.channel_id
-        WHERE cm.user_id = $1
-        "#,
-    )
-    .bind(user_id)
-    .fetch_all(&state.db)
-    .await?;
+    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_user_channels(user_id, None)
+        .await?;
 
     for channel in &mut channels {
         hydrate_direct_channel_display_name(&state, user_id, channel).await?;
@@ -256,30 +179,12 @@ pub async fn my_team_channels_not_members(
     let team_id = resolve_team_id(&state, &team_id).await?;
 
     let page = query.page.unwrap_or(0).max(0);
-    let per_page = query.per_page.unwrap_or(60).clamp(1, 200);
+    let per_page = query.per_page.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE);
     let offset = page * per_page;
 
-    let channels: Vec<Channel> = sqlx::query_as(
-        r#"
-        SELECT c.*
-        FROM channels c
-        WHERE c.team_id = $1
-          AND c.is_archived = false
-          AND c.type IN ('public', 'private')
-          AND NOT EXISTS (
-              SELECT 1 FROM channel_members cm
-              WHERE cm.channel_id = c.id AND cm.user_id = $2
-          )
-        ORDER BY COALESCE(c.display_name, c.name) ASC
-        LIMIT $3 OFFSET $4
-        "#,
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .bind(per_page)
-    .bind(offset)
-    .fetch_all(&state.db)
-    .await?;
+    let channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_not_member_channels(team_id, auth.user_id, per_page, offset)
+        .await?;
 
     let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
     Ok(Json(mm_channels))

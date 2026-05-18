@@ -6,7 +6,8 @@ import AuthLayout from '../../layouts/AuthLayout.vue'
 import BaseInput from '../../components/atomic/BaseInput.vue'
 import BaseButton from '../../components/atomic/BaseButton.vue'
 import TurnstileWidget from '../../components/auth/TurnstileWidget.vue'
-import { useConfigStore } from '../../stores/config'
+import { useConfigStore } from '../../features/config/stores/configStore'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const router = useRouter()
 const configStore = useConfigStore()
@@ -89,8 +90,8 @@ async function handleRegister() {
         window.location.href = '/'
       }
     }
-  } catch (e: any) {
-    error.value = e.response?.data?.message || 'Failed to register'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e) || 'Failed to register'
     // Reset Turnstile on error
     turnstileVerified.value = false
     turnstileToken.value = ''

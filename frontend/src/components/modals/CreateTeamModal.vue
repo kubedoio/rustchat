@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { X } from 'lucide-vue-next';
-import { useTeamStore } from '../../stores/teams';
-import { useAuthStore } from '../../stores/auth';
+import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import { canCreateTeam as canCreateTeamForRole } from '../../features/permissions/capabilities';
 import BaseButton from '../atomic/BaseButton.vue';
 import BaseInput from '../atomic/BaseInput.vue';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const props = defineProps<{
     show: boolean
@@ -51,8 +52,8 @@ async function handleSubmit() {
         displayName.value = '';
         description.value = '';
         emit('close');
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to create team';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to create team';
     } finally {
         loading.value = false;
     }

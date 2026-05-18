@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import RcAvatar from '../ui/RcAvatar.vue'
-import { useTeamStore } from '../../stores/teams'
+import { useTeamStore } from '../../features/teams/stores/teamStore'
 
 const props = defineProps<{
   query: string

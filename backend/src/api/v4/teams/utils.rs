@@ -1,6 +1,7 @@
 use axum::body::Bytes;
 use serde::Deserialize;
 
+use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE};
 use crate::error::{ApiResult, AppError};
 
 /// Validates email format: must contain @ with non-empty local and domain parts
@@ -59,7 +60,7 @@ pub fn pagination_from_group_query(query: &GroupAssociationQuery) -> (bool, usiz
     let _ = query.include_member_count.unwrap_or(false);
     let paginate = query.paginate.unwrap_or(true);
     let page = query.page.unwrap_or(0).max(0) as usize;
-    let per_page = query.per_page.unwrap_or(60).clamp(1, 200) as usize;
+    let per_page = query.per_page.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE) as usize;
     let offset = page.saturating_mul(per_page);
     (paginate, offset, per_page)
 }

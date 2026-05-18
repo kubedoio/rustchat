@@ -2,6 +2,7 @@ import type { Message, MessageId, MessageDraft } from '../../../core/entities/Me
 import type { ChannelId } from '../../../core/entities/Channel'
 import { postsApi, type Post, type CreatePostRequest } from '../../../api/posts'
 import { withRetry } from '../../../core/services/retry'
+import { isNotFoundError } from '../../../core/errors/errorUtils'
 
 export interface MessageQueryOptions {
   limit?: number
@@ -23,8 +24,8 @@ export const messageRepository = {
       try {
         const response = await postsApi.get(id)
         return response.data ? postToMessage(response.data) : null
-      } catch (error: any) {
-        if (error.response?.status === 404) {
+      } catch (error: unknown) {
+        if (isNotFoundError(error)) {
           return null
         }
         throw error
@@ -37,7 +38,7 @@ export const messageRepository = {
     options: MessageQueryOptions = {}
   ): Promise<{ messages: Message[]; readState?: MessageReadState }> {
     return withRetry(async () => {
-      const params: any = {
+      const params: Record<string, unknown> = {
         limit: options.limit ?? 50,
         before: options.before,
         after: options.after
@@ -192,14 +193,17 @@ export function postToMessage(post: Post): Message {
       url: f.url,
       size: f.size,
       mimeType: f.mime_type,
-      width: (f as any).width,
-      height: (f as any).height
+      width: (f as Record<string, unknown>).width as number | undefined,
+      height: (f as Record<string, unknown>).height as number | undefined
     })),
-    reactions: (rawPost.reactions || []).map((r: any) => ({
-      emoji: r.emoji,
-      count: r.count,
-      users: r.users.map((u: any) => String(u))
-    })),
+    reactions: (rawPost.reactions || []).map((r: unknown) => {
+      const reaction = r as Record<string, unknown>
+      return {
+        emoji: reaction.emoji as string,
+        count: reaction.count as number,
+        users: (reaction.users as unknown[]).map((u) => String(u))
+      }
+    }),
     isPinned: Boolean(rawPost.is_pinned),
     isSaved: rawPost.is_saved || false,
     status: 'delivered',

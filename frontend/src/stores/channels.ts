@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { channelsApi, type Channel, type CreateChannelRequest, type ChannelNotifyProps } from '../api/channels'
 import { useAuthStore } from './auth'
+import { getApiErrorMessage } from '../core/errors/errorUtils'
 
 export const useChannelStore = defineStore('channels', () => {
     const channels = ref<Channel[]>([])
@@ -51,8 +52,8 @@ export const useChannelStore = defineStore('channels', () => {
                     lastChannelByTeam.value[teamId] = currentChannelId.value
                 }
             }
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to fetch channels'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to fetch channels'
         } finally {
             loading.value = false
         }
@@ -68,8 +69,8 @@ export const useChannelStore = defineStore('channels', () => {
             addChannel(channel)
 
             return channel
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to create channel'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to create channel'
             throw e
         } finally {
             loading.value = false
@@ -85,8 +86,8 @@ export const useChannelStore = defineStore('channels', () => {
 
         try {
             await channelsApi.join(channelId, authStore.user.id)
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to join channel'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to join channel'
             throw e
         }
     }
@@ -95,8 +96,8 @@ export const useChannelStore = defineStore('channels', () => {
         try {
             await channelsApi.removeMember(channelId, userId)
             removeChannel(channelId)
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to leave channel'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to leave channel'
             throw e
         }
     }
@@ -157,7 +158,7 @@ export const useChannelStore = defineStore('channels', () => {
         try {
             const response = await channelsApi.listJoinable(teamId)
             joinableChannels.value = response.data
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error('Failed to fetch joinable channels', e)
         } finally {
             loading.value = false
@@ -174,8 +175,8 @@ export const useChannelStore = defineStore('channels', () => {
     async function updateNotifyProps(channelId: string, userId: string, props: ChannelNotifyProps) {
         try {
             await channelsApi.updateNotifyProps(channelId, userId, props)
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to update notification settings'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to update notification settings'
             throw e
         }
     }

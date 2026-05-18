@@ -5,7 +5,8 @@ import client from '../../api/client'
 import AuthLayout from '../../layouts/AuthLayout.vue'
 import BaseInput from '../../components/atomic/BaseInput.vue'
 import BaseButton from '../../components/atomic/BaseButton.vue'
-import { useAuthStore } from '../../stores/auth'
+import { useAuthStore } from '../../features/auth/stores/authStore'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const route = useRoute()
 const router = useRouter()
@@ -86,7 +87,7 @@ onMounted(async () => {
     } else {
       error.value = 'This link has expired or is invalid. Please request a new one.'
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     error.value = 'This link has expired or is invalid. Please request a new one.'
   } finally {
     validating.value = false
@@ -105,8 +106,8 @@ async function handleSubmit() {
       new_password: password.value
     })
     success.value = true
-  } catch (e: any) {
-    error.value = e.response?.data?.message || 'Failed to reset password. Please try again.'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e) || 'Failed to reset password. Please try again.'
   } finally {
     loading.value = false
   }

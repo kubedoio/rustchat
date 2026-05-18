@@ -31,6 +31,12 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use bytes::Bytes;
+use hmac::{Hmac, Mac};
+use sha2::{Sha256, Digest};
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -98,6 +104,15 @@ struct AppState {
     fcm_client: Option<FcmClient>,
     apns_client: Option<ApnsClient>,
     auth_key: Option<String>,
+    seen_nonces: Mutex<HashMap<String, Instant>>,
+}
+
+fn app(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route("/send", post(send_notification))
+        .route("/health", get(health_check))
+        .with_state(state)
+        .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
 #[tokio::main]
@@ -127,14 +142,10 @@ async fn main() -> anyhow::Result<()> {
         fcm_client,
         apns_client,
         auth_key,
+        seen_nonces: Mutex::new(HashMap::new()),
     });
 
-    // Build routes
-    let app = Router::new()
-        .route("/send", post(send_notification))
-        .route("/health", get(health_check))
-        .with_state(state)
-        .layer(tower_http::trace::TraceLayer::new_for_http());
+    let app = app(state);
 
     // Run server
     let port = std::env::var("RUSTCHAT_PUSH_PORT")
@@ -247,18 +258,55 @@ async fn health_check() -> Json<serde_json::Value> {
     }))
 }
 
-async fn send_notification(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(payload): Json<PushRequest>,
-) -> Result<StatusCode, (StatusCode, Json<PushResponse>)> {
-    // Validate shared-secret auth key if configured
-    if let Some(expected) = state.auth_key.as_ref() {
-        let provided = headers
-            .get("x-push-proxy-key")
-            .and_then(|v| v.to_str().ok());
-        if provided != Some(expected) {
-            warn!("Rejecting unauthenticated push request");
+/// Constant-time string comparison to prevent timing attacks
+fn constant_time_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.bytes()
+        .zip(b.bytes())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+        == 0
+}
+
+fn validate_hmac(
+    auth_key: &str,
+    headers: &HeaderMap,
+    body_bytes: &Bytes,
+    seen_nonces: &mut HashMap<String, Instant>,
+    now_secs: i64,
+    now_instant: Instant,
+) -> Result<(), (StatusCode, Json<PushResponse>)> {
+    let signature = headers
+        .get("x-push-proxy-signature")
+        .and_then(|v| v.to_str().ok());
+    let timestamp = headers
+        .get("x-push-proxy-timestamp")
+        .and_then(|v| v.to_str().ok());
+    let nonce = headers
+        .get("x-push-proxy-nonce")
+        .and_then(|v| v.to_str().ok());
+
+    if signature.is_none() || timestamp.is_none() || nonce.is_none() {
+        warn!("Rejecting push request: missing signature headers");
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(PushResponse {
+                success: false,
+                message: "Unauthorized".to_string(),
+            }),
+        ));
+    }
+
+    let signature = signature.unwrap();
+    let timestamp = timestamp.unwrap();
+    let nonce = nonce.unwrap();
+
+    // 1. Timestamp within 5 minutes
+    let ts: i64 = match timestamp.parse() {
+        Ok(t) => t,
+        Err(_) => {
+            warn!("Rejecting push request: invalid timestamp");
             return Err((
                 StatusCode::UNAUTHORIZED,
                 Json(PushResponse {
@@ -267,7 +315,90 @@ async fn send_notification(
                 }),
             ));
         }
+    };
+    if (now_secs - ts).abs() > 300 {
+        warn!("Rejecting push request: timestamp too old");
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(PushResponse {
+                success: false,
+                message: "Unauthorized".to_string(),
+            }),
+        ));
     }
+
+    // 2. Nonce deduplication (5-minute TTL)
+    seen_nonces.retain(|_, &mut inst| now_instant.duration_since(inst) < Duration::from_secs(300));
+    if seen_nonces.contains_key(nonce) {
+        warn!("Rejecting push request: nonce already seen");
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(PushResponse {
+                success: false,
+                message: "Unauthorized".to_string(),
+            }),
+        ));
+    }
+    seen_nonces.insert(nonce.to_string(), now_instant);
+
+    // 3. HMAC signature verification
+    let body_hash = {
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(body_bytes);
+        hex::encode(hasher.finalize())
+    };
+    let expected_sig_input = format!("{}:{}:{}", timestamp, nonce, body_hash);
+    let mut mac = Hmac::<Sha256>::new_from_slice(auth_key.as_bytes())
+        .expect("HMAC can take key of any size");
+    mac.update(expected_sig_input.as_bytes());
+    let expected_signature = hex::encode(mac.finalize().into_bytes());
+
+    if !constant_time_eq(&expected_signature, signature) {
+        warn!("Rejecting push request: invalid signature");
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(PushResponse {
+                success: false,
+                message: "Unauthorized".to_string(),
+            }),
+        ));
+    }
+
+    Ok(())
+}
+
+async fn send_notification(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body_bytes: Bytes,
+) -> Result<StatusCode, (StatusCode, Json<PushResponse>)> {
+    // Validate HMAC-SHA256 request signing if configured
+    if let Some(secret) = state.auth_key.as_ref() {
+        let mut nonces = state.seen_nonces.lock().unwrap();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let now_inst = Instant::now();
+        if let Err(err) = validate_hmac(secret, &headers, &body_bytes, &mut nonces, now, now_inst) {
+            return Err(err);
+        }
+    }
+
+    let payload: PushRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(p) => p,
+        Err(e) => {
+            warn!("Invalid JSON body: {}", e);
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(PushResponse {
+                    success: false,
+                    message: "Invalid request body".to_string(),
+                }),
+            ));
+        }
+    };
+
     let platform = payload.platform.to_lowercase();
     let is_call =
         payload.data.sub_type.as_deref() == Some("calls") || payload.notification_type == "call";
@@ -515,5 +646,197 @@ async fn send_fcm_push(
                 }),
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+    use bytes::Bytes;
+    use http_body_util::BodyExt;
+    use std::collections::HashMap;
+    use std::time::Instant;
+    use tower::ServiceExt;
+
+    const TEST_AUTH_KEY: &str = "test-secret-key";
+
+    fn test_state_with_auth() -> Arc<AppState> {
+        Arc::new(AppState {
+            fcm_client: None,
+            apns_client: None,
+            auth_key: Some(TEST_AUTH_KEY.to_string()),
+            seen_nonces: Mutex::new(HashMap::new()),
+        })
+    }
+
+    fn test_state_without_auth() -> Arc<AppState> {
+        Arc::new(AppState {
+            fcm_client: None,
+            apns_client: None,
+            auth_key: None,
+            seen_nonces: Mutex::new(HashMap::new()),
+        })
+    }
+
+    fn generate_signature(auth_key: &str, timestamp: i64, nonce: &str, body: &Bytes) -> String {
+        let body_hash = {
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(body);
+            hex::encode(hasher.finalize())
+        };
+        let expected_sig_input = format!("{}:{}:{}", timestamp, nonce, body_hash);
+        let mut mac = Hmac::<Sha256>::new_from_slice(auth_key.as_bytes()).unwrap();
+        mac.update(expected_sig_input.as_bytes());
+        hex::encode(mac.finalize().into_bytes())
+    }
+
+    fn make_headers(timestamp: i64, nonce: &str, signature: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-push-proxy-signature", signature.parse().unwrap());
+        headers.insert("x-push-proxy-timestamp", timestamp.to_string().parse().unwrap());
+        headers.insert("x-push-proxy-nonce", nonce.parse().unwrap());
+        headers
+    }
+
+    #[tokio::test]
+    async fn hmac_valid_request() {
+        let body = Bytes::from(r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#);
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let nonce = "nonce-1";
+        let signature = generate_signature(TEST_AUTH_KEY, timestamp, nonce, &body);
+        let headers = make_headers(timestamp, nonce, &signature);
+        let mut nonces = HashMap::new();
+        let now = Instant::now();
+
+        let result = validate_hmac(TEST_AUTH_KEY, &headers, &body, &mut nonces, timestamp, now);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn hmac_expired_timestamp() {
+        let body = Bytes::from(r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#);
+        let timestamp = 1000i64;
+        let nonce = "nonce-expired";
+        let signature = generate_signature(TEST_AUTH_KEY, timestamp, nonce, &body);
+        let headers = make_headers(timestamp, nonce, &signature);
+        let mut nonces = HashMap::new();
+        let now = Instant::now();
+        let now_secs = 10000i64;
+
+        let result = validate_hmac(TEST_AUTH_KEY, &headers, &body, &mut nonces, now_secs, now);
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn hmac_invalid_signature() {
+        let body = Bytes::from(r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#);
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let nonce = "nonce-invalid";
+        let headers = make_headers(timestamp, nonce, "invalid-signature");
+        let mut nonces = HashMap::new();
+        let now = Instant::now();
+
+        let result = validate_hmac(TEST_AUTH_KEY, &headers, &body, &mut nonces, timestamp, now);
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn hmac_replayed_nonce() {
+        let body = Bytes::from(r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#);
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let nonce = "nonce-replay";
+        let signature = generate_signature(TEST_AUTH_KEY, timestamp, nonce, &body);
+        let headers = make_headers(timestamp, nonce, &signature);
+        let mut nonces = HashMap::new();
+        let now = Instant::now();
+
+        let result = validate_hmac(TEST_AUTH_KEY, &headers, &body, &mut nonces, timestamp, now);
+        assert!(result.is_ok());
+
+        let result2 = validate_hmac(TEST_AUTH_KEY, &headers, &body, &mut nonces, timestamp, now);
+        assert!(result2.is_err());
+        let (status, _) = result2.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn route_android() {
+        let state = test_state_without_auth();
+        let app = app(state);
+
+        let body = r#"{"token":"android-token","title":"Test","body":"Body","platform":"android","type":"message","data":{"channel_id":"ch1","post_id":"p1","type":"message"}}"#;
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/send")
+            .header("content-type", "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(json["message"], "FCM not configured");
+    }
+
+    #[tokio::test]
+    async fn route_ios() {
+        let state = test_state_without_auth();
+        let app = app(state);
+
+        let body = r#"{"token":"ios-token","title":"Test","body":"Body","platform":"ios","type":"call","data":{"channel_id":"ch1","post_id":"p1","type":"call","call_uuid":"call-123"}}"#;
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/send")
+            .header("content-type", "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(json["message"], "APNS not configured");
+    }
+
+    #[tokio::test]
+    async fn health_check() {
+        let state = test_state_without_auth();
+        let app = app(state);
+
+        let request = Request::builder()
+            .method("GET")
+            .uri("/health")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(json["status"], "ok");
+        assert_eq!(json["service"], "rustchat-push-proxy");
     }
 }

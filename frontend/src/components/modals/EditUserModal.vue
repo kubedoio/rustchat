@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { X, UserCog, Shield, Type } from 'lucide-vue-next';
-import { useAdminStore } from '../../stores/admin';
+import { useAdminStore } from '../../features/admin/stores/adminStore';
 import type { AdminUser } from '../../api/admin';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const props = defineProps<{
     open: boolean
@@ -54,8 +55,8 @@ async function submit() {
         
         emit('updated');
         emit('close');
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to update user';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to update user';
     } finally {
         submitting.value = false;
     }

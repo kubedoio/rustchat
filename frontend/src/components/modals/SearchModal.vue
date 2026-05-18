@@ -3,7 +3,8 @@ import { ref, watch } from 'vue'
 import { X, Search, Hash, Clock, MessageSquare } from 'lucide-vue-next'
 import { format } from 'date-fns'
 import { searchApi, type SearchResult } from '../../api/search'
-import { useChannelStore } from '../../stores/channels'
+import { useChannelStore } from '../../features/channels/stores/channelStore'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const props = defineProps<{
     show: boolean
@@ -58,8 +59,8 @@ async function performSearch() {
         if (!recentSearches.value.includes(search)) {
             recentSearches.value = [search, ...recentSearches.value.slice(0, 4)]
         }
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Search failed'
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Search failed'
     } finally {
         loading.value = false
     }

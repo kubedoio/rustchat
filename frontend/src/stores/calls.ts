@@ -4,6 +4,7 @@ import callsApi, { type CallState, type CallsConfig } from '../api/calls'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useToast } from '../composables/useToast'
 import { useAuthStore } from './auth'
+import { getErrorMessage, isNotFoundError } from '../core/errors/errorUtils'
 
 export interface CurrentCall {
     channelId: string
@@ -48,16 +49,39 @@ export const useCallsStore = defineStore('calls', () => {
         return activeCalls.value.get(channelId)
     })
 
-    function readEventChannelId(data: any): string | undefined {
-        return data?.channel_id_raw || data?.channel_id
+    function eventPayload(data: unknown): Record<string, unknown> {
+        return data && typeof data === 'object' ? data as Record<string, unknown> : {}
     }
 
-    function readEventUserId(data: any): string | undefined {
-        return data?.user_id_raw || data?.user_id
+    function readEventChannelId(data: unknown): string | undefined {
+        const payload = eventPayload(data)
+        return (payload.channel_id_raw || payload.channel_id) as string | undefined
     }
 
-    function readEventSessionId(data: any): string | undefined {
-        return data?.session_id_raw || data?.session_id
+    function readEventUserId(data: unknown): string | undefined {
+        const payload = eventPayload(data)
+        return (payload.user_id_raw || payload.user_id) as string | undefined
+    }
+
+    function readEventSessionId(data: unknown): string | undefined {
+        const payload = eventPayload(data)
+        return (payload.session_id_raw || payload.session_id) as string | undefined
+    }
+
+    function readEventBoolean(data: unknown, key: string): boolean | undefined {
+        const value = eventPayload(data)[key]
+        return typeof value === 'boolean' ? value : undefined
+    }
+
+    function readEventString(data: unknown, ...keys: string[]): string | undefined {
+        const payload = eventPayload(data)
+        for (const key of keys) {
+            const value = payload[key]
+            if (typeof value === 'string' && value.length > 0) {
+                return value
+            }
+        }
+        return undefined
     }
 
     function findMySessionId(call: CallState): string {
@@ -116,12 +140,11 @@ export const useCallsStore = defineStore('calls', () => {
 
     onEvent('custom_com.mattermost.calls_user_muted', (data) => {
         console.log('User muted:', data)
-        const d = data as Record<string, unknown>
-        const eventChannelId = readEventChannelId(d)
+        const eventChannelId = readEventChannelId(data)
         if (eventChannelId && currentCall.value?.channelId === eventChannelId) {
-            const userId = readEventUserId(d)
+            const userId = readEventUserId(data)
             if (userId === authStore.user?.id) {
-                const muted = d.muted as boolean
+                const muted = readEventBoolean(data, 'muted') ?? true
                 isMuted.value = muted
                 // Update local tracks
                 const active = currentCall.value
@@ -217,18 +240,17 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_host_changed', (data) => {
-        const d = data as Record<string, unknown>
-        const eventChannelId = readEventChannelId(d)
+        const payload = eventPayload(data)
+        const eventChannelId = readEventChannelId(payload)
         if (currentCall.value && currentCall.value.channelId === eventChannelId) {
-            currentCall.value.call.host_id = (d.host_id || d.host_id_raw) as string
+            currentCall.value.call.host_id = readEventString(payload, 'host_id', 'host_id_raw') || ''
         }
     })
 
     onEvent('custom_com.mattermost.calls_ringing', (data) => {
         if (isInCall.value) return
-        const d = data as Record<string, unknown>
-        const eventChannelId = readEventChannelId(d)
-        const callerId = (d.sender_id || d.sender_id_raw) as string | undefined
+        const eventChannelId = readEventChannelId(data)
+        const callerId = readEventString(data, 'sender_id', 'sender_id_raw')
         if (eventChannelId && callerId) {
             setIncomingCall({ channelId: eventChannelId, callerId })
         }
@@ -349,9 +371,9 @@ export const useCallsStore = defineStore('calls', () => {
                 activeCalls.value.delete(channelId)
             }
             return data
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Silently handle 404s as they just mean there's no active call in the channel
-            if (error?.response?.status !== 404) {
+            if (!isNotFoundError(error)) {
                 console.error('Failed to load call for channel', error)
             }
             return null
@@ -401,11 +423,11 @@ export const useCallsStore = defineStore('calls', () => {
             toast.success('Call started', 'You are now in a call')
 
             return callData
-        } catch (error: any) {
+        } catch (error: unknown) {
             cleanupWebRTC()
             currentCall.value = null
             console.error('Failed to start call', error)
-            toast.error('Failed to start call', error.message || 'Unknown error')
+            toast.error('Failed to start call', getErrorMessage(error))
             throw error
         }
     }
@@ -456,11 +478,11 @@ export const useCallsStore = defineStore('calls', () => {
             isExpanded.value = true
             toast.success('Joined call', 'You are now in the call')
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             cleanupWebRTC()
             currentCall.value = null
             console.error('Failed to join call', error)
-            toast.error('Failed to join call', error.message || 'Unknown error')
+            toast.error('Failed to join call', getErrorMessage(error))
             throw error
         }
     }

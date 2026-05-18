@@ -150,8 +150,8 @@ export const playbooksApi = {
     deleteChecklist: (playbookId: string, id: string) => api.delete(`/playbooks/${playbookId}/checklists/${id}`),
 
     // Tasks
-    createTask: (checklistId: string, data: any) => api.post<PlaybookTask>(`/checklists/${checklistId}/tasks`, data),
-    updateTask: (id: string, data: any) => api.put<PlaybookTask>(`/tasks/${id}`, data),
+    createTask: (checklistId: string, data: Record<string, unknown>) => api.post<PlaybookTask>(`/checklists/${checklistId}/tasks`, data),
+    updateTask: (id: string, data: Record<string, unknown>) => api.put<PlaybookTask>(`/tasks/${id}`, data),
     deleteTask: (id: string) => api.delete(`/tasks/${id}`),
 
     // Runs

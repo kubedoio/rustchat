@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useAuthStore } from '../../stores/auth';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import { Camera, Save, Trash2, ArrowLeft } from 'lucide-vue-next';
 import RcAvatar from '../../components/ui/RcAvatar.vue';
-import api from '../../api/client';
+import api, { v4Api } from '../../api/client';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 import {
     useThemeStore,
     THEME_OPTIONS,
@@ -12,7 +13,7 @@ import {
     type Theme,
     type ChatFont,
     type ChatFontSize,
-} from '../../stores/theme';
+} from '../../features/theme/stores/themeStore';
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
@@ -64,13 +65,11 @@ async function handleUpdateProfile() {
     success.value = false;
     try {
         // Use Mattermost-compatible patch endpoint
-        await api.put('/users/me/patch', {
+        await v4Api.put('/users/me/patch', {
             first_name: firstName.value || undefined,
             last_name: lastName.value || undefined,
             nickname: nickname.value || undefined,
             position: position.value || undefined,
-        }, {
-            baseURL: '/api/v4',
         });
         // Also update username/display_name via our endpoint
         await api.put(`/users/${user.value.id}`, {
@@ -80,8 +79,8 @@ async function handleUpdateProfile() {
         await authStore.fetchMe();
         success.value = true;
         setTimeout(() => success.value = false, 3000);
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to update profile';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to update profile';
     } finally {
         saving.value = false;
     }
@@ -99,12 +98,10 @@ async function handleAvatarUpload(event: Event) {
     formData.append('image', file);
 
     try {
-        await api.post(`/users/${user.value.id}/image`, formData, {
-            baseURL: '/api/v4',
-        });
+        await v4Api.post(`/users/${user.value.id}/image`, formData);
         await authStore.fetchMe();
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to upload avatar';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to upload avatar';
     } finally {
         uploading.value = false;
         if (fileInput.value) fileInput.value.value = '';

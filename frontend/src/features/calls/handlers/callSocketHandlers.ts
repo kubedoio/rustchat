@@ -6,7 +6,7 @@ import type { ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
 import type { SessionId } from '../../../core/entities/Call'
 
-interface WebSocketCallEvent {
+export interface WebSocketCallEvent {
   event: string
   data: string
   broadcast: {
@@ -72,24 +72,24 @@ export function handleCallWebSocketEvent(event: WebSocketCallEvent) {
 }
 
 // Helper to read event data safely
-function readEventData(event: WebSocketCallEvent): any {
+function readEventData(event: WebSocketCallEvent): Record<string, unknown> {
   try {
-    return JSON.parse(event.data)
+    return JSON.parse(event.data) as Record<string, unknown>
   } catch {
     return {}
   }
 }
 
-function readEventChannelId(data: any): ChannelId | undefined {
-  return (data?.channel_id_raw || data?.channel_id) as ChannelId | undefined
+function readEventChannelId(data: Record<string, unknown>): ChannelId | undefined {
+  return ((data.channel_id_raw || data.channel_id) as string | undefined) as ChannelId | undefined
 }
 
-function readEventUserId(data: any): UserId | undefined {
-  return (data?.user_id_raw || data?.user_id) as UserId | undefined
+function readEventUserId(data: Record<string, unknown>): UserId | undefined {
+  return ((data.user_id_raw || data.user_id) as string | undefined) as UserId | undefined
 }
 
-function readEventSessionId(data: any): SessionId | undefined {
-  const id = data?.session_id_raw || data?.session_id
+function readEventSessionId(data: Record<string, unknown>): SessionId | undefined {
+  const id = (data.session_id_raw || data.session_id) as string | undefined
   return id ? (id as SessionId) : undefined
 }
 
@@ -202,7 +202,7 @@ function handleHostRemoved(event: WebSocketCallEvent) {
 function handleHostChanged(event: WebSocketCallEvent) {
   const data = readEventData(event)
   const channelId = readEventChannelId(data)
-  const hostId = data?.host_id || data?.host_id_raw
+  const hostId = (data.host_id || data.host_id_raw) as string | undefined
   if (channelId && hostId) {
     callService.handleHostChanged(channelId, hostId as UserId)
   }
@@ -211,7 +211,7 @@ function handleHostChanged(event: WebSocketCallEvent) {
 function handleRinging(event: WebSocketCallEvent) {
   const data = readEventData(event)
   const channelId = readEventChannelId(data)
-  const callerId = (data?.sender_id || data?.sender_id_raw) as UserId | undefined
+  const callerId = (data.sender_id || data.sender_id_raw) as string | undefined as UserId | undefined
   if (channelId && callerId) {
     callService.handleIncomingCall(channelId, callerId)
   }

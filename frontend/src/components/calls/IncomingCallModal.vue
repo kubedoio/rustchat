@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useCallsStore } from '../../stores/calls'
+import { useCallsStore } from '../../features/calls/stores/callStore'
 import { computed } from 'vue'
 import { Phone, PhoneOff } from 'lucide-vue-next'
 

@@ -42,6 +42,7 @@ use crate::mattermost_compat::{
     models as mm,
 };
 use crate::models::{IncomingWebhook, OutgoingWebhook};
+use crate::repositories::IntegrationRepository;
 use axum::extract::Path;
 use uuid::Uuid;
 
@@ -55,9 +56,8 @@ async fn can_manage_incoming_hook(
         return Ok(true);
     }
     let creator_id: Option<Uuid> =
-        sqlx::query_scalar("SELECT creator_id FROM incoming_webhooks WHERE id = $1")
-            .bind(hook_id)
-            .fetch_optional(&state.db)
+        IntegrationRepository::new(&state.db)
+            .get_incoming_webhook_creator_id(hook_id)
             .await?;
     Ok(creator_id == Some(auth.user_id))
 }
@@ -71,9 +71,8 @@ async fn can_manage_outgoing_hook(
         return Ok(true);
     }
     let creator_id: Option<Uuid> =
-        sqlx::query_scalar("SELECT creator_id FROM outgoing_webhooks WHERE id = $1")
-            .bind(hook_id)
-            .fetch_optional(&state.db)
+        IntegrationRepository::new(&state.db)
+            .get_outgoing_webhook_creator_id(hook_id)
             .await?;
     Ok(creator_id == Some(auth.user_id))
 }
@@ -140,22 +139,17 @@ pub async fn create_incoming_hook(
         ));
     }
 
-    let hook: IncomingWebhook = sqlx::query_as(
-        r#"
-        INSERT INTO incoming_webhooks (team_id, channel_id, creator_id, display_name, description, token, is_active)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING *
-        "#
-    )
-    .bind(team_id)
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .bind(&input.display_name)
-    .bind(&input.description)
-    .bind(Uuid::new_v4().to_string()) // In-situ token generation
-    .bind(true)
-    .fetch_one(&state.db)
-    .await?;
+    let hook: IncomingWebhook = IntegrationRepository::new(&state.db)
+        .create_incoming_webhook(
+            team_id,
+            channel_id,
+            auth.user_id,
+            Some(&input.display_name),
+            Some(&input.description),
+            &Uuid::new_v4().to_string(),
+            true,
+        )
+        .await?;
 
     Ok(Json(map_incoming_hook(hook)))
 }
@@ -165,54 +159,21 @@ pub async fn list_incoming_hooks(
     auth: MmAuthUser,
     Query(query): Query<HooksQuery>,
 ) -> ApiResult<Json<Vec<mm::IncomingWebhook>>> {
-    // List only hooks the user can manage: created by them or all if system admin
-    let hooks: Vec<IncomingWebhook> = if auth.has_permission(&permissions::SYSTEM_MANAGE) {
-        if let Some(ref tid_str) = query.team_id {
-            let tid = parse_mm_or_uuid(tid_str);
-            if let Some(tid) = tid {
-                sqlx::query_as(
-                    "SELECT * FROM incoming_webhooks WHERE team_id = $1 LIMIT $2 OFFSET $3",
-                )
-                .bind(tid)
-                .bind(query.per_page)
-                .bind(query.page * query.per_page)
-                .fetch_all(&state.db)
-                .await?
-            } else {
-                vec![]
-            }
-        } else {
-            sqlx::query_as("SELECT * FROM incoming_webhooks LIMIT $1 OFFSET $2")
-                .bind(query.per_page)
-                .bind(query.page * query.per_page)
-                .fetch_all(&state.db)
-                .await?
-        }
+    let team_id = query.team_id.as_ref().and_then(|t| parse_mm_or_uuid(t));
+    let creator_id = if auth.has_permission(&permissions::SYSTEM_MANAGE) {
+        None
     } else {
-        // Regular users can only see hooks they created
-        if let Some(ref tid_str) = query.team_id {
-            let tid = parse_mm_or_uuid(tid_str);
-            if let Some(tid) = tid {
-                sqlx::query_as("SELECT * FROM incoming_webhooks WHERE creator_id = $1 AND team_id = $2 LIMIT $3 OFFSET $4")
-                    .bind(auth.user_id)
-                    .bind(tid)
-                    .bind(query.per_page)
-                    .bind(query.page * query.per_page)
-                    .fetch_all(&state.db).await?
-            } else {
-                vec![]
-            }
-        } else {
-            sqlx::query_as(
-                "SELECT * FROM incoming_webhooks WHERE creator_id = $1 LIMIT $2 OFFSET $3",
-            )
-            .bind(auth.user_id)
-            .bind(query.per_page)
-            .bind(query.page * query.per_page)
-            .fetch_all(&state.db)
-            .await?
-        }
+        Some(auth.user_id)
     };
+
+    let hooks: Vec<IncomingWebhook> = IntegrationRepository::new(&state.db)
+        .list_incoming_webhooks_paginated(
+            team_id,
+            creator_id,
+            query.per_page,
+            query.page * query.per_page,
+        )
+        .await?;
 
     Ok(Json(hooks.into_iter().map(map_incoming_hook).collect()))
 }
@@ -237,26 +198,21 @@ pub async fn create_outgoing_hook(
 
     let channel_id = input.channel_id.and_then(|id| parse_mm_or_uuid(&id));
 
-    let hook: OutgoingWebhook = sqlx::query_as(
-        r#"
-        INSERT INTO outgoing_webhooks (team_id, channel_id, creator_id, display_name, description, trigger_words, trigger_when, callback_urls, content_type, token, is_active)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING *
-        "#
-    )
-    .bind(team_id)
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .bind(&input.display_name)
-    .bind(&input.description)
-    .bind(&input.trigger_words)
-    .bind("first_word") // Simplified mapping for trigger_when
-    .bind(&input.callback_urls)
-    .bind(&input.content_type)
-    .bind(Uuid::new_v4().to_string())
-    .bind(true)
-    .fetch_one(&state.db)
-    .await?;
+    let hook: OutgoingWebhook = IntegrationRepository::new(&state.db)
+        .create_outgoing_webhook(
+            team_id,
+            channel_id,
+            auth.user_id,
+            Some(&input.display_name),
+            Some(&input.description),
+            &input.trigger_words,
+            "first_word",
+            &input.callback_urls,
+            Some(&input.content_type),
+            &Uuid::new_v4().to_string(),
+            true,
+        )
+        .await?;
 
     Ok(Json(map_outgoing_hook(hook)))
 }
@@ -266,54 +222,21 @@ pub async fn list_outgoing_hooks(
     auth: MmAuthUser,
     Query(query): Query<HooksQuery>,
 ) -> ApiResult<Json<Vec<mm::OutgoingWebhook>>> {
-    // List only hooks the user can manage: created by them or all if system admin
-    let hooks: Vec<OutgoingWebhook> = if auth.has_permission(&permissions::SYSTEM_MANAGE) {
-        if let Some(ref tid_str) = query.team_id {
-            let tid = parse_mm_or_uuid(tid_str);
-            if let Some(tid) = tid {
-                sqlx::query_as(
-                    "SELECT * FROM outgoing_webhooks WHERE team_id = $1 LIMIT $2 OFFSET $3",
-                )
-                .bind(tid)
-                .bind(query.per_page)
-                .bind(query.page * query.per_page)
-                .fetch_all(&state.db)
-                .await?
-            } else {
-                vec![]
-            }
-        } else {
-            sqlx::query_as("SELECT * FROM outgoing_webhooks LIMIT $1 OFFSET $2")
-                .bind(query.per_page)
-                .bind(query.page * query.per_page)
-                .fetch_all(&state.db)
-                .await?
-        }
+    let team_id = query.team_id.as_ref().and_then(|t| parse_mm_or_uuid(t));
+    let creator_id = if auth.has_permission(&permissions::SYSTEM_MANAGE) {
+        None
     } else {
-        // Regular users can only see hooks they created
-        if let Some(ref tid_str) = query.team_id {
-            let tid = parse_mm_or_uuid(tid_str);
-            if let Some(tid) = tid {
-                sqlx::query_as("SELECT * FROM outgoing_webhooks WHERE creator_id = $1 AND team_id = $2 LIMIT $3 OFFSET $4")
-                    .bind(auth.user_id)
-                    .bind(tid)
-                    .bind(query.per_page)
-                    .bind(query.page * query.per_page)
-                    .fetch_all(&state.db).await?
-            } else {
-                vec![]
-            }
-        } else {
-            sqlx::query_as(
-                "SELECT * FROM outgoing_webhooks WHERE creator_id = $1 LIMIT $2 OFFSET $3",
-            )
-            .bind(auth.user_id)
-            .bind(query.per_page)
-            .bind(query.page * query.per_page)
-            .fetch_all(&state.db)
-            .await?
-        }
+        Some(auth.user_id)
     };
+
+    let hooks: Vec<OutgoingWebhook> = IntegrationRepository::new(&state.db)
+        .list_outgoing_webhooks_paginated(
+            team_id,
+            creator_id,
+            query.per_page,
+            query.page * query.per_page,
+        )
+        .await?;
 
     Ok(Json(hooks.into_iter().map(map_outgoing_hook).collect()))
 }
@@ -365,11 +288,10 @@ async fn get_incoming_hook(
         ));
     }
 
-    let hook: IncomingWebhook = sqlx::query_as("SELECT * FROM incoming_webhooks WHERE id = $1")
-        .bind(id)
-        .fetch_one(&state.db)
-        .await
-        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    let hook: IncomingWebhook = IntegrationRepository::new(&state.db)
+        .get_incoming_webhook_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
 
     Ok(Json(map_incoming_hook(hook)))
 }
@@ -398,19 +320,10 @@ async fn update_incoming_hook(
         ));
     }
 
-    let hook: IncomingWebhook = sqlx::query_as(
-        r#"UPDATE incoming_webhooks SET
-            display_name = COALESCE($2, display_name),
-            description = COALESCE($3, description),
-            updated_at = NOW()
-           WHERE id = $1 RETURNING *"#,
-    )
-    .bind(id)
-    .bind(&input.display_name)
-    .bind(&input.description)
-    .fetch_one(&state.db)
-    .await
-    .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    let hook: IncomingWebhook = IntegrationRepository::new(&state.db)
+        .update_incoming_webhook(id, input.display_name.as_deref(), input.description.as_deref())
+        .await
+        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
 
     Ok(Json(map_incoming_hook(hook)))
 }
@@ -430,9 +343,8 @@ async fn delete_incoming_hook(
         ));
     }
 
-    sqlx::query("DELETE FROM incoming_webhooks WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
+    IntegrationRepository::new(&state.db)
+        .delete_incoming_webhook(id)
         .await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
@@ -453,11 +365,10 @@ async fn get_outgoing_hook(
         ));
     }
 
-    let hook: OutgoingWebhook = sqlx::query_as("SELECT * FROM outgoing_webhooks WHERE id = $1")
-        .bind(id)
-        .fetch_one(&state.db)
-        .await
-        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    let hook: OutgoingWebhook = IntegrationRepository::new(&state.db)
+        .get_outgoing_webhook_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
 
     Ok(Json(map_outgoing_hook(hook)))
 }
@@ -498,23 +409,16 @@ async fn update_outgoing_hook(
         }
     }
 
-    let hook: OutgoingWebhook = sqlx::query_as(
-        r#"UPDATE outgoing_webhooks SET
-            display_name = COALESCE($2, display_name),
-            description = COALESCE($3, description),
-            trigger_words = COALESCE($4, trigger_words),
-            callback_urls = COALESCE($5, callback_urls),
-            updated_at = NOW()
-           WHERE id = $1 RETURNING *"#,
-    )
-    .bind(id)
-    .bind(&input.display_name)
-    .bind(&input.description)
-    .bind(&input.trigger_words)
-    .bind(&input.callback_urls)
-    .fetch_one(&state.db)
-    .await
-    .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    let hook: OutgoingWebhook = IntegrationRepository::new(&state.db)
+        .update_outgoing_webhook(
+            id,
+            input.display_name.as_deref(),
+            input.description.as_deref(),
+            input.trigger_words.as_deref(),
+            input.callback_urls.as_deref(),
+        )
+        .await
+        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
 
     Ok(Json(map_outgoing_hook(hook)))
 }
@@ -534,9 +438,8 @@ async fn delete_outgoing_hook(
         ));
     }
 
-    sqlx::query("DELETE FROM outgoing_webhooks WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
+    IntegrationRepository::new(&state.db)
+        .delete_outgoing_webhook(id)
         .await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
@@ -559,14 +462,10 @@ async fn regen_outgoing_hook_token(
 
     let new_token = Uuid::new_v4().to_string().replace("-", "");
 
-    let hook: OutgoingWebhook = sqlx::query_as(
-        "UPDATE outgoing_webhooks SET token = $2, updated_at = NOW() WHERE id = $1 RETURNING *",
-    )
-    .bind(id)
-    .bind(&new_token)
-    .fetch_one(&state.db)
-    .await
-    .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+    let hook: OutgoingWebhook = IntegrationRepository::new(&state.db)
+        .update_outgoing_hook_token(id, &new_token)
+        .await
+        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
 
     Ok(Json(map_outgoing_hook(hook)))
 }

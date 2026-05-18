@@ -5,7 +5,6 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::utils::ensure_channel_admin_or_system_manage;
 use super::utils::resolve_direct_channel_display_name;
@@ -14,6 +13,7 @@ use super::{
 };
 use crate::api::v4::channels::utils::map_channel_with_team_data_row;
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
+use crate::repositories::ChannelRepository;
 use serde_json::json;
 
 #[derive(Debug, Deserialize, Default)]
@@ -30,35 +30,6 @@ pub struct GetAllChannelsQuery {
     pub include_deleted: bool,
     #[serde(default)]
     pub include_total_count: bool,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-pub struct ChannelWithTeamDataRow {
-    pub id: Uuid,
-    pub team_id: Uuid,
-    #[sqlx(rename = "type")]
-    pub channel_type: crate::models::channel::ChannelType,
-    pub name: String,
-    pub display_name: Option<String>,
-    pub purpose: Option<String>,
-    pub header: Option<String>,
-    pub is_archived: bool,
-    pub creator_id: Option<Uuid>,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-    pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub team_display_name: Option<String>,
-    pub team_name: String,
-    pub team_updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-#[derive(Debug, serde::Serialize)]
-pub struct ChannelWithTeamDataResponse {
-    #[serde(flatten)]
-    pub channel: mm::Channel,
-    pub team_display_name: String,
-    pub team_name: String,
-    pub team_update_at: i64,
 }
 
 pub async fn get_all_channels(
@@ -92,80 +63,30 @@ pub async fn get_all_channels(
     per_page = per_page.min(10_000);
     let offset = page.saturating_mul(per_page) as i64;
 
-    let rows: Vec<ChannelWithTeamDataRow> = sqlx::query_as(
-        r#"
-        SELECT
-            c.id,
-            c.team_id,
-            c.type,
-            c.name,
-            c.display_name,
-            c.purpose,
-            c.header,
-            c.is_archived,
-            c.creator_id,
-            c.created_at,
-            c.updated_at,
-            t.display_name AS team_display_name,
-            t.name AS team_name,
-            t.updated_at AS team_updated_at
-        FROM channels c
-        JOIN teams t ON t.id = c.team_id
-        WHERE
-            ($1::bool OR (c.is_archived = false AND c.deleted_at IS NULL))
-            AND (NOT $2::bool OR c.name NOT IN ('town-square', 'off-topic'))
-            AND (
-                $3::uuid IS NULL
-                OR NOT EXISTS (
-                    SELECT 1
-                    FROM group_syncables gs
-                    WHERE gs.syncable_type = 'channel'
-                      AND gs.group_id = $3
-                      AND gs.syncable_id = c.id
-                )
-            )
-        ORDER BY c.created_at ASC
-        LIMIT $4 OFFSET $5
-        "#,
-    )
-    .bind(query.include_deleted)
-    .bind(query.exclude_default_channels)
-    .bind(not_associated_group_id)
-    .bind(per_page as i64)
-    .bind(offset)
-    .fetch_all(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    let rows = repo
+        .get_all_channels(
+            query.include_deleted,
+            query.exclude_default_channels,
+            not_associated_group_id,
+            per_page as i64,
+            offset,
+        )
+        .await?;
 
-    let channels: Vec<ChannelWithTeamDataResponse> = rows
+    let channels = rows
         .into_iter()
         .map(map_channel_with_team_data_row)
-        .collect();
+        .collect::<Vec<_>>();
 
     if query.include_total_count {
-        let total_count: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)::BIGINT
-            FROM channels c
-            WHERE
-                ($1::bool OR (c.is_archived = false AND c.deleted_at IS NULL))
-                AND (NOT $2::bool OR c.name NOT IN ('town-square', 'off-topic'))
-                AND (
-                    $3::uuid IS NULL
-                    OR NOT EXISTS (
-                        SELECT 1
-                        FROM group_syncables gs
-                        WHERE gs.syncable_type = 'channel'
-                          AND gs.group_id = $3
-                          AND gs.syncable_id = c.id
-                    )
-                )
-            "#,
-        )
-        .bind(query.include_deleted)
-        .bind(query.exclude_default_channels)
-        .bind(not_associated_group_id)
-        .fetch_one(&state.db)
-        .await?;
+        let total_count = repo
+            .count_all_channels(
+                query.include_deleted,
+                query.exclude_default_channels,
+                not_associated_group_id,
+            )
+            .await?;
 
         return Ok(Json(json!({
             "channels": channels,
@@ -183,22 +104,15 @@ pub async fn get_channel(
 ) -> ApiResult<Json<mm::Channel>> {
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    // Verify membership
-    let _membership: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
 
-    let mut channel: crate::models::Channel =
-        sqlx::query_as("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
-            .bind(channel_id)
-            .fetch_one(&state.db)
-            .await?;
+    let repo = ChannelRepository::new(&state.db);
+
+    // Verify membership
+    let _membership = repo
+        .require_member(channel_id, auth.user_id)
+        .await?;
+
+    let mut channel: crate::models::Channel = repo.get_by_id(channel_id).await?;
 
     // For Direct channels, ALWAYS compute display_name from the other participant
     // This ensures each user sees the other person's name, not their own
@@ -242,15 +156,10 @@ pub async fn create_channel(
     let team_id = parse_mm_or_uuid(&input.team_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
 
-    // Verify team membership
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
-    )
-    .bind(team_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
 
+    // Verify team membership
+    let is_member = repo.is_team_member(team_id, auth.user_id).await?;
     if !is_member {
         return Err(crate::error::AppError::Forbidden(
             "Not a member of this team".to_string(),
@@ -264,31 +173,20 @@ pub async fn create_channel(
         _ => "public",
     };
 
-    let channel: Channel = sqlx::query_as(
-        r#"
-        INSERT INTO channels (team_id, type, name, display_name, purpose, header, creator_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING *
-        "#,
-    )
-    .bind(team_id)
-    .bind(channel_type)
-    .bind(&input.name)
-    .bind(&input.display_name)
-    .bind(&input.purpose)
-    .bind(&input.header)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let channel: Channel = repo
+        .create(
+            team_id,
+            channel_type,
+            &input.name,
+            &input.display_name,
+            &input.purpose,
+            &input.header,
+            auth.user_id,
+        )
+        .await?;
 
     // Add creator as member
-    sqlx::query(
-        "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'admin') ON CONFLICT DO NOTHING",
-    )
-    .bind(channel.id)
-    .bind(auth.user_id)
-    .execute(&state.db)
-    .await?;
+    repo.add_member(channel.id, auth.user_id, "admin").await?;
 
     Ok(Json(channel.into()))
 }
@@ -321,26 +219,16 @@ pub async fn update_channel(
     let input: UpdateChannelRequest =
         super::utils::parse_body(&headers, &body, "Invalid channel update")?;
 
-    // Build update query dynamically
-    let channel: Channel = sqlx::query_as(
-        r#"
-        UPDATE channels SET
-            display_name = COALESCE($2, display_name),
-            name = COALESCE($3, name),
-            purpose = COALESCE($4, purpose),
-            header = COALESCE($5, header),
-            updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-        "#,
-    )
-    .bind(channel_id)
-    .bind(&input.display_name)
-    .bind(&input.name)
-    .bind(&input.purpose)
-    .bind(&input.header)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    let channel: Channel = repo
+        .update(
+            channel_id,
+            input.name.as_deref(),
+            input.display_name.as_deref(),
+            input.purpose.as_deref(),
+            input.header.as_deref(),
+        )
+        .await?;
 
     // Broadcast ChannelUpdated event
     let broadcast = WsBroadcast {
@@ -368,19 +256,16 @@ pub async fn delete_channel(
     // Only channel admins or system admins may delete a channel
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
+    let repo = ChannelRepository::new(&state.db);
+
     // Get channel info for the broadcast
-    let channel: Channel =
-        sqlx::query_as("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
-            .bind(channel_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+    let channel = repo
+        .get_by_id_optional(channel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
 
     // Soft delete the channel
-    sqlx::query("UPDATE channels SET deleted_at = NOW() WHERE id = $1")
-        .bind(channel_id)
-        .execute(&state.db)
-        .await?;
+    repo.soft_delete(channel_id).await?;
 
     // Broadcast ChannelDeleted event
     let broadcast = WsBroadcast {
@@ -427,25 +312,16 @@ pub async fn patch_channel(
 
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
-    let channel: Channel = sqlx::query_as(
-        r#"
-        UPDATE channels SET
-            display_name = COALESCE($2, display_name),
-            name = COALESCE($3, name),
-            purpose = COALESCE($4, purpose),
-            header = COALESCE($5, header),
-            updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-        "#,
-    )
-    .bind(channel_id)
-    .bind(&input.display_name)
-    .bind(&input.name)
-    .bind(&input.purpose)
-    .bind(&input.header)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    let channel: Channel = repo
+        .update(
+            channel_id,
+            input.name.as_deref(),
+            input.display_name.as_deref(),
+            input.purpose.as_deref(),
+            input.header.as_deref(),
+        )
+        .await?;
 
     // Broadcast ChannelUpdated event
     let broadcast = WsBroadcast {
@@ -489,13 +365,8 @@ pub async fn update_channel_privacy(
         }
     };
 
-    let channel: Channel = sqlx::query_as(
-        r#"UPDATE channels SET type = $2, updated_at = NOW() WHERE id = $1 RETURNING *"#,
-    )
-    .bind(channel_id)
-    .bind(channel_type)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    let channel: Channel = repo.update_privacy(channel_id, channel_type).await?;
 
     Ok(Json(channel.into()))
 }
@@ -512,12 +383,8 @@ pub async fn restore_channel(
     // Only channel admins or system admins may restore a deleted channel
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
-    let channel: Channel = sqlx::query_as(
-        r#"UPDATE channels SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *"#,
-    )
-    .bind(channel_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    let channel: Channel = repo.restore(channel_id).await?;
 
     Ok(Json(channel.into()))
 }
@@ -548,28 +415,17 @@ pub async fn move_channel(
         ));
     }
 
-    // Verify membership in new team
-    let is_team_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
-    )
-    .bind(new_team_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
 
+    // Verify membership in new team
+    let is_team_member = repo.is_team_member(new_team_id, auth.user_id).await?;
     if !is_team_member {
         return Err(crate::error::AppError::Forbidden(
             "Not a member of the target team".to_string(),
         ));
     }
 
-    let channel: Channel = sqlx::query_as(
-        r#"UPDATE channels SET team_id = $2, updated_at = NOW() WHERE id = $1 RETURNING *"#,
-    )
-    .bind(channel_id)
-    .bind(new_team_id)
-    .fetch_one(&state.db)
-    .await?;
+    let channel: Channel = repo.move_to_team(channel_id, new_team_id).await?;
 
     Ok(Json(channel.into()))
 }

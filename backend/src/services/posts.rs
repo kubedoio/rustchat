@@ -318,37 +318,44 @@ pub async fn create_post(
                 .flatten();
 
         if let Some(team_id) = team_id_opt {
-            for username in &mentions {
-                if let Ok(Some(mentioned_user_id)) =
-                    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE username = $1")
-                        .bind(username)
-                        .fetch_optional(&state.db)
-                        .await
-                {
-                    if mentioned_user_id != user_id {
-                        // Only notify if the mentioned user is actually a member of the channel
-                        let is_member: bool = sqlx::query_scalar(
-                            "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)"
-                        )
-                        .bind(channel_id)
-                        .bind(mentioned_user_id)
-                        .fetch_one(&state.db)
-                        .await
-                        .unwrap_or(false);
+            // Batch-resolve usernames to user IDs
+            let usernames = mentions.iter().map(|m| m.as_str()).collect::<Vec<_>>();
+            let users: Vec<(Uuid, String)> = sqlx::query_as(
+                "SELECT id, username FROM users WHERE username = ANY($1)"
+            )
+            .bind(&usernames)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
 
-                        if is_member {
-                            let _ = activity::create_mention_activity(
-                                state,
-                                mentioned_user_id,
-                                user_id,
-                                channel_id,
-                                team_id,
-                                post.id,
-                                &response.message,
-                            )
-                            .await;
-                        }
-                    }
+            let mentioned_user_ids: Vec<Uuid> = users
+                .into_iter()
+                .map(|(id, _)| id)
+                .filter(|id| *id != user_id)
+                .collect();
+
+            if !mentioned_user_ids.is_empty() {
+                // Batch-check channel memberships
+                let member_ids: Vec<Uuid> = sqlx::query_scalar::<_, Uuid>(
+                    "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = ANY($2)"
+                )
+                .bind(channel_id)
+                .bind(&mentioned_user_ids)
+                .fetch_all(&state.db)
+                .await
+                .unwrap_or_default();
+
+                for mentioned_user_id in member_ids {
+                    let _ = activity::create_mention_activity(
+                        state,
+                        mentioned_user_id,
+                        user_id,
+                        channel_id,
+                        team_id,
+                        post.id,
+                        &response.message,
+                    )
+                    .await;
                 }
             }
         }
@@ -397,7 +404,8 @@ pub async fn create_post(
             vec![]
         };
 
-        // Send push notifications asynchronously
+        // Send push notifications asynchronously with bounded concurrency
+        let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(50));
         for target_user_id in members_to_notify {
             // Don't notify the sender
             if target_user_id == user_id {
@@ -414,7 +422,14 @@ pub async fn create_post(
             let sender_name_clone = sender_name.clone();
             let message_preview_clone = message_preview.clone();
 
+            let permit = semaphore
+                .clone()
+                .acquire_owned()
+                .await
+                .expect("semaphore closed");
+
             tokio::spawn(async move {
+                let _permit = permit;
                 match crate::services::push_notifications::send_message_notification(
                     &state_clone,
                     target_user_id,
@@ -706,7 +721,7 @@ async fn check_playbook_triggers(
     if let Some(chan) = channel_info {
         // 2. Fetch playbooks with triggers
         let playbooks = sqlx::query_as::<_, crate::models::Playbook>(
-            "SELECT * FROM playbooks WHERE team_id = $1 AND is_archived = false AND keyword_triggers IS NOT NULL"
+            "SELECT * FROM playbooks WHERE team_id = $1 AND is_archived = false AND keyword_triggers IS NOT NULL LIMIT 100"
         )
         .bind(chan)
         .fetch_all(&state.db)

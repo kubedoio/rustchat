@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { X } from 'lucide-vue-next';
-import { useTeamStore } from '../../stores/teams';
-import { useChannelStore } from '../../stores/channels';
-import { useAuthStore } from '../../stores/auth';
+import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import { canCreateChannel as canCreateChannelForRole } from '../../features/permissions/capabilities';
 import BaseButton from '../atomic/BaseButton.vue';
 import BaseInput from '../atomic/BaseInput.vue';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const props = defineProps<{
     show: boolean
@@ -64,8 +65,8 @@ async function handleSubmit() {
         channelType.value = 'public';
         purpose.value = '';
         emit('close');
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to create channel';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to create channel';
     } finally {
         loading.value = false;
     }

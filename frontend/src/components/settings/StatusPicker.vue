@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { X, Clock, Check } from 'lucide-vue-next'
-import { usePreferencesStore } from '../../stores/preferences'
+import { usePreferencesStore } from '../../features/preferences/stores/preferencesStore'
 import EmojiPicker from '../atomic/EmojiPicker.vue'
 import BaseButton from '../atomic/BaseButton.vue'
 

@@ -4,7 +4,7 @@
 
 import { activityRepository } from '../repositories/activityRepository'
 import { useActivityStore } from '../stores/activityStore'
-import { useAuthStore } from '../../../stores/auth'
+import { useAuthStore } from '../../../features/auth/stores/authStore'
 import type { Activity } from '../types'
 import { ActivityType } from '../types'
 

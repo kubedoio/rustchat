@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use super::MmAuthUser;
 use super::{encode_mm_id, mm};
-use crate::api::v4::channels::crud::{ChannelWithTeamDataResponse, ChannelWithTeamDataRow};
+use crate::repositories::channel_repository::{ChannelWithTeamDataResponse, ChannelWithTeamDataRow};
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 

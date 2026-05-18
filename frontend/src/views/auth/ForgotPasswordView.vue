@@ -6,7 +6,8 @@ import AuthLayout from '../../layouts/AuthLayout.vue'
 import BaseInput from '../../components/atomic/BaseInput.vue'
 import BaseButton from '../../components/atomic/BaseButton.vue'
 import TurnstileWidget from '../../components/auth/TurnstileWidget.vue'
-import { useConfigStore } from '../../stores/config'
+import { useConfigStore } from '../../features/config/stores/configStore'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const router = useRouter()
 const configStore = useConfigStore()
@@ -71,9 +72,9 @@ async function handleSubmit() {
       website: website.value || undefined
     })
     success.value = true
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Always show generic error to prevent email enumeration
-    error.value = e.response?.data?.message || 'Failed to send reset email. Please try again.'
+    error.value = getApiErrorMessage(e) || 'Failed to send reset email. Please try again.'
     // Reset Turnstile on error
     turnstileVerified.value = false
     turnstileToken.value = ''

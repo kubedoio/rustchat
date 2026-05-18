@@ -8,6 +8,7 @@ use crate::auth::{hash_password, verify_password};
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::parse_mm_or_uuid;
 use crate::models::User;
+use crate::repositories::{SystemRepository, UserRepository};
 
 #[derive(Deserialize)]
 pub struct UserRolesRequest {
@@ -32,10 +33,8 @@ pub async fn update_user_roles(
         "member"
     };
 
-    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
-        .bind(role)
-        .bind(user_id)
-        .execute(&state.db)
+    UserRepository::new(&state.db)
+        .update_role(user_id, role)
         .await?;
 
     Ok(super::status_ok())
@@ -57,10 +56,8 @@ pub async fn update_user_active(
     if !auth.can_access_owned(user_id, &permissions::USER_MANAGE) {
         return Err(AppError::Forbidden("Insufficient permissions".to_string()));
     }
-    sqlx::query("UPDATE users SET is_active = $1 WHERE id = $2")
-        .bind(input.active)
-        .bind(user_id)
-        .execute(&state.db)
+    UserRepository::new(&state.db)
+        .update_active(user_id, input.active)
         .await?;
     Ok(super::status_ok())
 }
@@ -75,9 +72,8 @@ pub async fn demote_user(
     }
     let user_id = parse_mm_or_uuid(&user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
-    sqlx::query("UPDATE users SET role = 'member' WHERE id = $1")
-        .bind(user_id)
-        .execute(&state.db)
+    UserRepository::new(&state.db)
+        .update_role(user_id, "member")
         .await?;
     Ok(super::status_ok())
 }
@@ -93,9 +89,8 @@ pub async fn promote_user(
     }
     let user_id = parse_mm_or_uuid(&user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
-    sqlx::query("UPDATE users SET role = 'system_admin' WHERE id = $1")
-        .bind(user_id)
-        .execute(&state.db)
+    UserRepository::new(&state.db)
+        .update_role(user_id, "system_admin")
         .await?;
     Ok(super::status_ok())
 }
@@ -110,9 +105,8 @@ pub async fn convert_user_to_bot(
     }
     let user_id = parse_mm_or_uuid(&user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
-    sqlx::query("UPDATE users SET is_bot = true WHERE id = $1")
-        .bind(user_id)
-        .execute(&state.db)
+    UserRepository::new(&state.db)
+        .update_is_bot(user_id)
         .await?;
     Ok(super::status_ok())
 }
@@ -130,10 +124,10 @@ pub async fn update_user_password(
     Json(input): Json<UpdatePasswordRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let user_id = super::user_sidebar_categories::resolve_user_id(&user_id, &auth)?;
-    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_one(&state.db)
-        .await?;
+    let user: User = UserRepository::new(&state.db)
+        .get_by_id(user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     if user_id != auth.user_id {
         // Admins resetting another user's password do not need current_password
@@ -158,10 +152,8 @@ pub async fn update_user_password(
     }
 
     let new_hash = hash_password(&input.new_password)?;
-    sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
-        .bind(new_hash)
-        .bind(user_id)
-        .execute(&state.db)
+    UserRepository::new(&state.db)
+        .update_password_hash(user_id, &new_hash)
         .await?;
 
     Ok(super::status_ok())
@@ -254,24 +246,14 @@ pub async fn send_email_verification(
     Json(input): Json<SendVerificationRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Find user by email
-    let user: Option<User> = sqlx::query_as(
-        "SELECT * FROM users WHERE email = $1 AND is_active = true AND deleted_at IS NULL",
-    )
-    .bind(&input.email)
-    .fetch_optional(&state.db)
-    .await?;
+    let user = UserRepository::new(&state.db)
+        .get_by_email(&input.email)
+        .await?;
 
     if let Some(user) = user {
         if !user.email_verified {
             // Fetch site_url from server_config
-            let site_url: Option<String> = sqlx::query_scalar(
-                "SELECT site->>'site_url' FROM server_config WHERE id = 'default'",
-            )
-            .fetch_optional(&state.db)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|url: String| if url.is_empty() { None } else { Some(url) });
+            let site_url = SystemRepository::new(&state.db).get_site_url().await?;
 
             if let Some(site_url) = site_url {
                 let verification_base_url = format!("{}/verify-email", site_url);

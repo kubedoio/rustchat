@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use super::{encode_mm_id, mm, parse_mm_or_uuid, ApiResult, AppState, MmAuthUser};
 use crate::api::v4::posts::reactions_for_posts;
 use crate::models::post::PostResponse;
+use crate::repositories::PostRepository;
 use serde_json::json;
 
 #[derive(Deserialize)]
@@ -32,145 +33,67 @@ pub async fn get_posts(
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
 
+    let repo = PostRepository::new(state.db.clone());
+
     // Check channel membership first
-    let _membership: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     let per_page = pagination.per_page.unwrap_or(60).min(200) as i64;
 
     // Determine query type based on pagination params
-    let mut posts: Vec<PostResponse> = if let Some(since) = pagination.since {
-        // Incremental sync: get posts created or edited since timestamp
-        let since_time =
-            chrono::DateTime::from_timestamp_millis(since).unwrap_or_else(chrono::Utc::now);
+    let mut posts: Vec<PostResponse> =
+        if let Some(since) = pagination.since {
+            // Incremental sync: get posts created or edited since timestamp
+            let since_time =
+                chrono::DateTime::from_timestamp_millis(since).unwrap_or_else(chrono::Utc::now);
 
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1
-              AND p.deleted_at IS NULL
-              AND (p.created_at >= $2 OR p.edited_at >= $2)
-            ORDER BY p.created_at ASC
-            LIMIT $3
-            "#,
-        )
-        .bind(channel_id)
-        .bind(since_time)
-        .bind(per_page)
-        .fetch_all(&state.db)
-        .await?
-    } else if let Some(before) = &pagination.before {
-        // Cursor pagination: get posts before a specific post
-        let before_id = parse_mm_or_uuid(before).ok_or_else(|| {
-            crate::error::AppError::BadRequest("Invalid before post_id".to_string())
-        })?;
+            repo.list_since(channel_id, since_time, per_page)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        } else if let Some(before) = &pagination.before {
+            // Cursor pagination: get posts before a specific post
+            let before_id = parse_mm_or_uuid(before).ok_or_else(|| {
+                crate::error::AppError::BadRequest("Invalid before post_id".to_string())
+            })?;
 
-        // Get the created_at of the before post
-        let before_time: Option<chrono::DateTime<chrono::Utc>> =
-            sqlx::query_scalar("SELECT created_at FROM posts WHERE id = $1")
-                .bind(before_id)
-                .fetch_optional(&state.db)
-                .await?;
+            let before_time = repo.get_post_created_at(before_id).await?.ok_or_else(|| {
+                crate::error::AppError::NotFound("Before post not found".to_string())
+            })?;
 
-        let before_time = before_time
-            .ok_or_else(|| crate::error::AppError::NotFound("Before post not found".to_string()))?;
+            repo.list_before(channel_id, before_time, per_page)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        } else if let Some(after) = &pagination.after {
+            // Cursor pagination: get posts after a specific post
+            let after_id = parse_mm_or_uuid(after).ok_or_else(|| {
+                crate::error::AppError::BadRequest("Invalid after post_id".to_string())
+            })?;
 
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 
-              AND p.deleted_at IS NULL
-              AND p.created_at < $2
-            ORDER BY p.created_at DESC
-            LIMIT $3
-            "#,
-        )
-        .bind(channel_id)
-        .bind(before_time)
-        .bind(per_page)
-        .fetch_all(&state.db)
-        .await?
-    } else if let Some(after) = &pagination.after {
-        // Cursor pagination: get posts after a specific post
-        let after_id = parse_mm_or_uuid(after).ok_or_else(|| {
-            crate::error::AppError::BadRequest("Invalid after post_id".to_string())
-        })?;
+            let after_time = repo.get_post_created_at(after_id).await?.ok_or_else(|| {
+                crate::error::AppError::NotFound("After post not found".to_string())
+            })?;
 
-        // Get the created_at of the after post
-        let after_time: Option<chrono::DateTime<chrono::Utc>> =
-            sqlx::query_scalar("SELECT created_at FROM posts WHERE id = $1")
-                .bind(after_id)
-                .fetch_optional(&state.db)
-                .await?;
+            repo.list_after(channel_id, after_time, per_page)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        } else {
+            // Standard page-based pagination
+            let page = pagination.page.unwrap_or(0);
+            let offset = (page * per_page as u64) as i64;
 
-        let after_time = after_time
-            .ok_or_else(|| crate::error::AppError::NotFound("After post not found".to_string()))?;
-
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 
-              AND p.deleted_at IS NULL
-              AND p.created_at > $2
-            ORDER BY p.created_at ASC
-            LIMIT $3
-            "#,
-        )
-        .bind(channel_id)
-        .bind(after_time)
-        .bind(per_page)
-        .fetch_all(&state.db)
-        .await?
-    } else {
-        // Standard page-based pagination
-        let page = pagination.page.unwrap_or(0);
-        let offset = (page * per_page as u64) as i64;
-
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 AND p.deleted_at IS NULL
-            ORDER BY p.created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-        )
-        .bind(channel_id)
-        .bind(per_page)
-        .bind(offset)
-        .fetch_all(&state.db)
-        .await?
-    };
+            repo.list_by_channel(channel_id, per_page, offset)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        };
 
     crate::services::posts::populate_files(&state, &mut posts).await?;
 
@@ -226,42 +149,38 @@ pub async fn get_posts(
     }))
 }
 
+#[derive(Deserialize)]
+pub struct PinnedPostsQuery {
+    pub page: Option<u64>,
+    pub per_page: Option<u64>,
+}
+
 /// GET /channels/{channel_id}/pinned - Get pinned posts
 pub async fn get_pinned_posts(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
+    Query(query): Query<PinnedPostsQuery>,
 ) -> ApiResult<Json<mm::PostList>> {
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
 
-    // Verify membership
-    let _membership: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+    let repo = PostRepository::new(state.db.clone());
 
-    let mut posts: Vec<PostResponse> = sqlx::query_as(
-        r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-               p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
-        FROM posts p
-        LEFT JOIN users u ON p.user_id = u.id
-        WHERE p.channel_id = $1 AND p.is_pinned = true AND p.deleted_at IS NULL
-        ORDER BY p.created_at DESC
-        "#,
-    )
-    .bind(channel_id)
-    .fetch_all(&state.db)
-    .await?;
+    // Verify membership
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
+
+    let per_page = query.per_page.unwrap_or(100).min(100) as i64;
+    let page = query.page.unwrap_or(0) as i64;
+    let offset = page * per_page;
+
+    let mut posts: Vec<PostResponse> = repo
+        .list_pinned_posts(channel_id, per_page, offset)
+        .await?
+        .into_iter()
+        .map(|p| p.into())
+        .collect();
 
     crate::services::posts::populate_files(&state, &mut posts).await?;
 
@@ -319,23 +238,14 @@ pub async fn pin_post(
     let post_id = parse_mm_or_uuid(&path.post_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid post_id".to_string()))?;
 
+    let repo = PostRepository::new(state.db.clone());
+
     // Verify membership
-    let _membership: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     // Pin the post
-    sqlx::query("UPDATE posts SET is_pinned = true WHERE id = $1 AND channel_id = $2")
-        .bind(post_id)
-        .bind(channel_id)
-        .execute(&state.db)
-        .await?;
+    repo.pin_post(post_id).await?;
 
     Ok(Json(json!({"status": "OK"})))
 }
@@ -351,23 +261,14 @@ pub async fn unpin_post(
     let post_id = parse_mm_or_uuid(&path.post_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid post_id".to_string()))?;
 
+    let repo = PostRepository::new(state.db.clone());
+
     // Verify membership
-    let _membership: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| {
-                crate::error::AppError::Forbidden("Not a member of this channel".to_string())
-            })?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     // Unpin the post
-    sqlx::query("UPDATE posts SET is_pinned = false WHERE id = $1 AND channel_id = $2")
-        .bind(post_id)
-        .bind(channel_id)
-        .execute(&state.db)
-        .await?;
+    repo.unpin_post(post_id).await?;
 
     Ok(Json(json!({"status": "OK"})))
 }

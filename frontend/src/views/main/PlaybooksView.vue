@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Book, Play, ArrowRight } from 'lucide-vue-next'
-import { usePlaybookStore } from '../../stores/playbooks'
+import { usePlaybookStore } from '../../features/playbooks/stores/playbookStore'
 import ChannelSidebar from '../../components/layout/ChannelSidebar.vue'
 import PlaybookList from '../../components/playbooks/PlaybookList.vue'
 import BaseButton from '../../components/atomic/BaseButton.vue'

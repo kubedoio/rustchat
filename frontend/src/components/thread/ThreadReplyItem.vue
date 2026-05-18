@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { format } from 'date-fns'
 import type { Post } from '../../api/posts'
-import { useAuthStore } from '../../stores/auth'
+import { useAuthStore } from '../../features/auth/stores/authStore'
 import RcAvatar from '../ui/RcAvatar.vue'
 import FilePreview from '../atomic/FilePreview.vue'
 import { useMarkdownRenderer } from '../../composables/useMarkdownRenderer'

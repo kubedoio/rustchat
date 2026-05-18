@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
-import { useAdminStore } from '../../stores/admin';
-import { useAuthStore } from '../../stores/auth';
+import { useAdminStore } from '../../features/admin/stores/adminStore';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import { Users, Plus, Search, MoreHorizontal, UserCheck, UserX, Edit2, Trash2, AlertTriangle, X, Eraser, RefreshCw, UserPlus, KeyRound, Eye, EyeOff } from 'lucide-vue-next';
 import membershipPoliciesApi from '../../api/membershipPolicies';
 import CreateUserModal from '../../components/modals/CreateUserModal.vue';
 import EditUserModal from '../../components/modals/EditUserModal.vue';
 import type { AdminUser } from '../../api/admin';
 import adminApi from '../../api/admin';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const adminStore = useAdminStore();
 const authStore = useAuthStore();
@@ -110,8 +111,8 @@ async function submitPasswordChange() {
         showPasswordModal.value = false;
         passwordUser.value = null;
         passwordForm.value = { newPassword: '', confirmPassword: '' };
-    } catch (e: any) {
-        passwordError.value = e?.response?.data?.error?.message || e?.response?.data?.message || 'Failed to set password';
+    } catch (e: unknown) {
+        passwordError.value = getApiErrorMessage(e) || 'Failed to set password';
     } finally {
         passwordSubmitting.value = false;
     }
@@ -179,8 +180,8 @@ async function confirmDeleteUser() {
             search: searchQuery.value || undefined,
             include_deleted: includeDeleted.value,
         });
-    } catch (e: any) {
-        deleteError.value = e?.response?.data?.error?.message || e?.response?.data?.message || 'Failed to delete user';
+    } catch (e: unknown) {
+        deleteError.value = getApiErrorMessage(e) || 'Failed to delete user';
     } finally {
         deleteSubmitting.value = false;
     }
@@ -213,8 +214,8 @@ async function confirmWipeUser() {
             search: searchQuery.value || undefined,
             include_deleted: includeDeleted.value,
         });
-    } catch (e: any) {
-        wipeError.value = e?.response?.data?.error?.message || e?.response?.data?.message || 'Failed to wipe user';
+    } catch (e: unknown) {
+        wipeError.value = getApiErrorMessage(e) || 'Failed to wipe user';
     } finally {
         wipeSubmitting.value = false;
     }
@@ -257,8 +258,8 @@ async function confirmResyncUser() {
     try {
         const response = await membershipPoliciesApi.resyncUser(resyncingUser.value.id);
         resyncResult.value = response.data;
-    } catch (e: any) {
-        resyncError.value = e?.response?.data?.error?.message || e?.response?.data?.message || 'Failed to re-sync user memberships';
+    } catch (e: unknown) {
+        resyncError.value = getApiErrorMessage(e) || 'Failed to re-sync user memberships';
     } finally {
         resyncSubmitting.value = false;
     }

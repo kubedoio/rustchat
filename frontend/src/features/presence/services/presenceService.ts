@@ -4,11 +4,7 @@ import type { UserId, PresenceStatus } from '../../../core/entities/User'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { MessageId } from '../../../core/entities/Message'
 import { usePresenceStore } from '../stores/presenceStore'
-
-// Typing indicator timeout (5 seconds)
-const TYPING_TIMEOUT = 5000
-// Cleanup interval (3 seconds)
-const CLEANUP_INTERVAL = 3000
+import { TYPING_CLEANUP_INTERVAL, TYPING_TIMEOUT } from '../../../constants'
 
 class PresenceService {
   private get store() {

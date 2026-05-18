@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { Pencil } from 'lucide-vue-next'
 import SettingItemMax from '../SettingItemMax.vue'
-import { useCallsStore } from '../../../stores/calls'
+import { useCallsStore } from '../../../features/calls/stores/callStore'
+import { getErrorMessage } from '@/core/errors/errorUtils'
 
 const callsStore = useCallsStore()
 const expandedRow = ref<string | null>(null)
@@ -54,9 +55,9 @@ async function enumerateDevices() {
     videoDevices.value = devices.filter((d) => d.kind === 'videoinput')
 
     permissionError.value = null
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to enumerate devices', error)
-    permissionError.value = error?.message || 'Permission denied'
+    permissionError.value = getErrorMessage(error, 'Permission denied')
   }
 }
 

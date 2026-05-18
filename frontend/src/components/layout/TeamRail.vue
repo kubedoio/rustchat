@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { Plus } from 'lucide-vue-next';
-import { useTeamStore } from '../../stores/teams';
-import { useUnreadStore } from '../../stores/unreads';
-import { useAuthStore } from '../../stores/auth';
+import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useUnreadStore } from '../../features/unreads/stores/unreadStore';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import { canCreateTeam as canCreateTeamForRole } from '../../features/permissions/capabilities';
 import CreateTeamModal from '../modals/CreateTeamModal.vue';
 

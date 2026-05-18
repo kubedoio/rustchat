@@ -16,7 +16,6 @@ use axum::{
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
 use crate::api::AppState;
@@ -25,6 +24,7 @@ use crate::mattermost_compat::{
     id::{encode_mm_id, parse_mm_or_uuid},
     models as mm,
 };
+use crate::repositories::PostRepository;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -120,36 +120,6 @@ fn default_per_page() -> i64 {
     25
 }
 
-// Thread membership for DB queries
-#[derive(sqlx::FromRow, Debug)]
-#[allow(dead_code)]
-struct ThreadMembership {
-    user_id: Uuid,
-    post_id: Uuid,
-    following: bool,
-    last_read_at: Option<DateTime<Utc>>,
-    mention_count: i32,
-    unread_replies_count: i32,
-}
-
-// Thread row with post info
-#[derive(sqlx::FromRow, Debug)]
-struct ThreadRow {
-    // Post fields
-    id: Uuid,
-    channel_id: Uuid,
-    user_id: Uuid,
-    message: String,
-    created_at: DateTime<Utc>,
-    reply_count: i64,
-    last_reply_at: Option<DateTime<Utc>>,
-    // Membership fields
-    following: bool,
-    last_read_at: Option<DateTime<Utc>>,
-    mention_count: i32,
-    unread_replies_count: i32,
-}
-
 /// GET /users/{user_id}/teams/{team_id}/threads
 pub async fn get_threads_internal(
     State(state): State<AppState>,
@@ -162,120 +132,19 @@ pub async fn get_threads_internal(
     let team_id = parse_mm_or_uuid(&path.team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
 
-    // Build query for threads the user is following
     let per_page = query.per_page.min(100);
     let offset = query.page * per_page;
 
-    let threads: Vec<ThreadRow> = if query.unread {
-        // Fetch only unread threads
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
-                   p.reply_count::int8 as reply_count, p.last_reply_at,
-                   tm.following, tm.last_read_at, tm.mention_count, tm.unread_replies_count
-            FROM posts p
-            JOIN thread_memberships tm ON tm.post_id = p.id
-            JOIN channels c ON p.channel_id = c.id
-            WHERE tm.user_id = $1
-              AND tm.following = true
-              AND c.team_id = $2
-              AND p.root_post_id IS NULL
-              AND p.deleted_at IS NULL
-              AND (tm.unread_replies_count > 0 OR tm.mention_count > 0)
-            ORDER BY COALESCE(p.last_reply_at, p.created_at) DESC
-            LIMIT $3 OFFSET $4
-        "#,
-        )
-        .bind(user_id)
-        .bind(team_id)
-        .bind(per_page)
-        .bind(offset)
-        .fetch_all(&state.db)
-        .await?
-    } else {
-        // Fetch all followed threads
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
-                   p.reply_count::int8 as reply_count, p.last_reply_at,
-                   tm.following, tm.last_read_at, tm.mention_count, tm.unread_replies_count
-            FROM posts p
-            JOIN thread_memberships tm ON tm.post_id = p.id
-            JOIN channels c ON p.channel_id = c.id
-            WHERE tm.user_id = $1
-              AND tm.following = true
-              AND c.team_id = $2
-              AND p.root_post_id IS NULL
-              AND p.deleted_at IS NULL
-            ORDER BY COALESCE(p.last_reply_at, p.created_at) DESC
-            LIMIT $3 OFFSET $4
-        "#,
-        )
-        .bind(user_id)
-        .bind(team_id)
-        .bind(per_page)
-        .bind(offset)
-        .fetch_all(&state.db)
-        .await?
-    };
+    let repo = PostRepository::new(state.db.clone());
 
-    // Count totals
-    let total: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)
-        FROM posts p
-        JOIN thread_memberships tm ON tm.post_id = p.id
-        JOIN channels c ON p.channel_id = c.id
-        WHERE tm.user_id = $1
-          AND tm.following = true
-          AND c.team_id = $2
-          AND p.root_post_id IS NULL
-          AND p.deleted_at IS NULL
-    "#,
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_one(&state.db)
-    .await?;
+    let threads = repo
+        .list_threads_for_user_in_team(user_id, team_id, query.unread, per_page, offset)
+        .await?;
 
-    let total_unread_threads: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)
-        FROM posts p
-        JOIN thread_memberships tm ON tm.post_id = p.id
-        JOIN channels c ON p.channel_id = c.id
-        WHERE tm.user_id = $1
-          AND tm.following = true
-          AND c.team_id = $2
-          AND p.root_post_id IS NULL
-          AND p.deleted_at IS NULL
-          AND (tm.unread_replies_count > 0 OR tm.mention_count > 0)
-    "#,
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_one(&state.db)
-    .await?;
+    let total = repo.count_threads_for_user_in_team(user_id, team_id).await?;
+    let total_unread_threads = repo.count_unread_threads_for_user_in_team(user_id, team_id).await?;
+    let total_unread_mentions = repo.sum_unread_mentions_for_user_in_team(user_id, team_id).await?;
 
-    let total_unread_mentions: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COALESCE(SUM(tm.mention_count), 0)
-        FROM thread_memberships tm
-        JOIN posts p ON tm.post_id = p.id
-        JOIN channels c ON p.channel_id = c.id
-        WHERE tm.user_id = $1
-          AND tm.following = true
-          AND c.team_id = $2
-          AND p.root_post_id IS NULL
-          AND p.deleted_at IS NULL
-    "#,
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_one(&state.db)
-    .await?;
-
-    // Map to MM format
     let mm_threads: Vec<mm::Thread> = threads
         .into_iter()
         .map(|t| {
@@ -285,7 +154,7 @@ pub async fn get_threads_internal(
                 reply_count: t.reply_count,
                 last_reply_at: t.last_reply_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
                 last_viewed_at: t.last_read_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
-                participants: vec![], // Could be populated with thread participants
+                participants: vec![],
                 post: mm::PostInThread {
                     id: encode_mm_id(t.id),
                     channel_id: encode_mm_id(t.channel_id),
@@ -319,38 +188,13 @@ pub async fn get_all_threads_internal(
     let per_page = query.per_page.min(100);
     let offset = query.page * per_page;
 
-    let threads: Vec<ThreadRow> = sqlx::query_as(
-        r#"
-        SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
-               p.reply_count::int8 as reply_count, p.last_reply_at,
-               tm.following, tm.last_read_at, tm.mention_count, tm.unread_replies_count
-        FROM posts p
-        JOIN thread_memberships tm ON tm.post_id = p.id
-        WHERE tm.user_id = $1
-          AND tm.following = true
-          AND p.root_post_id IS NULL
-          AND p.deleted_at IS NULL
-        ORDER BY COALESCE(p.last_reply_at, p.created_at) DESC
-        LIMIT $2 OFFSET $3
-    "#,
-    )
-    .bind(user_id)
-    .bind(per_page)
-    .bind(offset)
-    .fetch_all(&state.db)
-    .await?;
+    let repo = PostRepository::new(state.db.clone());
 
-    let total: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)
-        FROM thread_memberships tm
-        JOIN posts p ON tm.post_id = p.id
-        WHERE tm.user_id = $1 AND tm.following = true AND p.deleted_at IS NULL
-    "#,
-    )
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let threads = repo
+        .list_all_threads_for_user(user_id, per_page, offset)
+        .await?;
+
+    let total = repo.count_all_threads_for_user(user_id).await?;
 
     let mm_threads: Vec<mm::Thread> = threads
         .into_iter()
@@ -393,48 +237,28 @@ pub async fn get_thread_internal(
     let thread_id = parse_mm_or_uuid(&path.thread_id)
         .ok_or_else(|| AppError::BadRequest("Invalid thread_id".to_string()))?;
 
-    // Fetch thread info
-    let thread: Option<ThreadRow> = sqlx::query_as(
-        r#"
-        SELECT p.id, p.channel_id, p.user_id, p.message, p.created_at,
-               p.reply_count::int8 as reply_count, p.last_reply_at,
-               COALESCE(tm.following, false) as following,
-               tm.last_read_at,
-               COALESCE(tm.mention_count, 0) as mention_count,
-               COALESCE(tm.unread_replies_count, 0) as unread_replies_count
-        FROM posts p
-        JOIN channels c ON p.channel_id = c.id
-        LEFT JOIN thread_memberships tm ON tm.post_id = p.id AND tm.user_id = $2
-        WHERE p.id = $1
-          AND c.team_id = $3
-          AND p.root_post_id IS NULL
-          AND p.deleted_at IS NULL
-    "#,
-    )
-    .bind(thread_id)
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_optional(&state.db)
-    .await?;
-
-    let t = thread.ok_or_else(|| AppError::NotFound("Thread not found".to_string()))?;
+    let repo = PostRepository::new(state.db.clone());
+    let thread = repo
+        .get_thread_for_user_in_team(thread_id, user_id, team_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Thread not found".to_string()))?;
 
     Ok(Json(mm::Thread {
-        id: encode_mm_id(t.id),
-        reply_count: t.reply_count,
-        last_reply_at: t.last_reply_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
-        last_viewed_at: t.last_read_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
+        id: encode_mm_id(thread.id),
+        reply_count: thread.reply_count,
+        last_reply_at: thread.last_reply_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
+        last_viewed_at: thread.last_read_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
         participants: vec![],
         post: mm::PostInThread {
-            id: encode_mm_id(t.id),
-            channel_id: encode_mm_id(t.channel_id),
-            user_id: encode_mm_id(t.user_id),
-            message: t.message,
-            create_at: t.created_at.timestamp_millis(),
+            id: encode_mm_id(thread.id),
+            channel_id: encode_mm_id(thread.channel_id),
+            user_id: encode_mm_id(thread.user_id),
+            message: thread.message,
+            create_at: thread.created_at.timestamp_millis(),
         },
-        unread_replies: t.unread_replies_count as i64,
-        unread_mentions: t.mention_count as i64,
-        is_following: Some(t.following),
+        unread_replies: thread.unread_replies_count as i64,
+        unread_mentions: thread.mention_count as i64,
+        is_following: Some(thread.following),
     }))
 }
 
@@ -452,23 +276,9 @@ pub async fn mark_thread_read_internal(
 
     let read_at = DateTime::from_timestamp_millis(path.timestamp).unwrap_or_else(Utc::now);
 
-    // Upsert thread membership with read time
-    sqlx::query(r#"
-        INSERT INTO thread_memberships (user_id, post_id, last_read_at, unread_replies_count, mention_count)
-        VALUES ($1, $2, $3, 0, 0)
-        ON CONFLICT (user_id, post_id) DO UPDATE SET
-            last_read_at = $3,
-            unread_replies_count = 0,
-            mention_count = 0,
-            updated_at = NOW()
-    "#)
-    .bind(user_id)
-    .bind(thread_id)
-    .bind(read_at)
-    .execute(&state.db)
-    .await?;
+    let repo = PostRepository::new(state.db.clone());
+    repo.mark_thread_read(user_id, thread_id, read_at).await?;
 
-    // Return updated thread
     get_thread_internal(
         State(state),
         auth,
@@ -491,25 +301,8 @@ pub async fn mark_all_read_internal(
     let team_id = parse_mm_or_uuid(&path.team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
 
-    // Update all thread memberships for this user/team
-    sqlx::query(
-        r#"
-        UPDATE thread_memberships tm SET
-            last_read_at = NOW(),
-            unread_replies_count = 0,
-            mention_count = 0,
-            updated_at = NOW()
-        FROM posts p
-        JOIN channels c ON p.channel_id = c.id
-        WHERE tm.post_id = p.id
-          AND tm.user_id = $1
-          AND c.team_id = $2
-    "#,
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .execute(&state.db)
-    .await?;
+    let repo = PostRepository::new(state.db.clone());
+    repo.mark_all_threads_read(user_id, team_id).await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
@@ -531,24 +324,10 @@ pub async fn get_thread_mention_counts(
     let team_id = parse_mm_or_uuid(&path.team_id)
         .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
 
-    let rows: Vec<(Uuid, i64)> = sqlx::query_as(
-        r#"
-        SELECT c.id, COALESCE(SUM(tm.mention_count), 0)
-        FROM thread_memberships tm
-        JOIN posts p ON tm.post_id = p.id
-        JOIN channels c ON p.channel_id = c.id
-        WHERE tm.user_id = $1
-          AND tm.following = true
-          AND c.team_id = $2
-          AND p.root_post_id IS NULL
-          AND p.deleted_at IS NULL
-        GROUP BY c.id
-        "#,
-    )
-    .bind(user_id)
-    .bind(team_id)
-    .fetch_all(&state.db)
-    .await?;
+    let repo = PostRepository::new(state.db.clone());
+    let rows = repo
+        .get_thread_mention_counts_by_channel(user_id, team_id)
+        .await?;
 
     let mut counts = std::collections::HashMap::new();
     for (channel_id, count) in rows {
@@ -568,22 +347,9 @@ pub async fn follow_thread_internal(
     let thread_id = parse_mm_or_uuid(&path.thread_id)
         .ok_or_else(|| AppError::BadRequest("Invalid thread_id".to_string()))?;
 
-    // Upsert with following = true
-    sqlx::query(
-        r#"
-        INSERT INTO thread_memberships (user_id, post_id, following)
-        VALUES ($1, $2, true)
-        ON CONFLICT (user_id, post_id) DO UPDATE SET
-            following = true,
-            updated_at = NOW()
-    "#,
-    )
-    .bind(user_id)
-    .bind(thread_id)
-    .execute(&state.db)
-    .await?;
+    let repo = PostRepository::new(state.db.clone());
+    repo.follow_thread(user_id, thread_id).await?;
 
-    // Return updated thread
     get_thread_internal(State(state), auth, Path(path)).await
 }
 
@@ -597,21 +363,9 @@ pub async fn unfollow_thread_internal(
     let thread_id = parse_mm_or_uuid(&path.thread_id)
         .ok_or_else(|| AppError::BadRequest("Invalid thread_id".to_string()))?;
 
-    // Update following to false
-    sqlx::query(
-        r#"
-        UPDATE thread_memberships SET
-            following = false,
-            updated_at = NOW()
-        WHERE user_id = $1 AND post_id = $2
-    "#,
-    )
-    .bind(user_id)
-    .bind(thread_id)
-    .execute(&state.db)
-    .await?;
+    let repo = PostRepository::new(state.db.clone());
+    repo.unfollow_thread(user_id, thread_id).await?;
 
-    // Return updated thread
     get_thread_internal(State(state), auth, Path(path)).await
 }
 
@@ -628,30 +382,14 @@ pub async fn set_thread_unread(
     let post_id = parse_mm_or_uuid(&path.post_id)
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
 
-    let post_created_at: Option<DateTime<Utc>> =
-        sqlx::query_scalar("SELECT created_at FROM posts WHERE id = $1 AND root_post_id = $2")
-            .bind(post_id)
-            .bind(thread_id)
-            .fetch_optional(&state.db)
-            .await?;
+    let repo = PostRepository::new(state.db.clone());
+    let post_created_at = repo
+        .get_post_created_at_in_thread(post_id, thread_id)
+        .await?;
 
     let last_read_at = post_created_at.map(|dt| dt - Duration::milliseconds(1));
 
-    sqlx::query(
-        r#"
-        INSERT INTO thread_memberships (user_id, post_id, last_read_at, unread_replies_count, mention_count)
-        VALUES ($1, $2, $3, 1, 0)
-        ON CONFLICT (user_id, post_id) DO UPDATE SET
-            last_read_at = $3,
-            unread_replies_count = GREATEST(thread_memberships.unread_replies_count, 1),
-            updated_at = NOW()
-        "#,
-    )
-    .bind(user_id)
-    .bind(thread_id)
-    .bind(last_read_at)
-    .execute(&state.db)
-    .await?;
+    repo.set_thread_unread(user_id, thread_id, last_read_at).await?;
 
     get_thread_internal(
         State(state),

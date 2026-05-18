@@ -3,9 +3,11 @@ import { ref, watch } from 'vue'
 import { Camera } from 'lucide-vue-next'
 import BaseButton from '../../atomic/BaseButton.vue'
 import BaseInput from '../../atomic/BaseInput.vue'
-import api from '../../../api/client'
-import { useAuthStore } from '../../../stores/auth'
+import api, { v4Api } from '../../../api/client'
+import { useAuthStore } from '../../../features/auth/stores/authStore'
 import { usersApi } from '../../../api/users'
+import { MAX_PROFILE_IMAGE_SIZE } from '../../../constants'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const auth = useAuthStore()
 const loading = ref(false)
@@ -60,7 +62,7 @@ async function handleFileUpload(event: Event) {
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_PROFILE_IMAGE_SIZE) {
       error.value = 'Image size must be less than 5MB'
       return
     }
@@ -72,14 +74,12 @@ async function handleFileUpload(event: Event) {
       const formData = new FormData()
       formData.append('image', file)
 
-      await api.post(`/users/${auth.user?.id}/image`, formData, {
-        baseURL: '/api/v4',
-      })
+      await v4Api.post(`/users/${auth.user?.id}/image`, formData)
       await auth.fetchMe()
       avatarUrl.value = auth.user?.avatar_url || ''
       success.value = 'Avatar uploaded successfully!'
-    } catch (e: any) {
-      error.value = e.response?.data?.message || 'Failed to upload avatar'
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to upload avatar'
     } finally {
       loading.value = false
       input.value = ''
@@ -118,8 +118,8 @@ async function handleSaveProfile() {
     }
     success.value = 'Profile updated successfully!'
     setTimeout(() => success.value = '', 3000)
-  } catch (e: any) {
-    error.value = e.response?.data?.message || 'Failed to update profile'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e) || 'Failed to update profile'
   } finally {
     loading.value = false
   }
@@ -137,7 +137,7 @@ async function handleSaveStatus() {
     })
     success.value = 'Status updated successfully!'
     setTimeout(() => success.value = '', 3000)
-  } catch (e: any) {
+  } catch (e: unknown) {
     error.value = 'Failed to update status'
   } finally {
     loading.value = false

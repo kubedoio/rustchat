@@ -2,7 +2,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { Send, Loader2 } from 'lucide-vue-next'
 import { useThreadStore } from '../../features/messages/stores/threadStore'
-import { useUIStore } from '../../stores/ui'
+import { useUIStore } from '../../features/ui/stores/uiStore'
 import ThreadHeader from './ThreadHeader.vue'
 import ThreadReplyList from './ThreadReplyList.vue'
 

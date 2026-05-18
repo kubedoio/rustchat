@@ -4,7 +4,7 @@ import './style.css'
 import 'highlight.js/styles/github-dark.css'
 import App from './App.vue'
 import router from './router'
-import { useThemeStore } from './stores/theme'
+import { useThemeStore } from './features/theme/stores/themeStore'
 
 const app = createApp(App)
 const pinia = createPinia()

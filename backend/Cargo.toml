@@ -70,14 +70,14 @@ mime = "0.3"
 mime_guess = "2.0"
 sha2 = "0.10"
 hex = "0.4"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 
 # HTTP client for OAuth (rustls for musl compatibility)
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 urlencoding = "2.1"
 
 # Email
-lettre = { version = "0.11", default-features = false, features = ["tokio1", "tokio1-rustls-tls", "builder", "smtp-transport", "pool"] }
+lettre = { version = "0.11.22", default-features = false, features = ["tokio1", "tokio1-rustls-tls", "builder", "smtp-transport", "pool"] }
 base64 = "0.22.1"
 url = "2.5.8"
 
@@ -96,7 +96,7 @@ sdp = "0.6"
 interceptor = "0.12"
 
 [dev-dependencies]
-reqwest = { version = "0.12", features = ["json", "cookies", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "multipart", "rustls-tls"] }
 tokio-test = "0.4"
 tokio-tungstenite = "0.24"
 

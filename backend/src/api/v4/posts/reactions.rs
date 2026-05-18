@@ -12,6 +12,7 @@ use super::{
     encode_mm_id, mm, parse_body, parse_mm_or_uuid, ApiResult, AppError, AppState, EventType,
     MmAuthUser, WsBroadcast, WsEnvelope,
 };
+use crate::repositories::PostRepository;
 
 #[derive(Deserialize)]
 struct ReactionRequest {
@@ -27,19 +28,10 @@ fn reaction_event_payload(mm_reaction: &mm::Reaction) -> serde_json::Value {
 
 /// Verify the caller is a member of the channel containing the post.
 async fn check_channel_membership(state: &AppState, post_id: Uuid, user_id: Uuid) -> ApiResult<()> {
-    let is_member: bool = sqlx::query_scalar(
-        r#"
-        SELECT EXISTS(
-            SELECT 1 FROM posts p
-            JOIN channel_members cm ON cm.channel_id = p.channel_id
-            WHERE p.id = $1 AND cm.user_id = $2
-        )
-        "#,
-    )
-    .bind(post_id)
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let is_member = PostRepository::new(state.db.clone())
+        .check_channel_membership(post_id, user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     if !is_member {
         return Err(AppError::Forbidden(
@@ -77,49 +69,29 @@ pub(super) async fn add_reaction(
         return Err(AppError::BadRequest("Invalid emoji name".to_string()));
     }
 
+    let repo = PostRepository::new(state.db.clone());
+
     if !crate::mattermost_compat::emoji_data::is_system_emoji(&emoji_name) {
-        let exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM custom_emojis WHERE name = $1 AND delete_at IS NULL)",
-        )
-        .bind(&emoji_name)
-        .fetch_one(&state.db)
-        .await?;
+        let exists = repo
+            .custom_emoji_exists(&emoji_name)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?;
 
         if !exists {
             return Err(AppError::NotFound("Emoji not found".to_string()));
         }
     }
 
-    let reaction: crate::models::reaction::Reaction = sqlx::query_as(
-        r#"
-        INSERT INTO reactions (user_id, post_id, emoji_name)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, post_id, emoji_name) DO UPDATE SET emoji_name = $3
-        RETURNING *
-        "#,
-    )
-    .bind(auth.user_id)
-    .bind(post_id)
-    .bind(&emoji_name)
-    .fetch_one(&state.db)
-    .await?;
-
-    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
-        .bind(post_id)
-        .fetch_one(&state.db)
+    let reaction = repo
+        .add_reaction(post_id, auth.user_id, &emoji_name)
         .await?;
 
-    // Create reaction activity for the post author
-    let post_info: Option<(Uuid, Uuid)> = sqlx::query_as(
-        "SELECT p.user_id, c.team_id FROM posts p JOIN channels c ON p.channel_id = c.id WHERE p.id = $1"
-    )
-    .bind(post_id)
-    .fetch_optional(&state.db)
-    .await
-    .ok()
-    .flatten();
+    let channel_id = repo.get_post_channel_id(post_id).await?;
 
-    if let Some((post_user_id, team_id)) = post_info {
+    // Create reaction activity for the post author
+    if let Some((post_user_id, team_id)) =
+        repo.get_post_author_and_team(post_id).await.ok().flatten()
+    {
         if post_user_id != auth.user_id {
             let _ = crate::services::activity::create_reaction_activity(
                 &state,
@@ -169,17 +141,10 @@ pub(crate) async fn reactions_for_posts(
         return Ok(HashMap::new());
     }
 
-    let reactions: Vec<(Uuid, Uuid, String, i64, Uuid)> = sqlx::query_as(
-        r#"
-        SELECT r.post_id, r.user_id, r.emoji_name, r.create_at, p.channel_id
-        FROM reactions r
-        JOIN posts p ON p.id = r.post_id
-        WHERE r.post_id = ANY($1)
-        "#,
-    )
-    .bind(post_ids)
-    .fetch_all(&state.db)
-    .await?;
+    let reactions = PostRepository::new(state.db.clone())
+        .get_reactions_with_channel_for_posts(post_ids)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut map: HashMap<Uuid, Vec<mm::Reaction>> = HashMap::new();
     for (post_id, user_id, emoji_name, create_at, channel_id) in reactions {
@@ -251,29 +216,16 @@ async fn remove_reaction_internal(
 ) -> ApiResult<()> {
     let emoji_name = crate::mattermost_compat::emoji_data::get_short_name_for_emoji(emoji_name);
 
-    let reaction: Option<crate::models::reaction::Reaction> = sqlx::query_as(
-        "SELECT * FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
-    )
-    .bind(user_id)
-    .bind(post_id)
-    .bind(&emoji_name)
-    .fetch_optional(&state.db)
-    .await?;
+    let repo = PostRepository::new(state.db.clone());
 
-    if let Some(r) = reaction {
-        sqlx::query(
-            "DELETE FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
-        )
-        .bind(user_id)
-        .bind(post_id)
-        .bind(&emoji_name)
-        .execute(&state.db)
-        .await?;
+    if let Some(r) = repo
+        .get_reaction(user_id, post_id, &emoji_name)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+    {
+        repo.remove_reaction(post_id, user_id, &emoji_name).await?;
 
-        let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
-            .bind(post_id)
-            .fetch_one(&state.db)
-            .await?;
+        let channel_id = repo.get_post_channel_id(post_id).await?;
 
         let mm_reaction = mm::Reaction {
             user_id: encode_mm_id(r.user_id),
@@ -312,22 +264,15 @@ pub(super) async fn get_reactions(
     // Verify the caller is a member of the channel that owns this post.
     check_channel_membership(&state, post_id, auth.user_id).await?;
 
-    let reactions: Vec<(Uuid, Uuid, String, i64, Uuid)> = sqlx::query_as(
-        r#"
-        SELECT r.user_id, r.post_id, r.emoji_name, r.create_at, p.channel_id
-        FROM reactions r
-        JOIN posts p ON p.id = r.post_id
-        WHERE r.post_id = $1
-        "#,
-    )
-    .bind(post_id)
-    .fetch_all(&state.db)
-    .await?;
+    let reactions = PostRepository::new(state.db.clone())
+        .get_reactions_with_channel_for_post(post_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mm_reactions = reactions
         .into_iter()
         .map(
-            |(user_id, post_id, emoji_name, create_at, channel_id)| mm::Reaction {
+            |(user_id, _post_id, emoji_name, create_at, channel_id)| mm::Reaction {
                 user_id: encode_mm_id(user_id),
                 post_id: encode_mm_id(post_id),
                 emoji_name: crate::mattermost_compat::emoji_data::get_short_name_for_emoji(

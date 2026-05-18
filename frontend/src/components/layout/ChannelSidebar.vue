@@ -3,11 +3,11 @@ import { ref, computed, watch, onMounted } from 'vue';
 import {
   Hash, Lock, ChevronDown, ChevronRight, Plus, MessageCircle, Settings, Compass, Shield, Check, LogOut, MoreVertical
 } from 'lucide-vue-next';
-import { useTeamStore } from '../../stores/teams';
-import { useChannelStore } from '../../stores/channels';
-import { useAuthStore } from '../../stores/auth';
-import { useUnreadStore } from '../../stores/unreads';
-import { useChannelPreferencesStore } from '../../stores/channelPreferences';
+import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useAuthStore } from '../../features/auth/stores/authStore';
+import { useUnreadStore } from '../../features/unreads/stores/unreadStore';
+import { useChannelPreferencesStore } from '../../features/channels/stores/channelPreferencesStore';
 import { usePresenceStore } from '../../features/presence';
 import CreateChannelModal from '../modals/CreateChannelModal.vue';
 import DirectMessageModal from '../modals/DirectMessageModal.vue';

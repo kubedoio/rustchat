@@ -22,6 +22,7 @@ use crate::mattermost_compat::{
     id::{encode_mm_id, parse_mm_or_uuid},
     models as mm,
 };
+use crate::repositories::{ChannelRepository, UploadRepository};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -104,34 +105,26 @@ async fn create_upload(
         .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
 
     // Verify user has access to channel
-    let _: crate::models::ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _ = ChannelRepository::new(&state.db)
+        .require_member(channel_id, auth.user_id)
+        .await?;
 
     // Create upload session
     let session_id = Uuid::new_v4();
     let now = Utc::now();
     let expires_at = now + chrono::Duration::hours(24);
 
-    sqlx::query(
-        r#"
-        INSERT INTO upload_sessions (id, user_id, channel_id, filename, file_size, file_offset, created_at, expires_at)
-        VALUES ($1, $2, $3, $4, $5, 0, $6, $7)
-        "#,
-    )
-    .bind(session_id)
-    .bind(auth.user_id)
-    .bind(channel_id)
-    .bind(&input.filename)
-    .bind(input.file_size)
-    .bind(now)
-    .bind(expires_at)
-    .execute(&state.db)
-    .await?;
+    UploadRepository::new(&state.db)
+        .create_session(
+            session_id,
+            auth.user_id,
+            channel_id,
+            &input.filename,
+            input.file_size,
+            now,
+            expires_at,
+        )
+        .await?;
 
     Ok((
         StatusCode::CREATED,
@@ -147,17 +140,6 @@ async fn create_upload(
     ))
 }
 
-#[derive(sqlx::FromRow)]
-struct UploadSessionRow {
-    id: Uuid,
-    user_id: Uuid,
-    channel_id: Uuid,
-    filename: String,
-    file_size: i64,
-    file_offset: i64,
-    created_at: chrono::DateTime<Utc>,
-}
-
 /// GET /api/v4/uploads/{upload_id} - Get upload session details
 async fn get_upload(
     State(state): State<AppState>,
@@ -167,17 +149,10 @@ async fn get_upload(
     let upload_id = parse_mm_or_uuid(&upload_id)
         .ok_or_else(|| AppError::BadRequest("Invalid upload_id".to_string()))?;
 
-    let session: UploadSessionRow = sqlx::query_as(
-        r#"
-        SELECT id, user_id, channel_id, filename, file_size, file_offset, created_at
-        FROM upload_sessions
-        WHERE id = $1 AND expires_at > NOW()
-        "#,
-    )
-    .bind(upload_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Upload session not found".to_string()))?;
+    let session = UploadRepository::new(&state.db)
+        .get_session(upload_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Upload session not found".to_string()))?;
 
     // Only the creator can view the session
     if session.user_id != auth.user_id {
@@ -205,17 +180,10 @@ async fn upload_data(
     let upload_id = parse_mm_or_uuid(&upload_id)
         .ok_or_else(|| AppError::BadRequest("Invalid upload_id".to_string()))?;
 
-    let session: UploadSessionRow = sqlx::query_as(
-        r#"
-        SELECT id, user_id, channel_id, filename, file_size, file_offset, created_at
-        FROM upload_sessions
-        WHERE id = $1 AND expires_at > NOW()
-        "#,
-    )
-    .bind(upload_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Upload session not found".to_string()))?;
+    let session = UploadRepository::new(&state.db)
+        .get_session(upload_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Upload session not found".to_string()))?;
 
     if session.user_id != auth.user_id {
         return Err(AppError::Forbidden("Not your upload session".to_string()));
@@ -224,30 +192,17 @@ async fn upload_data(
     let new_offset = session.file_offset + body.len() as i64;
 
     // Append data to session
-    sqlx::query(
-        r#"
-        UPDATE upload_sessions
-        SET file_data = COALESCE(file_data, ''::bytea) || $1,
-            file_offset = $2
-        WHERE id = $3
-        "#,
-    )
-    .bind(body.as_ref())
-    .bind(new_offset)
-    .bind(upload_id)
-    .execute(&state.db)
-    .await?;
+    UploadRepository::new(&state.db)
+        .append_data(upload_id, body.as_ref(), new_offset)
+        .await?;
 
     // Check if upload is complete
     if new_offset >= session.file_size {
         // Retrieve full file data
-        let file_data: Option<Vec<u8>> =
-            sqlx::query_scalar("SELECT file_data FROM upload_sessions WHERE id = $1")
-                .bind(upload_id)
-                .fetch_one(&state.db)
-                .await?;
-
-        let file_data = file_data.unwrap_or_default();
+        let file_data = UploadRepository::new(&state.db)
+            .get_file_data(upload_id)
+            .await?
+            .unwrap_or_default();
 
         // Create file record and upload to S3
         let file_id = Uuid::new_v4();
@@ -370,32 +325,27 @@ async fn upload_data(
         let has_thumbnail = thumbnail_key.is_some();
 
         // Insert into files table with correct schema
-        sqlx::query(
-            r#"
-            INSERT INTO files (id, uploader_id, channel_id, name, key, mime_type, size, sha256, width, height, has_thumbnail, thumbnail_key, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            "#,
-        )
-        .bind(file_id)
-        .bind(auth.user_id)
-        .bind(session.channel_id)
-        .bind(&filename)
-        .bind(&key)
-        .bind(&mime_type)
-        .bind(session.file_size)
-        .bind(&hash)
-        .bind(width)
-        .bind(height)
-        .bind(has_thumbnail)
-        .bind(&thumbnail_key)
-        .bind(now)
-        .execute(&state.db)
-        .await?;
+        UploadRepository::new(&state.db)
+            .create_file(
+                file_id,
+                auth.user_id,
+                session.channel_id,
+                &filename,
+                &key,
+                &mime_type,
+                session.file_size,
+                &hash,
+                width,
+                height,
+                has_thumbnail,
+                &thumbnail_key,
+                now,
+            )
+            .await?;
 
         // Delete upload session
-        sqlx::query("DELETE FROM upload_sessions WHERE id = $1")
-            .bind(upload_id)
-            .execute(&state.db)
+        UploadRepository::new(&state.db)
+            .delete_session(upload_id)
             .await?;
 
         // Return FileInfo
@@ -419,7 +369,7 @@ async fn upload_data(
 
         Ok((
             StatusCode::CREATED,
-            Json(serde_json::to_value(file_info).unwrap()),
+            Json(serde_json::to_value(file_info)?),
         )
             .into_response())
     } else {
