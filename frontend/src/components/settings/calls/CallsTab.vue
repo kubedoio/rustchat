@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Pencil } from 'lucide-vue-next'
 import SettingItemMax from '../SettingItemMax.vue'
-import { useCallsStore } from '../../../features/calls/stores/callStore'
+import { useCallsStore } from '../../../stores/calls'
 import { getErrorMessage } from '@/core/errors/errorUtils'
 
 const callsStore = useCallsStore()

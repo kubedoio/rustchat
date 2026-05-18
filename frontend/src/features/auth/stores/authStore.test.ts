@@ -21,11 +21,11 @@ vi.mock('@vueuse/core', () => ({
   useStorage: (_key: string, initialValue: string) => ref(initialValue),
 }))
 
-vi.mock('../composables/useUserSummary', () => ({
+vi.mock('../../../composables/useUserSummary', () => ({
   clearUserSummaryCache,
 }))
 
-vi.mock('../features/presence', () => ({
+vi.mock('../../presence', () => ({
   usePresenceStore: () => ({
     clear: clearPresence,
   }),
@@ -61,7 +61,7 @@ vi.mock('@/features/channels/stores/channelPreferencesStore', () => ({
   }),
 }))
 
-vi.mock('./ui', () => ({
+vi.mock('../../ui/stores/uiStore', () => ({
   useUIStore: () => ({
     closeVideoCall,
     closeRhs,
@@ -70,19 +70,19 @@ vi.mock('./ui', () => ({
   }),
 }))
 
-vi.mock('./calls', () => ({
+vi.mock('@/stores/calls', () => ({
   useCallsStore: () => ({
     resetSessionState: resetCalls,
   }),
 }))
 
-vi.mock('./theme', () => ({
+vi.mock('../../theme/stores/themeStore', () => ({
   useThemeStore: () => ({
     syncFromServer: syncTheme,
   }),
 }))
 
-vi.mock('../api/client', () => ({
+vi.mock('../../../api/client', () => ({
   default: {
     post: vi.fn(),
     get: vi.fn(),
@@ -109,7 +109,7 @@ describe('auth logout session cleanup', () => {
   })
 
   it('clears the active presence path and user summary cache on logout', async () => {
-    const { useAuthStore } = await import('./auth')
+    const { useAuthStore } = await import('./authStore')
     const store = useAuthStore()
 
     store.token = 'token-value'

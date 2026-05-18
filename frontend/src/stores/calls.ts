@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import callsApi, { type CallState, type CallsConfig } from '../api/calls'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useToast } from '../composables/useToast'
-import { useAuthStore } from './auth'
+import { useAuthStore } from '../features/auth/stores/authStore'
 import { getErrorMessage, isNotFoundError } from '../core/errors/errorUtils'
 
 export interface CurrentCall {

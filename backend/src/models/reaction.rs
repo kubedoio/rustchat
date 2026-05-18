@@ -9,7 +9,6 @@ use uuid::Uuid;
 /// A reaction to a post
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Reaction {
-    pub id: Uuid,
     pub post_id: Uuid,
     pub user_id: Uuid,
     pub emoji_name: String,
