@@ -283,9 +283,10 @@ pub(crate) async fn broadcast_ringing_event(
                     // No devices to notify
                 }
                 Err(e) => {
+                    let error_message = e.to_string();
                     debug!(
                         user_id = %user_id,
-                        error = %e,
+                        error = %error_message,
                         "Failed to send push notification for call"
                     );
                 }
