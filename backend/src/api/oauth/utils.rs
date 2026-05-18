@@ -82,6 +82,8 @@ pub async fn send_with_retry(
     request: reqwest::RequestBuilder,
     context: &'static str,
 ) -> Result<reqwest::Response, AppError> {
+    let external_service_context = context.to_owned();
+    let clone_context = context.to_owned();
     let retry_config = RetryConfig {
         max_attempts: 3,
         initial_delay: Duration::from_millis(150),
@@ -93,8 +95,8 @@ pub async fn send_with_retry(
     send_reqwest_with_retry(
         request,
         &retry_config,
-        move |e| AppError::ExternalService(format!("{}: {}", context, e)),
-        move || AppError::Internal(format!("Failed to clone request builder: {}", context)),
+        move |e| AppError::ExternalService(format!("{}: {}", external_service_context, e)),
+        move || AppError::Internal(format!("Failed to clone request builder: {}", clone_context)),
     )
     .await
 }
