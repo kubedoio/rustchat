@@ -70,6 +70,22 @@ function comparableId(value: unknown): string | undefined {
     return normalizeEntityId(value) ?? value
 }
 
+function optionalString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+    return typeof value === 'boolean' ? value : undefined
+}
+
+function optionalNumber(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' ? value as Record<string, unknown> : {}
+}
+
 function idsMatch(left: unknown, right: unknown): boolean {
     const lhs = comparableId(left)
     const rhs = comparableId(right)
@@ -568,7 +584,8 @@ export const useMessageStore = defineStore('messages', () => {
         }
     }
 
-    function handleMessageUpdate(data: Record<string, unknown>) {
+    function handleMessageUpdate(rawData: unknown) {
+        const data = asRecord(rawData)
         if (!data.id) return
 
         // 1. Update in main channels
@@ -581,14 +598,15 @@ export const useMessageStore = defineStore('messages', () => {
                 const msg = messages[index]
                 if (!msg) continue
 
-                if (data.message !== undefined) msg.content = data.message
-                if (data.is_pinned !== undefined) msg.isPinned = data.is_pinned
-                if (data.reply_count !== undefined) msg.threadCount = data.reply_count
+                if (data.message !== undefined) msg.content = optionalString(data.message) ?? msg.content
+                if (data.is_pinned !== undefined) msg.isPinned = optionalBoolean(data.is_pinned) ?? msg.isPinned
+                if (data.reply_count !== undefined) msg.threadCount = optionalNumber(data.reply_count)
                 if (data.edited_at !== undefined || data.edit_at !== undefined) {
                     msg.editedAt = toOptionalIsoTimestamp(data.edited_at ?? data.edit_at)
                 }
-                if (data.reply_count_inc) {
-                    msg.threadCount = (msg.threadCount || 0) + data.reply_count_inc
+                const replyCountInc = optionalNumber(data.reply_count_inc)
+                if (replyCountInc) {
+                    msg.threadCount = (msg.threadCount || 0) + replyCountInc
                 }
             }
         }
@@ -603,8 +621,8 @@ export const useMessageStore = defineStore('messages', () => {
                 const msg = replies[index]
                 if (!msg) continue
 
-                if (data.message !== undefined) msg.content = data.message
-                if (data.is_pinned !== undefined) msg.isPinned = data.is_pinned
+                if (data.message !== undefined) msg.content = optionalString(data.message) ?? msg.content
+                if (data.is_pinned !== undefined) msg.isPinned = optionalBoolean(data.is_pinned) ?? msg.isPinned
                 if (data.edited_at !== undefined || data.edit_at !== undefined) {
                     msg.editedAt = toOptionalIsoTimestamp(data.edited_at ?? data.edit_at)
                 }
@@ -636,19 +654,23 @@ export const useMessageStore = defineStore('messages', () => {
         }
     }
 
-    function handleReactionAdded(data: Record<string, unknown>) {
-        const reactionKey = getReactionEmojiKey(data.emoji_name)
-        const apiKey = getPreferredEmojiName(data.emoji_name)
+    function handleReactionAdded(rawData: unknown) {
+        const data = asRecord(rawData)
+        const reactionKey = getReactionEmojiKey(optionalString(data.emoji_name) ?? '')
+        const apiKey = getPreferredEmojiName(optionalString(data.emoji_name) ?? '')
+        const postId = optionalString(data.post_id)
+        const userId = optionalString(data.user_id)
+        if (!postId || !userId) return
 
         visitLoadedMessages((message) => {
-            if (message.id !== data.post_id) {
+            if (message.id !== postId) {
                 return
             }
 
             const existingReaction = message.reactions.find((reaction) => reaction.emoji === reactionKey)
             if (existingReaction) {
-                if (!existingReaction.users.includes(data.user_id)) {
-                    existingReaction.users.push(data.user_id)
+                if (!existingReaction.users.includes(userId)) {
+                    existingReaction.users.push(userId)
                 }
                 existingReaction.count = existingReaction.users.length || existingReaction.count + 1
                 existingReaction.apiKey = existingReaction.apiKey || apiKey
@@ -657,17 +679,21 @@ export const useMessageStore = defineStore('messages', () => {
                     emoji: reactionKey,
                     apiKey,
                     count: 1,
-                    users: [data.user_id],
+                    users: [userId],
                 })
             }
         })
     }
 
-    function handleReactionRemoved(data: Record<string, unknown>) {
-        const reactionKey = getReactionEmojiKey(data.emoji_name)
+    function handleReactionRemoved(rawData: unknown) {
+        const data = asRecord(rawData)
+        const reactionKey = getReactionEmojiKey(optionalString(data.emoji_name) ?? '')
+        const postId = optionalString(data.post_id)
+        const userId = optionalString(data.user_id)
+        if (!postId || !userId) return
 
         visitLoadedMessages((message) => {
-            if (message.id !== data.post_id) {
+            if (message.id !== postId) {
                 return
             }
 
@@ -681,7 +707,7 @@ export const useMessageStore = defineStore('messages', () => {
                 return
             }
 
-            const userIndex = reaction.users.indexOf(data.user_id)
+            const userIndex = reaction.users.indexOf(userId)
             if (userIndex !== -1) {
                 reaction.users.splice(userIndex, 1)
             }
