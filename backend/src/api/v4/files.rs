@@ -186,10 +186,10 @@ async fn upload_file(
             format!("files/{}/{}.{}", auth.user_id, file_id, extension)
         };
 
-        let hash = file.hash;
+        let hash = file.hash.clone();
         let size = file.size as i64;
 
-        let mut temp_guard = TempFile(file.temp_path);
+        let mut temp_guard = TempFile(file.temp_path.clone());
         state
             .s3_client
             .upload_file(&key, &temp_guard.0, &content_type)
