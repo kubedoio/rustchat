@@ -96,7 +96,7 @@ sdp = "0.6"
 interceptor = "0.12"
 
 [dev-dependencies]
-reqwest = { version = "0.12", features = ["json", "cookies", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "multipart", "rustls-tls"] }
 tokio-test = "0.4"
 tokio-tungstenite = "0.24"
 

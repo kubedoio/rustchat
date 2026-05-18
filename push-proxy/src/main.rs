@@ -659,7 +659,7 @@ mod tests {
     use bytes::Bytes;
     use http_body_util::BodyExt;
     use std::collections::HashMap;
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
     use tower::ServiceExt;
 
     const TEST_AUTH_KEY: &str = "test-secret-key";
