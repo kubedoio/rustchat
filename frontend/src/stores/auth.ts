@@ -12,11 +12,11 @@ import {
     scheduleStatusExpiry,
 } from '../features/presence/statusExpiry'
 import { useThemeStore } from './theme'
-import { useMessageStore } from './messages'
-import { useChannelStore } from './channels'
-import { useUnreadStore } from './unreads'
-import { useTeamStore } from './teams'
-import { useChannelPreferencesStore } from './channelPreferences'
+import { useMessageStore } from '@/features/messages/stores/messageStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
+import { useTeamStore } from '@/features/teams/stores/teamStore'
+import { useChannelPreferencesStore } from '@/features/channels/stores/channelPreferencesStore'
 import { useUIStore } from './ui'
 import { useCallsStore } from './calls'
 

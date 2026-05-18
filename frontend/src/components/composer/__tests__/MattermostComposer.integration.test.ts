@@ -9,13 +9,13 @@ vi.mock('../../../composables/useWebSocket', () => ({
     })
 }))
 
-vi.mock('../../../stores/teams', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
     useTeamStore: () => ({
         members: []
     })
 }))
 
-vi.mock('../../../stores/channels', () => ({
+vi.mock('@/features/channels/stores/channelStore', () => ({
     useChannelStore: () => ({
         channels: []
     })
@@ -102,17 +102,16 @@ describe('MattermostComposer Integration', () => {
             props: {
                 channelId: 'channel-123',
                 channelName: 'general'
-            }
+            },
+            attachTo: document.body
         })
 
         const textarea = wrapper.find('textarea')
         await textarea.setValue('hello world')
         
-        // Select text
-        const element = textarea.element
-        element.selectionStart = 6
-        element.selectionEnd = 11
-        await textarea.trigger('select')
+        // Mock selection
+        vi.spyOn(textarea.element, 'selectionStart', 'get').mockReturnValue(6)
+        vi.spyOn(textarea.element, 'selectionEnd', 'get').mockReturnValue(11)
 
         // Click bold button
         const boldButton = wrapper.find('[aria-label="Bold"]')

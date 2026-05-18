@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { useMessageStore, type Message } from './messages'
+import { useMessageStore } from '@/features/messages/stores/messageStore'
+import type { Message } from '@/features/messages/stores/messageStore'
 
 function buildMessage(overrides: Partial<Message> = {}): Message {
   return {

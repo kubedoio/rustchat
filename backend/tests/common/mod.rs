@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use once_cell::sync::Lazy;
 use rustchat::{api, config::Config, realtime::WsHub, storage::S3Client};
 use sqlx::{Connection, Executor, PgConnection, PgPool};

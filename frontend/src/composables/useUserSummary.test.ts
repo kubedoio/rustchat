@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 
 const getMock = vi.fn()
 const getByIdsMock = vi.fn()
@@ -25,7 +26,7 @@ vi.mock('../api/users', () => ({
   },
 }))
 
-vi.mock('../stores/teams', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
   useTeamStore: () => teamStore,
 }))
 
@@ -41,6 +42,7 @@ async function flushPromises() {
 
 describe('useUserSummary', () => {
   beforeEach(async () => {
+    setActivePinia(createPinia())
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-03-29T12:00:00Z'))
     vi.clearAllMocks()

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useStorage } from '@vueuse/core';
-import { useChannelStore } from '../../features/channels/stores/channelStore';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useChannelStore } from '@/features/channels/stores/channelStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
 import BreadcrumbBar from '../../components/navigation/BreadcrumbBar.vue';
 import type { BreadcrumbSegment } from '../../components/navigation/BreadcrumbBar.vue';
 
-import { useMessageStore } from '../../features/messages/stores/messageStore';
-import { useUnreadStore } from '../../features/unreads/stores/unreadStore';
+import { useMessageStore } from '@/features/messages/stores/messageStore';
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore';
 import { useCallsStore } from '../../stores/calls';
 import { useWebSocket } from '../../composables/useWebSocket';
 import AppShell from '../../components/layout/AppShell.vue';

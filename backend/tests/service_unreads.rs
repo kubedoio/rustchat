@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #![allow(clippy::needless_borrows_for_generic_args)]
 use crate::common::spawn_app;
 use rustchat::mattermost_compat::id::encode_mm_id;

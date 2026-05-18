@@ -194,20 +194,21 @@ function normalizeCallState(raw: unknown): CallState {
   const r = raw as Record<string, unknown>
   const participants = new Map<SessionId, CallParticipant>()
   
-  if (raw.sessions) {
-    for (const [key, session] of Object.entries(raw.sessions)) {
+  const sessions = r.sessions
+  if (sessions && typeof sessions === 'object') {
+    for (const [key, session] of Object.entries(sessions)) {
       const s = session as Record<string, unknown>
-      const sessionId = createSessionId(s.session_id || key)
+      const sessionId = createSessionId(String(s.session_id || key))
       participants.set(sessionId, {
         sessionId,
         userId: (s.user_id_raw || s.user_id) as UserId,
-        username: s.username || '',
-        displayName: s.display_name,
-        isMuted: !s.unmuted,
+        username: String(s.username || ''),
+        displayName: s.display_name as string | undefined,
+        isMuted: !Boolean(s.unmuted),
         isSpeaking: false, // Will be updated by WebSocket events
         isScreenSharing: false, // Will be updated by WebSocket events
-        raisedHandAt: s.raised_hand || 0,
-        joinedAt: new Date(raw.start_at || Date.now())
+        raisedHandAt: Number(s.raised_hand || 0),
+        joinedAt: new Date((r.start_at || Date.now()) as string | number)
       })
     }
   }

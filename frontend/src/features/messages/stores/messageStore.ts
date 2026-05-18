@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed, type ComputedRef } from 'vue'
 import { postsApi, type Post } from '../../../api/posts'
-import { useChannelStore } from '../../channels/stores/channelStore'
-import { useUnreadStore } from '../../unreads/stores/unreadStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
 import { useAuthStore } from '../../auth/stores/authStore'
-import { useTeamStore } from '../../teams/stores/teamStore'
+import { useTeamStore } from '@/features/teams/stores/teamStore'
 import { normalizeEntityId } from '../../../utils/idCompat'
 import { getPreferredEmojiName, getReactionEmojiKey } from '../../../utils/emoji'
 import { getApiErrorMessage, getErrorMessage } from '../../../core/errors/errorUtils'
@@ -74,6 +74,18 @@ function idsMatch(left: unknown, right: unknown): boolean {
   const lhs = comparableId(left)
   const rhs = comparableId(right)
   return !!lhs && !!rhs && lhs === rhs
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function booleanValue(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function resolveAuthorDetails(rawPost: Post & { username?: string; avatar_url?: string; email?: string }): {
@@ -569,26 +581,31 @@ export const useMessageStore = defineStore('messageStore', () => {
   }
 
   function handleMessageUpdate(data: Record<string, unknown>) {
-    if (!data.id) return
+    const id = stringValue(data.id)
+    if (!id) return
 
     // 1. Update in main channels
     for (const cid in messagesByChannel.value) {
       const messages = messagesByChannel.value[cid]
       if (!messages) continue
 
-      const index = messages.findIndex(m => m.id === data.id)
+      const index = messages.findIndex(m => m.id === id)
       if (index !== -1) {
         const msg = messages[index]
         if (!msg) continue
 
-        if (data.message !== undefined) msg.content = data.message
-        if (data.is_pinned !== undefined) msg.isPinned = data.is_pinned
-        if (data.reply_count !== undefined) msg.threadCount = data.reply_count
+        const message = stringValue(data.message)
+        const isPinned = booleanValue(data.is_pinned)
+        const replyCount = numberValue(data.reply_count)
+        const replyCountInc = numberValue(data.reply_count_inc)
+        if (message !== undefined) msg.content = message
+        if (isPinned !== undefined) msg.isPinned = isPinned
+        if (replyCount !== undefined) msg.threadCount = replyCount
         if (data.edited_at !== undefined || data.edit_at !== undefined) {
           msg.editedAt = toOptionalIsoTimestamp(data.edited_at ?? data.edit_at)
         }
-        if (data.reply_count_inc) {
-          msg.threadCount = (msg.threadCount || 0) + data.reply_count_inc
+        if (replyCountInc) {
+          msg.threadCount = (msg.threadCount || 0) + replyCountInc
         }
       }
     }
@@ -598,13 +615,15 @@ export const useMessageStore = defineStore('messageStore', () => {
       const replies = repliesByThread.value[rootId]
       if (!replies) continue
 
-      const index = replies.findIndex(m => m.id === data.id)
+      const index = replies.findIndex(m => m.id === id)
       if (index !== -1) {
         const msg = replies[index]
         if (!msg) continue
 
-        if (data.message !== undefined) msg.content = data.message
-        if (data.is_pinned !== undefined) msg.isPinned = data.is_pinned
+        const message = stringValue(data.message)
+        const isPinned = booleanValue(data.is_pinned)
+        if (message !== undefined) msg.content = message
+        if (isPinned !== undefined) msg.isPinned = isPinned
         if (data.edited_at !== undefined || data.edit_at !== undefined) {
           msg.editedAt = toOptionalIsoTimestamp(data.edited_at ?? data.edit_at)
         }
@@ -637,18 +656,23 @@ export const useMessageStore = defineStore('messageStore', () => {
   }
 
   function handleReactionAdded(data: Record<string, unknown>) {
-    const reactionKey = getReactionEmojiKey(data.emoji_name)
-    const apiKey = getPreferredEmojiName(data.emoji_name)
+    const postId = stringValue(data.post_id)
+    const userId = stringValue(data.user_id)
+    if (!postId || !userId) return
+
+    const emojiName = stringValue(data.emoji_name) ?? ''
+    const reactionKey = getReactionEmojiKey(emojiName)
+    const apiKey = getPreferredEmojiName(emojiName)
 
     visitLoadedMessages((message) => {
-      if (message.id !== data.post_id) {
+      if (message.id !== postId) {
         return
       }
 
       const existingReaction = message.reactions.find((reaction) => reaction.emoji === reactionKey)
       if (existingReaction) {
-        if (!existingReaction.users.includes(data.user_id)) {
-          existingReaction.users.push(data.user_id)
+        if (!existingReaction.users.includes(userId)) {
+          existingReaction.users.push(userId)
         }
         existingReaction.count = existingReaction.users.length || existingReaction.count + 1
         existingReaction.apiKey = existingReaction.apiKey || apiKey
@@ -657,17 +681,22 @@ export const useMessageStore = defineStore('messageStore', () => {
           emoji: reactionKey,
           apiKey,
           count: 1,
-          users: [data.user_id],
+          users: [userId],
         })
       }
     })
   }
 
   function handleReactionRemoved(data: Record<string, unknown>) {
-    const reactionKey = getReactionEmojiKey(data.emoji_name)
+    const postId = stringValue(data.post_id)
+    const userId = stringValue(data.user_id)
+    if (!postId || !userId) return
+
+    const emojiName = stringValue(data.emoji_name) ?? ''
+    const reactionKey = getReactionEmojiKey(emojiName)
 
     visitLoadedMessages((message) => {
-      if (message.id !== data.post_id) {
+      if (message.id !== postId) {
         return
       }
 
@@ -681,7 +710,7 @@ export const useMessageStore = defineStore('messageStore', () => {
         return
       }
 
-      const userIndex = reaction.users.indexOf(data.user_id)
+      const userIndex = reaction.users.indexOf(userId)
       if (userIndex !== -1) {
         reaction.users.splice(userIndex, 1)
       }
@@ -822,6 +851,10 @@ export const useMessageStore = defineStore('messageStore', () => {
     loading.value = value
   }
 
+  function setLoadingOlder(value: boolean) {
+    isLoadingOlder.value = value
+  }
+
   function setHasMoreOlder(channelId: string, value: boolean) {
     hasMoreOlderByChannel.value[channelId] = value
   }
@@ -838,6 +871,18 @@ export const useMessageStore = defineStore('messageStore', () => {
     delete messagesByChannel.value[channelId]
     delete hasMoreOlderByChannel.value[channelId]
     messagesCache.delete(channelId)
+  }
+
+  function updateMessage(message: Message) {
+    patchMessage(message.id, message)
+  }
+
+  function findMessageByClientId(channelId: string, clientId: string) {
+    return messagesByChannel.value[channelId]?.find(m => m.clientMsgId === clientId)
+  }
+
+  function getMessageById(channelId: string, messageId: string) {
+    return messagesByChannel.value[channelId]?.find(m => m.id === messageId)
   }
 
   return {
@@ -889,9 +934,13 @@ export const useMessageStore = defineStore('messageStore', () => {
     removeReaction,
     addOptimisticReaction,
     setLoading,
+    setLoadingOlder,
     setHasMoreOlder,
     setError,
     clearError,
-    clearChannel
+    clearChannel,
+    updateMessage,
+    findMessageByClientId,
+    getMessageById
   }
 })

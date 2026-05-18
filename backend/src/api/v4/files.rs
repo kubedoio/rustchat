@@ -80,6 +80,15 @@ async fn upload_file(
         head: Vec<u8>,
     }
 
+    impl Drop for PendingFile {
+        fn drop(&mut self) {
+            // Delete temp file when PendingFile is dropped, unless it was already moved
+            if self.temp_path.exists() {
+                let _ = std::fs::remove_file(&self.temp_path);
+            }
+        }
+    }
+
     let mut pending_files: Vec<PendingFile> = Vec::new();
 
     while let Some(mut field) = multipart

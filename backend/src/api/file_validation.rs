@@ -38,32 +38,29 @@ pub fn validate_file_upload(filename: &str, data: &[u8]) -> Result<(String, Stri
     let actual_mime = detect_mime_from_bytes(data);
 
     match ext.as_str() {
-        "png" | "jpg" | "jpeg" | "gif" | "webp" => {
-            if actual_mime.as_deref() != Some(expected_mime) {
-                return Err(AppError::BadRequest(format!(
-                    "File content does not match extension '.{}'. Expected {}, got {}",
-                    ext,
-                    expected_mime,
-                    actual_mime.as_deref().unwrap_or("unknown")
-                )));
-            }
+        "png" | "jpg" | "jpeg" | "gif" | "webp"
+            if actual_mime.as_deref() != Some(expected_mime) =>
+        {
+            Err(AppError::BadRequest(format!(
+                "File content does not match extension '.{}'. Expected {}, got {}",
+                ext,
+                expected_mime,
+                actual_mime.as_deref().unwrap_or("unknown")
+            )))
         }
-        "pdf" => {
-            if actual_mime.as_deref() != Some("application/pdf") {
-                return Err(AppError::BadRequest(
-                    "File content does not match declared PDF extension".to_string(),
-                ));
-            }
+        "pdf" if actual_mime.as_deref() != Some("application/pdf") => {
+            Err(AppError::BadRequest(
+                "File content does not match declared PDF extension".to_string(),
+            ))
         }
-        "zip" => {
-            if actual_mime.as_deref() != Some("application/zip") {
-                return Err(AppError::BadRequest(
-                    "File content does not match declared ZIP extension".to_string(),
-                ));
-            }
+        "zip" if actual_mime.as_deref() != Some("application/zip") => {
+            Err(AppError::BadRequest(
+                "File content does not match declared ZIP extension".to_string(),
+            ))
         }
         "svg" => {
             validate_svg(data)?;
+            Ok(())
         }
         "txt" | "md" => {
             if std::str::from_utf8(data).is_err() {
@@ -77,9 +74,10 @@ pub fn validate_file_upload(filename: &str, data: &[u8]) -> Result<(String, Stri
                     "File content does not match declared text extension".to_string(),
                 ));
             }
+            Ok(())
         }
-        _ => {}
-    }
+        _ => Ok(()),
+    }?;
 
     Ok((expected_mime.to_string(), ext))
 }
@@ -200,32 +198,28 @@ pub fn validate_file_upload_head(
     let actual_mime = detect_mime_from_bytes(head);
 
     match ext.as_str() {
-        "png" | "jpg" | "jpeg" | "gif" | "webp" => {
-            if actual_mime.as_deref() != Some(expected_mime) {
-                return Err(AppError::BadRequest(format!(
-                    "File content does not match extension '.{}'. Expected {}, got {}",
-                    ext,
-                    expected_mime,
-                    actual_mime.as_deref().unwrap_or("unknown")
-                )));
-            }
+        "png" | "jpg" | "jpeg" | "gif" | "webp"
+            if actual_mime.as_deref() != Some(expected_mime) =>
+        {
+            Err(AppError::BadRequest(format!(
+                "File content does not match extension '.{}'. Expected {}, got {}",
+                ext,
+                expected_mime,
+                actual_mime.as_deref().unwrap_or("unknown")
+            )))
         }
-        "pdf" => {
-            if actual_mime.as_deref() != Some("application/pdf") {
-                return Err(AppError::BadRequest(
-                    "File content does not match declared PDF extension".to_string(),
-                ));
-            }
+        "pdf" if actual_mime.as_deref() != Some("application/pdf") => {
+            Err(AppError::BadRequest(
+                "File content does not match declared PDF extension".to_string(),
+            ))
         }
-        "zip" => {
-            if actual_mime.as_deref() != Some("application/zip") {
-                return Err(AppError::BadRequest(
-                    "File content does not match declared ZIP extension".to_string(),
-                ));
-            }
+        "zip" if actual_mime.as_deref() != Some("application/zip") => {
+            Err(AppError::BadRequest(
+                "File content does not match declared ZIP extension".to_string(),
+            ))
         }
-        _ => {}
-    }
+        _ => Ok(()),
+    }?;
 
     Ok((expected_mime.to_string(), ext))
 }

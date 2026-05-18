@@ -25,6 +25,9 @@ export const useCallStore = defineStore('callStore', () => {
   const isMuted = ref(true)
   const isHandRaised = ref(false)
   const isScreenSharing = ref(false)
+  const preferredAudioInput = ref('')
+  const preferredAudioOutput = ref('')
+  const preferredVideoDevice = ref('')
   const speakingParticipants = ref<Set<SessionId>>(new Set())
 
   // Getters
@@ -42,6 +45,8 @@ export const useCallStore = defineStore('callStore', () => {
   const remoteStreams = computed(() => {
     return currentCall.value?.remoteStreams ?? new Map()
   })
+
+  const currentChannelCall = computed(() => currentCall.value?.call ?? null)
 
   function getActiveCall(channelId: ChannelId): CallState | undefined {
     return activeCalls.value.get(channelId)
@@ -139,6 +144,24 @@ export const useCallStore = defineStore('callStore', () => {
     isScreenSharing.value = value
   }
 
+  function setPreferredAudioInput(value: string) {
+    preferredAudioInput.value = value
+  }
+
+  function setPreferredAudioOutput(value: string) {
+    preferredAudioOutput.value = value
+  }
+
+  function setPreferredVideoDevice(value: string) {
+    preferredVideoDevice.value = value
+  }
+
+  function resetSessionState() {
+    clearCurrentCall()
+    activeCalls.value.clear()
+    incomingCall.value = null
+  }
+
   // WebRTC state mutations
   function setPeerConnection(pc: RTCPeerConnection) {
     if (!currentCall.value) return
@@ -198,6 +221,9 @@ export const useCallStore = defineStore('callStore', () => {
     isMuted: readonly(isMuted),
     isHandRaised: readonly(isHandRaised),
     isScreenSharing: readonly(isScreenSharing),
+    preferredAudioInput,
+    preferredAudioOutput,
+    preferredVideoDevice,
     speakingParticipants: readonly(speakingParticipants),
 
     // Getters
@@ -205,6 +231,7 @@ export const useCallStore = defineStore('callStore', () => {
     currentUserId,
     currentCallParticipants,
     remoteStreams,
+    currentChannelCall,
 
     // Actions
     getActiveCall,
@@ -223,6 +250,10 @@ export const useCallStore = defineStore('callStore', () => {
     setIsMuted,
     setIsHandRaised,
     setIsScreenSharing,
+    setPreferredAudioInput,
+    setPreferredAudioOutput,
+    setPreferredVideoDevice,
+    resetSessionState,
     setPeerConnection,
     setLocalStream,
     setScreenStream,
@@ -235,3 +266,5 @@ export const useCallStore = defineStore('callStore', () => {
     clearSpeakingParticipants
   }
 })
+
+export const useCallsStore: any = useCallStore

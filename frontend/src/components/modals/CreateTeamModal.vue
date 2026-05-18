@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { X } from 'lucide-vue-next';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
 import { useAuthStore } from '../../features/auth/stores/authStore';
 import { canCreateTeam as canCreateTeamForRole } from '../../features/permissions/capabilities';
 import BaseButton from '../atomic/BaseButton.vue';

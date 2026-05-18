@@ -37,7 +37,7 @@ vi.mock('../../features/calls/stores/callStore', () => ({
     useCallsStore: () => callsStore,
 }))
 
-vi.mock('../../features/channels/stores/channelStore', () => ({
+vi.mock('@/features/channels/stores/channelStore', () => ({
     useChannelStore: () => channelStore,
 }))
 

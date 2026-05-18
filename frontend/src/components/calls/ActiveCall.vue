@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useCallsStore } from '../../features/calls/stores/callStore'
 import { useAuthStore } from '../../features/auth/stores/authStore'
-import { useChannelStore } from '../../features/channels/stores/channelStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { computed, ref, watchEffect } from 'vue'
 import { 
     Maximize2, 
@@ -27,7 +27,7 @@ const isExpanded = computed(() => callsStore.isExpanded)
 const isMuted = computed(() => callsStore.isMuted)
 const isHandRaised = computed(() => callsStore.isHandRaised)
 const isScreenSharing = computed(() => callsStore.isScreenSharing)
-const participants = computed(() => callsStore.currentCallParticipants)
+const participants = computed<any[]>(() => callsStore.currentCallParticipants)
 
 const showParticipants = ref(false)
 const showMenu = ref(false)
@@ -43,7 +43,7 @@ const screenShareStream = computed(() => {
     if (activeCall.value.screenStream) return activeCall.value.screenStream
     
     // Prefer the stream that matches the call state's screen sharing session.
-    const remoteStreams = Array.from(activeCall.value.remoteStreams.values())
+    const remoteStreams = Array.from(activeCall.value.remoteStreams.values()) as MediaStream[]
     const screenSessionId = activeCall.value.call.screen_sharing_session_id
     if (screenSessionId) {
         const matched = remoteStreams.find((stream) => {
@@ -120,8 +120,9 @@ const handleHostRemove = (sessionId: string) => {
     participantMenuOpen.value = null
 }
 
-const formatDuration = (startAt: number) => {
-    const elapsed = Math.floor((Date.now() - startAt) / 1000)
+const formatDuration = (startAt: number | string | Date) => {
+    const startTime = startAt instanceof Date ? startAt.getTime() : new Date(startAt).getTime()
+    const elapsed = Math.floor((Date.now() - startTime) / 1000)
     const minutes = Math.floor(elapsed / 60)
     const seconds = elapsed % 60
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
@@ -251,7 +252,7 @@ const formatDuration = (startAt: number) => {
                              ? 'ring-2 ring-success bg-success/20 z-20' 
                              : 'bg-brand/20'
                      ]"
-                     :style="{ marginLeft: idx > 0 ? '-0.5rem' : '0', zIndex: speakingParticipants.has(participant.session_id) ? 30 : (10 - idx) }">
+                     :style="{ marginLeft: Number(idx) > 0 ? '-0.5rem' : '0', zIndex: speakingParticipants.has(participant.session_id) ? 30 : (10 - Number(idx)) }">
                     <span class="text-brand text-xs font-medium">
                         {{ participant.user_id.slice(0, 2).toUpperCase() }}
                     </span>

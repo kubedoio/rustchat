@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { X } from 'lucide-vue-next';
 import { useUIStore } from '../../features/ui/stores/uiStore';
-import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useChannelStore } from '@/features/channels/stores/channelStore';
 import ThreadPanel from '../channel/ThreadPanel.vue';
 import SearchPanel from '../channel/SearchPanel.vue';
 import ChannelMembersPanel from '../channel/ChannelMembersPanel.vue';

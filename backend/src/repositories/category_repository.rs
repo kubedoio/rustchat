@@ -161,6 +161,7 @@ impl<'a> CategoryRepository<'a> {
     }
 
     /// Update category fields (pool version).
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_fields(
         &self,
         category_id: Uuid,
@@ -189,6 +190,7 @@ impl<'a> CategoryRepository<'a> {
     }
 
     /// Update category fields inside a transaction.
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_fields_in_tx(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -218,6 +220,7 @@ impl<'a> CategoryRepository<'a> {
     }
 
     /// Update category with COALESCE semantics, returning the row.
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_returning(
         &self,
         category_id: Uuid,

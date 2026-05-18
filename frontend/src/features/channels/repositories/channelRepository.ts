@@ -230,6 +230,7 @@ function normalizeChannel(raw: unknown): Channel {
 
 function normalizeChannelMember(raw: unknown): ChannelMember {
   const r = raw as Record<string, unknown>
+  const notifyProps = (r.notify_props as Record<string, unknown> | undefined) ?? {}
   return {
     channelId: r.channel_id as ChannelId,
     userId: r.user_id as UserId,
@@ -237,9 +238,19 @@ function normalizeChannelMember(raw: unknown): ChannelMember {
     joinedAt: new Date(r.joined_at as string | number),
     lastViewedAt: r.last_viewed_at ? new Date(r.last_viewed_at as string | number) : undefined,
     notifyProps: {
-      desktop: ((r.notify_props as Record<string, unknown> | undefined)?.desktop as string) || 'default',
-      mobile: ((r.notify_props as Record<string, unknown> | undefined)?.mobile as string) || 'default',
-      markUnread: ((r.notify_props as Record<string, unknown> | undefined)?.mark_unread as string) || 'all'
+      desktop: normalizeNotifySetting(notifyProps.desktop, 'default'),
+      mobile: normalizeNotifySetting(notifyProps.mobile, 'default'),
+      markUnread: normalizeMarkUnread(notifyProps.mark_unread)
     }
   }
+}
+
+function normalizeNotifySetting(value: unknown, fallback: 'default'): 'default' | 'all' | 'mention' | 'none' {
+  return value === 'all' || value === 'mention' || value === 'none' || value === 'default'
+    ? value
+    : fallback
+}
+
+function normalizeMarkUnread(value: unknown): 'all' | 'mention' {
+  return value === 'mention' ? 'mention' : 'all'
 }

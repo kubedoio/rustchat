@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useUnreadStore } from '../../features/unreads/stores/unreadStore';
-import { useChannelStore } from '../../features/channels/stores/channelStore';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore';
+import { useChannelStore } from '@/features/channels/stores/channelStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
 import { Hash, ArrowRight, BellOff } from 'lucide-vue-next';
 
 const unreadStore = useUnreadStore();

@@ -402,17 +402,17 @@ export const useThemeStore = defineStore('themeStore', () => {
         }
     }
 
-    function setTheme(newTheme: Theme | 'system' | 'light' | 'dark') {
+    function setTheme(newTheme: Theme | 'system' | 'light' | 'dark', persist = true) {
         const normalized = newTheme === 'system' ? normalizeTheme('system') : normalizeTheme(newTheme)
         theme.value = normalized
         if (typeof window !== 'undefined') {
             localStorage.setItem(STORAGE_THEME, normalized)
         }
         applyTheme()
-        void persistToServer()
+        if (persist) void persistToServer()
     }
 
-    function setFont(newFont: ChatFont) {
+    function setFont(newFont: ChatFont, persist = true) {
         if (!isChatFont(newFont)) {
             return
         }
@@ -422,10 +422,10 @@ export const useThemeStore = defineStore('themeStore', () => {
             localStorage.setItem(STORAGE_FONT, newFont)
         }
         applyTypography()
-        void persistToServer()
+        if (persist) void persistToServer()
     }
 
-    function setFontSize(newSize: ChatFontSize) {
+    function setFontSize(newSize: ChatFontSize, persist = true) {
         if (!FONT_SIZE_OPTIONS.includes(newSize)) {
             return
         }
@@ -435,7 +435,7 @@ export const useThemeStore = defineStore('themeStore', () => {
             localStorage.setItem(STORAGE_FONT_SIZE, String(newSize))
         }
         applyTypography()
-        void persistToServer()
+        if (persist) void persistToServer()
     }
 
     // Legacy aliases

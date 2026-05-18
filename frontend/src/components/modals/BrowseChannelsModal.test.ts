@@ -33,11 +33,11 @@ const toast = {
     error: vi.fn(),
 }
 
-vi.mock('../../stores/channels', () => ({
+vi.mock('@/features/channels/stores/channelStore', () => ({
     useChannelStore: () => channelStore,
 }))
 
-vi.mock('../../stores/teams', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
     useTeamStore: () => teamStore,
 }))
 

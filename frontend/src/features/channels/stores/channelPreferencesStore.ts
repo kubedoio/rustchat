@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { preferencesApi, type Preference } from '../api/preferences'
-import { channelsApi, type ChannelNotifyProps } from '../api/channels'
-import { useAuthStore } from './auth'
+import { preferencesApi, type Preference } from '../../../api/preferences'
+import { channelsApi, type ChannelNotifyProps } from '../../../api/channels'
+import { useAuthStore } from '../../../stores/auth'
 
 export const useChannelPreferencesStore = defineStore('channelPreferences', () => {
     const favoriteChannels = ref<Set<string>>(new Set())

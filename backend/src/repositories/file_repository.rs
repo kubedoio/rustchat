@@ -64,6 +64,7 @@ impl<'a> FileRepository<'a> {
     }
 
     /// Create a file record with minimal metadata (used by api/files upload).
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_simple(
         &self,
         file_id: Uuid,

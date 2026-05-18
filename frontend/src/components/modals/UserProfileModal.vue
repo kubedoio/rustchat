@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { X, Mail, MessageCircle, Briefcase } from 'lucide-vue-next';
 import RcAvatar from '../ui/RcAvatar.vue';
 import BaseButton from '../atomic/BaseButton.vue';
-import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useChannelStore } from '@/features/channels/stores/channelStore';
 import { useRouter } from 'vue-router';
 import client from '../../api/client';
 import { getPresencePresentation } from '../../features/presence/presencePresentation';

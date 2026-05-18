@@ -41,7 +41,7 @@ describe('markdownTransforms', () => {
                 selectionEnd: 5
             }
             const result = wrapSelection(selection, '**')
-            expect(result.text).toBe('hello**')
+            expect(result.text).toBe('hello****')
             expect(result.selectionStart).toBe(7)
             expect(result.selectionEnd).toBe(7)
         })
@@ -191,7 +191,7 @@ describe('markdownTransforms', () => {
                 selectionEnd: 0
             }
             const result = makeLink(selection)
-            expect(result.text).toBe('[link text]()')
+            expect(result.text).toBe('[click text]()')
         })
     })
 

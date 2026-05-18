@@ -44,8 +44,8 @@ class UnreadService {
         this.store.setChannelUnread(channelId, 0)
         this.store.setChannelMentions(channelId, 0)
         this.store.setReadState(channelId, {
-          lastReadMessageId: null,
-          firstUnreadMessageId: null
+          last_read_message_id: null,
+          first_unread_message_id: null
         })
       }
       // If targetSeq is provided, it's "mark as unread from here"
@@ -104,7 +104,10 @@ class UnreadService {
 
   // Set read state for "new messages" line
   setReadState(channelId: ChannelId, state: ReadState): void {
-    this.store.setReadState(channelId, state)
+    this.store.setReadState(channelId, {
+      last_read_message_id: state.lastReadMessageId ?? null,
+      first_unread_message_id: state.firstUnreadMessageId ?? null,
+    })
   }
 
   // Private: Recalculate team unread total

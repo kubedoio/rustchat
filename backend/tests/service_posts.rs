@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 #![allow(clippy::needless_borrows_for_generic_args)]
 use std::time::{Duration, Instant};
 

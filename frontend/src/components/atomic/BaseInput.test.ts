@@ -70,7 +70,7 @@ describe('BaseInput', () => {
     it('generates a fallback id when id prop is omitted', async () => {
         const BaseInput = (await import('./BaseInput.vue')).default
         const wrapper = mount(BaseInput, {
-            props: { modelValue: '', label: 'Name' },
+            props: { modelValue: '', label: 'Name', error: 'Invalid' },
         })
         const inputId = wrapper.find('input').attributes('id')
         expect(inputId).toBeTruthy()

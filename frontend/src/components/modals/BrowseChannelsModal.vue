@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { X, Hash, ArrowRight } from 'lucide-vue-next';
-import { useChannelStore } from '../../features/channels/stores/channelStore';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useChannelStore } from '@/features/channels/stores/channelStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
 import { useToast } from '../../composables/useToast';
 
 const props = defineProps<{

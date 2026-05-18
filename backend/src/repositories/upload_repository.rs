@@ -24,6 +24,7 @@ impl<'a> UploadRepository<'a> {
     }
 
     /// Create a new upload session.
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_session(
         &self,
         id: Uuid,
@@ -112,6 +113,7 @@ impl<'a> UploadRepository<'a> {
     }
 
     /// Create a file record.
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_file(
         &self,
         id: Uuid,

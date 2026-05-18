@@ -16,7 +16,7 @@ vi.mock('../../features/presence', () => ({
     usePresenceStore: () => presenceStore,
 }))
 
-vi.mock('../../features/teams/stores/teamStore', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
     useTeamStore: () => teamStore,
 }))
 

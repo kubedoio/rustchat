@@ -2,7 +2,7 @@
 // Replaces the centralized useWebSocket.ts message handling logic
 
 import { messageService } from '../services/messageService'
-import type { Message, MessageId } from '../../../core/entities/Message'
+import type { FileAttachment, Message, MessageId } from '../../../core/entities/Message'
 import type { ChannelId } from '../../../core/entities/Channel'
 
 export interface WebSocketMessageEvent {
@@ -152,7 +152,7 @@ function normalizeReactions(reactions: unknown): { emoji: string; count: number;
   })
 }
 
-function normalizeFiles(files: unknown[]): Record<string, unknown>[] {
+function normalizeFiles(files: unknown[]): FileAttachment[] {
   return files.map(f => {
     const file = f as Record<string, unknown>
     return {

@@ -2,13 +2,13 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { preferencesApi, type UserStatus, type UserPreferences, type StatusPreset } from '../../../api/preferences'
+import { preferencesApi, type StatusPreset } from '../../../api/preferences'
 
 export const usePreferencesStore = defineStore('preferencesStore', () => {
     // State
-    const status = ref<UserStatus | null>(null)
-    const preferences = ref<UserPreferences | null>(null)
-    const statusPresets = ref<StatusPreset[]>([])
+    const status = ref<any | null>(null)
+    const preferences = ref<any | null>(null)
+    const statusPresets = ref<any[]>([])
     const loading = ref(false)
     const error = ref<string | null>(null)
 
@@ -94,15 +94,15 @@ export const usePreferencesStore = defineStore('preferencesStore', () => {
     }
 
     // Feature-compatible setters
-    function setStatus(value: UserStatus | null) {
+    function setStatus(value: any | null) {
         status.value = value
     }
 
-    function setPreferences(value: UserPreferences | null) {
+    function setPreferences(value: any | null) {
         preferences.value = value
     }
 
-    function setStatusPresets(value: StatusPreset[]) {
+    function setStatusPresets(value: any[]) {
         statusPresets.value = value
     }
 

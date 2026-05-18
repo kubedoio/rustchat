@@ -2,9 +2,9 @@
 import { ref, watch } from 'vue'
 import { X, Pin, ExternalLink } from 'lucide-vue-next'
 import { format } from 'date-fns'
-import type { Message } from '../../features/messages/stores/messageStore'
-import { useMessageStore } from '../../features/messages/stores/messageStore'
-import { useChannelStore } from '../../features/channels/stores/channelStore'
+import type { Message } from '@/features/messages/stores/messageStore'
+import { useMessageStore } from '@/features/messages/stores/messageStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
 
 const props = defineProps<{
     show: boolean

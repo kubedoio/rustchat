@@ -106,6 +106,7 @@ impl<'a> BookmarkRepository<'a> {
     }
 
     /// Update a bookmark with COALESCE semantics.
+    #[allow(clippy::too_many_arguments)]
     pub async fn update(
         &self,
         bookmark_id: Uuid,

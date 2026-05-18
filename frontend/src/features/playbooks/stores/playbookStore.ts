@@ -3,7 +3,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { playbooksApi, type Playbook, type PlaybookFull, type PlaybookRun, type RunWithTasks } from '../../../api/playbooks'
-import { useTeamStore } from '../../teams/stores/teamStore'
+import { useTeamStore } from '@/features/teams/stores/teamStore'
 
 export const usePlaybookStore = defineStore('playbookStore', () => {
     const playbooks = ref<Playbook[]>([])
@@ -40,7 +40,7 @@ export const usePlaybookStore = defineStore('playbookStore', () => {
     async function createPlaybook(data: Record<string, unknown>) {
         if (!teamStore.currentTeamId) return
         try {
-            const response = await playbooksApi.create(teamStore.currentTeamId, data)
+            const response = await playbooksApi.create(teamStore.currentTeamId, data as any)
             playbooks.value.push(response.data)
             return response.data
         } catch (e) {

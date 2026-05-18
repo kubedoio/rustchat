@@ -1067,6 +1067,7 @@ impl<'a> AdminRepository<'a> {
     }
 
     /// Create a new email template version (auto-increments version number)
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_email_template_version(
         &self,
         family_id: Uuid,
