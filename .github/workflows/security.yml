@@ -69,19 +69,6 @@ jobs:
         working-directory: ./backend
         run: cargo build --all-targets --all-features
 
-      - name: Setup Node.js
-        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
-        with:
-          node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Build frontend
-        working-directory: ./frontend
-        run: |
-          npm ci --ignore-scripts
-          npm run build
-
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@45775bd8235c68ba998cffa5171334d58593da47 # v3.28.15
 
