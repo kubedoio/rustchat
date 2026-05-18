@@ -12,6 +12,7 @@ import type { TeamId } from '../../../core/entities/Team'
 import type { UserId } from '../../../core/entities/User'
 import { withRetry } from '../../../core/services/retry'
 import type { SidebarCategory } from '../../../api/channels'
+import { isNotFoundError } from '../../../core/errors/errorUtils'
 
 export interface CreateChannelRequest {
   teamId: TeamId
@@ -59,8 +60,8 @@ export const channelRepository = {
       try {
         const response = await channelsApi.get(channelId)
         return normalizeChannel(response.data)
-      } catch (error: any) {
-        if (error?.response?.status === 404) {
+      } catch (error: unknown) {
+        if (isNotFoundError(error)) {
           return null
         }
         throw error
@@ -159,8 +160,8 @@ export const channelRepository = {
       try {
         const response = await channelsApi.getMember(channelId, userId)
         return normalizeChannelMember(response.data)
-      } catch (error: any) {
-        if (error?.response?.status === 404) {
+      } catch (error: unknown) {
+        if (isNotFoundError(error)) {
           return null
         }
         throw error
@@ -209,34 +210,36 @@ export const channelRepository = {
 }
 
 // Normalize API Channel to domain entity
-function normalizeChannel(raw: any): Channel {
+function normalizeChannel(raw: unknown): Channel {
+  const r = raw as Record<string, unknown>
   return {
-    id: raw.id as ChannelId,
-    teamId: raw.team_id,
-    name: raw.name,
-    displayName: raw.display_name,
-    type: raw.type || raw.channel_type, // Support both field names (backend now sends 'type')
-    purpose: raw.purpose,
-    header: raw.header,
-    creatorId: raw.creator_id as UserId,
-    createdAt: new Date(raw.created_at),
-    updatedAt: new Date(raw.updated_at || raw.created_at),
-    isArchived: raw.is_archived || false,
-    memberCount: raw.member_count
+    id: r.id as ChannelId,
+    teamId: r.team_id as string,
+    name: r.name as string,
+    displayName: r.display_name as string,
+    type: (r.type || r.channel_type) as Channel['type'], // Support both field names (backend now sends 'type')
+    purpose: r.purpose as string | undefined,
+    header: r.header as string | undefined,
+    creatorId: r.creator_id as UserId,
+    createdAt: new Date(r.created_at as string | number),
+    updatedAt: new Date((r.updated_at || r.created_at) as string | number),
+    isArchived: Boolean(r.is_archived),
+    memberCount: r.member_count as number | undefined
   }
 }
 
-function normalizeChannelMember(raw: any): ChannelMember {
+function normalizeChannelMember(raw: unknown): ChannelMember {
+  const r = raw as Record<string, unknown>
   return {
-    channelId: raw.channel_id as ChannelId,
-    userId: raw.user_id as UserId,
-    roles: raw.roles || [],
-    joinedAt: new Date(raw.joined_at),
-    lastViewedAt: raw.last_viewed_at ? new Date(raw.last_viewed_at) : undefined,
+    channelId: r.channel_id as ChannelId,
+    userId: r.user_id as UserId,
+    roles: (r.roles as string[] | undefined) || [],
+    joinedAt: new Date(r.joined_at as string | number),
+    lastViewedAt: r.last_viewed_at ? new Date(r.last_viewed_at as string | number) : undefined,
     notifyProps: {
-      desktop: raw.notify_props?.desktop || 'default',
-      mobile: raw.notify_props?.mobile || 'default',
-      markUnread: raw.notify_props?.mark_unread || 'all'
+      desktop: ((r.notify_props as Record<string, unknown> | undefined)?.desktop as string) || 'default',
+      mobile: ((r.notify_props as Record<string, unknown> | undefined)?.mobile as string) || 'default',
+      markUnread: ((r.notify_props as Record<string, unknown> | undefined)?.mark_unread as string) || 'all'
     }
   }
 }

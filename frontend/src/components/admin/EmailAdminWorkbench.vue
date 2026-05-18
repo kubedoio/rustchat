@@ -97,7 +97,7 @@ watch(selectedFamilyId, async (id) => {
     try {
         const { data } = await adminEmailApi.listTemplateVersions(id)
         templateVersions.value = data
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to load template versions'), 'error')
     }
 })
@@ -126,7 +126,7 @@ async function refreshAll() {
         }
 
         await Promise.all([loadOutbox(), loadEvents()])
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to load email admin data'), 'error')
     } finally {
         loading.value = false
@@ -156,7 +156,7 @@ async function deleteProvider(id: string) {
         await adminEmailApi.deleteProvider(id)
         providers.value = providers.value.filter(p => p.id !== id)
         setMessage('Provider deleted')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to delete provider'), 'error')
     }
 }
@@ -166,7 +166,7 @@ async function setDefaultProvider(id: string) {
         const { data } = await adminEmailApi.setDefaultProvider(id)
         providers.value = providers.value.map(p => ({ ...p, is_default: p.id === data.id }))
         setMessage('Default provider updated')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to set default provider'), 'error')
     }
 }
@@ -185,7 +185,7 @@ async function testProvider(id: string) {
                 ? `Success (${data.stage || 'sent'})`
                 : `Failed (${data.stage || 'error'}): ${data.error || 'Unknown error'}`,
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         providerTestStatus.value = { ...providerTestStatus.value, [id]: extractError(e, 'Provider test failed') }
     }
 }
@@ -227,7 +227,7 @@ async function createOrUpdateFamily() {
             familyForm.value = { key: '', name: '', description: '', workflow_key: '' }
             setMessage('Template family created')
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to save template family'), 'error')
     }
 }
@@ -241,7 +241,7 @@ async function removeFamily(family: EmailTemplateFamily) {
             selectedFamilyId.value = templateFamilies.value[0]?.id || ''
         }
         setMessage('Template family deleted')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to delete template family'), 'error')
     }
 }
@@ -262,7 +262,7 @@ async function createTemplateVersion() {
         templateVersions.value = data
         versionForm.value = { locale: 'en', subject: '', body_text: '', body_html: '' }
         setMessage('Template version created')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to create template version'), 'error')
     }
 }
@@ -275,7 +275,7 @@ async function publishVersion(versionId: string) {
             templateVersions.value = data
         }
         setMessage('Template version published')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to publish template version'), 'error')
     }
 }
@@ -291,7 +291,7 @@ async function saveWorkflow(wf: WorkflowResponse) {
         const idx = workflows.value.findIndex(w => w.id === wf.id)
         if (idx >= 0) workflows.value[idx] = data
         setMessage(`Workflow "${wf.workflow_key}" updated`)
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to update workflow'), 'error')
         await refreshAll()
     }
@@ -301,7 +301,7 @@ async function refreshOutbox() {
     try {
         await loadOutbox()
         setMessage('Outbox refreshed')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to load outbox'), 'error')
     }
 }
@@ -310,7 +310,7 @@ async function viewOutboxDetails(id: string) {
     try {
         const { data } = await adminEmailApi.getOutboxEntry(id)
         selectedOutbox.value = data
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to load outbox entry'), 'error')
     }
 }
@@ -320,7 +320,7 @@ async function cancelOutbox(id: string) {
         await adminEmailApi.cancelOutboxEntry(id)
         await loadOutbox()
         setMessage('Outbox entry cancelled')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Cannot cancel outbox entry'), 'error')
     }
 }
@@ -330,7 +330,7 @@ async function retryOutbox(id: string) {
         await adminEmailApi.retryOutboxEntry(id)
         await loadOutbox()
         setMessage('Outbox entry queued for retry')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Cannot retry outbox entry'), 'error')
     }
 }
@@ -339,7 +339,7 @@ async function refreshEvents() {
     try {
         await loadEvents()
         setMessage('Email events refreshed')
-    } catch (e: any) {
+    } catch (e: unknown) {
         setMessage(extractError(e, 'Failed to load email events'), 'error')
     }
 }

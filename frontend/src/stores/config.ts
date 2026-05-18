@@ -85,7 +85,7 @@ export const useConfigStore = defineStore('config', () => {
     function initSync() {
         const { onEvent } = useWebSocket()
 
-        onEvent('config_updated', (data: any) => {
+        onEvent('config_updated', (data: Record<string, unknown>) => {
             if (data.category === 'site') {
                 siteConfig.value = {
                     ...siteConfig.value,

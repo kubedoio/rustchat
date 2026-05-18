@@ -9,7 +9,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
-use crate::api::v4::calls_plugin::state::{CallState, Participant};
+use crate::calls::state::{CallState, Participant};
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
@@ -20,6 +20,7 @@ use crate::models::{
     CreateSlashCommand, ExecuteCommand, IncomingWebhook, OutgoingWebhook, OutgoingWebhookPayload,
     SlashCommand, WebhookPayload,
 };
+use crate::repositories::{ChannelRepository, IntegrationRepository, UserRepository};
 use crate::services::webhooks::is_valid_callback_url;
 use chrono::Utc;
 use std::time::Duration;
@@ -97,14 +98,10 @@ pub struct TeamQuery {
 
 /// Verify the user is a member of the specified team.
 async fn ensure_team_member(state: &AppState, team_id: Uuid, user_id: Uuid) -> ApiResult<()> {
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2)",
-    )
-    .bind(team_id)
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
-    if !is_member {
+    if !ChannelRepository::new(&state.db)
+        .is_team_member(team_id, user_id)
+        .await?
+    {
         return Err(AppError::Forbidden("Not a member of this team".to_string()));
     }
     Ok(())
@@ -119,12 +116,9 @@ async fn list_incoming_webhooks(
 ) -> ApiResult<Json<Vec<IncomingWebhook>>> {
     ensure_team_member(&state, query.team_id, auth.user_id).await?;
 
-    let webhooks: Vec<IncomingWebhook> = sqlx::query_as(
-        "SELECT * FROM incoming_webhooks WHERE team_id = $1 ORDER BY created_at DESC",
-    )
-    .bind(query.team_id)
-    .fetch_all(&state.db)
-    .await?;
+    let webhooks = IntegrationRepository::new(&state.db)
+        .list_incoming_webhooks_by_team(query.team_id)
+        .await?;
 
     Ok(Json(webhooks))
 }
@@ -137,21 +131,17 @@ async fn create_incoming_webhook(
 ) -> ApiResult<Json<IncomingWebhook>> {
     let token = generate_token();
 
-    let webhook: IncomingWebhook = sqlx::query_as(
-        r#"
-        INSERT INTO incoming_webhooks (team_id, channel_id, creator_id, display_name, description, token)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
-        "#,
-    )
-    .bind(query.team_id)
-    .bind(input.channel_id)
-    .bind(auth.user_id)
-    .bind(&input.display_name)
-    .bind(&input.description)
-    .bind(&token)
-    .fetch_one(&state.db)
-    .await?;
+    let webhook = IntegrationRepository::new(&state.db)
+        .create_incoming_webhook(
+            query.team_id,
+            input.channel_id,
+            auth.user_id,
+            input.display_name.as_deref(),
+            input.description.as_deref(),
+            &token,
+            true,
+        )
+        .await?;
 
     Ok(Json(webhook))
 }
@@ -161,9 +151,8 @@ async fn get_incoming_webhook(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<IncomingWebhook>> {
-    let webhook: IncomingWebhook = sqlx::query_as("SELECT * FROM incoming_webhooks WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let webhook = IntegrationRepository::new(&state.db)
+        .get_incoming_webhook_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
 
@@ -181,9 +170,8 @@ async fn delete_incoming_webhook(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let webhook: IncomingWebhook = sqlx::query_as("SELECT * FROM incoming_webhooks WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let webhook = IntegrationRepository::new(&state.db)
+        .get_incoming_webhook_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
 
@@ -193,9 +181,8 @@ async fn delete_incoming_webhook(
         ));
     }
 
-    sqlx::query("DELETE FROM incoming_webhooks WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
+    IntegrationRepository::new(&state.db)
+        .delete_incoming_webhook(id)
         .await?;
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
@@ -207,26 +194,20 @@ async fn execute_incoming_webhook(
     Path(token): Path<String>,
     Json(payload): Json<WebhookPayload>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let webhook: IncomingWebhook =
-        sqlx::query_as("SELECT * FROM incoming_webhooks WHERE token = $1 AND is_active = true")
-            .bind(&token)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Unauthorized("Invalid webhook token".to_string()))?;
+    let webhook = IntegrationRepository::new(&state.db)
+        .get_incoming_webhook_by_token(&token)
+        .await?
+        .ok_or_else(|| AppError::Unauthorized("Invalid webhook token".to_string()))?;
 
     // Create a post in the channel
-    sqlx::query(
-        r#"
-        INSERT INTO posts (channel_id, user_id, message, props)
-        VALUES ($1, $2, $3, $4)
-        "#,
-    )
-    .bind(webhook.channel_id)
-    .bind(webhook.creator_id) // Use webhook creator as poster
-    .bind(&payload.text)
-    .bind(&payload.props)
-    .execute(&state.db)
-    .await?;
+    IntegrationRepository::new(&state.db)
+        .create_post_from_webhook(
+            webhook.channel_id,
+            webhook.creator_id,
+            &payload.text,
+            &payload.props,
+        )
+        .await?;
 
     Ok(Json(serde_json::json!({"status": "ok"})))
 }
@@ -240,12 +221,9 @@ async fn list_outgoing_webhooks(
 ) -> ApiResult<Json<Vec<OutgoingWebhook>>> {
     ensure_team_member(&state, query.team_id, auth.user_id).await?;
 
-    let webhooks: Vec<OutgoingWebhook> = sqlx::query_as(
-        "SELECT * FROM outgoing_webhooks WHERE team_id = $1 ORDER BY created_at DESC",
-    )
-    .bind(query.team_id)
-    .fetch_all(&state.db)
-    .await?;
+    let webhooks = IntegrationRepository::new(&state.db)
+        .list_outgoing_webhooks_by_team(query.team_id)
+        .await?;
 
     Ok(Json(webhooks))
 }
@@ -264,25 +242,21 @@ async fn create_outgoing_webhook(
 
     let token = generate_token();
 
-    let webhook: OutgoingWebhook = sqlx::query_as(
-        r#"
-        INSERT INTO outgoing_webhooks 
-        (team_id, channel_id, creator_id, display_name, description, trigger_words, trigger_when, callback_urls, token)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING *
-        "#,
-    )
-    .bind(query.team_id)
-    .bind(input.channel_id)
-    .bind(auth.user_id)
-    .bind(&input.display_name)
-    .bind(&input.description)
-    .bind(&input.trigger_words)
-    .bind(&input.trigger_when)
-    .bind(&input.callback_urls)
-    .bind(&token)
-    .fetch_one(&state.db)
-    .await?;
+    let webhook = IntegrationRepository::new(&state.db)
+        .create_outgoing_webhook(
+            query.team_id,
+            input.channel_id,
+            auth.user_id,
+            input.display_name.as_deref(),
+            input.description.as_deref(),
+            &input.trigger_words,
+            &input.trigger_when,
+            &input.callback_urls,
+            None,
+            &token,
+            true,
+        )
+        .await?;
 
     Ok(Json(webhook))
 }
@@ -292,9 +266,8 @@ async fn get_outgoing_webhook(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<OutgoingWebhook>> {
-    let webhook: OutgoingWebhook = sqlx::query_as("SELECT * FROM outgoing_webhooks WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let webhook = IntegrationRepository::new(&state.db)
+        .get_outgoing_webhook_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
 
@@ -312,9 +285,8 @@ async fn delete_outgoing_webhook(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let webhook: OutgoingWebhook = sqlx::query_as("SELECT * FROM outgoing_webhooks WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let webhook = IntegrationRepository::new(&state.db)
+        .get_outgoing_webhook_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
 
@@ -324,9 +296,8 @@ async fn delete_outgoing_webhook(
         ));
     }
 
-    sqlx::query("DELETE FROM outgoing_webhooks WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
+    IntegrationRepository::new(&state.db)
+        .delete_outgoing_webhook(id)
         .await?;
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
@@ -341,11 +312,9 @@ async fn list_slash_commands(
 ) -> ApiResult<Json<Vec<SlashCommand>>> {
     ensure_team_member(&state, query.team_id, auth.user_id).await?;
 
-    let commands: Vec<SlashCommand> =
-        sqlx::query_as("SELECT * FROM slash_commands WHERE team_id = $1 ORDER BY trigger")
-            .bind(query.team_id)
-            .fetch_all(&state.db)
-            .await?;
+    let commands = IntegrationRepository::new(&state.db)
+        .list_slash_commands_by_team(query.team_id)
+        .await?;
 
     Ok(Json(commands))
 }
@@ -363,25 +332,19 @@ async fn create_slash_command(
     let token = generate_token();
     let trigger = input.trigger.trim_start_matches('/');
 
-    let command: SlashCommand = sqlx::query_as(
-        r#"
-        INSERT INTO slash_commands 
-        (team_id, creator_id, trigger, url, method, display_name, description, hint, token)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING *
-        "#,
-    )
-    .bind(query.team_id)
-    .bind(auth.user_id)
-    .bind(trigger)
-    .bind(&input.url)
-    .bind(&input.method)
-    .bind(&input.display_name)
-    .bind(&input.description)
-    .bind(&input.hint)
-    .bind(&token)
-    .fetch_one(&state.db)
-    .await?;
+    let command = IntegrationRepository::new(&state.db)
+        .create_slash_command(
+            query.team_id,
+            auth.user_id,
+            trigger,
+            &input.url,
+            &input.method,
+            input.display_name.as_deref(),
+            input.description.as_deref(),
+            input.hint.as_deref(),
+            &token,
+        )
+        .await?;
 
     Ok(Json(command))
 }
@@ -391,9 +354,8 @@ async fn get_slash_command(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<SlashCommand>> {
-    let command: SlashCommand = sqlx::query_as("SELECT * FROM slash_commands WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let command = IntegrationRepository::new(&state.db)
+        .get_slash_command_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Command not found".to_string()))?;
 
@@ -411,9 +373,8 @@ async fn delete_slash_command(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let command: SlashCommand = sqlx::query_as("SELECT * FROM slash_commands WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let command = IntegrationRepository::new(&state.db)
+        .get_slash_command_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Command not found".to_string()))?;
 
@@ -423,9 +384,8 @@ async fn delete_slash_command(
         ));
     }
 
-    sqlx::query("DELETE FROM slash_commands WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
+    IntegrationRepository::new(&state.db)
+        .delete_slash_command(id)
         .await?;
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
@@ -506,11 +466,10 @@ pub async fn execute_command_internal(
                 });
             }
 
-            let user =
-                sqlx::query_as::<_, crate::models::User>("SELECT * FROM users WHERE id = $1")
-                    .bind(auth.user_id)
-                    .fetch_one(&state.db)
-                    .await?;
+            let user = UserRepository::new(&state.db)
+                .get_by_id_unchecked(auth.user_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
             // Get call manager
             let call_manager = state.call_state_manager.as_ref();
@@ -865,29 +824,21 @@ pub async fn execute_command_internal(
             let channel_name = args.trim().trim_start_matches('~');
 
             // Get team_id from current channel
-            let current_team_id: Uuid =
-                sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-                    .bind(payload.channel_id)
-                    .fetch_one(&state.db)
-                    .await?;
+            let current_team_id: Uuid = ChannelRepository::new(&state.db)
+                .get_team_id(payload.channel_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
 
             // Find channel
-            let target_channel: Option<crate::models::Channel> =
-                sqlx::query_as("SELECT * FROM channels WHERE team_id = $1 AND name = $2")
-                    .bind(current_team_id)
-                    .bind(channel_name)
-                    .fetch_optional(&state.db)
-                    .await?;
+            let target_channel = ChannelRepository::new(&state.db)
+                .find_by_team_and_name(current_team_id, channel_name)
+                .await?;
 
             if let Some(ch) = target_channel {
                 // Add user to channel
-                sqlx::query(
-                    "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING"
-                )
-                .bind(ch.id)
-                .bind(auth.user_id)
-                .execute(&state.db)
-                .await?;
+                ChannelRepository::new(&state.db)
+                    .add_member(ch.id, auth.user_id, "member")
+                    .await?;
 
                 return Ok(CommandResponse {
                     response_type: "ephemeral".to_string(),
@@ -910,11 +861,9 @@ pub async fn execute_command_internal(
         }
         "leave" => {
             // Leave current channel
-            let channel =
-                sqlx::query_as::<_, crate::models::Channel>("SELECT * FROM channels WHERE id = $1")
-                    .bind(payload.channel_id)
-                    .fetch_optional(&state.db)
-                    .await?;
+            let channel = ChannelRepository::new(&state.db)
+                .get_by_id_optional(payload.channel_id)
+                .await?;
 
             if let Some(ch) = channel {
                 if ch.channel_type == crate::models::ChannelType::Direct {
@@ -928,10 +877,8 @@ pub async fn execute_command_internal(
                     });
                 }
 
-                sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-                    .bind(payload.channel_id)
-                    .bind(auth.user_id)
-                    .execute(&state.db)
+                ChannelRepository::new(&state.db)
+                    .remove_member(payload.channel_id, auth.user_id)
                     .await?;
 
                 // Broadcast member left
@@ -972,12 +919,12 @@ pub async fn execute_command_internal(
         }
         "me" => {
             // /me action - creates an italic-style action message
-            let user_name =
-                sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
-                    .bind(auth.user_id)
-                    .fetch_one(&state.db)
-                    .await
-                    .unwrap_or_else(|_| "someone".to_string());
+            let user_name = UserRepository::new(&state.db)
+                .get_username(auth.user_id)
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| "someone".to_string());
 
             let message = format!("*{} {}*", user_name, args);
 
@@ -1033,36 +980,32 @@ pub async fn execute_command_internal(
     let team_id = if let Some(tid) = payload.team_id {
         tid
     } else {
-        sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM channels WHERE id = $1")
-            .bind(payload.channel_id)
-            .fetch_optional(&state.db)
+        ChannelRepository::new(&state.db)
+            .get_team_id(payload.channel_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?
     };
 
-    let command = sqlx::query_as::<_, SlashCommand>(
-        "SELECT * FROM slash_commands WHERE team_id = $1 AND trigger = $2",
-    )
-    .bind(team_id)
-    .bind(trigger)
-    .fetch_optional(&state.db)
-    .await?;
+    let command = IntegrationRepository::new(&state.db)
+        .get_slash_command_by_team_and_trigger(team_id, trigger)
+        .await?;
 
     if let Some(cmd) = command {
         // Fetch username
-        let user_name = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
-            .bind(auth.user_id)
-            .fetch_one(&state.db)
+        let user_name = UserRepository::new(&state.db)
+            .get_username(auth.user_id)
             .await
-            .unwrap_or_else(|_| "unknown".to_string());
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| "unknown".to_string());
 
         // Fetch channel name
-        let channel_name =
-            sqlx::query_scalar::<_, String>("SELECT name FROM channels WHERE id = $1")
-                .bind(payload.channel_id)
-                .fetch_one(&state.db)
-                .await
-                .unwrap_or_else(|_| "unknown".to_string());
+        let channel_name = ChannelRepository::new(&state.db)
+            .get_name(payload.channel_id)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| "unknown".to_string());
 
         // Validate slash command URL to prevent SSRF
         if !is_valid_callback_url(&cmd.url) {
@@ -1148,14 +1091,11 @@ pub async fn execute_command_internal(
 // ============ Bots ============
 
 async fn list_bots(State(state): State<AppState>, auth: AuthUser) -> ApiResult<Json<Vec<Bot>>> {
-    let bots: Vec<Bot> = if auth.has_permission(&permissions::ADMIN_FULL) {
-        sqlx::query_as("SELECT * FROM bots ORDER BY created_at DESC")
-            .fetch_all(&state.db)
-            .await?
+    let bots = if auth.has_permission(&permissions::ADMIN_FULL) {
+        IntegrationRepository::new(&state.db).list_bots().await?
     } else {
-        sqlx::query_as("SELECT * FROM bots WHERE owner_id = $1 ORDER BY created_at DESC")
-            .bind(auth.user_id)
-            .fetch_all(&state.db)
+        IntegrationRepository::new(&state.db)
+            .list_bots_by_owner(auth.user_id)
             .await?
     };
 
@@ -1174,31 +1114,18 @@ async fn create_bot(
     );
     let bot_email = format!("{}@bot.rustchat.local", bot_username);
 
-    let bot_user_id: (Uuid,) = sqlx::query_as(
-        r#"
-        INSERT INTO users (username, email, password_hash, is_bot, role)
-        VALUES ($1, $2, 'BOT_NO_PASSWORD', true, 'member')
-        RETURNING id
-        "#,
-    )
-    .bind(&bot_username)
-    .bind(&bot_email)
-    .fetch_one(&state.db)
-    .await?;
+    let bot_user_id = IntegrationRepository::new(&state.db)
+        .create_bot_user(&bot_username, &bot_email)
+        .await?;
 
-    let bot: Bot = sqlx::query_as(
-        r#"
-        INSERT INTO bots (user_id, owner_id, display_name, description)
-        VALUES ($1, $2, $3, $4)
-        RETURNING *
-        "#,
-    )
-    .bind(bot_user_id.0)
-    .bind(auth.user_id)
-    .bind(&input.display_name)
-    .bind(&input.description)
-    .fetch_one(&state.db)
-    .await?;
+    let bot = IntegrationRepository::new(&state.db)
+        .create_bot(
+            bot_user_id,
+            auth.user_id,
+            &input.display_name,
+            input.description.as_deref(),
+        )
+        .await?;
 
     Ok(Json(bot))
 }
@@ -1208,9 +1135,8 @@ async fn get_bot(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Bot>> {
-    let bot: Bot = sqlx::query_as("SELECT * FROM bots WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let bot = IntegrationRepository::new(&state.db)
+        .get_bot_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
 
@@ -1226,9 +1152,8 @@ async fn delete_bot(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let bot: Bot = sqlx::query_as("SELECT * FROM bots WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let bot = IntegrationRepository::new(&state.db)
+        .get_bot_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
 
@@ -1236,10 +1161,7 @@ async fn delete_bot(
         return Err(AppError::Forbidden("Cannot delete this bot".to_string()));
     }
 
-    sqlx::query("DELETE FROM bots WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
-        .await?;
+    IntegrationRepository::new(&state.db).delete_bot(id).await?;
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }
@@ -1249,9 +1171,8 @@ async fn list_bot_tokens(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Vec<BotToken>>> {
-    let bot: Bot = sqlx::query_as("SELECT * FROM bots WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let bot = IntegrationRepository::new(&state.db)
+        .get_bot_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
 
@@ -1259,11 +1180,9 @@ async fn list_bot_tokens(
         return Err(AppError::Forbidden("Cannot access this bot".to_string()));
     }
 
-    let tokens: Vec<BotToken> =
-        sqlx::query_as("SELECT * FROM bot_tokens WHERE bot_id = $1 ORDER BY created_at DESC")
-            .bind(id)
-            .fetch_all(&state.db)
-            .await?;
+    let tokens = IntegrationRepository::new(&state.db)
+        .list_bot_tokens(id)
+        .await?;
 
     Ok(Json(tokens))
 }
@@ -1279,9 +1198,8 @@ async fn create_bot_token(
     Path(id): Path<Uuid>,
     Json(input): Json<CreateBotTokenRequest>,
 ) -> ApiResult<Json<BotToken>> {
-    let bot: Bot = sqlx::query_as("SELECT * FROM bots WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.db)
+    let bot = IntegrationRepository::new(&state.db)
+        .get_bot_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
 
@@ -1291,18 +1209,9 @@ async fn create_bot_token(
 
     let token = generate_token();
 
-    let bot_token: BotToken = sqlx::query_as(
-        r#"
-        INSERT INTO bot_tokens (bot_id, token, description)
-        VALUES ($1, $2, $3)
-        RETURNING *
-        "#,
-    )
-    .bind(id)
-    .bind(&token)
-    .bind(&input.description)
-    .fetch_one(&state.db)
-    .await?;
+    let bot_token = IntegrationRepository::new(&state.db)
+        .create_bot_token(id, &token, input.description.as_deref())
+        .await?;
 
     Ok(Json(bot_token))
 }
@@ -1312,9 +1221,8 @@ async fn revoke_bot_token(
     auth: AuthUser,
     Path((bot_id, token_id)): Path<(Uuid, Uuid)>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let bot: Bot = sqlx::query_as("SELECT * FROM bots WHERE id = $1")
-        .bind(bot_id)
-        .fetch_optional(&state.db)
+    let bot = IntegrationRepository::new(&state.db)
+        .get_bot_by_id(bot_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
 
@@ -1322,10 +1230,8 @@ async fn revoke_bot_token(
         return Err(AppError::Forbidden("Cannot access this bot".to_string()));
     }
 
-    sqlx::query("DELETE FROM bot_tokens WHERE id = $1 AND bot_id = $2")
-        .bind(token_id)
-        .bind(bot_id)
-        .execute(&state.db)
+    IntegrationRepository::new(&state.db)
+        .delete_bot_token(token_id, bot_id)
         .await?;
 
     Ok(Json(serde_json::json!({"status": "revoked"})))

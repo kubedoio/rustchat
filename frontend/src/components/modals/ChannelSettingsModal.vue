@@ -4,11 +4,12 @@ import { X, Hash, Lock, Settings, Users, Trash2, Search, Plus, UserMinus } from 
 import BaseButton from '../atomic/BaseButton.vue'
 import BaseInput from '../atomic/BaseInput.vue'
 import { channelsApi, type Channel } from '../../api/channels'
-import { useChannelStore } from '../../stores/channels'
-import { useTeamStore } from '../../stores/teams'
-import { useAuthStore } from '../../stores/auth'
+import { useChannelStore } from '../../features/channels/stores/channelStore'
+import { useTeamStore } from '../../features/teams/stores/teamStore'
+import { useAuthStore } from '../../features/auth/stores/authStore'
 import { useToast } from '../../composables/useToast'
 import { useChannelManagementPermission } from '../../features/permissions/capabilities'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const props = defineProps<{
   isOpen: boolean
@@ -109,8 +110,8 @@ async function addMember(userId: string) {
     await fetchMembers()
     toast.success('Member added', 'User added to channel')
     searchQuery.value = '' // Clear search
-  } catch (e: any) {
-    toast.error('Failed to add member', e.response?.data?.message)
+  } catch (e: unknown) {
+    toast.error('Failed to add member', getApiErrorMessage(e))
   } finally {
     addingMember.value = null
   }
@@ -125,8 +126,8 @@ async function removeMember(userId: string) {
     await channelsApi.removeMember(props.channel.id, userId)
     await fetchMembers()
     toast.success('Member removed', 'User removed from channel')
-  } catch (e: any) {
-    toast.error('Failed to remove member', e.response?.data?.message)
+  } catch (e: unknown) {
+    toast.error('Failed to remove member', getApiErrorMessage(e))
   } finally {
     removingMember.value = null
   }
@@ -149,8 +150,8 @@ async function handleSave() {
     toast.success('Channel updated', 'Settings saved successfully')
     emit('updated', response.data)
     emit('close')
-  } catch (e: any) {
-    toast.error('Update failed', e.response?.data?.message || 'Could not update channel')
+  } catch (e: unknown) {
+    toast.error('Update failed', getApiErrorMessage(e) || 'Could not update channel')
   } finally {
     loading.value = false
   }
@@ -166,8 +167,8 @@ async function handleDelete() {
     toast.success('Channel deleted', `#${props.channel.name} has been removed`)
     emit('deleted')
     emit('close')
-  } catch (e: any) {
-    toast.error('Delete failed', e.response?.data?.message || 'Could not delete channel')
+  } catch (e: unknown) {
+    toast.error('Delete failed', getApiErrorMessage(e) || 'Could not delete channel')
   } finally {
     deleting.value = false
   }

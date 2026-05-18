@@ -1,4 +1,5 @@
 use crate::api::AppState;
+use crate::constants::*;
 use crate::error::ApiResult;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -804,8 +805,8 @@ pub async fn apply_auto_membership_for_team_join(
                     .bind(target.target_id)
                     .bind(user_id)
                     .bind(match target.role_mode {
-                        RoleMode::Member => "member",
-                        RoleMode::Admin => "admin",
+                        RoleMode::Member => ROLE_MEMBER,
+                        RoleMode::Admin => ROLE_ADMIN,
                     })
                     .execute(&state.db)
                     .await;
@@ -843,8 +844,8 @@ pub async fn apply_auto_membership_for_team_join(
                     .bind(target.target_id)
                     .bind(user_id)
                     .bind(match target.role_mode {
-                        RoleMode::Member => "member",
-                        RoleMode::Admin => "admin",
+                        RoleMode::Member => ROLE_MEMBER,
+                        RoleMode::Admin => ROLE_ADMIN,
                     })
                     .fetch_optional(&state.db)
                     .await;
@@ -992,8 +993,8 @@ pub async fn apply_auto_membership_for_new_user(
                     .bind(target.target_id)
                     .bind(user_id)
                     .bind(match target.role_mode {
-                        RoleMode::Member => "member",
-                        RoleMode::Admin => "admin",
+                        RoleMode::Member => ROLE_MEMBER,
+                        RoleMode::Admin => ROLE_ADMIN,
                     })
                     .execute(&state.db)
                     .await;
@@ -1033,8 +1034,8 @@ pub async fn apply_auto_membership_for_new_user(
                     .bind(target.target_id)
                     .bind(user_id)
                     .bind(match target.role_mode {
-                        RoleMode::Member => "member",
-                        RoleMode::Admin => "admin",
+                        RoleMode::Member => ROLE_MEMBER,
+                        RoleMode::Admin => ROLE_ADMIN,
                     })
                     .fetch_optional(&state.db)
                     .await;
@@ -1104,7 +1105,7 @@ mod tests {
                 {
                     "target_type": "channel",
                     "target_id": "22222222-2222-2222-2222-222222222222",
-                    "role_mode": "member"
+                    "role_mode": ROLE_MEMBER
                 }
             ]
         });
@@ -1135,7 +1136,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_value(RoleMode::Admin).expect("serialize role"),
-            json!("admin")
+            json!(ROLE_ADMIN)
         );
     }
 }

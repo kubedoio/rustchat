@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { usePresenceStore } from '../../features/presence';
 import { getPresencePresentation, normalizePresenceStatus } from '../../features/presence/presencePresentation';
-import { useTeamStore } from '../../stores/teams';
+import { useTeamStore } from '../../features/teams/stores/teamStore';
 import type { PresenceStatus } from '../../core/entities/User';
 
 interface Props {

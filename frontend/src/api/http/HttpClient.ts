@@ -6,6 +6,7 @@
 import { buildURL } from './querySerializer'
 import { uploadWithProgress, type UploadConfig } from './uploadWithProgress'
 import { HttpError, TimeoutError, AbortError } from './errors'
+import { HTTP_DEFAULT_TIMEOUT } from '../../constants'
 
 export interface HttpClientConfig {
     baseURL?: string
@@ -33,7 +34,7 @@ export interface HttpResponse<T> {
     headers: Headers
 }
 
-const DEFAULT_TIMEOUT = 30000 // 30 seconds
+const DEFAULT_TIMEOUT = HTTP_DEFAULT_TIMEOUT
 
 export class HttpClient {
     private baseURL?: string

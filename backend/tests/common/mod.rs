@@ -4,6 +4,15 @@ use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::SocketAddr;
 use uuid::Uuid;
 
+use futures_util::{SinkExt, StreamExt};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{client::IntoClientRequest, http::HeaderValue, Message},
+};
+
+pub type WsStream =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+
 // Ensure tracing is initialized only once
 static TRACING: Lazy<()> = Lazy::new(|| {
     let log_level = "info";
@@ -18,6 +27,74 @@ pub struct TestApp {
     pub db_pool: PgPool,
     pub redis_pool: deadpool_redis::Pool,
     pub api_client: reqwest::Client,
+}
+
+impl TestApp {
+    pub async fn connect_ws_v4(&self, token: &str) -> WsStream {
+        let ws_base = self.address.replacen("http://", "ws://", 1);
+        let ws_url = format!("{ws_base}/api/v4/websocket");
+
+        let mut request = ws_url
+            .into_client_request()
+            .expect("websocket request should be valid");
+        request.headers_mut().insert(
+            "Sec-WebSocket-Protocol",
+            HeaderValue::from_str(token).expect("valid websocket subprotocol token"),
+        );
+
+        let (ws_stream, _) = connect_async(request)
+            .await
+            .expect("websocket connection should succeed");
+        ws_stream
+    }
+
+    pub async fn wait_for_event(
+        &self,
+        ws: &mut WsStream,
+        expected_event: &str,
+        timeout_ms: u64,
+    ) -> serde_json::Value {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
+
+        loop {
+            let now = std::time::Instant::now();
+            assert!(
+                now < deadline,
+                "timed out waiting for websocket event {expected_event}"
+            );
+
+            let timeout_left = deadline.saturating_duration_since(now);
+            let message = tokio::time::timeout(timeout_left, ws.next())
+                .await
+                .expect("timeout while waiting for websocket frame")
+                .expect("websocket closed unexpectedly")
+                .expect("websocket frame should be valid");
+
+            if let Message::Text(text) = message {
+                let parsed: serde_json::Value =
+                    serde_json::from_str(&text).expect("frame should be valid JSON");
+                if parsed["event"] == expected_event {
+                    return parsed["data"].clone();
+                }
+            }
+        }
+    }
+
+    pub async fn send_ws_command(
+        &self,
+        ws: &mut WsStream,
+        command: &str,
+        data: serde_json::Value,
+    ) {
+        let payload = serde_json::json!({
+            "type": "command",
+            "event": command,
+            "data": data,
+        });
+        ws.send(Message::Text(payload.to_string()))
+            .await
+            .expect("websocket command should be sent");
+    }
 }
 
 #[allow(dead_code)]

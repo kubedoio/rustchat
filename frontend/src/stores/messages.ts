@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, type ComputedRef } from 'vue'
 import { postsApi, type Post } from '../api/posts'
 import { useChannelStore } from './channels'
 import { useUnreadStore } from './unreads'
@@ -7,6 +7,8 @@ import { useAuthStore } from './auth'
 import { useTeamStore } from './teams'
 import { normalizeEntityId } from '../utils/idCompat'
 import { getPreferredEmojiName, getReactionEmojiKey } from '../utils/emoji'
+import { DEFAULT_MESSAGE_LIMIT } from '../constants'
+import { getApiErrorMessage, getErrorMessage } from '../core/errors/errorUtils'
 
 export interface MessageReaction {
     emoji: string
@@ -138,18 +140,19 @@ function mergeReaction(target: MessageReaction, incoming: MessageReaction): Mess
     }
 }
 
-function normalizeReaction(rawReaction: any): MessageReaction | null {
-    if (!rawReaction || typeof rawReaction !== 'object' || typeof rawReaction.emoji !== 'string') {
+function normalizeReaction(rawReaction: unknown): MessageReaction | null {
+    const r = rawReaction as Record<string, unknown>
+    if (!r || typeof r !== 'object' || typeof r.emoji !== 'string') {
         return null
     }
 
-    const emoji = getReactionEmojiKey(rawReaction.emoji)
-    const users = normalizeReactionUsers(rawReaction.users)
-    const numericCount = Number(rawReaction.count)
+    const emoji = getReactionEmojiKey(r.emoji)
+    const users = normalizeReactionUsers(r.users)
+    const numericCount = Number(r.count)
 
     return {
         emoji,
-        apiKey: getPreferredEmojiName(rawReaction.emoji),
+        apiKey: getPreferredEmojiName(r.emoji),
         users,
         count: users.length > 0
             ? users.length
@@ -226,8 +229,17 @@ export const useMessageStore = defineStore('messages', () => {
     const isLoadingOlder = ref(false)
     const error = ref<string | null>(null)
 
+    // Cache computed refs per channelId so Vue can cache reactivity across callers
+    const messagesCache = new Map<string, ComputedRef<Message[]>>()
+
     function getMessages(channelId: string) {
-        return computed(() => messagesByChannel.value[channelId] || [])
+        if (!messagesCache.has(channelId)) {
+            messagesCache.set(
+                channelId,
+                computed(() => messagesByChannel.value[channelId] || [])
+            )
+        }
+        return messagesCache.get(channelId)!
     }
 
     const hasMoreOlder = computed(() => (channelId: string) => hasMoreOlderByChannel.value[channelId] ?? true)
@@ -259,7 +271,7 @@ export const useMessageStore = defineStore('messages', () => {
         error.value = null
         try {
             const unreadStore = useUnreadStore()
-            const response = await postsApi.list(channelId, { limit: 50 })
+            const response = await postsApi.list(channelId, { limit: DEFAULT_MESSAGE_LIMIT })
             const messages = response.data.messages
                 .filter(p => !p.root_post_id)
                 .map(postToMessage)
@@ -272,10 +284,10 @@ export const useMessageStore = defineStore('messages', () => {
             }
 
             // If we got fewer than 50, we probably reached the end
-            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= 50
-        } catch (e: any) {
+            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
+        } catch (e: unknown) {
             console.error(`Failed to fetch messages for channel ${channelId}:`, e);
-            error.value = e.response?.data?.message || e.message || 'Failed to fetch messages'
+            error.value = getApiErrorMessage(e) || getErrorMessage(e) || 'Failed to fetch messages'
         } finally {
             loading.value = false
         }
@@ -296,7 +308,7 @@ export const useMessageStore = defineStore('messages', () => {
         loading.value = true
         isLoadingOlder.value = true
         try {
-            const response = await postsApi.list(channelId, { before, limit: 50 })
+            const response = await postsApi.list(channelId, { before, limit: DEFAULT_MESSAGE_LIMIT })
             const olderMessages = response.data.messages
                 .filter(p => !p.root_post_id)
                 .map(postToMessage)
@@ -306,8 +318,8 @@ export const useMessageStore = defineStore('messages', () => {
                 messagesByChannel.value[channelId] = [...olderMessages, ...currentMessages]
             }
 
-            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= 50
-        } catch (e: any) {
+            hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
+        } catch (e: unknown) {
             console.error('Failed to fetch older messages:', e)
         } finally {
             loading.value = false
@@ -326,9 +338,9 @@ export const useMessageStore = defineStore('messages', () => {
                 .filter((post): post is Post => post !== undefined)
                 .map(postToMessage)
             repliesByThread.value[rootId] = replies
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(`Failed to fetch thread ${rootId}:`, e);
-            error.value = e.response?.data?.message || e.message || 'Failed to fetch thread'
+            error.value = getApiErrorMessage(e) || getErrorMessage(e) || 'Failed to fetch thread'
         } finally {
             loading.value = false
         }
@@ -442,8 +454,10 @@ export const useMessageStore = defineStore('messages', () => {
     function clearMessages(channelId?: string) {
         if (channelId) {
             delete messagesByChannel.value[channelId]
+            messagesCache.delete(channelId)
         } else {
             messagesByChannel.value = {}
+            messagesCache.clear()
         }
     }
 
@@ -454,6 +468,7 @@ export const useMessageStore = defineStore('messages', () => {
         loading.value = false
         isLoadingOlder.value = false
         error.value = null
+        messagesCache.clear()
     }
 
     async function pinMessage(messageId: string, channelId: string) {
@@ -464,7 +479,7 @@ export const useMessageStore = defineStore('messages', () => {
             if (message) {
                 message.isPinned = true
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to pin message'
             throw e
         }
@@ -478,7 +493,7 @@ export const useMessageStore = defineStore('messages', () => {
             if (message) {
                 message.isPinned = false
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to unpin message'
             throw e
         }
@@ -492,7 +507,7 @@ export const useMessageStore = defineStore('messages', () => {
             if (message) {
                 message.isSaved = true
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to save message'
             throw e
         }
@@ -506,7 +521,7 @@ export const useMessageStore = defineStore('messages', () => {
             if (message) {
                 message.isSaved = false
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to unsave message'
             throw e
         }
@@ -518,7 +533,7 @@ export const useMessageStore = defineStore('messages', () => {
         try {
             const response = await postsApi.list(channelId, { q: query })
             return response.data.messages.map(postToMessage)
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to search messages'
             throw e
         } finally {
@@ -532,7 +547,7 @@ export const useMessageStore = defineStore('messages', () => {
         try {
             const response = await postsApi.list(channelId, { is_pinned: true })
             return response.data.messages.map(postToMessage)
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to fetch pinned messages'
             throw e
         } finally {
@@ -545,7 +560,7 @@ export const useMessageStore = defineStore('messages', () => {
         try {
             const response = await postsApi.getSaved()
             return response.data.map(postToMessage)
-        } catch (e: any) {
+        } catch (e: unknown) {
             error.value = 'Failed to fetch saved messages'
             throw e
         } finally {
@@ -553,7 +568,7 @@ export const useMessageStore = defineStore('messages', () => {
         }
     }
 
-    function handleMessageUpdate(data: any) {
+    function handleMessageUpdate(data: Record<string, unknown>) {
         if (!data.id) return
 
         // 1. Update in main channels
@@ -621,7 +636,7 @@ export const useMessageStore = defineStore('messages', () => {
         }
     }
 
-    function handleReactionAdded(data: any) {
+    function handleReactionAdded(data: Record<string, unknown>) {
         const reactionKey = getReactionEmojiKey(data.emoji_name)
         const apiKey = getPreferredEmojiName(data.emoji_name)
 
@@ -648,7 +663,7 @@ export const useMessageStore = defineStore('messages', () => {
         })
     }
 
-    function handleReactionRemoved(data: any) {
+    function handleReactionRemoved(data: Record<string, unknown>) {
         const reactionKey = getReactionEmojiKey(data.emoji_name)
 
         visitLoadedMessages((message) => {

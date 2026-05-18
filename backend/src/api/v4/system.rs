@@ -148,9 +148,8 @@ async fn test_notifications(
     info!(user_id = %auth.user_id, "Test notification requested");
 
     let device_rows: Vec<(Option<String>, Option<String>)> =
-        sqlx::query_as("SELECT token, platform FROM user_devices WHERE user_id = $1")
-            .bind(auth.user_id)
-            .fetch_all(&state.db)
+        crate::repositories::SystemRepository::new(&state.db)
+            .get_user_devices(auth.user_id)
             .await
             .map_err(|e| {
                 AppError::Internal(format!(
@@ -283,26 +282,20 @@ async fn get_config(
     State(state): State<AppState>,
     auth: crate::api::v4::extractors::MmAuthUser,
 ) -> ApiResult<Json<serde_json::Value>> {
+    let repo = crate::repositories::SystemRepository::new(&state.db);
+
     // Fetch config from DB
-    let config: crate::models::ServerConfig =
-        sqlx::query_as("SELECT * FROM server_config WHERE id = 'default'")
-            .fetch_one(&state.db)
-            .await
-            .map_err(|_| crate::error::AppError::NotFound("Config not found".to_string()))?;
+    let config: crate::models::ServerConfig = repo
+        .get_server_config()
+        .await
+        .map_err(|_| crate::error::AppError::NotFound("Config not found".to_string()))?;
 
     // Fetch default email provider settings
-    let provider_settings: Option<MailProviderSettings> = sqlx::query_as(
-        r#"
-        SELECT * FROM mail_provider_settings
-        WHERE enabled = true AND is_default = true
-        ORDER BY tenant_id NULLS LAST
-        LIMIT 1
-        "#,
-    )
-    .fetch_optional(&state.db)
-    .await
-    .ok()
-    .flatten();
+    let provider_settings: Option<MailProviderSettings> = repo
+        .get_default_mail_provider()
+        .await
+        .ok()
+        .flatten();
     let configured_default_channels = get_configured_default_channels(&state).await?;
 
     // Convert to Mattermost-compatible format
@@ -472,58 +465,30 @@ async fn patch_config(
     // Parse and apply patches to the relevant config sections
     // The patch format is { "SectionName": { "key": "value" } }
 
+    let repo = crate::repositories::SystemRepository::new(&state.db);
+
     // Handle TeamSettings -> site.site_name
     if let Some(team_settings) = patch.get("TeamSettings").and_then(|v| v.as_object()) {
         if let Some(site_name) = team_settings.get("SiteName").and_then(|v| v.as_str()) {
-            sqlx::query(
-                "UPDATE server_config SET site = jsonb_set(site, '{site_name}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(site_name))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_site_name(site_name, auth.user_id).await?;
         }
 
         if let Some(default_channels) = team_settings.get("ExperimentalDefaultChannels") {
             let normalized = normalize_configured_default_channels(default_channels);
-            sqlx::query(
-                "UPDATE server_config SET experimental = jsonb_set(experimental, '{team_default_channels}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(normalized))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_team_default_channels(&serde_json::json!(normalized), auth.user_id).await?;
         }
     }
 
     // Handle EmailSettings
     if let Some(email_settings) = patch.get("EmailSettings").and_then(|v| v.as_object()) {
         if let Some(host) = email_settings.get("SMTPServer").and_then(|v| v.as_str()) {
-            sqlx::query(
-                "UPDATE server_config SET email = jsonb_set(email, '{smtp_host}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(host))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_smtp_host(host, auth.user_id).await?;
         }
         if let Some(port) = email_settings.get("SMTPPort").and_then(|v| v.as_str()) {
-            sqlx::query(
-                "UPDATE server_config SET email = jsonb_set(email, '{smtp_port}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(port))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_smtp_port(port, auth.user_id).await?;
         }
         if let Some(from) = email_settings.get("FeedbackEmail").and_then(|v| v.as_str()) {
-            sqlx::query(
-                "UPDATE server_config SET email = jsonb_set(email, '{from_address}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(from))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_from_address(from, auth.user_id).await?;
         }
     }
 
@@ -533,23 +498,11 @@ async fn patch_config(
             .get("EnableIncomingWebhooks")
             .and_then(|v| v.as_bool())
         {
-            sqlx::query(
-                "UPDATE server_config SET integrations = jsonb_set(integrations, '{enable_webhooks}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(enable_webhooks))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_enable_webhooks(enable_webhooks, auth.user_id).await?;
         }
         if let Some(enable_commands) = int_settings.get("EnableCommands").and_then(|v| v.as_bool())
         {
-            sqlx::query(
-                "UPDATE server_config SET integrations = jsonb_set(integrations, '{enable_slash_commands}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(enable_commands))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_enable_slash_commands(enable_commands, auth.user_id).await?;
         }
     }
 
@@ -562,22 +515,10 @@ async fn patch_config(
             .get("MessageRetentionDays")
             .and_then(|v| v.as_i64())
         {
-            sqlx::query(
-                "UPDATE server_config SET compliance = jsonb_set(compliance, '{message_retention_days}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(days))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_message_retention_days(days, auth.user_id).await?;
         }
         if let Some(days) = retention.get("FileRetentionDays").and_then(|v| v.as_i64()) {
-            sqlx::query(
-                "UPDATE server_config SET compliance = jsonb_set(compliance, '{file_retention_days}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
-            )
-            .bind(serde_json::json!(days))
-            .bind(auth.user_id)
-            .execute(&state.db)
-            .await?;
+            repo.update_file_retention_days(days, auth.user_id).await?;
         }
     }
 
@@ -719,16 +660,14 @@ async fn get_push_diagnostics(state: &AppState) -> PushDiagnostics {
             .ok()
             .is_some_and(|v| !v.trim().is_empty());
 
-    let has_fcm_db_config = sqlx::query_as::<_, (String, String)>(
-        "SELECT fcm_project_id, fcm_access_token FROM server_config WHERE id = 'default'",
-    )
-    .fetch_optional(&state.db)
-    .await
-    .ok()
-    .flatten()
-    .is_some_and(|(project_id, access_token)| {
-        !project_id.trim().is_empty() && !access_token.trim().is_empty()
-    });
+    let has_fcm_db_config = crate::repositories::SystemRepository::new(&state.db)
+        .get_fcm_credentials()
+        .await
+        .ok()
+        .flatten()
+        .is_some_and(|(project_id, access_token)| {
+            !project_id.trim().is_empty() && !access_token.trim().is_empty()
+        });
 
     PushDiagnostics {
         has_push_proxy_url,

@@ -1,4 +1,4 @@
-import api from './client'
+import api, { v4Api } from './client'
 
 export interface UserStatus {
     text: string | null
@@ -144,13 +144,13 @@ export const preferencesApi = {
     // Mattermost-compatible preferences (for favorites)
     getMyPreferencesMm: () => api.get<Preference[]>('/users/me/preferences'),
     getMyPreferencesMmV4: () =>
-        api.get<Preference[]>('/users/me/preferences', { baseURL: '/api/v4' }),
+        v4Api.get<Preference[]>('/users/me/preferences'),
     getPreferencesByCategory: (userId: string, category: string) =>
         api.get<Preference[]>(`/users/${userId}/preferences/${category}`),
     updatePreferences: (userId: string, preferences: Preference[]) =>
         api.put(`/users/${userId}/preferences`, preferences),
     updatePreferencesV4: (userId: string, preferences: Preference[]) =>
-        api.put(`/users/${userId}/preferences`, preferences, { baseURL: '/api/v4' }),
+        v4Api.put(`/users/${userId}/preferences`, preferences),
     deletePreferences: (userId: string, preferences: Preference[]) =>
         api.delete(`/users/${userId}/preferences`, { data: preferences }),
 }

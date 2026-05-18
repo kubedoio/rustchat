@@ -14,9 +14,10 @@ use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
     ChannelNotificationSetting, CreateStatusPreset, StatusPreset, UpdateChannelNotification,
-    UpdatePreferences, UpdateStatus, UserPreferences, UserStatus,
+    UpdatePreferences, UserPreferences, UserStatus,
 };
 use crate::realtime::{EventType, PresenceEvent, WsEnvelope};
+use crate::repositories::UserRepository;
 
 /// Build preferences routes
 pub fn router() -> Router<AppState> {
@@ -61,23 +62,12 @@ async fn get_my_status(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> ApiResult<Json<UserStatus>> {
-    let user = sqlx::query_as::<
-        _,
-        (
-            String,
-            bool,
-            Option<chrono::DateTime<Utc>>,
-            Option<String>,
-            Option<String>,
-            Option<chrono::DateTime<Utc>>,
-        ),
-    >(
-        "SELECT presence, COALESCE(presence_manual, false), last_login_at, status_text, status_emoji, status_expires_at FROM users WHERE id = $1",
-    )
-    .bind(auth.user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+    let repo = UserRepository::new(&state.db);
+    let user = repo
+        .get_user_status_fields(auth.user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     Ok(Json(UserStatus {
         presence: Some(user.0),
@@ -94,17 +84,15 @@ async fn get_my_status(
 async fn update_my_status(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(payload): Json<UpdateStatus>,
+    Json(payload): Json<crate::models::UpdateStatus>,
 ) -> ApiResult<Json<UserStatus>> {
     let expires_at = payload
         .duration_minutes
         .map(|mins| Utc::now() + Duration::minutes(mins as i64));
 
-    // We only update presence if it's provided.
-    // If text/emoji are provided, we update them.
-    // This allows updating just presence or just status message.
+    let repo = UserRepository::new(&state.db);
 
-    // First get current values to merge if needed, or we can just run dynamic query
+    // Build dynamic update using QueryBuilder
     let mut builder = sqlx::QueryBuilder::new("UPDATE users SET updated_at = NOW()");
 
     if let Some(ref p) = payload.presence {
@@ -116,16 +104,6 @@ async fn update_my_status(
     }
 
     if payload.text.is_some() || payload.emoji.is_some() {
-        // If updating custom status, always update these fields
-        // Note: passing None for text/emoji clears them (which is what we want if user clears status)
-        // But the DTO has Option, so if it's missing (None), it might mean "don't change".
-        // We need to clarify behavior.
-        // Ideally:
-        // - presence: Update if Some
-        // - text/emoji: Update if Some. To clear, client should send Some("") or explicit null?
-        // For simplicity, let's assume client sends all fields they want to change.
-        // But typical "set status" UI might only send text/emoji. "Set presence" UI only sends presence.
-
         if let Some(ref t) = payload.text {
             builder.push(", status_text = ");
             builder.push_bind(t);
@@ -181,10 +159,11 @@ async fn update_my_status(
     state.ws_hub.broadcast(event).await;
 
     // Broadcast full user update (for status message/emoji)
-    let full_user: crate::models::User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+    let full_user = repo
+        .get_by_id(auth.user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     let update_event = WsEnvelope::event(
         EventType::UserUpdated,
@@ -202,12 +181,11 @@ async fn clear_my_status(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> ApiResult<Json<UserStatus>> {
-    let user = sqlx::query_as::<_, (String, bool, Option<chrono::DateTime<Utc>>, Option<String>, Option<String>, Option<chrono::DateTime<Utc>>)>(
-        "UPDATE users SET status_text = NULL, status_emoji = NULL, status_expires_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING presence, COALESCE(presence_manual, false), last_login_at, status_text, status_emoji, status_expires_at"
-    )
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let repo = UserRepository::new(&state.db);
+    let user = repo
+        .clear_status_returning(auth.user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Update Hub and broadcast presence change
     state
@@ -236,10 +214,11 @@ async fn clear_my_status(
     state.ws_hub.broadcast(event).await;
 
     // Broadcast full user update (for cleared status)
-    let full_user: crate::models::User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+    let full_user = repo
+        .get_by_id(auth.user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     let update_event = WsEnvelope::event(
         EventType::UserUpdated,
@@ -265,23 +244,12 @@ async fn get_user_status(
         ));
     }
 
-    let user = sqlx::query_as::<
-        _,
-        (
-            String,
-            bool,
-            Option<chrono::DateTime<Utc>>,
-            Option<String>,
-            Option<String>,
-            Option<chrono::DateTime<Utc>>,
-        ),
-    >(
-        "SELECT presence, COALESCE(presence_manual, false), last_login_at, status_text, status_emoji, status_expires_at FROM users WHERE id = $1",
-    )
-    .bind(user_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+    let repo = UserRepository::new(&state.db);
+    let user = repo
+        .get_user_status_fields(user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     // Check if status has expired
     let mut text = user.3;
@@ -310,29 +278,12 @@ async fn get_my_preferences(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> ApiResult<Json<UserPreferences>> {
-    // Try to get existing preferences
-    let prefs =
-        sqlx::query_as::<_, UserPreferences>("SELECT * FROM user_preferences WHERE user_id = $1")
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?;
-
-    match prefs {
-        Some(p) => Ok(Json(p)),
-        None => {
-            // Create default preferences
-            let prefs = sqlx::query_as::<_, UserPreferences>(
-                r#"
-                INSERT INTO user_preferences (user_id) VALUES ($1)
-                RETURNING *
-                "#,
-            )
-            .bind(auth.user_id)
-            .fetch_one(&state.db)
-            .await?;
-            Ok(Json(prefs))
-        }
-    }
+    let repo = UserRepository::new(&state.db);
+    let prefs = repo
+        .get_or_create_preferences(auth.user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(prefs))
 }
 
 /// Update current user's preferences
@@ -341,98 +292,11 @@ async fn update_my_preferences(
     auth: AuthUser,
     Json(payload): Json<UpdatePreferences>,
 ) -> ApiResult<Json<UserPreferences>> {
-    // Upsert preferences
-    let prefs = sqlx::query_as::<_, UserPreferences>(
-        r#"
-        INSERT INTO user_preferences (
-            user_id, notify_desktop, notify_push, notify_email, notify_sounds,
-            dnd_enabled, message_display, sidebar_behavior, time_format, mention_keywords,
-            collapsed_reply_threads, use_military_time, teammate_name_display,
-            availability_status_visible, show_last_active_time, timezone,
-            link_previews_enabled, image_previews_enabled, click_to_reply,
-            channel_display_mode, quick_reactions_enabled, emoji_picker_enabled, language,
-            group_unread_channels, limit_visible_dms_gms,
-            send_on_ctrl_enter, enable_post_formatting, enable_join_leave_messages,
-            enable_performance_debugging, unread_scroll_position, sync_drafts
-        )
-        VALUES (
-            $1, COALESCE($2, 'all'), COALESCE($3, 'all'), COALESCE($4, 'none'), COALESCE($5, true),
-            COALESCE($6, false), COALESCE($7, 'standard'), COALESCE($8, 'unreads_first'), COALESCE($9, '12h'), $10,
-            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
-            $24, $25, $26, $27, $28, $29, $30, $31
-        )
-        ON CONFLICT (user_id) DO UPDATE SET
-            notify_desktop = COALESCE($2, user_preferences.notify_desktop),
-            notify_push = COALESCE($3, user_preferences.notify_push),
-            notify_email = COALESCE($4, user_preferences.notify_email),
-            notify_sounds = COALESCE($5, user_preferences.notify_sounds),
-            dnd_enabled = COALESCE($6, user_preferences.dnd_enabled),
-            message_display = COALESCE($7, user_preferences.message_display),
-            sidebar_behavior = COALESCE($8, user_preferences.sidebar_behavior),
-            time_format = COALESCE($9, user_preferences.time_format),
-            mention_keywords = COALESCE($10, user_preferences.mention_keywords),
-            collapsed_reply_threads = COALESCE($11, user_preferences.collapsed_reply_threads),
-            use_military_time = COALESCE($12, user_preferences.use_military_time),
-            teammate_name_display = COALESCE($13, user_preferences.teammate_name_display),
-            availability_status_visible = COALESCE($14, user_preferences.availability_status_visible),
-            show_last_active_time = COALESCE($15, user_preferences.show_last_active_time),
-            timezone = COALESCE($16, user_preferences.timezone),
-            link_previews_enabled = COALESCE($17, user_preferences.link_previews_enabled),
-            image_previews_enabled = COALESCE($18, user_preferences.image_previews_enabled),
-            click_to_reply = COALESCE($19, user_preferences.click_to_reply),
-            channel_display_mode = COALESCE($20, user_preferences.channel_display_mode),
-            quick_reactions_enabled = COALESCE($21, user_preferences.quick_reactions_enabled),
-            emoji_picker_enabled = COALESCE($22, user_preferences.emoji_picker_enabled),
-            language = COALESCE($23, user_preferences.language),
-            group_unread_channels = COALESCE($24, user_preferences.group_unread_channels),
-            limit_visible_dms_gms = COALESCE($25, user_preferences.limit_visible_dms_gms),
-            send_on_ctrl_enter = COALESCE($26, user_preferences.send_on_ctrl_enter),
-            enable_post_formatting = COALESCE($27, user_preferences.enable_post_formatting),
-            enable_join_leave_messages = COALESCE($28, user_preferences.enable_join_leave_messages),
-            enable_performance_debugging = COALESCE($29, user_preferences.enable_performance_debugging),
-            unread_scroll_position = COALESCE($30, user_preferences.unread_scroll_position),
-            sync_drafts = COALESCE($31, user_preferences.sync_drafts),
-            updated_at = NOW()
-        RETURNING *
-        "#
-    )
-    .bind(auth.user_id)
-    .bind(&payload.notify_desktop)
-    .bind(&payload.notify_push)
-    .bind(&payload.notify_email)
-    .bind(payload.notify_sounds)
-    .bind(payload.dnd_enabled)
-    .bind(&payload.message_display)
-    .bind(&payload.sidebar_behavior)
-    .bind(&payload.time_format)
-    .bind(&payload.mention_keywords)
-    // Display settings (S7)
-    .bind(payload.collapsed_reply_threads)
-    .bind(payload.use_military_time)
-    .bind(&payload.teammate_name_display)
-    .bind(payload.availability_status_visible)
-    .bind(payload.show_last_active_time)
-    .bind(&payload.timezone)
-    .bind(payload.link_previews_enabled)
-    .bind(payload.image_previews_enabled)
-    .bind(payload.click_to_reply)
-    .bind(&payload.channel_display_mode)
-    .bind(payload.quick_reactions_enabled)
-    .bind(payload.emoji_picker_enabled)
-    .bind(&payload.language)
-    // Sidebar settings (S6)
-    .bind(&payload.group_unread_channels)
-    .bind(&payload.limit_visible_dms_gms)
-    // Advanced settings (S5)
-    .bind(payload.send_on_ctrl_enter)
-    .bind(payload.enable_post_formatting)
-    .bind(payload.enable_join_leave_messages)
-    .bind(payload.enable_performance_debugging)
-    .bind(&payload.unread_scroll_position)
-    .bind(payload.sync_drafts)
-    .fetch_one(&state.db)
-    .await?;
-
+    let repo = UserRepository::new(&state.db);
+    let prefs = repo
+        .upsert_preferences(auth.user_id, &payload)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(prefs))
 }
 
@@ -441,13 +305,11 @@ async fn list_status_presets(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> ApiResult<Json<Vec<StatusPreset>>> {
-    let presets = sqlx::query_as::<_, StatusPreset>(
-        "SELECT * FROM status_presets WHERE user_id IS NULL OR user_id = $1 ORDER BY is_default DESC, sort_order"
-    )
-    .bind(auth.user_id)
-    .fetch_all(&state.db)
-    .await?;
-
+    let repo = UserRepository::new(&state.db);
+    let presets = repo
+        .list_status_presets(auth.user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(presets))
 }
 
@@ -457,20 +319,11 @@ async fn create_status_preset(
     auth: AuthUser,
     Json(payload): Json<CreateStatusPreset>,
 ) -> ApiResult<Json<StatusPreset>> {
-    let preset = sqlx::query_as::<_, StatusPreset>(
-        r#"
-        INSERT INTO status_presets (user_id, emoji, text, duration_minutes, sort_order)
-        VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM status_presets WHERE user_id = $1))
-        RETURNING *
-        "#
-    )
-    .bind(auth.user_id)
-    .bind(&payload.emoji)
-    .bind(&payload.text)
-    .bind(payload.duration_minutes)
-    .fetch_one(&state.db)
-    .await?;
-
+    let repo = UserRepository::new(&state.db);
+    let preset = repo
+        .create_status_preset(auth.user_id, &payload.emoji, &payload.text, payload.duration_minutes)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(preset))
 }
 
@@ -480,15 +333,13 @@ async fn delete_status_preset(
     auth: AuthUser,
     Path(preset_id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let result = sqlx::query(
-        "DELETE FROM status_presets WHERE id = $1 AND user_id = $2 AND is_default = false",
-    )
-    .bind(preset_id)
-    .bind(auth.user_id)
-    .execute(&state.db)
-    .await?;
+    let repo = UserRepository::new(&state.db);
+    let rows = repo
+        .delete_status_preset(preset_id, auth.user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    if result.rows_affected() == 0 {
+    if rows == 0 {
         return Err(AppError::NotFound(
             "Preset not found or cannot be deleted".to_string(),
         ));
@@ -503,14 +354,11 @@ async fn get_channel_notifications(
     auth: AuthUser,
     Path(channel_id): Path<Uuid>,
 ) -> ApiResult<Json<Option<ChannelNotificationSetting>>> {
-    let setting = sqlx::query_as::<_, ChannelNotificationSetting>(
-        "SELECT * FROM channel_notification_settings WHERE user_id = $1 AND channel_id = $2",
-    )
-    .bind(auth.user_id)
-    .bind(channel_id)
-    .fetch_optional(&state.db)
-    .await?;
-
+    let repo = UserRepository::new(&state.db);
+    let setting = repo
+        .get_channel_notification(auth.user_id, channel_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(setting))
 }
 
@@ -521,25 +369,10 @@ async fn update_channel_notifications(
     Path(channel_id): Path<Uuid>,
     Json(payload): Json<UpdateChannelNotification>,
 ) -> ApiResult<Json<ChannelNotificationSetting>> {
-    let setting = sqlx::query_as::<_, ChannelNotificationSetting>(
-        r#"
-        INSERT INTO channel_notification_settings (user_id, channel_id, notify_level, is_muted, mute_until)
-        VALUES ($1, $2, COALESCE($3, 'default'), COALESCE($4, false), $5)
-        ON CONFLICT (user_id, channel_id) DO UPDATE SET
-            notify_level = COALESCE($3, channel_notification_settings.notify_level),
-            is_muted = COALESCE($4, channel_notification_settings.is_muted),
-            mute_until = COALESCE($5, channel_notification_settings.mute_until),
-            updated_at = NOW()
-        RETURNING *
-        "#
-    )
-    .bind(auth.user_id)
-    .bind(channel_id)
-    .bind(&payload.notify_level)
-    .bind(payload.is_muted)
-    .bind(payload.mute_until)
-    .fetch_one(&state.db)
-    .await?;
-
+    let repo = UserRepository::new(&state.db);
+    let setting = repo
+        .upsert_channel_notification(auth.user_id, channel_id, &payload)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(setting))
 }

@@ -3,7 +3,7 @@ import { type User, usersApi } from '../api/users'
 import { usePresenceStore } from '../features/presence'
 import { normalizePresenceStatus } from '../features/presence/presencePresentation'
 import { clearStatusExpiryTimer, parseStatusExpiryMs, scheduleStatusExpiry } from '../features/presence/statusExpiry'
-import { useTeamStore } from '../stores/teams'
+import { useTeamStore } from '../features/teams/stores/teamStore'
 
 export interface UserSummary {
   id: string

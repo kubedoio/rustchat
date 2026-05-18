@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { X, Loader2 } from 'lucide-vue-next'
 import { channelService } from '../../features/channels'
 import type { Channel } from '../../core/entities/Channel'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 interface FormData {
   name: string
@@ -84,8 +85,8 @@ async function handleSubmit() {
     
     emit('updated', updatedChannel)
     emit('close')
-  } catch (error: any) {
-    const message = error?.message || error?.response?.data?.message || 'Failed to update channel'
+  } catch (error: unknown) {
+    const message = getApiErrorMessage(error) || 'Failed to update channel'
     errors.value.submit = message
   } finally {
     isLoading.value = false

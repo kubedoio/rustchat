@@ -16,6 +16,7 @@ use crate::models::{
     normalize_avatar_url, Channel, ChannelMember, ChannelType, CreateChannel, UpdateChannel,
 };
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
+use crate::repositories::{AdminRepository, ChannelRepository, UserRepository};
 
 /// Check if user is channel creator, admin, or has system manage permission
 async fn is_channel_creator_or_admin(
@@ -24,42 +25,24 @@ async fn is_channel_creator_or_admin(
     user_id: Uuid,
 ) -> ApiResult<bool> {
     // Check system manage permission first
-    let has_system_manage = sqlx::query_scalar::<_, bool>(
-        r#"
-        SELECT EXISTS(
-            SELECT 1 FROM users u
-            JOIN roles r ON u.role = r.name
-            WHERE u.id = $1 AND r.permissions @> ARRAY['system_manage']
-        )
-        "#,
-    )
-    .bind(user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let has_system_manage = AdminRepository::new(&state.db)
+        .has_system_manage_permission(user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     if has_system_manage {
         return Ok(true);
     }
 
     // Check if user is channel creator
-    let creator_id: Option<Uuid> =
-        sqlx::query_scalar("SELECT creator_id FROM channels WHERE id = $1")
-            .bind(channel_id)
-            .fetch_optional(&state.db)
-            .await?;
+    let creator_id: Option<Uuid> = ChannelRepository::new(&state.db).get_creator_id(channel_id).await?;
 
     if creator_id == Some(user_id) {
         return Ok(true);
     }
 
     // Check if user is channel admin
-    let role: Option<String> = sqlx::query_scalar(
-        "SELECT role FROM channel_members WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let role: Option<String> = ChannelRepository::new(&state.db).get_member_role(channel_id, user_id).await?;
 
     let is_admin = matches!(
         role.as_deref(),
@@ -137,21 +120,9 @@ async fn hydrate_direct_channel_display_name(
         return Ok(());
     }
 
-    let display_name: Option<String> = sqlx::query_scalar(
-        r#"
-        SELECT COALESCE(NULLIF(u.display_name, ''), u.username)
-        FROM channel_members cm
-        JOIN users u ON u.id = cm.user_id
-        WHERE cm.channel_id = $1
-          AND cm.user_id <> $2
-        ORDER BY u.username ASC
-        LIMIT 1
-        "#,
-    )
-    .bind(channel.id)
-    .bind(viewer_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let display_name = ChannelRepository::new(&state.db)
+        .get_dm_display_name(channel.id, viewer_id)
+        .await?;
 
     channel.display_name = display_name.or_else(|| Some("Direct Message".to_string()));
     Ok(())
@@ -168,67 +139,22 @@ async fn list_channels(
 
     if available_to_join {
         // First check if user is a member of the team
-        let team_member =
-            sqlx::query("SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2")
-                .bind(query.team_id)
-                .bind(auth.user_id)
-                .fetch_optional(&state.db)
-                .await?;
-
-        if team_member.is_none() {
+        if !ChannelRepository::new(&state.db).is_team_member(query.team_id, auth.user_id).await? {
             return Err(AppError::Forbidden("Not a member of this team".to_string()));
         }
 
         // List public and private channels user is NOT in
-        let channels: Vec<Channel> = sqlx::query_as(
-            r#"
-            SELECT c.* FROM channels c
-            WHERE c.team_id = $1 
-            AND c.type IN ('public', 'private')
-            AND c.is_archived = false
-            AND c.deleted_at IS NULL
-            AND c.id NOT IN (
-                SELECT channel_id FROM channel_members WHERE user_id = $2
-            )
-            ORDER BY c.name
-            "#,
-        )
-        .bind(query.team_id)
-        .bind(auth.user_id)
-        .fetch_all(&state.db)
-        .await?;
+        let channels: Vec<Channel> = ChannelRepository::new(&state.db)
+            .list_joinable(query.team_id, auth.user_id)
+            .await?;
 
         return Ok(Json(channels));
     }
 
     // Default behavior: List channels user is a member of
-    let mut channels: Vec<Channel> = if include_archived {
-        sqlx::query_as(
-            r#"
-            SELECT c.* FROM channels c
-            INNER JOIN channel_members cm ON cm.channel_id = c.id
-            WHERE c.team_id = $1 AND cm.user_id = $2 AND c.deleted_at IS NULL
-            ORDER BY c.name
-            "#,
-        )
-        .bind(query.team_id)
-        .bind(auth.user_id)
-        .fetch_all(&state.db)
-        .await?
-    } else {
-        sqlx::query_as(
-            r#"
-            SELECT c.* FROM channels c
-            INNER JOIN channel_members cm ON cm.channel_id = c.id
-            WHERE c.team_id = $1 AND cm.user_id = $2 AND c.is_archived = false AND c.deleted_at IS NULL
-            ORDER BY c.name
-            "#,
-        )
-        .bind(query.team_id)
-        .bind(auth.user_id)
-        .fetch_all(&state.db)
-        .await?
-    };
+    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+        .list_for_user(query.team_id, auth.user_id, include_archived)
+        .await?;
 
     for channel in &mut channels {
         hydrate_direct_channel_display_name(&state, auth.user_id, channel).await?;
@@ -256,23 +182,9 @@ async fn create_channel(
         let legacy_dm_name = crate::models::legacy_direct_channel_name(ids[0], ids[1]);
 
         // Check if DM channel already exists in this team
-        let existing = sqlx::query_as::<_, Channel>(
-            r#"
-            SELECT *
-            FROM channels
-            WHERE team_id = $1
-              AND type = 'direct'::channel_type
-              AND (name = $2 OR name = $3)
-              AND deleted_at IS NULL
-            ORDER BY created_at ASC
-            LIMIT 1
-            "#,
-        )
-        .bind(input.team_id)
-        .bind(&dm_name)
-        .bind(&legacy_dm_name)
-        .fetch_optional(&state.db)
-        .await?;
+        let existing = ChannelRepository::new(&state.db)
+            .find_dm_channel(input.team_id, &dm_name, &legacy_dm_name)
+            .await?;
 
         if let Some(mut channel) = existing {
             // Re-add both users as members just in case they left (resurrect DM)
@@ -282,25 +194,15 @@ async fn create_channel(
         }
 
         // Validate target user exists in the team
-        let is_target_member =
-            sqlx::query("SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2")
-                .bind(input.team_id)
-                .bind(target_id)
-                .fetch_optional(&state.db)
-                .await?;
-
-        if is_target_member.is_none() {
+        if !ChannelRepository::new(&state.db).is_team_member(input.team_id, target_id).await? {
             return Err(AppError::Forbidden(
                 "Target user is not a member of this team".to_string(),
             ));
         }
 
-        let teammate_display_name: Option<String> = sqlx::query_scalar(
-            "SELECT COALESCE(NULLIF(display_name, ''), username) FROM users WHERE id = $1",
-        )
-        .bind(target_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let teammate_display_name = UserRepository::new(&state.db)
+            .get_display_name_or_username(target_id)
+            .await?;
         let display_name = input
             .display_name
             .as_deref()
@@ -311,31 +213,22 @@ async fn create_channel(
             .unwrap_or_else(|| "Direct Message".to_string());
 
         // Create DM channel
-        let channel: Channel = sqlx::query_as(
-            r#"
-            INSERT INTO channels (team_id, name, display_name, purpose, type, creator_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
-            "#,
-        )
-        .bind(input.team_id)
-        .bind(&dm_name)
-        .bind(&display_name)
-        .bind(&input.purpose)
-        .bind(input.channel_type)
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+        let channel = ChannelRepository::new(&state.db)
+            .create(
+                input.team_id,
+                &input.channel_type.to_string(),
+                &dm_name,
+                &display_name,
+                &input.purpose.unwrap_or_default(),
+                "",
+                auth.user_id,
+            )
+            .await?;
 
         // Add both users as members
+        let repo = ChannelRepository::new(&state.db);
         for user_id in ids {
-            sqlx::query(
-                "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING"
-            )
-            .bind(channel.id)
-            .bind(user_id)
-            .execute(&state.db)
-            .await?;
+            repo.add_member(channel.id, user_id, "member").await?;
 
             // Broadcast event to each user individually
             let event =
@@ -368,38 +261,26 @@ async fn create_channel(
     }
 
     // Check if team exists and user is member
-    let member = sqlx::query("SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2")
-        .bind(input.team_id)
-        .bind(auth.user_id)
-        .fetch_optional(&state.db)
-        .await?;
-
-    if member.is_none() {
+    if !ChannelRepository::new(&state.db).is_team_member(input.team_id, auth.user_id).await? {
         return Err(AppError::Forbidden("Not a member of this team".to_string()));
     }
 
     // Create channel
-    let channel: Channel = sqlx::query_as(
-        r#"
-        INSERT INTO channels (team_id, name, display_name, purpose, type, creator_id)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
-        "#,
-    )
-    .bind(input.team_id)
-    .bind(&input.name)
-    .bind(&input.display_name)
-    .bind(&input.purpose)
-    .bind(input.channel_type)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let channel = ChannelRepository::new(&state.db)
+        .create(
+            input.team_id,
+            &input.channel_type.to_string(),
+            &input.name,
+            &input.display_name.unwrap_or_default(),
+            &input.purpose.unwrap_or_default(),
+            "",
+            auth.user_id,
+        )
+        .await?;
 
     // Add creator as admin member
-    sqlx::query("INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'admin')")
-        .bind(channel.id)
-        .bind(auth.user_id)
-        .execute(&state.db)
+    ChannelRepository::new(&state.db)
+        .add_member(channel.id, auth.user_id, "admin")
         .await?;
 
     // Broadcast event
@@ -436,19 +317,13 @@ async fn get_channel(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Channel>> {
     // Check membership
-    let _member: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _member = ChannelRepository::new(&state.db)
+        .require_member(id, auth.user_id)
+        .await?;
 
-    let mut channel: Channel =
-        sqlx::query_as("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
-            .bind(id)
-            .fetch_one(&state.db)
-            .await?;
+    let mut channel = ChannelRepository::new(&state.db)
+        .get_by_id(id)
+        .await?;
 
     hydrate_direct_channel_display_name(&state, auth.user_id, &mut channel).await?;
 
@@ -487,25 +362,15 @@ async fn update_channel(
     }
 
     // Update channel using a single query with COALESCE for optional fields
-    let channel: Channel = sqlx::query_as(
-        r#"
-        UPDATE channels SET
-            name = COALESCE($2, name),
-            display_name = COALESCE($3, display_name),
-            purpose = COALESCE($4, purpose),
-            header = COALESCE($5, header),
-            updated_at = NOW()
-        WHERE id = $1
-        RETURNING *
-        "#,
-    )
-    .bind(id)
-    .bind(&input.name)
-    .bind(&input.display_name)
-    .bind(&input.purpose)
-    .bind(&input.header)
-    .fetch_one(&state.db)
-    .await?;
+    let channel: Channel = ChannelRepository::new(&state.db)
+        .update(
+            id,
+            input.name.as_deref(),
+            input.display_name.as_deref(),
+            input.purpose.as_deref(),
+            input.header.as_deref(),
+        )
+        .await?;
 
     // Broadcast ChannelUpdated event
     let broadcast = WsBroadcast {
@@ -537,18 +402,13 @@ async fn delete_channel(
     }
 
     // Get channel info for the broadcast
-    let channel: Channel =
-        sqlx::query_as("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+    let channel = ChannelRepository::new(&state.db)
+        .get_by_id(id)
+        .await
+        .map_err(|_| AppError::NotFound("Channel not found".to_string()))?;
 
     // Soft delete the channel
-    sqlx::query("UPDATE channels SET deleted_at = NOW() WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
-        .await?;
+    ChannelRepository::new(&state.db).soft_delete(id).await?;
 
     // Broadcast ChannelDeleted event
     let broadcast = WsBroadcast {
@@ -577,27 +437,9 @@ async fn list_members(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Vec<ChannelMember>>> {
-    // Check membership
-    let _: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
-
-    let mut members: Vec<ChannelMember> = sqlx::query_as(
-        r#"
-        SELECT cm.*, u.username, u.display_name, u.avatar_url, u.presence
-        FROM channel_members cm
-        INNER JOIN users u ON cm.user_id = u.id
-        WHERE cm.channel_id = $1
-        ORDER BY u.username ASC
-        "#,
-    )
-    .bind(id)
-    .fetch_all(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    let _ = repo.require_member(id, auth.user_id).await?;
+    let mut members: Vec<ChannelMember> = repo.list_members(id).await?;
 
     for member in &mut members {
         member.avatar_url = normalize_avatar_url(member.user_id, member.avatar_url.as_deref());
@@ -616,21 +458,12 @@ async fn add_member(
     // Check permissions
     if auth.user_id == input.user_id {
         // User joining themselves
-        let channel: Channel =
-            sqlx::query_as("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
-                .bind(id)
-                .fetch_one(&state.db)
-                .await?;
+        let channel: Channel = ChannelRepository::new(&state.db).get_by_id(id).await?;
 
         if channel.channel_type != crate::models::ChannelType::Public {
-            let member: ChannelMember = sqlx::query_as(
-                "SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2",
-            )
-            .bind(id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+            let member = ChannelRepository::new(&state.db)
+                .require_member(id, auth.user_id)
+                .await?;
 
             if member.role != "admin" && !auth.has_permission(&permissions::CHANNEL_MANAGE) {
                 return Err(AppError::Forbidden(
@@ -641,13 +474,9 @@ async fn add_member(
         // If public, allow proceed
     } else {
         // Adding someone else - require admin
-        let member: ChannelMember =
-            sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-                .bind(id)
-                .bind(auth.user_id)
-                .fetch_optional(&state.db)
-                .await?
-                .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+        let member = ChannelRepository::new(&state.db)
+            .require_member(id, auth.user_id)
+            .await?;
 
         if member.role != "admin" && !auth.has_permission(&permissions::CHANNEL_MANAGE) {
             return Err(AppError::Forbidden(
@@ -656,33 +485,20 @@ async fn add_member(
         }
     }
 
-    let new_member: ChannelMember = sqlx::query_as(
-        r#"
-        INSERT INTO channel_members (channel_id, user_id, role)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (channel_id, user_id) DO UPDATE SET role = $3
-        RETURNING *
-        "#,
-    )
-    .bind(id)
-    .bind(input.user_id)
-    .bind(input.role.as_deref().unwrap_or("member"))
-    .fetch_one(&state.db)
-    .await?;
+    let new_member: ChannelMember = ChannelRepository::new(&state.db)
+        .upsert_member(id, input.user_id, input.role.as_deref().unwrap_or("member"))
+        .await?;
 
     // Announce join in public channels
-    let channel_type = sqlx::query_scalar::<_, crate::models::ChannelType>(
-        "SELECT type FROM channels WHERE id = $1 AND deleted_at IS NULL",
-    )
-    .bind(id)
-    .fetch_one(&state.db)
-    .await?;
+    let channel = ChannelRepository::new(&state.db)
+        .get_by_id(id)
+        .await?;
 
-    if channel_type == crate::models::ChannelType::Public {
-        let username = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
-            .bind(input.user_id)
-            .fetch_one(&state.db)
-            .await?;
+    if channel.channel_type == crate::models::ChannelType::Public {
+        let username = UserRepository::new(&state.db)
+            .get_username(input.user_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
         let _ = crate::services::posts::create_system_message(
             &state,
@@ -710,13 +526,9 @@ async fn remove_member(
 ) -> ApiResult<Json<serde_json::Value>> {
     // Check admin membership (or user removing themselves)
     if auth.user_id != user_id {
-        let member: ChannelMember =
-            sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-                .bind(channel_id)
-                .bind(auth.user_id)
-                .fetch_optional(&state.db)
-                .await?
-                .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+        let member = ChannelRepository::new(&state.db)
+            .require_member(channel_id, auth.user_id)
+            .await?;
 
         if member.role != "admin" && !auth.has_permission(&permissions::CHANNEL_MANAGE) {
             return Err(AppError::Forbidden(
@@ -725,10 +537,8 @@ async fn remove_member(
         }
     }
 
-    sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-        .bind(channel_id)
-        .bind(user_id)
-        .execute(&state.db)
+    ChannelRepository::new(&state.db)
+        .remove_member(channel_id, user_id)
         .await?;
 
     Ok(Json(serde_json::json!({"status": "removed"})))
@@ -758,36 +568,16 @@ async fn mark_channel_member_as_read(
     }
 
     // Verify membership
-    let _membership: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _membership = ChannelRepository::new(&state.db)
+        .require_member(channel_id, auth.user_id)
+        .await?;
 
     // Update last_viewed_at to mark all messages as read
-    sqlx::query(
-        "UPDATE channel_members SET last_viewed_at = NOW(), manually_unread = false, last_update_at = NOW() WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .execute(&state.db)
-    .await?;
+    let repo = ChannelRepository::new(&state.db);
+    repo.mark_channel_read(channel_id, auth.user_id).await?;
 
     // Also update channel_reads table
-    sqlx::query(
-        r#"
-        INSERT INTO channel_reads (user_id, channel_id, last_read_message_id, last_read_at)
-        VALUES ($1, $2, (SELECT MAX(seq) FROM posts WHERE channel_id = $2), NOW())
-        ON CONFLICT (user_id, channel_id)
-        DO UPDATE SET last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = NOW()
-        "#,
-    )
-    .bind(auth.user_id)
-    .bind(channel_id)
-    .execute(&state.db)
-    .await?;
+    repo.update_channel_reads_to_latest(auth.user_id, channel_id).await?;
 
     // Broadcast channel viewed event
     let broadcast = WsEnvelope::event(
@@ -833,22 +623,13 @@ async fn update_notify_props(
     }
 
     // Verify membership
-    let _membership: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _membership = ChannelRepository::new(&state.db)
+        .require_member(channel_id, auth.user_id)
+        .await?;
 
-    sqlx::query(
-        "UPDATE channel_members SET notify_props = $1 WHERE channel_id = $2 AND user_id = $3",
-    )
-    .bind(&input)
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .execute(&state.db)
-    .await?;
+    ChannelRepository::new(&state.db)
+        .update_member_notify_props(channel_id, auth.user_id, &input)
+        .await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
@@ -868,25 +649,13 @@ async fn get_channel_stats(
     Path(channel_id): Path<Uuid>,
 ) -> ApiResult<Json<ChannelStats>> {
     // Verify membership
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_id)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
+    let _membership = ChannelRepository::new(&state.db)
+        .require_member(channel_id, auth.user_id)
+        .await?;
 
-    if !is_member {
-        return Err(AppError::Forbidden(
-            "Not a member of this channel".to_string(),
-        ));
-    }
-
-    let member_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM channel_members WHERE channel_id = $1")
-            .bind(channel_id)
-            .fetch_one(&state.db)
-            .await?;
+    let member_count = ChannelRepository::new(&state.db)
+        .count_members(channel_id)
+        .await?;
 
     Ok(Json(ChannelStats {
         channel_id: channel_id.to_string(),

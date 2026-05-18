@@ -13,11 +13,13 @@ use uuid::Uuid;
 use super::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
+use crate::constants::{DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT};
 use crate::error::{ApiResult, AppError};
 use crate::models::reaction::Reaction;
 use crate::models::{
     ChannelMember, CreatePost, CreateReaction, Post, PostResponse, ThreadResponse, UpdatePost,
 };
+use crate::repositories::PostRepository;
 
 /// Build posts routes
 pub fn router() -> Router<AppState> {
@@ -85,43 +87,19 @@ async fn list_posts(
         channel_id,
         auth.user_id
     );
+
+    let repo = PostRepository::new(state.db.clone());
+
     // Check membership
-    let _: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember = repo
+        .require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     // Get read state
-    let last_read: Option<i64> = sqlx::query_scalar(
-        "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
-    )
-    .bind(auth.user_id)
-    .bind(channel_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let last_read = repo.get_channel_read(auth.user_id, channel_id).await?;
+    let first_unread = repo.get_first_unread_seq(channel_id, last_read).await?;
 
-    let first_unread: Option<i64> = match last_read {
-        Some(lr) => sqlx::query_scalar(
-            "SELECT MIN(seq) FROM posts WHERE channel_id = $1 AND seq > $2 AND deleted_at IS NULL",
-        )
-        .bind(channel_id)
-        .bind(lr)
-        .fetch_one(&state.db)
-        .await?,
-        None => {
-            sqlx::query_scalar(
-                "SELECT MIN(seq) FROM posts WHERE channel_id = $1 AND deleted_at IS NULL",
-            )
-            .bind(channel_id)
-            .fetch_one(&state.db)
-            .await?
-        }
-    };
-
-    let limit = query.limit.unwrap_or(50).min(100);
+    let limit = query.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).min(MAX_SEARCH_LIMIT);
 
     // Build SQL query safely without format!() for dynamic parts
     // Use separate condition arrays that we track in parallel with bound values
@@ -236,28 +214,17 @@ async fn get_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Post>> {
-    let post: Post = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-               is_pinned, created_at, edited_at, deleted_at,
-               reply_count::int8 as reply_count,
-               last_reply_at, seq
-        FROM posts WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let repo = PostRepository::new(state.db.clone());
+
+    let post = repo
+        .get_post_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check membership
-    let _: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(post.channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember = repo
+        .require_channel_membership(post.channel_id, auth.user_id)
+        .await?;
 
     Ok(Json(post))
 }
@@ -269,19 +236,12 @@ async fn update_post(
     Path(id): Path<Uuid>,
     Json(input): Json<UpdatePost>,
 ) -> ApiResult<Json<Post>> {
-    let post: Post = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-               is_pinned, created_at, edited_at, deleted_at,
-               reply_count::int8 as reply_count,
-               last_reply_at, seq
-        FROM posts WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let repo = PostRepository::new(state.db.clone());
+
+    let post = repo
+        .get_post_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Only author can edit
     if !auth.can_access_owned(post.user_id, &permissions::ADMIN_FULL) {
@@ -289,7 +249,7 @@ async fn update_post(
     }
 
     if input.message != post.message {
-        let post_edit_time_limit_seconds = load_post_edit_time_limit_seconds(&state).await?;
+        let post_edit_time_limit_seconds = repo.load_post_edit_time_limit_seconds().await?;
         if post_edit_time_limit_seconds == 0 {
             return Err(AppError::BadRequest(
                 "Message editing is disabled by server policy".to_string(),
@@ -308,19 +268,9 @@ async fn update_post(
         }
     }
 
-    let updated: Post = sqlx::query_as(
-        r#"
-        UPDATE posts SET message = $1, edited_at = NOW() WHERE id = $2
-        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                  is_pinned, created_at, edited_at, deleted_at,
-                  reply_count::int8 as reply_count,
-                  last_reply_at, seq
-        "#,
-    )
-    .bind(&input.message)
-    .bind(id)
-    .fetch_one(&state.db)
-    .await?;
+    let updated = repo
+        .update_post_message_returning(id, &input.message)
+        .await?;
 
     // Broadcast update
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -344,45 +294,25 @@ async fn update_post(
     Ok(Json(updated))
 }
 
-async fn load_post_edit_time_limit_seconds(state: &AppState) -> ApiResult<i64> {
-    let limit = sqlx::query_scalar::<_, i64>(
-        "SELECT COALESCE((site->>'post_edit_time_limit_seconds')::bigint, -1) FROM server_config WHERE id = 'default'",
-    )
-    .fetch_optional(&state.db)
-    .await?
-    .unwrap_or(-1);
-    Ok(limit)
-}
-
 /// Soft delete a post
 async fn delete_post(
     State(state): State<AppState>,
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post: Post = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-               is_pinned, created_at, edited_at, deleted_at,
-               reply_count::int8 as reply_count,
-               last_reply_at, seq
-        FROM posts WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let repo = PostRepository::new(state.db.clone());
+
+    let post = repo
+        .get_post_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Only author or admin can delete
     if !auth.can_access_owned(post.user_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden("Cannot delete this post".to_string()));
     }
 
-    sqlx::query("UPDATE posts SET deleted_at = NOW() WHERE id = $1")
-        .bind(id)
-        .execute(&state.db)
-        .await?;
+    repo.soft_delete_post_simple(id).await?;
 
     // Broadcast deletion
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -433,13 +363,9 @@ async fn get_thread(
         .next()
         .ok_or_else(|| AppError::NotFound("Thread not found".to_string()))?;
 
-    let _: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(first_post.channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember = PostRepository::new(state.db.clone())
+        .require_channel_membership(first_post.channel_id, auth.user_id)
+        .await?;
 
     Ok(Json(thread_response))
 }
@@ -451,42 +377,21 @@ async fn add_reaction(
     Path(id): Path<Uuid>,
     Json(input): Json<CreateReaction>,
 ) -> ApiResult<Json<Reaction>> {
-    let post: Post = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-               is_pinned, created_at, edited_at, deleted_at,
-               reply_count::int8 as reply_count,
-               last_reply_at, seq
-        FROM posts WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let repo = PostRepository::new(state.db.clone());
+
+    let post = repo
+        .get_post_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check membership
-    let _: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(post.channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember = repo
+        .require_channel_membership(post.channel_id, auth.user_id)
+        .await?;
 
-    let reaction: Reaction = sqlx::query_as(
-        r#"
-        INSERT INTO reactions (post_id, user_id, emoji_name)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (post_id, user_id, emoji_name) DO UPDATE SET create_at = extract(epoch from now()) * 1000
-        RETURNING *
-        "#,
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .bind(&input.emoji_name)
-    .fetch_one(&state.db)
-    .await?;
+    let reaction = repo
+        .add_reaction(id, auth.user_id, &input.emoji_name)
+        .await?;
 
     // Broadcast reaction
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -511,26 +416,12 @@ async fn remove_reaction(
     auth: AuthUser,
     Path((id, emoji)): Path<(Uuid, String)>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // Get post to find channel_id for broadcast
-    let post: Option<Post> = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-               is_pinned, created_at, edited_at, deleted_at,
-               reply_count::int8 as reply_count,
-               last_reply_at, seq
-        FROM posts WHERE id = $1
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?;
+    let repo = PostRepository::new(state.db.clone());
 
-    sqlx::query("DELETE FROM reactions WHERE post_id = $1 AND user_id = $2 AND emoji_name = $3")
-        .bind(id)
-        .bind(auth.user_id)
-        .bind(&emoji)
-        .execute(&state.db)
-        .await?;
+    // Get post to find channel_id for broadcast
+    let post = repo.get_post_by_id(id).await?;
+
+    repo.remove_reaction(id, auth.user_id, &emoji).await?;
 
     if let Some(p) = post {
         let broadcast = crate::realtime::WsEnvelope::event(
@@ -560,45 +451,23 @@ async fn pin_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Post>> {
-    let post: Post = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-               is_pinned, created_at, edited_at, deleted_at,
-               reply_count::int8 as reply_count,
-               last_reply_at, seq
-        FROM posts WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let repo = PostRepository::new(state.db.clone());
+
+    let post = repo
+        .get_post_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check admin membership
-    let member: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(post.channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let member = repo
+        .require_channel_membership(post.channel_id, auth.user_id)
+        .await?;
 
     if member.role != "admin" && !auth.has_permission(&permissions::CHANNEL_MANAGE) {
         return Err(AppError::Forbidden("Only admins can pin posts".to_string()));
     }
 
-    let pinned: Post = sqlx::query_as(
-        r#"
-        UPDATE posts SET is_pinned = true WHERE id = $1
-        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                  is_pinned, created_at, edited_at, deleted_at,
-                  reply_count::int8 as reply_count,
-                  last_reply_at, seq
-        "#,
-    )
-    .bind(id)
-    .fetch_one(&state.db)
-    .await?;
+    let pinned = repo.pin_post_returning(id).await?;
 
     // Broadcast pin change
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -627,28 +496,17 @@ async fn unpin_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<Post>> {
-    let post: Post = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-               is_pinned, created_at, edited_at, deleted_at,
-               reply_count::int8 as reply_count,
-               last_reply_at, seq
-        FROM posts WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let repo = PostRepository::new(state.db.clone());
+
+    let post = repo
+        .get_post_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
     // Check admin membership
-    let member: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(post.channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let member = repo
+        .require_channel_membership(post.channel_id, auth.user_id)
+        .await?;
 
     if member.role != "admin" && !auth.has_permission(&permissions::CHANNEL_MANAGE) {
         return Err(AppError::Forbidden(
@@ -656,18 +514,7 @@ async fn unpin_post(
         ));
     }
 
-    let unpinned: Post = sqlx::query_as(
-        r#"
-        UPDATE posts SET is_pinned = false WHERE id = $1
-        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                  is_pinned, created_at, edited_at, deleted_at,
-                  reply_count::int8 as reply_count,
-                  last_reply_at, seq
-        "#,
-    )
-    .bind(id)
-    .fetch_one(&state.db)
-    .await?;
+    let unpinned = repo.unpin_post_returning(id).await?;
 
     // Broadcast pin change
     let broadcast = crate::realtime::WsEnvelope::event(
@@ -701,45 +548,21 @@ async fn save_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    // Verify post exists
-    let _post: Post = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-               is_pinned, created_at, edited_at, deleted_at,
-               reply_count::int8 as reply_count,
-               last_reply_at, seq
-        FROM posts WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let repo = PostRepository::new(state.db.clone());
 
-    // Check if membership is needed? Usually saving implies you can see it.
-    // If list_posts filters by membership, saving implies you have access.
-    // We can skip explicit membership check here if we assume valid post ID is sufficient.
-    // Let's add a quick membership check.
-    let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
-        .bind(id)
-        .fetch_one(&state.db)
+    // Verify post exists
+    let _post = repo
+        .get_post_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+
+    let channel_id = repo.get_post_channel_id(id).await?;
+
+    let _: ChannelMember = repo
+        .require_channel_membership(channel_id, auth.user_id)
         .await?;
 
-    let _: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(auth.user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
-
-    sqlx::query(
-        "INSERT INTO saved_posts (user_id, post_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-    )
-    .bind(auth.user_id)
-    .bind(id)
-    .execute(&state.db)
-    .await?;
+    repo.save_post(auth.user_id, id).await?;
 
     Ok(Json(serde_json::json!({"status": "saved"})))
 }
@@ -750,11 +573,8 @@ async fn unsave_post(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    sqlx::query("DELETE FROM saved_posts WHERE user_id = $1 AND post_id = $2")
-        .bind(auth.user_id)
-        .bind(id)
-        .execute(&state.db)
-        .await?;
+    let repo = PostRepository::new(state.db.clone());
+    repo.unsave_post(auth.user_id, id).await?;
 
     Ok(Json(serde_json::json!({"status": "unsaved"})))
 }
@@ -803,11 +623,9 @@ async fn populate_reactions(state: &AppState, posts: &mut [PostResponse]) -> Api
 
     let post_ids: Vec<Uuid> = posts.iter().map(|p| p.id).collect();
 
-    let reactions: Vec<Reaction> =
-        sqlx::query_as("SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY create_at")
-            .bind(&post_ids)
-            .fetch_all(&state.db)
-            .await?;
+    let reactions = PostRepository::new(state.db.clone())
+        .get_reactions_for_posts(&post_ids)
+        .await?;
 
     let mut reaction_map: HashMap<Uuid, Vec<Reaction>> = HashMap::new();
     for r in reactions {
@@ -848,13 +666,9 @@ async fn populate_saved_status(
 
     let post_ids: Vec<Uuid> = posts.iter().map(|p| p.id).collect();
 
-    let saved_ids: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT post_id FROM saved_posts WHERE user_id = $1 AND post_id = ANY($2)",
-    )
-    .bind(user_id)
-    .bind(&post_ids)
-    .fetch_all(&state.db)
-    .await?;
+    let saved_ids = PostRepository::new(state.db.clone())
+        .get_saved_post_ids(user_id, &post_ids)
+        .await?;
 
     let saved_set: std::collections::HashSet<Uuid> = saved_ids.into_iter().collect();
 

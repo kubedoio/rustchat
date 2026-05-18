@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useToast } from '../../composables/useToast'
 import { adminApi, type SsoConfig, type CreateSsoConfigRequest, type AuthConfig } from '../../api/admin'
 import { Shield, Plus, Edit2, Trash2, TestTube, AlertCircle, CheckCircle, HelpCircle } from 'lucide-vue-next'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const toast = useToast()
 
@@ -229,8 +230,8 @@ async function saveConfig() {
     }
     
     await loadSsoConfigs()
-  } catch (error: any) {
-    const message = error.response?.data?.error || 'Failed to save SSO configuration'
+  } catch (error: unknown) {
+    const message = getApiErrorMessage(error) || 'Failed to save SSO configuration'
     toast.error(message)
   } finally {
     loading.value = false
@@ -259,10 +260,10 @@ async function testConfig(config: SsoConfig) {
   try {
     const response = await adminApi.testSsoConfig(config.id)
     testResult.value = response.data
-  } catch (error: any) {
+  } catch (error: unknown) {
     testResult.value = {
       success: false,
-      message: error.response?.data?.error || 'Test failed',
+      message: getApiErrorMessage(error) || 'Test failed',
       details: null,
     }
   }
@@ -544,7 +545,7 @@ function getProviderBadgeClass(type: string) {
             <div class="flex flex-wrap gap-2 mb-2">
               <span
                 v-for="(scope, index) in form.scopes"
-                :key="index"
+                :key="scope"
                 class="inline-flex items-center px-2 py-1 bg-brand/10 text-brand rounded text-sm"
               >
                 {{ scope }}
@@ -573,7 +574,7 @@ function getProviderBadgeClass(type: string) {
             <div class="flex flex-wrap gap-2 mb-2">
               <span
                 v-for="(domain, index) in (form.allow_domains || [])"
-                :key="index"
+                :key="domain"
                 class="inline-flex items-center px-2 py-1 bg-success/10 text-success rounded text-sm"
               >
                 {{ domain }}

@@ -3,8 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import SettingItemMin from '../SettingItemMin.vue'
 import SettingItemMax from '../SettingItemMax.vue'
 import ThemeEditor from './ThemeEditor.vue'
-import { useThemeStore, THEME_OPTIONS, type Theme } from '../../../stores/theme'
-import { usePreferencesStore } from '../../../stores/preferences'
+import { useThemeStore, THEME_OPTIONS, type Theme } from '../../../features/theme/stores/themeStore'
+import { usePreferencesStore } from '../../../features/preferences/stores/preferencesStore'
 
 
 const themeStore = useThemeStore()

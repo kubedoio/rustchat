@@ -4,6 +4,7 @@ import callsApi, { type CallState, type CallsConfig } from '../api/calls'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useToast } from '../composables/useToast'
 import { useAuthStore } from './auth'
+import { getErrorMessage, isNotFoundError } from '../core/errors/errorUtils'
 
 export interface CurrentCall {
     channelId: string
@@ -48,16 +49,16 @@ export const useCallsStore = defineStore('calls', () => {
         return activeCalls.value.get(channelId)
     })
 
-    function readEventChannelId(data: any): string | undefined {
-        return data?.channel_id_raw || data?.channel_id
+    function readEventChannelId(data: Record<string, unknown>): string | undefined {
+        return (data.channel_id_raw || data.channel_id) as string | undefined
     }
 
-    function readEventUserId(data: any): string | undefined {
-        return data?.user_id_raw || data?.user_id
+    function readEventUserId(data: Record<string, unknown>): string | undefined {
+        return (data.user_id_raw || data.user_id) as string | undefined
     }
 
-    function readEventSessionId(data: any): string | undefined {
-        return data?.session_id_raw || data?.session_id
+    function readEventSessionId(data: Record<string, unknown>): string | undefined {
+        return (data.session_id_raw || data.session_id) as string | undefined
     }
 
     function findMySessionId(call: CallState): string {
@@ -349,9 +350,9 @@ export const useCallsStore = defineStore('calls', () => {
                 activeCalls.value.delete(channelId)
             }
             return data
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Silently handle 404s as they just mean there's no active call in the channel
-            if (error?.response?.status !== 404) {
+            if (!isNotFoundError(error)) {
                 console.error('Failed to load call for channel', error)
             }
             return null
@@ -401,11 +402,11 @@ export const useCallsStore = defineStore('calls', () => {
             toast.success('Call started', 'You are now in a call')
 
             return callData
-        } catch (error: any) {
+        } catch (error: unknown) {
             cleanupWebRTC()
             currentCall.value = null
             console.error('Failed to start call', error)
-            toast.error('Failed to start call', error.message || 'Unknown error')
+            toast.error('Failed to start call', getErrorMessage(error))
             throw error
         }
     }
@@ -456,11 +457,11 @@ export const useCallsStore = defineStore('calls', () => {
             isExpanded.value = true
             toast.success('Joined call', 'You are now in the call')
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             cleanupWebRTC()
             currentCall.value = null
             console.error('Failed to join call', error)
-            toast.error('Failed to join call', error.message || 'Unknown error')
+            toast.error('Failed to join call', getErrorMessage(error))
             throw error
         }
     }

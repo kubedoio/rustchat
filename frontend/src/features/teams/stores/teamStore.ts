@@ -1,51 +1,54 @@
-// Team Store - Pure state management for teams
+// Team Store - Compatible with legacy stores/teams.ts API
 
 import { defineStore } from 'pinia'
-import { ref, computed, readonly } from 'vue'
-import type { Team, TeamId, TeamMember } from '../../../core/entities/Team'
+import { ref, computed } from 'vue'
+import { useStorage } from '@vueuse/core'
+import { teamsApi, type Team, type CreateTeamRequest, type TeamMember } from '../../../api/teams'
+import type { TeamId } from '../../../core/entities/Team'
+import { getApiErrorMessage } from '../../../core/errors/errorUtils'
 
 export const useTeamStore = defineStore('teamStore', () => {
-  // State
-  const teams = ref<Map<TeamId, Team>>(new Map())
+  // Internal Map for feature architecture compatibility
+  const _teamsMap = ref<Map<TeamId, Team>>(new Map())
   const publicTeams = ref<Team[]>([])
   const members = ref<TeamMember[]>([])
-  const currentTeamId = ref<TeamId | null>(null)
+  const currentTeamId = useStorage<TeamId | null>('active_team_id', null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // Getters
-  const allTeams = computed(() => Array.from(teams.value.values()))
+  // Legacy-compatible computed: teams as Array
+  const teams = computed(() => Array.from(_teamsMap.value.values()))
 
   const currentTeam = computed(() => {
     if (!currentTeamId.value) return null
-    return teams.value.get(currentTeamId.value) || null
+    return _teamsMap.value.get(currentTeamId.value) || null
   })
 
-  // Actions
+  // Actions - Simple state mutations (feature architecture)
   function setTeams(items: Team[]) {
-    teams.value.clear()
+    _teamsMap.value.clear()
     for (const team of items) {
-      teams.value.set(team.id, team)
+      _teamsMap.value.set(team.id, team)
     }
   }
 
   function addTeam(team: Team) {
-    teams.value.set(team.id, team)
+    _teamsMap.value.set(team.id, team)
   }
 
   function updateTeam(team: Team) {
-    const existing = teams.value.get(team.id)
+    const existing = _teamsMap.value.get(team.id)
     if (existing) {
-      teams.value.set(team.id, { ...existing, ...team })
+      _teamsMap.value.set(team.id, { ...existing, ...team })
     }
   }
 
   function removeTeam(teamId: TeamId) {
-    teams.value.delete(teamId)
-    
+    _teamsMap.value.delete(teamId)
+
     // If we removed the current team, select another
     if (currentTeamId.value === teamId) {
-      const remaining = allTeams.value
+      const remaining = teams.value
       currentTeamId.value = remaining[0]?.id || null
     }
   }
@@ -75,36 +78,140 @@ export const useTeamStore = defineStore('teamStore', () => {
   }
 
   function clear() {
-    teams.value.clear()
+    _teamsMap.value.clear()
     publicTeams.value = []
     members.value = []
     currentTeamId.value = null
   }
 
+  // Legacy async methods
+  async function fetchTeams() {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await teamsApi.list()
+      _teamsMap.value.clear()
+      for (const team of response.data) {
+        _teamsMap.value.set(team.id, team)
+      }
+      // Auto-select first team if none selected
+      if (!currentTeamId.value && response.data.length > 0) {
+        currentTeamId.value = response.data[0]?.id || null
+      }
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to fetch teams'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchPublicTeams() {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await teamsApi.listPublic()
+      publicTeams.value = response.data
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to fetch public teams'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function joinTeam(teamId: string) {
+    loading.value = true
+    error.value = null
+    try {
+      await teamsApi.join(teamId)
+      // Refresh user's teams
+      await fetchTeams()
+      // Select the joined team
+      currentTeamId.value = teamId
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to join team'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function leaveTeam(teamId: string) {
+    loading.value = true
+    error.value = null
+    try {
+      await teamsApi.leave(teamId)
+      // Remove from local teams list
+      removeTeam(teamId)
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to leave team'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function createTeam(data: CreateTeamRequest) {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await teamsApi.create(data)
+      addTeam(response.data)
+      return response.data
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to create team'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function selectTeam(teamId: string) {
+    currentTeamId.value = teamId
+  }
+
+  async function fetchMembers(teamId: string) {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await teamsApi.getMembers(teamId)
+      members.value = response.data
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to fetch members'
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
-    // State (readonly)
-    teams: readonly(teams),
-    publicTeams: readonly(publicTeams),
-    members: readonly(members),
-    currentTeamId: readonly(currentTeamId),
-    loading: readonly(loading),
-    error: readonly(error),
-
-    // Getters
-    allTeams,
+    // State
+    teams,
+    publicTeams,
+    members,
+    currentTeamId,
     currentTeam,
+    loading,
+    error,
 
-    // Actions
+    // Feature actions
     setTeams,
     addTeam,
     updateTeam,
-    removeTeam,
     setPublicTeams,
     setCurrentTeamId,
     setMembers,
     setLoading,
     setError,
     clearError,
-    clear
+    clear,
+
+    // Legacy actions
+    fetchTeams,
+    fetchPublicTeams,
+    joinTeam,
+    leaveTeam,
+    createTeam,
+    selectTeam,
+    fetchMembers,
+    removeTeam
   }
 })

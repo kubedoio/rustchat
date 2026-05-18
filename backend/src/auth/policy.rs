@@ -3,6 +3,7 @@
 //! Provides a centralized permission system for access control.
 //! Supports both role-based and resource-based permissions.
 
+use crate::constants::*;
 use std::collections::HashSet;
 use uuid::Uuid;
 
@@ -107,7 +108,7 @@ impl Role {
         permissions.insert(POST_DELETE); // Can delete any post
 
         Self {
-            name: "system_admin".to_string(),
+            name: ROLE_SYSTEM_ADMIN.to_string(),
             permissions,
         }
     }
@@ -124,7 +125,7 @@ impl Role {
         permissions.insert(POST_DELETE); // Can delete posts in their teams
 
         Self {
-            name: "team_admin".to_string(),
+            name: ROLE_TEAM_ADMIN.to_string(),
             permissions,
         }
     }
@@ -143,7 +144,7 @@ impl Role {
         permissions.insert(POST_DELETE);
 
         Self {
-            name: "org_admin".to_string(),
+            name: ROLE_ORG_ADMIN.to_string(),
             permissions,
         }
     }
@@ -167,7 +168,7 @@ impl Role {
         permissions.insert(SYSTEM_READ);
 
         Self {
-            name: "member".to_string(),
+            name: ROLE_MEMBER.to_string(),
             permissions,
         }
     }
@@ -184,7 +185,7 @@ impl Role {
         permissions.insert(FILE_READ);
 
         Self {
-            name: "guest".to_string(),
+            name: ROLE_GUEST.to_string(),
             permissions,
         }
     }
@@ -197,12 +198,12 @@ impl Role {
     /// Get role by name
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
-            "system_admin" => Some(Self::system_admin()),
-            "team_admin" => Some(Self::team_admin()),
-            "org_admin" => Some(Self::org_admin()),
-            "admin" => Some(Self::org_admin()), // Alias
-            "member" => Some(Self::member()),
-            "guest" => Some(Self::guest()),
+            ROLE_SYSTEM_ADMIN => Some(Self::system_admin()),
+            ROLE_TEAM_ADMIN => Some(Self::team_admin()),
+            ROLE_ORG_ADMIN => Some(Self::org_admin()),
+            ROLE_ADMIN => Some(Self::org_admin()), // Alias
+            ROLE_MEMBER => Some(Self::member()),
+            ROLE_GUEST => Some(Self::guest()),
             _ => None,
         }
     }

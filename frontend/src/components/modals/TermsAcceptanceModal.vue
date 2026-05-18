@@ -1,22 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { FileText, CheckCircle, AlertTriangle } from 'lucide-vue-next';
-import { HttpClient } from '../../api/http/HttpClient';
-
-// Create v4 API client
-const v4Api = new HttpClient({
-    baseURL: '/api/v4',
-    requestInterceptor: (config) => {
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-            config.headers = {
-                ...config.headers,
-                Authorization: `Bearer ${token}`,
-            };
-        }
-        return config;
-    },
-});
+import { v4Api } from '../../api/client';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 interface TermsOfService {
     id: string;
@@ -61,7 +47,7 @@ async function checkTermsStatus() {
             // Terms already accepted or no active terms
             emit('accepted');
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Failed to check terms status', e);
         // On error, allow the user through
         emit('accepted');
@@ -80,8 +66,8 @@ async function acceptTerms() {
         });
         show.value = false;
         emit('accepted');
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to accept terms. Please try again.';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to accept terms. Please try again.';
     } finally {
         submitting.value = false;
     }

@@ -19,6 +19,7 @@ use crate::models::channel_bookmark::{
     UpdateBookmarkRequest,
 };
 use crate::realtime::{WsBroadcast, WsEnvelope};
+use crate::repositories::{BookmarkRepository, ChannelRepository};
 
 /// Build channel bookmarks routes
 pub fn router() -> Router<AppState> {
@@ -51,32 +52,16 @@ async fn get_channel_bookmarks(
     let channel_uuid = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| AppError::BadRequest("Invalid channel ID".to_string()))?;
 
-    // Verify membership (system admins bypass)
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_uuid)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
-
+    let repo = ChannelRepository::new(&state.db);
+    let is_member = repo.is_channel_member(channel_uuid, auth.user_id).await?;
     if !is_member {
         return Err(AppError::Forbidden(
             "Not a member of this channel".to_string(),
         ));
     }
 
-    let bookmarks: Vec<ChannelBookmark> = sqlx::query_as(
-        r#"
-        SELECT id, channel_id, owner_id, type, display_name, link_url, file_id, emoji, sort_order, image_url, create_at, update_at, delete_at
-        FROM channel_bookmarks
-        WHERE channel_id = $1 AND delete_at = 0
-        ORDER BY sort_order ASC, create_at ASC
-        "#,
-    )
-    .bind(channel_uuid)
-    .fetch_all(&state.db)
-    .await?;
+    let bookmark_repo = BookmarkRepository::new(&state.db);
+    let bookmarks = bookmark_repo.list_for_channel(channel_uuid).await?;
 
     let responses: Vec<BookmarkResponse> = bookmarks.into_iter().map(Into::into).collect();
     Ok(Json(responses))
@@ -93,15 +78,8 @@ async fn create_bookmark(
     let channel_uuid = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| AppError::BadRequest("Invalid channel ID".to_string()))?;
 
-    // Validate channel exists and user is member
-    let is_member: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
-    )
-    .bind(channel_uuid)
-    .bind(auth.user_id)
-    .fetch_one(&state.db)
-    .await?;
-
+    let repo = ChannelRepository::new(&state.db);
+    let is_member = repo.is_channel_member(channel_uuid, auth.user_id).await?;
     if !is_member {
         return Err(AppError::Forbidden(
             "Not a member of this channel".to_string(),
@@ -133,25 +111,19 @@ async fn create_bookmark(
     let now = Utc::now().timestamp_millis();
     let sort_order = body.sort_order.unwrap_or(0);
 
-    let bookmark: ChannelBookmark = sqlx::query_as(
-        r#"
-        INSERT INTO channel_bookmarks (channel_id, owner_id, type, display_name, link_url, file_id, emoji, sort_order, image_url, create_at, update_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
-        RETURNING id, channel_id, owner_id, type, display_name, link_url, file_id, emoji, sort_order, image_url, create_at, update_at, delete_at
-        "#,
-    )
-    .bind(channel_uuid)
-    .bind(auth.user_id)
-    .bind(&body.r#type)
-    .bind(&body.display_name)
-    .bind(&body.link_url)
-    .bind(file_uuid)
-    .bind(&body.emoji)
-    .bind(sort_order)
-    .bind(&body.image_url)
-    .bind(now)
-    .fetch_one(&state.db)
-    .await?;
+    let bookmark_repo = BookmarkRepository::new(&state.db);
+    let bookmark = bookmark_repo.create(
+        channel_uuid,
+        auth.user_id,
+        &body.r#type,
+        body.display_name.as_deref(),
+        body.link_url.as_deref(),
+        file_uuid,
+        body.emoji.as_deref(),
+        sort_order,
+        body.image_url.as_deref(),
+        now,
+    ).await?;
 
     // Broadcast event
     broadcast_bookmark_event(&state, "channel_bookmark_created", &bookmark).await;
@@ -172,16 +144,9 @@ async fn update_bookmark(
     let bookmark_uuid = parse_mm_or_uuid(&bookmark_id)
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark ID".to_string()))?;
 
-    // Check ownership or admin
-    let owner_id: Option<Uuid> = sqlx::query_scalar(
-        "SELECT owner_id FROM channel_bookmarks WHERE id = $1 AND channel_id = $2 AND delete_at = 0"
-    )
-    .bind(bookmark_uuid)
-    .bind(channel_uuid)
-    .fetch_optional(&state.db)
-    .await?;
-
-    let owner_id = owner_id.ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
+    let bookmark_repo = BookmarkRepository::new(&state.db);
+    let owner_id = bookmark_repo.get_owner_id(bookmark_uuid, channel_uuid).await?
+        .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     if owner_id != auth.user_id && !auth.has_role("admin") {
         return Err(AppError::Forbidden(
@@ -191,29 +156,16 @@ async fn update_bookmark(
 
     let now = Utc::now().timestamp_millis();
 
-    let bookmark: ChannelBookmark = sqlx::query_as(
-        r#"
-        UPDATE channel_bookmarks
-        SET display_name = COALESCE($3, display_name),
-            link_url = COALESCE($4, link_url),
-            emoji = COALESCE($5, emoji),
-            sort_order = COALESCE($6, sort_order),
-            image_url = COALESCE($7, image_url),
-            update_at = $8
-        WHERE id = $1 AND channel_id = $2 AND delete_at = 0
-        RETURNING id, channel_id, owner_id, type, display_name, link_url, file_id, emoji, sort_order, image_url, create_at, update_at, delete_at
-        "#,
-    )
-    .bind(bookmark_uuid)
-    .bind(channel_uuid)
-    .bind(&body.display_name)
-    .bind(&body.link_url)
-    .bind(&body.emoji)
-    .bind(body.sort_order)
-    .bind(&body.image_url)
-    .bind(now)
-    .fetch_one(&state.db)
-    .await?;
+    let bookmark = bookmark_repo.update(
+        bookmark_uuid,
+        channel_uuid,
+        body.display_name.as_deref(),
+        body.link_url.as_deref(),
+        body.emoji.as_deref(),
+        body.sort_order,
+        body.image_url.as_deref(),
+        now,
+    ).await?;
 
     // Broadcast event
     broadcast_bookmark_event(&state, "channel_bookmark_updated", &bookmark).await;
@@ -233,16 +185,9 @@ async fn delete_bookmark(
     let bookmark_uuid = parse_mm_or_uuid(&bookmark_id)
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark ID".to_string()))?;
 
-    // Check ownership or admin
-    let bookmark: Option<ChannelBookmark> = sqlx::query_as(
-        "SELECT id, channel_id, owner_id, type, display_name, link_url, file_id, emoji, sort_order, image_url, create_at, update_at, delete_at FROM channel_bookmarks WHERE id = $1 AND channel_id = $2 AND delete_at = 0"
-    )
-    .bind(bookmark_uuid)
-    .bind(channel_uuid)
-    .fetch_optional(&state.db)
-    .await?;
-
-    let bookmark = bookmark.ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
+    let bookmark_repo = BookmarkRepository::new(&state.db);
+    let bookmark = bookmark_repo.get(bookmark_uuid, channel_uuid).await?
+        .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     if bookmark.owner_id != auth.user_id && !auth.has_role("admin") {
         return Err(AppError::Forbidden(
@@ -252,13 +197,7 @@ async fn delete_bookmark(
 
     let now = Utc::now().timestamp_millis();
 
-    // Soft delete
-    sqlx::query("UPDATE channel_bookmarks SET delete_at = $3 WHERE id = $1 AND channel_id = $2")
-        .bind(bookmark_uuid)
-        .bind(channel_uuid)
-        .bind(now)
-        .execute(&state.db)
-        .await?;
+    bookmark_repo.soft_delete(bookmark_uuid, channel_uuid, now).await?;
 
     // Broadcast event
     broadcast_bookmark_event(&state, "channel_bookmark_deleted", &bookmark).await;
@@ -279,16 +218,9 @@ async fn reorder_bookmark(
     let bookmark_uuid = parse_mm_or_uuid(&bookmark_id)
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark ID".to_string()))?;
 
-    // Check ownership or admin
-    let bookmark: Option<ChannelBookmark> = sqlx::query_as(
-        "SELECT id, channel_id, owner_id, type, display_name, link_url, file_id, emoji, sort_order, image_url, create_at, update_at, delete_at FROM channel_bookmarks WHERE id = $1 AND channel_id = $2 AND delete_at = 0"
-    )
-    .bind(bookmark_uuid)
-    .bind(channel_uuid)
-    .fetch_optional(&state.db)
-    .await?;
-
-    let bookmark = bookmark.ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
+    let bookmark_repo = BookmarkRepository::new(&state.db);
+    let bookmark = bookmark_repo.get(bookmark_uuid, channel_uuid).await?
+        .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     if bookmark.owner_id != auth.user_id && !auth.has_role("admin") {
         return Err(AppError::Forbidden(
@@ -298,20 +230,7 @@ async fn reorder_bookmark(
 
     let now = Utc::now().timestamp_millis();
 
-    let bookmark: ChannelBookmark = sqlx::query_as(
-        r#"
-        UPDATE channel_bookmarks
-        SET sort_order = $3, update_at = $4
-        WHERE id = $1 AND channel_id = $2 AND delete_at = 0
-        RETURNING id, channel_id, owner_id, type, display_name, link_url, file_id, emoji, sort_order, image_url, create_at, update_at, delete_at
-        "#,
-    )
-    .bind(bookmark_uuid)
-    .bind(channel_uuid)
-    .bind(body.sort_order)
-    .bind(now)
-    .fetch_one(&state.db)
-    .await?;
+    let bookmark = bookmark_repo.reorder(bookmark_uuid, channel_uuid, body.sort_order, now).await?;
 
     // Broadcast event
     broadcast_bookmark_event(&state, "channel_bookmark_sorted", &bookmark).await;

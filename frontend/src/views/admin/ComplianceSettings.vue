@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
-import { useAdminStore } from '../../stores/admin';
+import { useAdminStore } from '../../features/admin/stores/adminStore';
 import { Scale, Trash2, Save, AlertCircle, CheckCircle, Download } from 'lucide-vue-next';
 import api from '../../api/client';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const adminStore = useAdminStore();
 
@@ -40,8 +41,8 @@ const saveSettings = async () => {
         await adminStore.updateConfig('compliance', form.value);
         saveSuccess.value = true;
         setTimeout(() => saveSuccess.value = false, 3000);
-    } catch (e: any) {
-        saveError.value = e.response?.data?.message || 'Failed to save settings';
+    } catch (e: unknown) {
+        saveError.value = getApiErrorMessage(e) || 'Failed to save settings';
     } finally {
         saving.value = false;
     }

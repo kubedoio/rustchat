@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { teamsApi, type Team, type CreateTeamRequest, type TeamMember } from '../api/teams'
+import { getApiErrorMessage } from '../core/errors/errorUtils'
 
 export const useTeamStore = defineStore('teams', () => {
     const teams = ref<Team[]>([])
@@ -25,8 +26,8 @@ export const useTeamStore = defineStore('teams', () => {
             if (!currentTeamId.value && teams.value.length > 0) {
                 currentTeamId.value = teams.value[0]?.id || null
             }
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to fetch teams'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to fetch teams'
         } finally {
             loading.value = false
         }
@@ -38,8 +39,8 @@ export const useTeamStore = defineStore('teams', () => {
         try {
             const response = await teamsApi.listPublic()
             publicTeams.value = response.data
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to fetch public teams'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to fetch public teams'
         } finally {
             loading.value = false
         }
@@ -54,8 +55,8 @@ export const useTeamStore = defineStore('teams', () => {
             await fetchTeams()
             // Select the joined team
             currentTeamId.value = teamId
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to join team'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to join team'
             throw e
         } finally {
             loading.value = false
@@ -72,8 +73,8 @@ export const useTeamStore = defineStore('teams', () => {
             if (currentTeamId.value === teamId) {
                 currentTeamId.value = teams.value[0]?.id || null
             }
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to leave team'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to leave team'
             throw e
         } finally {
             loading.value = false
@@ -87,8 +88,8 @@ export const useTeamStore = defineStore('teams', () => {
             const response = await teamsApi.create(data)
             teams.value.push(response.data)
             return response.data
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to create team'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to create team'
             throw e
         } finally {
             loading.value = false
@@ -105,8 +106,8 @@ export const useTeamStore = defineStore('teams', () => {
         try {
             const response = await teamsApi.getMembers(teamId)
             members.value = response.data
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to fetch members'
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to fetch members'
         } finally {
             loading.value = false
         }

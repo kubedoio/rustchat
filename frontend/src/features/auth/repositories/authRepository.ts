@@ -134,31 +134,32 @@ export const authRepository = {
 }
 
 // Normalize API user response to domain entity
-function normalizeUser(raw: any): User {
-  const customStatus = raw.custom_status || {
-    text: raw.status_text,
-    emoji: raw.status_emoji,
-    expires_at: raw.status_expires_at
+function normalizeUser(raw: unknown): User {
+  const r = raw as Record<string, unknown>
+  const customStatus = (r.custom_status as Record<string, unknown> | undefined) || {
+    text: r.status_text,
+    emoji: r.status_emoji,
+    expires_at: r.status_expires_at
   }
 
   return {
-    id: raw.id as UserId,
-    username: raw.username,
-    email: raw.email,
-    displayName: raw.display_name,
-    avatarUrl: raw.avatar_url || raw.profile_image,
-    role: raw.role || 'user',
-    presence: raw.presence || 'offline',
-    isActive: raw.is_active !== false, // Default to true if not specified
-    isBot: raw.is_bot || false,
-    timezone: raw.timezone,
-    locale: raw.locale,
+    id: r.id as UserId,
+    username: r.username as string,
+    email: r.email as string,
+    displayName: r.display_name as string,
+    avatarUrl: (r.avatar_url || r.profile_image) as string | undefined,
+    role: (r.role as string) || 'user',
+    presence: (r.presence as string) || 'offline',
+    isActive: r.is_active !== false, // Default to true if not specified
+    isBot: Boolean(r.is_bot),
+    timezone: r.timezone as string | undefined,
+    locale: r.locale as string | undefined,
     customStatus: customStatus.text || customStatus.emoji ? {
-      emoji: customStatus.emoji,
-      text: customStatus.text,
-      expiresAt: customStatus.expires_at ? new Date(customStatus.expires_at) : undefined
+      emoji: customStatus.emoji as string | undefined,
+      text: customStatus.text as string | undefined,
+      expiresAt: customStatus.expires_at ? new Date(customStatus.expires_at as string | number) : undefined
     } : undefined,
-    createdAt: new Date(raw.created_at || Date.now()),
-    updatedAt: new Date(raw.updated_at || raw.created_at || Date.now())
+    createdAt: new Date((r.created_at || Date.now()) as string | number),
+    updatedAt: new Date((r.updated_at || r.created_at || Date.now()) as string | number)
   }
 }

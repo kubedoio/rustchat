@@ -34,7 +34,7 @@ export const usePlaybookStore = defineStore('playbooks', () => {
         }
     }
 
-    async function createPlaybook(data: any) {
+    async function createPlaybook(data: Record<string, unknown>) {
         if (!teamStore.currentTeamId) return
         try {
             const response = await playbooksApi.create(teamStore.currentTeamId, data)
@@ -45,7 +45,7 @@ export const usePlaybookStore = defineStore('playbooks', () => {
         }
     }
 
-    async function updatePlaybook(id: string, data: any) {
+    async function updatePlaybook(id: string, data: Record<string, unknown>) {
         loading.value = true
         try {
             const response = await playbooksApi.update(id, data)

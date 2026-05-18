@@ -16,106 +16,192 @@
 //! - ServiceUnlimited: no limit
 //! - CIStandard: 5k req/hr
 //!
-//! ### 2. IP-Based Rate Limiting (Delegated to Reverse Proxy)
+//! ### 2. IP-Based Rate Limiting (Implemented)
 //! Unauthenticated endpoints (login, registration, password reset) are rate limited
-//! by IP address. This is **delegated to the reverse proxy layer** (nginx, Cloudflare, etc.)
-//! for better performance and DDoS protection.
-//!
-//! The middleware functions below are stubs that pass through requests, relying on
-//! upstream infrastructure for IP rate limiting. In production:
-//! - nginx limit_req module
-//! - Cloudflare rate limiting rules
-//! - AWS WAF rate-based rules
-//!
-//! This approach is preferred because:
-//! - Reverse proxies handle rate limiting before requests reach the application
-//! - Better protection against layer 7 DDoS attacks
-//! - Lower latency (no Redis roundtrip per request)
-//! - Centralized rate limit configuration
+//! by IP address using Redis-backed fixed window counters.
+
+use std::net::SocketAddr;
 
 use crate::error::AppError;
 use axum::{
-    extract::{Request, State},
+    extract::{ConnectInfo, Request, State},
     middleware::Next,
     response::Response,
 };
 use deadpool_redis::redis::AsyncCommands;
 
+/// Extract the client IP from common proxy headers or connection info.
+fn extract_client_ip(request: &Request) -> Option<String> {
+    if let Some(forwarded) = request.headers().get("X-Forwarded-For") {
+        if let Ok(s) = forwarded.to_str() {
+            if let Some(ip) = s.split(',').next() {
+                let ip = ip.trim();
+                if !ip.is_empty() {
+                    return Some(ip.to_string());
+                }
+            }
+        }
+    }
+
+    if let Some(real_ip) = request.headers().get("X-Real-IP") {
+        if let Ok(s) = real_ip.to_str() {
+            let ip = s.trim();
+            if !ip.is_empty() {
+                return Some(ip.to_string());
+            }
+        }
+    }
+
+    request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|info| info.0.ip().to_string())
+}
+
+/// Check an IP-based rate limit using a fixed window counter in Redis.
+async fn check_ip_rate_limit(
+    redis: &deadpool_redis::Pool,
+    action: &str,
+    ip: &str,
+    window_secs: u64,
+    max_requests: u64,
+) -> Result<bool, AppError> {
+    let mut conn = redis
+        .get()
+        .await
+        .map_err(|e| AppError::Internal(format!("Redis connection error: {}", e)))?;
+
+    let now = chrono::Utc::now().timestamp() as u64;
+    let window = now / window_secs;
+    let redis_key = format!("ratelimit:ip:{}:{}:{}", action, ip, window);
+
+    let count: u64 = conn.incr(&redis_key, 1u64).await.map_err(AppError::Redis)?;
+    let _: () = conn
+        .expire(&redis_key, window_secs as i64)
+        .await
+        .map_err(AppError::Redis)?;
+
+    Ok(count <= max_requests)
+}
+
 /// Rate limit middleware for registration endpoints
 ///
-/// **Note:** IP-based rate limiting is delegated to reverse proxy (nginx/Cloudflare).
-/// This middleware passes requests through without additional rate limiting.
-///
-/// Recommended reverse proxy configuration:
-/// - nginx: `limit_req zone=registration burst=5 nodelay;`
-/// - Cloudflare: 5 requests per minute per IP
+/// Limits registration attempts to 5 requests per 15 minutes per IP.
 pub async fn register_ip_rate_limit(
-    State(_state): State<crate::api::AppState>,
+    State(state): State<crate::api::AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
-    // IP rate limiting delegated to reverse proxy
+    const WINDOW_SECS: u64 = 15 * 60;
+    const MAX_REQUESTS: u64 = 5;
+
+    let ip = match extract_client_ip(&request) {
+        Some(ip) => ip,
+        None => {
+            tracing::warn!("Unable to determine client IP for registration rate limiting");
+            return Ok(next.run(request).await);
+        }
+    };
+
+    if !check_ip_rate_limit(&state.redis, "register", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
+        return Err(AppError::TooManyRequests(
+            "Too many registration attempts. Please try again later.".to_string(),
+        ));
+    }
+
     Ok(next.run(request).await)
 }
 
 /// Rate limit middleware for auth endpoints
 ///
-/// **Note:** IP-based rate limiting is delegated to reverse proxy (nginx/Cloudflare).
-/// This middleware passes requests through without additional rate limiting.
-///
-/// Recommended reverse proxy configuration:
-/// - nginx: `limit_req zone=auth burst=10 nodelay;`
-/// - Cloudflare: 10 requests per minute per IP
+/// Limits auth attempts to 10 requests per 15 minutes per IP.
 pub async fn auth_ip_rate_limit(
-    State(_state): State<crate::api::AppState>,
+    State(state): State<crate::api::AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
-    // IP rate limiting delegated to reverse proxy
+    const WINDOW_SECS: u64 = 15 * 60;
+    const MAX_REQUESTS: u64 = 10;
+
+    let ip = match extract_client_ip(&request) {
+        Some(ip) => ip,
+        None => {
+            tracing::warn!("Unable to determine client IP for auth rate limiting");
+            return Ok(next.run(request).await);
+        }
+    };
+
+    if !check_ip_rate_limit(&state.redis, "auth", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
+        return Err(AppError::TooManyRequests(
+            "Too many authentication attempts. Please try again later.".to_string(),
+        ));
+    }
+
     Ok(next.run(request).await)
 }
 
 /// Rate limit middleware for password reset endpoints
 ///
-/// **Note:** IP-based rate limiting is delegated to reverse proxy (nginx/Cloudflare).
-/// This middleware passes requests through without additional rate limiting.
-///
-/// Recommended reverse proxy configuration:
-/// - nginx: `limit_req zone=password_reset burst=3 nodelay;`
-/// - Cloudflare: 3 requests per minute per IP
+/// Limits password reset attempts to 3 requests per 15 minutes per IP.
 pub async fn password_reset_ip_rate_limit(
-    State(_state): State<crate::api::AppState>,
+    State(state): State<crate::api::AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
-    // IP rate limiting delegated to reverse proxy
+    const WINDOW_SECS: u64 = 15 * 60;
+    const MAX_REQUESTS: u64 = 3;
+
+    let ip = match extract_client_ip(&request) {
+        Some(ip) => ip,
+        None => {
+            tracing::warn!("Unable to determine client IP for password reset rate limiting");
+            return Ok(next.run(request).await);
+        }
+    };
+
+    if !check_ip_rate_limit(&state.redis, "password_reset", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
+        return Err(AppError::TooManyRequests(
+            "Too many password reset attempts. Please try again later.".to_string(),
+        ));
+    }
+
     Ok(next.run(request).await)
 }
 
 /// Rate limit middleware for WebSocket endpoints
 ///
-/// **Note:** IP-based rate limiting is delegated to reverse proxy (nginx/Cloudflare).
-/// This middleware passes requests through without additional rate limiting.
-///
-/// Recommended reverse proxy configuration:
-/// - nginx: `limit_req zone=websocket burst=20 nodelay;`
-/// - Cloudflare: 20 requests per minute per IP
+/// Limits WebSocket connection attempts to 20 connections per minute per IP.
 pub async fn websocket_ip_rate_limit(
-    State(_state): State<crate::api::AppState>,
+    State(state): State<crate::api::AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
-    // IP rate limiting delegated to reverse proxy
+    const WINDOW_SECS: u64 = 60;
+    const MAX_REQUESTS: u64 = 20;
+
+    let ip = match extract_client_ip(&request) {
+        Some(ip) => ip,
+        None => {
+            tracing::warn!("Unable to determine client IP for websocket rate limiting");
+            return Ok(next.run(request).await);
+        }
+    };
+
+    if !check_ip_rate_limit(&state.redis, "websocket", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
+        return Err(AppError::TooManyRequests(
+            "Too many WebSocket connection attempts. Please try again later.".to_string(),
+        ));
+    }
+
     Ok(next.run(request).await)
 }
 
 // ============================================================================
 // Legacy API - Kept for backward compatibility
 // ============================================================================
-// These types and functions are used by existing code (src/api/auth.rs, src/api/v4/users.rs)
-// They are stubs that always allow requests. Real rate limiting is handled by:
-// 1. Entity-level: RateLimitService (services/rate_limit.rs)
-// 2. IP-level: Reverse proxy (nginx/Cloudflare)
+// These types and functions are used by existing code (src/api/auth.rs, src/api/v4/users.rs).
+// `check_rate_limit` provides per-account sliding window rate limiting.
+// IP-level rate limiting is handled by the middleware functions above.
 
 /// Legacy rate limit configuration (stub)
 #[derive(Debug, Clone, Copy)]
@@ -145,7 +231,7 @@ pub struct RateLimitResult {
 /// Per-account rate limit check using a Redis sliding window.
 ///
 /// Used by login handlers to throttle individual accounts independently of
-/// IP-based limits enforced at the reverse proxy layer.
+/// IP-based limits enforced by the middleware above.
 pub async fn check_rate_limit(
     redis: &deadpool_redis::Pool,
     config: &RateLimitConfig,

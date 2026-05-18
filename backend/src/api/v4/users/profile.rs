@@ -11,6 +11,7 @@ use crate::auth::extractors::PolymorphicAuth;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::parse_mm_or_uuid, models as mm};
 use crate::models::User;
+use crate::repositories::UserRepository;
 
 /// GET /users/me - Get authenticated user (supports both JWT and API key auth)
 ///
@@ -18,10 +19,10 @@ use crate::models::User;
 /// - JWT token (for human users via browser/mobile)
 /// - API key (for agents, services, and CI systems)
 pub async fn me(State(state): State<AppState>, auth: PolymorphicAuth) -> ApiResult<Json<mm::User>> {
-    let mut user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL")
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+    let mut user: User = UserRepository::new(&state.db)
+        .get_by_id(auth.user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     let _ = status::clear_expired_custom_status_if_needed(&state, auth.user_id).await?;
     user.clear_custom_status_if_expired();
@@ -43,9 +44,8 @@ pub async fn get_user_by_id(
             .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?
     };
 
-    let mut user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
-        .bind(user_uuid)
-        .fetch_optional(&state.db)
+    let mut user: User = UserRepository::new(&state.db)
+        .get_by_id_unchecked(user_uuid)
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
@@ -61,9 +61,8 @@ pub async fn get_user_by_username(
     _auth: MmAuthUser,
     axum::extract::Path(username): axum::extract::Path<String>,
 ) -> ApiResult<Json<mm::User>> {
-    let user: User = sqlx::query_as("SELECT * FROM users WHERE username = $1")
-        .bind(&username)
-        .fetch_optional(&state.db)
+    let user: User = UserRepository::new(&state.db)
+        .get_by_username(&username)
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
@@ -116,10 +115,10 @@ pub async fn patch_me(
     .await?;
 
     // Fetch updated user
-    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
-        .bind(auth.user_id)
-        .fetch_one(&state.db)
-        .await?;
+    let user: User = UserRepository::new(&state.db)
+        .get_by_id_unchecked(auth.user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     Ok(Json(user.into()))
 }
@@ -157,9 +156,9 @@ pub async fn patch_user(
     .execute(&state.db)
     .await?;
 
-    let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_one(&state.db)
-        .await?;
+    let user: User = UserRepository::new(&state.db)
+        .get_by_id_unchecked(user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
     Ok(Json(user.into()))
 }

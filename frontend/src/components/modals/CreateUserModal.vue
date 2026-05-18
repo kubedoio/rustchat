@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { X, UserPlus, Eye, EyeOff, Shield, Type, Mail, Lock } from 'lucide-vue-next';
-import { useAdminStore } from '../../stores/admin';
+import { useAdminStore } from '../../features/admin/stores/adminStore';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const props = defineProps<{
     open: boolean
@@ -79,8 +80,8 @@ async function submit() {
         
         emit('created');
         emit('close');
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to create user';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to create user';
     } finally {
         submitting.value = false;
     }

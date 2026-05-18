@@ -7,6 +7,7 @@ import adminApi, {
     type SystemStats,
     type HealthStatus
 } from '../api/admin';
+import { getApiErrorMessage, getErrorMessage } from '@/core/errors/errorUtils';
 
 export const useAdminStore = defineStore('admin', () => {
     // State
@@ -26,21 +27,21 @@ export const useAdminStore = defineStore('admin', () => {
         try {
             const response = await adminApi.getConfig();
             config.value = response.data;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to load config';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to load config';
         } finally {
             loading.value = false;
         }
     }
 
-    async function updateConfig(category: string, data: any) {
+    async function updateConfig(category: string, data: Record<string, unknown>) {
         loading.value = true;
         error.value = null;
         try {
             await adminApi.updateConfig(category, data);
             await fetchConfig(); // Refresh
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to update config';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to update config';
             throw e;
         } finally {
             loading.value = false;
@@ -54,8 +55,8 @@ export const useAdminStore = defineStore('admin', () => {
             const response = await adminApi.listUsers(params);
             users.value = response.data.users;
             usersTotal.value = response.data.total;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to load users';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to load users';
         } finally {
             loading.value = false;
         }
@@ -69,8 +70,8 @@ export const useAdminStore = defineStore('admin', () => {
             users.value.unshift(response.data);
             usersTotal.value++;
             return response.data;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to create user';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to create user';
             throw e;
         } finally {
             loading.value = false;
@@ -83,8 +84,8 @@ export const useAdminStore = defineStore('admin', () => {
             const idx = users.value.findIndex(u => u.id === id);
             if (idx !== -1) users.value[idx] = response.data;
             return response.data;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to update user';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to update user';
             throw e;
         }
     }
@@ -94,8 +95,8 @@ export const useAdminStore = defineStore('admin', () => {
             await adminApi.deactivateUser(id);
             const user = users.value.find(u => u.id === id);
             if (user) user.is_active = false;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to deactivate user';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to deactivate user';
             throw e;
         }
     }
@@ -105,8 +106,8 @@ export const useAdminStore = defineStore('admin', () => {
             await adminApi.reactivateUser(id);
             const user = users.value.find(u => u.id === id);
             if (user) user.is_active = true;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to reactivate user';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to reactivate user';
             throw e;
         }
     }
@@ -121,8 +122,8 @@ export const useAdminStore = defineStore('admin', () => {
                 user.delete_reason = data.reason ?? null;
             }
             return response.data;
-        } catch (e: any) {
-            error.value = e.response?.data?.error?.message || e.response?.data?.message || 'Failed to delete user';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to delete user';
             throw e;
         }
     }
@@ -134,8 +135,8 @@ export const useAdminStore = defineStore('admin', () => {
             users.value = users.value.filter(u => u.id !== id);
             usersTotal.value--;
             return response.data;
-        } catch (e: any) {
-            error.value = e.response?.data?.error?.message || e.response?.data?.message || 'Failed to wipe user';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to wipe user';
             throw e;
         }
     }
@@ -145,8 +146,8 @@ export const useAdminStore = defineStore('admin', () => {
         try {
             const response = await adminApi.listAuditLogs(params);
             auditLogs.value = response.data;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to load audit logs';
+        } catch (e: unknown) {
+            error.value = getApiErrorMessage(e) || 'Failed to load audit logs';
         } finally {
             loading.value = false;
         }
@@ -156,9 +157,9 @@ export const useAdminStore = defineStore('admin', () => {
         try {
             const response = await adminApi.getStats();
             stats.value = response.data;
-        } catch (e: any) {
+        } catch (e: unknown) {
             // Stats endpoint might not exist yet
-            console.warn('Stats not available:', e.message);
+            console.warn('Stats not available:', getErrorMessage(e));
         }
     }
 
@@ -166,8 +167,8 @@ export const useAdminStore = defineStore('admin', () => {
         try {
             const response = await adminApi.getHealth();
             health.value = response.data;
-        } catch (e: any) {
-            console.warn('Health endpoint not available:', e.message);
+        } catch (e: unknown) {
+            console.warn('Health endpoint not available:', getErrorMessage(e));
         }
     }
 

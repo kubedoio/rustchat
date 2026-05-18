@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import SettingItemMin from '../SettingItemMin.vue'
 import SettingItemMax from '../SettingItemMax.vue'
-import { usePreferencesStore } from '../../../stores/preferences'
+import { usePreferencesStore } from '../../../features/preferences/stores/preferencesStore'
 
 const preferencesStore = usePreferencesStore()
 const expandedRow = ref<string | null>(null)

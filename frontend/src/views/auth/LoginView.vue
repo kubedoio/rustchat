@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useAuthStore } from '../../stores/auth'
+import { useAuthStore } from '../../features/auth/stores/authStore'
 import AuthLayout from '../../layouts/AuthLayout.vue'
 import BaseInput from '../../components/atomic/BaseInput.vue'
 import BaseButton from '../../components/atomic/BaseButton.vue'
 import api from '../../api/client'
-import { useConfigStore } from '../../stores/config'
+import { useConfigStore } from '../../features/config/stores/configStore'
 import type { SsoProviderInfo } from '../../api/admin'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const auth = useAuthStore()
 const configStore = useConfigStore()
@@ -46,8 +47,8 @@ async function handleLogin() {
     // Use full page reload to ensure all stores (Teams, Channels, etc.) 
     // are initialized cleanly with the new auth state.
     window.location.href = '/'
-  } catch (e: any) {
-    error.value = e.response?.data?.error || e.response?.data?.message || 'Failed to login'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e) || 'Failed to login'
   } finally {
     loading.value = false
   }

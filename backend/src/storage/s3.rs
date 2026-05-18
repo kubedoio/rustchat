@@ -113,6 +113,33 @@ impl S3Client {
         Ok(())
     }
 
+    /// Upload a file from a local path to S3
+    pub async fn upload_file(
+        &self,
+        key: &str,
+        path: &std::path::Path,
+        content_type: &str,
+    ) -> Result<(), AppError> {
+        let body = ByteStream::from_path(path)
+            .await
+            .map_err(|e| AppError::Internal(format!("ByteStream from path error: {}", e)))?;
+
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .body(body)
+            .content_type(content_type)
+            .send()
+            .await
+            .map_err(|e| {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 upload failed");
+                AppError::Internal(format!("S3 upload error: {}", e))
+            })?;
+
+        Ok(())
+    }
+
     /// Ensure bucket exists (create if missing) and configure CORS
     pub async fn ensure_bucket(&self) -> Result<(), AppError> {
         let result = self
@@ -207,6 +234,33 @@ impl S3Client {
 
     /// Download a file from S3, returning None if the key doesn't exist
     pub async fn download_optional(&self, key: &str) -> Result<Option<Vec<u8>>, AppError> {
+        match self.download_stream_optional(key).await? {
+            Some(stream) => {
+                let data = stream
+                    .collect()
+                    .await
+                    .map_err(|e| AppError::Internal(format!("S3 read error: {}", e)))?
+                    .into_bytes()
+                    .to_vec();
+                Ok(Some(data))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Stream a file from S3 as a ByteStream.
+    pub async fn download_stream(&self, key: &str) -> Result<ByteStream, AppError> {
+        self.download_stream_optional(key).await?.ok_or_else(|| {
+            error!(bucket = %self.bucket, key = %key, "S3 file not found");
+            AppError::NotFound(format!("File not found: {}", key))
+        })
+    }
+
+    /// Stream a file from S3, returning None if the key doesn't exist
+    pub async fn download_stream_optional(
+        &self,
+        key: &str,
+    ) -> Result<Option<ByteStream>, AppError> {
         let result = self
             .client
             .get_object()
@@ -216,16 +270,7 @@ impl S3Client {
             .await;
 
         match result {
-            Ok(response) => {
-                let data = response
-                    .body
-                    .collect()
-                    .await
-                    .map_err(|e| AppError::Internal(format!("S3 read error: {}", e)))?
-                    .into_bytes()
-                    .to_vec();
-                Ok(Some(data))
-            }
+            Ok(response) => Ok(Some(response.body)),
             Err(SdkError::ServiceError(service_error)) => {
                 let code = service_error.err().code().unwrap_or_default();
                 if code == "NoSuchKey" {

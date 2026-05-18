@@ -1,6 +1,6 @@
 <template>
   <nav aria-label="Breadcrumb" class="flex items-center gap-0.5 text-sm min-w-0">
-    <template v-for="(segment, index) in segments" :key="index">
+    <template v-for="(segment, index) in segments" :key="segment.label">
       <!-- Separator -->
       <ChevronRight v-if="index > 0" class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
 

@@ -13,6 +13,7 @@ import type { ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
 import { withRetry } from '../../../core/services/retry'
 import { AppError } from '../../../core/errors/AppError'
+import { isNotFoundError } from '../../../core/errors/errorUtils'
 
 
 export interface CallChannelState {
@@ -86,8 +87,8 @@ export const callRepository = {
           enabled: response.data.enabled,
           call: response.data.call ? normalizeCallState(response.data.call) : undefined
         }
-      } catch (error: any) {
-        if (error?.response?.status === 404) {
+      } catch (error: unknown) {
+        if (isNotFoundError(error)) {
           return null
         }
         throw error
@@ -189,12 +190,13 @@ export const callRepository = {
 }
 
 // Normalize API CallState to domain entity
-function normalizeCallState(raw: any): CallState {
+function normalizeCallState(raw: unknown): CallState {
+  const r = raw as Record<string, unknown>
   const participants = new Map<SessionId, CallParticipant>()
   
   if (raw.sessions) {
     for (const [key, session] of Object.entries(raw.sessions)) {
-      const s = session as any
+      const s = session as Record<string, unknown>
       const sessionId = createSessionId(s.session_id || key)
       participants.set(sessionId, {
         sessionId,
@@ -211,20 +213,20 @@ function normalizeCallState(raw: any): CallState {
   }
 
   return {
-    id: createCallId(raw.id || raw.id_raw || ''),
-    channelId: (raw.channel_id_raw || raw.channel_id) as ChannelId,
-    startedAt: new Date(raw.start_at || Date.now()),
-    startedBy: (raw.owner_id_raw || raw.owner_id) as UserId,
-    hostId: (raw.host_id_raw || raw.host_id) as UserId,
+    id: createCallId((r.id || r.id_raw || '') as string),
+    channelId: ((r.channel_id_raw || r.channel_id) as string) as ChannelId,
+    startedAt: new Date((r.start_at || Date.now()) as string | number),
+    startedBy: ((r.owner_id_raw || r.owner_id) as string) as UserId,
+    hostId: ((r.host_id_raw || r.host_id) as string) as UserId,
     participants,
-    screenSharingSessionId: raw.screen_sharing_session_id 
-      ? createSessionId(raw.screen_sharing_session_id)
+    screenSharingSessionId: r.screen_sharing_session_id 
+      ? createSessionId(r.screen_sharing_session_id as string)
       : undefined,
-    threadId: raw.thread_id,
-    recording: raw.recording ? {
+    threadId: r.thread_id as string | undefined,
+    recording: r.recording ? {
       isRecording: true,
-      startedAt: new Date(raw.recording.start_at),
-      startedBy: raw.owner_id as UserId
+      startedAt: new Date((r.recording as Record<string, unknown>).start_at as string | number),
+      startedBy: r.owner_id as UserId
     } : undefined
   }
 }

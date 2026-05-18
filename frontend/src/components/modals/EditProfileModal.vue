@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { X, User, Camera } from 'lucide-vue-next';
-import { useAuthStore } from '../../stores/auth';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import type { AuthUser } from '../../core/entities/Auth';
 import { usersApi } from '../../api/users';
 import BaseButton from '../atomic/BaseButton.vue';
 import BaseInput from '../atomic/BaseInput.vue';
+import { getApiErrorMessage } from '@/core/errors/errorUtils';
 
 const props = defineProps<{
     show: boolean
@@ -78,8 +79,8 @@ async function handleSubmit() {
         setTimeout(() => {
             emit('close');
         }, 1000);
-    } catch (e: any) {
-        error.value = e.response?.data?.message || 'Failed to update profile';
+    } catch (e: unknown) {
+        error.value = getApiErrorMessage(e) || 'Failed to update profile';
     } finally {
         loading.value = false;
     }

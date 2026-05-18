@@ -6,10 +6,18 @@ mod admin;
 mod admin_audit;
 mod admin_email;
 mod admin_membership_policies;
+mod admin_permissions;
+mod admin_plugins;
+mod admin_retention;
+mod admin_sso;
+mod admin_stats;
+mod admin_teams;
+mod admin_users;
 mod auth;
 mod calls;
 mod channels;
 mod files;
+mod file_validation;
 mod health;
 mod integrations;
 mod oauth;
@@ -71,9 +79,9 @@ fn handle_panic(
         .unwrap()
 }
 
-use crate::api::v4::calls_plugin::sfu::{SFUManager, VOICE_EVENT_CHANNEL_CAPACITY};
+use crate::calls::sfu::{SFUManager, VOICE_EVENT_CHANNEL_CAPACITY};
 use crate::api::v4::calls_plugin::start_voice_event_listener;
-use crate::api::v4::calls_plugin::state::{CallStateBackend, CallStateManager};
+use crate::calls::state::{CallStateBackend, CallStateManager};
 use crate::config::Config;
 use crate::middleware::reliability::ServiceCircuitBreakers;
 use crate::middleware::security_headers::{cors_compatible_config, SecurityHeadersLayer};
@@ -127,28 +135,7 @@ fn build_cors_layer(config: &Config) -> CorsLayer {
     cors.allow_origin(Any).allow_headers(Any)
 }
 
-/// Application state shared across handlers
-#[derive(Clone)]
-pub struct AppState {
-    pub db: PgPool,
-    pub redis: deadpool_redis::Pool,
-    pub jwt_secret: String,
-    pub jwt_issuer: Option<String>,
-    pub jwt_audience: Option<String>,
-    pub jwt_expiry_hours: u64,
-    pub ws_hub: Arc<WsHub>,
-    pub connection_store: Arc<ConnectionStore>,
-    pub s3_client: S3Client,
-    pub http_client: reqwest::Client,
-    pub start_time: std::time::Instant,
-    pub config: Config,
-    pub sfu_manager: Arc<SFUManager>,
-    pub call_state_manager: Arc<CallStateManager>,
-    pub circuit_breakers: Arc<ServiceCircuitBreakers>,
-    pub reconciliation_tx: Option<
-        async_channel::Sender<crate::services::membership_reconciliation::ReconciliationTask>,
-    >,
-}
+pub use crate::state::AppState;
 
 /// Build the main application router
 pub fn router(

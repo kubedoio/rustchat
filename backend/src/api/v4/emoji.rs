@@ -6,6 +6,7 @@ use crate::mattermost_compat::{
     id::{encode_mm_id, parse_mm_or_uuid},
     models as mm,
 };
+use crate::repositories::EmojiRepository;
 use axum::{
     extract::{Path, State},
     routing::{get, post},
@@ -29,30 +30,11 @@ pub struct EmojiSearchRequest {
     pub term: String,
 }
 
-#[derive(sqlx::FromRow)]
-struct DbEmoji {
-    id: Uuid,
-    name: String,
-    creator_id: Uuid,
-    create_at: i64,
-    update_at: i64,
-    delete_at: i64,
-}
-
 pub async fn list_emoji(
     State(state): State<AppState>,
     _auth: MmAuthUser,
 ) -> ApiResult<Json<Vec<mm::Emoji>>> {
-    let emojis: Vec<DbEmoji> = sqlx::query_as(
-        "SELECT id, name, creator_id, 
-                (extract(epoch from create_at)*1000)::bigint as create_at, 
-                (extract(epoch from update_at)*1000)::bigint as update_at, 
-                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
-         FROM custom_emojis WHERE delete_at IS NULL",
-    )
-    .fetch_all(&state.db)
-    .await?;
-
+    let emojis = EmojiRepository::new(&state.db).list().await?;
     let mm_emojis: Vec<mm::Emoji> = emojis.into_iter().map(map_emoji).collect();
     Ok(Json(mm_emojis))
 }
@@ -63,18 +45,7 @@ pub async fn search_emoji(
     Json(input): Json<EmojiSearchRequest>,
 ) -> ApiResult<Json<Vec<mm::Emoji>>> {
     let term = format!("%{}%", input.term);
-    let emojis: Vec<DbEmoji> = sqlx::query_as(
-        "SELECT id, name, creator_id, 
-                (extract(epoch from create_at)*1000)::bigint as create_at, 
-                (extract(epoch from update_at)*1000)::bigint as update_at, 
-                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
-         FROM custom_emojis 
-         WHERE name ILIKE $1 AND delete_at IS NULL",
-    )
-    .bind(term)
-    .fetch_all(&state.db)
-    .await?;
-
+    let emojis = EmojiRepository::new(&state.db).search(&term).await?;
     let mm_emojis: Vec<mm::Emoji> = emojis.into_iter().map(map_emoji).collect();
     Ok(Json(mm_emojis))
 }
@@ -87,21 +58,12 @@ pub async fn get_emoji(
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
 
-    let emoji: Option<DbEmoji> = sqlx::query_as(
-        "SELECT id, name, creator_id, 
-                (extract(epoch from create_at)*1000)::bigint as create_at, 
-                (extract(epoch from update_at)*1000)::bigint as update_at, 
-                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
-         FROM custom_emojis WHERE id = $1 AND delete_at IS NULL",
-    )
-    .bind(emoji_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let emoji = EmojiRepository::new(&state.db)
+        .get_by_id(emoji_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
-    match emoji {
-        Some(emoji) => Ok(Json(map_emoji(emoji))),
-        None => Err(AppError::NotFound("Emoji not found".to_string())),
-    }
+    Ok(Json(map_emoji(emoji)))
 }
 
 pub async fn get_emoji_by_name(
@@ -145,18 +107,10 @@ pub async fn get_emoji_by_name(
     }
 
     // Check custom emojis in DB
-    let emoji: Option<DbEmoji> = sqlx::query_as(
-        "SELECT id, name, creator_id, 
-                (extract(epoch from create_at)*1000)::bigint as create_at, 
-                (extract(epoch from update_at)*1000)::bigint as update_at, 
-                COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
-         FROM custom_emojis WHERE name = $1 AND delete_at IS NULL",
-    )
-    .bind(&name)
-    .fetch_optional(&state.db)
-    .await?;
-
-    let emoji = emoji.ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
+    let emoji = EmojiRepository::new(&state.db)
+        .get_by_name(&name)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
     Ok(Json(map_emoji(emoji)))
 }
@@ -189,19 +143,15 @@ pub async fn get_emoji_image(
         .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
     // Get the emoji's image path from database
-    let image_url: Option<String> = sqlx::query_scalar(
-        "SELECT image_url FROM custom_emojis WHERE id = $1 AND delete_at IS NULL",
-    )
-    .bind(emoji_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let image_url = EmojiRepository::new(&state.db)
+        .get_image_url(emoji_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
-    if let Some(key) = image_url {
-        if !key.is_empty() {
-            // Generate presigned URL for S3
-            let url = state.s3_client.presigned_download_url(&key, 3600).await?;
-            return Ok(axum::response::Redirect::temporary(&url).into_response());
-        }
+    if !image_url.is_empty() {
+        // Generate presigned URL for S3
+        let url = state.s3_client.presigned_download_url(&image_url, 3600).await?;
+        return Ok(axum::response::Redirect::temporary(&url).into_response());
     }
 
     Err(AppError::NotFound("Emoji image not found".to_string()))
@@ -260,12 +210,7 @@ pub async fn create_emoji(
     }
 
     // Check for duplicate custom emoji
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM custom_emojis WHERE name = $1 AND delete_at IS NULL)",
-    )
-    .bind(&name)
-    .fetch_one(&state.db)
-    .await?;
+    let exists = EmojiRepository::new(&state.db).exists(&name).await?;
     if exists {
         return Err(AppError::BadRequest(
             "Emoji name already exists".to_string(),
@@ -275,6 +220,9 @@ pub async fn create_emoji(
     if image_data.is_empty() {
         return Err(AppError::BadRequest("Missing emoji image".to_string()));
     }
+
+    // Validate image format and size
+    let _ = crate::api::file_validation::validate_image_bytes(&image_data)?;
 
     // Resize image (128x128 max)
     let resized_image = tokio::task::spawn_blocking(move || -> ApiResult<Vec<u8>> {
@@ -304,22 +252,9 @@ pub async fn create_emoji(
         .await?;
 
     // DB Insert
-    let db_emoji: DbEmoji = sqlx::query_as(
-        r#"
-         INSERT INTO custom_emojis (id, name, creator_id, image_url)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, name, creator_id, 
-                   (extract(epoch from create_at)*1000)::bigint as create_at, 
-                   (extract(epoch from update_at)*1000)::bigint as update_at, 
-                   COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
-         "#,
-    )
-    .bind(emoji_id)
-    .bind(&name)
-    .bind(auth.user_id)
-    .bind(&key)
-    .fetch_one(&state.db)
-    .await?;
+    let db_emoji = EmojiRepository::new(&state.db)
+        .create(emoji_id, &name, auth.user_id, &key)
+        .await?;
 
     Ok((axum::http::StatusCode::CREATED, Json(map_emoji(db_emoji))))
 }
@@ -333,19 +268,10 @@ pub async fn delete_emoji(
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
         .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
 
-    let emoji: DbEmoji = sqlx::query_as(
-        r#"
-        SELECT id, name, creator_id, 
-               (extract(epoch from create_at)*1000)::bigint as create_at, 
-               (extract(epoch from update_at)*1000)::bigint as update_at, 
-               COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
-        FROM custom_emojis WHERE id = $1 AND delete_at IS NULL
-        "#,
-    )
-    .bind(emoji_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
+    let emoji = EmojiRepository::new(&state.db)
+        .get_by_id(emoji_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
 
     // Authorization
     if !auth.can_access_owned(emoji.creator_id, &permissions::ADMIN_FULL) {
@@ -355,10 +281,7 @@ pub async fn delete_emoji(
     }
 
     // Soft delete
-    sqlx::query("UPDATE custom_emojis SET delete_at = NOW() WHERE id = $1")
-        .bind(emoji_id)
-        .execute(&state.db)
-        .await?;
+    EmojiRepository::new(&state.db).soft_delete(emoji_id).await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }
@@ -372,25 +295,12 @@ pub async fn get_emojis_by_names(
         return Ok(Json(vec![]));
     }
 
-    let emojis: Vec<DbEmoji> = sqlx::query_as(
-        r#"
-        SELECT id, name, creator_id, 
-               (extract(epoch from create_at)*1000)::bigint as create_at, 
-               (extract(epoch from update_at)*1000)::bigint as update_at, 
-               COALESCE((extract(epoch from delete_at)*1000)::bigint, 0) as delete_at 
-        FROM custom_emojis 
-        WHERE name = ANY($1) AND delete_at IS NULL
-        "#,
-    )
-    .bind(&input)
-    .fetch_all(&state.db)
-    .await?;
-
+    let emojis = EmojiRepository::new(&state.db).get_by_names(&input).await?;
     let mm_emojis: Vec<mm::Emoji> = emojis.into_iter().map(map_emoji).collect();
     Ok(Json(mm_emojis))
 }
 
-fn map_emoji(emoji: DbEmoji) -> mm::Emoji {
+fn map_emoji(emoji: crate::repositories::DbEmoji) -> mm::Emoji {
     mm::Emoji {
         id: encode_mm_id(emoji.id),
         create_at: emoji.create_at,

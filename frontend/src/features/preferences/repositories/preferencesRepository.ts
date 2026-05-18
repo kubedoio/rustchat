@@ -80,7 +80,7 @@ export const preferencesRepository = {
   // Update user preferences
   async updateMyPreferences(data: UserPreferences): Promise<UserPreferences> {
     return withRetry(async () => {
-      const response = await preferencesApi.updateMyPreferences(data as any)
+      const response = await preferencesApi.updateMyPreferences(data as Record<string, unknown>)
       return normalizePreferences(response.data)
     })
   },
@@ -89,21 +89,25 @@ export const preferencesRepository = {
   async listStatusPresets(): Promise<StatusPreset[]> {
     return withRetry(async () => {
       const response = await preferencesApi.listStatusPresets()
-      return response.data.map((p: any) => ({
-        emoji: p.emoji,
-        text: p.text,
-        durationMinutes: p.duration_minutes
-      }))
+      return response.data.map((p: unknown) => {
+        const item = p as Record<string, unknown>
+        return {
+          emoji: item.emoji as string,
+          text: item.text as string,
+          durationMinutes: item.duration_minutes as number | undefined
+        }
+      })
     })
   }
 }
 
-function normalizePreferences(raw: any): UserPreferences {
-  const prefs: UserPreferences = { ...raw }
+function normalizePreferences(raw: unknown): UserPreferences {
+  const r = raw as Record<string, unknown>
+  const prefs: UserPreferences = { ...r }
   
   // Normalize common fields
-  if (raw.collapsed_categories) {
-    prefs.collapsedCategories = raw.collapsed_categories
+  if (r.collapsed_categories) {
+    prefs.collapsedCategories = r.collapsed_categories as string[]
   }
   
   return prefs

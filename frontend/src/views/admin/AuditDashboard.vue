@@ -7,6 +7,7 @@ import {
 } from 'lucide-vue-next';
 import { format, subDays } from 'date-fns';
 import { useToast } from '../../composables/useToast';
+import { getErrorMessage } from '@/core/errors/errorUtils';
 import api from '../../api/client';
 
 const toast = useToast();
@@ -57,8 +58,8 @@ async function fetchDashboard() {
         summary.value = summaryRes.data;
         recentFailures.value = failuresRes.data;
         policyStats.value = statsRes.data;
-    } catch (error: any) {
-        toast.error('Failed to load audit data', error.message);
+    } catch (error: unknown) {
+        toast.error('Failed to load audit data', getErrorMessage(error));
     } finally {
         loading.value = false;
     }
@@ -76,8 +77,8 @@ async function fetchAuditLogs() {
         
         const response = await api.get('/admin/audit/membership', { params });
         auditLogs.value = response.data;
-    } catch (error: any) {
-        toast.error('Failed to load audit logs', error.message);
+    } catch (error: unknown) {
+        toast.error('Failed to load audit logs', getErrorMessage(error));
     } finally {
         loading.value = false;
     }
@@ -100,8 +101,8 @@ async function exportLogs() {
         window.URL.revokeObjectURL(url);
         
         toast.success('Audit logs exported');
-    } catch (error: any) {
-        toast.error('Export failed', error.message);
+    } catch (error: unknown) {
+        toast.error('Export failed', getErrorMessage(error));
     }
 }
 

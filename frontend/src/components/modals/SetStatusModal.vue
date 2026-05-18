@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { X } from 'lucide-vue-next';
-import { useAuthStore } from '../../stores/auth';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 
 const props = defineProps<{
   show: boolean
