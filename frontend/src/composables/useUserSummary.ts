@@ -2,8 +2,8 @@ import { computed, ref, watchEffect } from 'vue'
 import { type User, usersApi } from '../api/users'
 import { usePresenceStore } from '../features/presence'
 import { normalizePresenceStatus } from '../features/presence/presencePresentation'
-import { clearStatusExpiryTimer, parseStatusExpiryMs, scheduleStatusExpiry } from '../features/presence/statusExpiry'
-import { useTeamStore } from '../features/teams/stores/teamStore'
+import { parseStatusExpiryMs, scheduleStatusExpiry } from '../features/presence/statusExpiry'
+import { useTeamStore } from '@/features/teams/stores/teamStore'
 
 export interface UserSummary {
   id: string
@@ -50,6 +50,14 @@ const hydratedUsers = ref<Record<string, HydratedUserRecord>>({})
 const pendingUsers = ref<Record<string, boolean>>({})
 const userErrors = ref<Record<string, string | undefined>>({})
 const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+export function clearUserSummaryCache() {
+  hydratedUsers.value = {}
+  pendingUsers.value = {}
+  userErrors.value = {}
+  expiryTimers.forEach((timer) => clearTimeout(timer))
+  expiryTimers.clear()
+}
 
 function clearExpiredCustomStatus(userId: string) {
   const existing = hydratedUsers.value[userId]
@@ -254,14 +262,6 @@ export function applyUserStatusSnapshot(update: LiveUserStatusUpdate) {
   }
 
   upsertHydratedUser(update.userId, partial)
-}
-
-export function clearUserSummaryCache() {
-  hydratedUsers.value = {}
-  pendingUsers.value = {}
-  userErrors.value = {}
-  expiryTimers.forEach((_, userId) => clearStatusExpiryTimer(expiryTimers, userId))
-  expiryTimers.clear()
 }
 
 export function useUserSummary(userIdSource: () => string | null | undefined) {

@@ -25,11 +25,11 @@ const authStore = reactive({
 
 let canCreateChannelResult = true
 
-vi.mock('../../features/teams/stores/teamStore', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
     useTeamStore: () => teamStore,
 }))
 
-vi.mock('../../features/channels/stores/channelStore', () => ({
+vi.mock('@/features/channels/stores/channelStore', () => ({
     useChannelStore: () => channelStore,
 }))
 
@@ -63,7 +63,7 @@ describe('CreateChannelModal', () => {
             },
         })
 
-        const backdrop = wrapper.find('.bg-black\/50')
+        const backdrop = wrapper.find('[class*="bg-black/50"]')
         expect(backdrop.exists()).toBe(true)
 
         await backdrop.trigger('click')
@@ -186,16 +186,16 @@ describe('CreateChannelModal', () => {
             global: {
                 stubs: {
                     teleport: true,
-                    BaseButton: true,
+                    BaseButton: false,
                     BaseInput: true,
                 },
             },
         })
 
         // The cancel button is the first BaseButton stub with "Cancel" text
-        const buttons = wrapper.findAllComponents({ name: 'BaseButton' })
+        const buttons = wrapper.findAll('button')
         const cancelButton = buttons.find((b) => b.text().includes('Cancel'))
-        expect(cancelButton).toBeDefined()
+        expect(cancelButton?.exists()).toBe(true)
 
         await cancelButton!.trigger('click')
         await flushPromises()

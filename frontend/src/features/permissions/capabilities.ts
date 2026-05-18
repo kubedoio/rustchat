@@ -1,7 +1,7 @@
 import { computed, ref, watchEffect } from 'vue'
 import { channelsApi } from '../../api/channels'
 import { useAuthStore } from '../../features/auth/stores/authStore'
-import { useTeamStore } from '../../features/teams/stores/teamStore'
+import { useTeamStore } from '@/features/teams/stores/teamStore'
 
 const TEAM_MANAGER_ROLES = new Set([
     'system_admin',

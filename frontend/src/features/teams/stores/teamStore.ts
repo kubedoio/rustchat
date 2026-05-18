@@ -3,15 +3,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useStorage } from '@vueuse/core'
-import { teamsApi, type Team, type CreateTeamRequest, type TeamMember } from '../../../api/teams'
+import { teamsApi, type CreateTeamRequest } from '../../../api/teams'
 import type { TeamId } from '../../../core/entities/Team'
 import { getApiErrorMessage } from '../../../core/errors/errorUtils'
 
 export const useTeamStore = defineStore('teamStore', () => {
   // Internal Map for feature architecture compatibility
-  const _teamsMap = ref<Map<TeamId, Team>>(new Map())
-  const publicTeams = ref<Team[]>([])
-  const members = ref<TeamMember[]>([])
+  const _teamsMap = ref<Map<TeamId, any>>(new Map())
+  const publicTeams = ref<any[]>([])
+  const members = ref<any[]>([])
   const currentTeamId = useStorage<TeamId | null>('active_team_id', null)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -25,18 +25,18 @@ export const useTeamStore = defineStore('teamStore', () => {
   })
 
   // Actions - Simple state mutations (feature architecture)
-  function setTeams(items: Team[]) {
+  function setTeams(items: any[]) {
     _teamsMap.value.clear()
     for (const team of items) {
       _teamsMap.value.set(team.id, team)
     }
   }
 
-  function addTeam(team: Team) {
+  function addTeam(team: any) {
     _teamsMap.value.set(team.id, team)
   }
 
-  function updateTeam(team: Team) {
+  function updateTeam(team: any) {
     const existing = _teamsMap.value.get(team.id)
     if (existing) {
       _teamsMap.value.set(team.id, { ...existing, ...team })
@@ -53,7 +53,7 @@ export const useTeamStore = defineStore('teamStore', () => {
     }
   }
 
-  function setPublicTeams(items: Team[]) {
+  function setPublicTeams(items: any[]) {
     publicTeams.value = items
   }
 
@@ -61,7 +61,7 @@ export const useTeamStore = defineStore('teamStore', () => {
     currentTeamId.value = teamId
   }
 
-  function setMembers(items: TeamMember[]) {
+  function setMembers(items: any[]) {
     members.value = items
   }
 

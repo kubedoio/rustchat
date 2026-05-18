@@ -32,7 +32,7 @@ export const adminRepository = {
   },
 
   async updateConfig(category: string, data: unknown): Promise<void> {
-    await withRetry(() => adminApi.updateConfig(category, data))
+    await withRetry(() => adminApi.updateConfig(category, data as Record<string, unknown>))
   },
 
   // Users

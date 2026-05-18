@@ -1,7 +1,7 @@
 // Channel WebSocket Handlers - Feature-specific channel event handling
 
 import { channelService } from '../services/channelService'
-import type { ChannelId } from '../../../core/entities/Channel'
+import type { Channel, ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
 
 export interface WebSocketChannelEvent {
@@ -92,7 +92,9 @@ function handleUserAdded(event: WebSocketChannelEvent) {
   if (channelId && userId) {
     channelService.handleUserJoined(channelId, userId)
     // Refresh channel to get updated member count
-    void channelService.loadChannels(data.team_id)
+    if (typeof data.team_id === 'string') {
+      void channelService.loadChannels(data.team_id)
+    }
   }
 }
 
@@ -104,7 +106,9 @@ function handleUserRemoved(event: WebSocketChannelEvent) {
   if (channelId && userId) {
     channelService.handleUserLeft(channelId, userId)
     // Refresh channel to get updated member count
-    void channelService.loadChannels(data.team_id)
+    if (typeof data.team_id === 'string') {
+      void channelService.loadChannels(data.team_id)
+    }
   }
 }
 
@@ -120,7 +124,7 @@ function handleChannelViewed(event: WebSocketChannelEvent) {
 }
 
 // Normalize WebSocket channel data to domain entity
-function normalizeChannel(data: Record<string, unknown>): Record<string, unknown> {
+function normalizeChannel(data: Record<string, unknown>): Channel {
   // Handle both full channel objects and event data with channel_id
   const channelData = (data.channel as Record<string, unknown> | undefined) || data;
   
@@ -139,5 +143,5 @@ function normalizeChannel(data: Record<string, unknown>): Record<string, unknown
                channelData.update_at ? new Date(channelData.update_at as string | number) : new Date(),
     isArchived: Boolean(channelData.deleted_at || channelData.delete_at),
     memberCount: channelData.member_count || data.member_count
-  }
+  } as Channel
 }

@@ -1,4 +1,4 @@
-import { HttpClient } from './http/HttpClient'
+import { HttpClient, type HttpResponse, type RequestConfig } from './http/HttpClient'
 import { useAuthStore } from '../features/auth/stores/authStore'
 import { normalizeIdsDeep, shouldNormalizeHttpPayload } from '../utils/idCompat'
 import { API_V1_BASE, API_V4_BASE } from '../constants'
@@ -6,13 +6,13 @@ import { API_V1_BASE, API_V4_BASE } from '../constants'
 /**
  * Shared interceptors used by both v1 and v4 API clients.
  */
-const requestInterceptor = (config: Record<string, unknown>) => {
+const requestInterceptor = (config: RequestConfig): RequestConfig => {
     const authStore = useAuthStore()
 
     // Add auth header if token exists
     if (authStore.token) {
         config.headers = {
-            ...config.headers,
+            ...(config.headers ?? {}),
             Authorization: `Bearer ${authStore.token}`,
         }
     }
@@ -28,10 +28,10 @@ const requestInterceptor = (config: Record<string, unknown>) => {
     return config
 }
 
-const responseInterceptor = (response: Record<string, unknown>) => {
+const responseInterceptor = <T>(response: HttpResponse<T>): HttpResponse<T> => {
     // Normalize IDs in response data
     if (shouldNormalizeHttpPayload(response.data)) {
-        response.data = normalizeIdsDeep(response.data)
+        response.data = normalizeIdsDeep(response.data) as T
     }
 
     // Handle 401 - logout

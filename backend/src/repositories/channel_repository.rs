@@ -500,6 +500,7 @@ impl<'a> ChannelRepository<'a> {
     }
 
     /// Update a channel bookmark
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_channel_bookmark(
         &self,
         bookmark_id: Uuid,
@@ -674,6 +675,7 @@ impl<'a> ChannelRepository<'a> {
     }
 
     /// Create a new channel
+    #[allow(clippy::too_many_arguments)]
     pub async fn create(
         &self,
         team_id: Uuid,

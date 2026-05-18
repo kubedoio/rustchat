@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 const mocks = vi.hoisted(() => ({
     authStore: {
@@ -67,23 +68,23 @@ const mocks = vi.hoisted(() => ({
     isLoading: { value: false, __v_isRef: true },
 }))
 
-vi.mock('../../stores/auth', () => ({
+vi.mock('../../features/auth/stores/authStore', () => ({
     useAuthStore: () => mocks.authStore,
 }))
 
-vi.mock('../../stores/teams', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
     useTeamStore: () => mocks.teamStore,
 }))
 
-vi.mock('../../stores/unreads', () => ({
+vi.mock('@/features/unreads/stores/unreadStore', () => ({
     useUnreadStore: () => mocks.unreadStore,
 }))
 
-vi.mock('../../stores/channels', () => ({
+vi.mock('@/features/channels/stores/channelStore', () => ({
     useChannelStore: () => mocks.channelStore,
 }))
 
-vi.mock('../../stores/channelPreferences', () => ({
+vi.mock('@/features/channels/stores/channelPreferencesStore', () => ({
     useChannelPreferencesStore: () => mocks.channelPrefsStore,
 }))
 
@@ -129,6 +130,7 @@ vi.mock('./capabilities', () => ({
 
 describe('permission UI guardrails', () => {
     beforeEach(() => {
+        setActivePinia(createPinia())
         vi.clearAllMocks()
         mocks.authStore.user = {
             id: 'user-1',

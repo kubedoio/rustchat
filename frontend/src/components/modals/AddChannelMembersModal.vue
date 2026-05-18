@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { X, Search, User, UserPlus } from 'lucide-vue-next';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
 import { useAuthStore } from '../../features/auth/stores/authStore';
 import BaseButton from '../atomic/BaseButton.vue';
 import { channelRepository } from '../../features/channels/repositories/channelRepository';

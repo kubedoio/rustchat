@@ -98,7 +98,7 @@ class PresenceService {
   private startCleanupTimer(): void {
     this.cleanupTimer = setInterval(() => {
       this.cleanupStaleTypingIndicators()
-    }, CLEANUP_INTERVAL)
+    }, TYPING_CLEANUP_INTERVAL)
   }
 
   private cleanupStaleTypingIndicators(): void {

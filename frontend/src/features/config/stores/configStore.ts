@@ -91,14 +91,18 @@ export const useConfigStore = defineStore('configStore', () => {
     function initSync() {
         const { onEvent } = useWebSocket()
 
-        onEvent('config_updated', (data: Record<string, unknown>) => {
+        onEvent('config_updated', (payload: unknown) => {
+            const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {}
+            const config = data.config && typeof data.config === 'object'
+                ? data.config as Record<string, unknown>
+                : {}
             if (data.category === 'site') {
                 siteConfig.value = {
                     ...siteConfig.value,
-                    ...data.config,
+                    ...config,
                 }
             } else if (data.category === 'authentication') {
-                authConfig.value = { ...authConfig.value, ...data.config }
+                authConfig.value = { ...authConfig.value, ...config } as AuthConfig
             }
         })
     }

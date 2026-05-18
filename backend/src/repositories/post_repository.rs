@@ -522,6 +522,7 @@ impl PostRepository {
     }
 
     /// Create a scheduled post
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_scheduled_post(
         &self,
         user_id: Uuid,
@@ -557,6 +558,7 @@ impl PostRepository {
     }
 
     /// Update a scheduled post
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_scheduled_post(
         &self,
         scheduled_id: Uuid,
@@ -858,6 +860,7 @@ impl PostRepository {
     }
 
     /// Update channel member unread state
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_channel_member_unread(
         &self,
         channel_id: Uuid,

@@ -2,10 +2,10 @@
 import { ref, computed, nextTick } from 'vue'
 import { format, formatDistanceToNow } from 'date-fns'
 import { Smile, MessageSquare, MoreHorizontal, Pencil, Trash2, Pin, X, Check, Bookmark, ArrowRight, Video, Phone, PhoneOff } from 'lucide-vue-next'
-import type { Message } from '../../features/messages/stores/messageStore'
-import { useMessageStore } from '../../features/messages/stores/messageStore'
+import type { Message } from '@/features/messages/stores/messageStore'
+import { useMessageStore } from '@/features/messages/stores/messageStore'
 import { useAuthStore } from '../../features/auth/stores/authStore'
-import { useUnreadStore } from '../../features/unreads/stores/unreadStore'
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
 import { useUIStore } from '../../features/ui/stores/uiStore'
 import { useConfigStore } from '../../features/config/stores/configStore'
 import { postsApi } from '../../api/posts'
@@ -16,6 +16,7 @@ import ImageGallery from '../atomic/ImageGallery.vue'
 import { getEmojiChar, getPreferredEmojiName, getReactionEmojiKey } from '../../utils/emoji'
 import type { FileUploadResponse } from '../../api/files'
 import { useMarkdownRenderer } from '../../composables/useMarkdownRenderer'
+import { normalizeSafeHttpUrl } from '../../utils/safeUrl'
 
 const props = defineProps<{
   message: Message
@@ -75,11 +76,13 @@ const isCallsProtocol = computed(() => props.message.props?.type === 'custom_com
 function joinCall() {
   if (!props.message.props) return
   const { meeting_url, mode } = props.message.props
+  const safeMeetingUrl = normalizeSafeHttpUrl(meeting_url)
+  if (!safeMeetingUrl) return
 
   if (mode === 'embed_iframe') {
-    uiStore.openVideoCall(meeting_url)
+    uiStore.openVideoCall(safeMeetingUrl)
   } else {
-    window.open(meeting_url, '_blank', 'noopener,noreferrer')
+    window.open(safeMeetingUrl, '_blank', 'noopener,noreferrer')
   }
 }
 
@@ -157,7 +160,7 @@ async function saveEdit() {
   saving.value = true
   try {
     const { data: updatedPost } = await postsApi.update(props.message.id, editContent.value)
-    messageStore.handleMessageUpdate(updatedPost)
+    messageStore.handleMessageUpdate(updatedPost as unknown as Record<string, unknown>)
     if (!updatedPost?.edited_at && !updatedPost?.edit_at) {
       messageStore.handleMessageUpdate({
         id: props.message.id,

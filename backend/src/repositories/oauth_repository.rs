@@ -198,6 +198,7 @@ impl<'a> OAuthRepository<'a> {
     }
 
     /// Create a new OAuth user
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_oauth_user(
         &self,
         username: &str,

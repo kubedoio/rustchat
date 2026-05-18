@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import { X, Search, Hash, Clock, MessageSquare } from 'lucide-vue-next'
 import { format } from 'date-fns'
 import { searchApi, type SearchResult } from '../../api/search'
-import { useChannelStore } from '../../features/channels/stores/channelStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const props = defineProps<{

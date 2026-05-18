@@ -14,8 +14,8 @@
         </div>
         <div class="w-full h-full bg-black">
             <iframe
-                v-if="url"
-                :src="url"
+                v-if="safeUrl"
+                :src="safeUrl"
                 class="w-full h-full border-0"
                 allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; web-share; autoplay"
             ></iframe>
@@ -26,10 +26,15 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+import { normalizeSafeHttpUrl } from '../../utils/safeUrl'
+
+const props = defineProps<{
   isOpen: boolean
   url: string | null
 }>()
+
+const safeUrl = computed(() => normalizeSafeHttpUrl(props.url))
 
 const emit = defineEmits<{
   (e: 'close'): void

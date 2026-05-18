@@ -1,15 +1,24 @@
 import { ref } from 'vue'
 import { useAuthStore } from '../features/auth/stores/authStore'
-import { useMessageStore, postToMessage, type Message } from '../stores/messages'
+import { useMessageStore } from '@/features/messages/stores/messageStore'
+import { postToMessage } from '@/features/messages/stores/messageStore'
+import type { Message } from '@/features/messages/stores/messageStore'
 import { usePresenceStore } from '../features/presence'
 import type { PresenceStatus } from '../core/entities/User'
-import { useUnreadStore } from '../stores/unreads'
-import { useChannelStore } from '../features/channels/stores/channelStore'
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { useToast } from './useToast'
 import { postsApi, type ChannelUnreadAt, type Post } from '../api/posts'
 import type { Channel } from '../api/channels'
 import { normalizeEntityId, normalizeIdsDeep } from '../utils/idCompat'
 import { applyUserStatusSnapshot } from './useUserSummary'
+import {
+  MAX_RECONNECT_ATTEMPTS,
+  WS_DISCONNECTED_TIMEOUT,
+  WS_FAILED_TIMEOUT,
+  RECONNECT_DELAY_BASE_MS,
+  RECONNECT_DELAY_MAX_MS,
+} from '../constants'
 
 
 // Type for WebSocket listener callbacks

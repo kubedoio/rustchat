@@ -380,9 +380,7 @@ async fn send_notification(
             .unwrap_or_default()
             .as_secs() as i64;
         let now_inst = Instant::now();
-        if let Err(err) = validate_hmac(secret, &headers, &body_bytes, &mut nonces, now, now_inst) {
-            return Err(err);
-        }
+        validate_hmac(secret, &headers, &body_bytes, &mut nonces, now, now_inst)?;
     }
 
     let payload: PushRequest = match serde_json::from_slice(&body_bytes) {
@@ -664,16 +662,8 @@ mod tests {
 
     const TEST_AUTH_KEY: &str = "test-secret-key";
 
-    fn test_state_with_auth() -> Arc<AppState> {
-        Arc::new(AppState {
-            fcm_client: None,
-            apns_client: None,
-            auth_key: Some(TEST_AUTH_KEY.to_string()),
-            seen_nonces: Mutex::new(HashMap::new()),
-        })
-    }
-
     fn test_state_without_auth() -> Arc<AppState> {
+
         Arc::new(AppState {
             fcm_client: None,
             apns_client: None,

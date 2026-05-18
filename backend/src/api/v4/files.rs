@@ -80,6 +80,15 @@ async fn upload_file(
         head: Vec<u8>,
     }
 
+    impl Drop for PendingFile {
+        fn drop(&mut self) {
+            // Delete temp file when PendingFile is dropped, unless it was already moved
+            if self.temp_path.exists() {
+                let _ = std::fs::remove_file(&self.temp_path);
+            }
+        }
+    }
+
     let mut pending_files: Vec<PendingFile> = Vec::new();
 
     while let Some(mut field) = multipart
@@ -177,10 +186,10 @@ async fn upload_file(
             format!("files/{}/{}.{}", auth.user_id, file_id, extension)
         };
 
-        let hash = file.hash;
+        let hash = file.hash.clone();
         let size = file.size as i64;
 
-        let mut temp_guard = TempFile(file.temp_path);
+        let mut temp_guard = TempFile(file.temp_path.clone());
         state
             .s3_client
             .upload_file(&key, &temp_guard.0, &content_type)

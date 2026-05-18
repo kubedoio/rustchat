@@ -31,31 +31,31 @@ vi.mock('../features/presence', () => ({
   }),
 }))
 
-vi.mock('./messages', () => ({
+vi.mock('@/features/messages/stores/messageStore', () => ({
   useMessageStore: () => ({
     resetSessionState: resetMessages,
   }),
 }))
 
-vi.mock('./channels', () => ({
+vi.mock('@/features/channels/stores/channelStore', () => ({
   useChannelStore: () => ({
     clearChannels,
   }),
 }))
 
-vi.mock('./unreads', () => ({
+vi.mock('@/features/unreads/stores/unreadStore', () => ({
   useUnreadStore: () => ({
     clearAllState: clearUnreads,
   }),
 }))
 
-vi.mock('./teams', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
   useTeamStore: () => ({
     clear: clearTeams,
   }),
 }))
 
-vi.mock('./channelPreferences', () => ({
+vi.mock('@/features/channels/stores/channelPreferencesStore', () => ({
   useChannelPreferencesStore: () => ({
     clearState: clearPreferences,
   }),

@@ -12,9 +12,9 @@ import {
     Settings,
     Trash2
 } from 'lucide-vue-next';
-import { useChannelPreferencesStore } from '../../features/channels/stores/channelPreferencesStore';
-import { useUnreadStore } from '../../features/unreads/stores/unreadStore';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useChannelPreferencesStore } from '@/features/channels/stores/channelPreferencesStore';
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
 import { useAuthStore } from '../../features/auth/stores/authStore';
 import { channelRepository, channelService } from '../../features/channels';
 import type { SidebarCategory } from '../../api/channels';

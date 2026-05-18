@@ -1,16 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useStorage } from '@vueuse/core'
-import { channelsApi, type Channel, type CreateChannelRequest, type ChannelNotifyProps } from '../../../api/channels'
+import { channelsApi, type CreateChannelRequest, type ChannelNotifyProps } from '../../../api/channels'
 import type { ChannelId } from '../../../core/entities/Channel'
-import type { TeamId } from '../../../core/entities/Team'
-import type { UserId } from '../../../core/entities/User'
 import { getApiErrorMessage } from '../../../core/errors/errorUtils'
 
 export const useChannelStore = defineStore('channelStore', () => {
   // Internal Map for feature architecture compatibility
-  const _channelsMap = ref<Map<ChannelId, Channel>>(new Map())
-  const joinableChannels = ref<Channel[]>([])
+  const _channelsMap = ref<Map<ChannelId, any>>(new Map())
+  const joinableChannels = ref<any[]>([])
   const currentChannelId = ref<ChannelId | null>(null)
   const lastChannelByTeam = useStorage<Record<string, string>>('last_channel_by_team', {})
   const loading = ref(false)
@@ -39,18 +37,18 @@ export const useChannelStore = defineStore('channelStore', () => {
   )
 
   // Feature actions
-  function setChannels(items: Channel[]) {
+  function setChannels(items: any[]) {
     _channelsMap.value.clear()
     for (const channel of items) {
       _channelsMap.value.set(channel.id, channel)
     }
   }
 
-  function addChannel(channel: Channel) {
+  function addChannel(channel: any) {
     _channelsMap.value.set(channel.id, channel)
   }
 
-  function updateChannel(channel: Channel) {
+  function updateChannel(channel: any) {
     const existing = _channelsMap.value.get(channel.id)
     if (existing) {
       _channelsMap.value.set(channel.id, { ...existing, ...channel })
@@ -68,7 +66,7 @@ export const useChannelStore = defineStore('channelStore', () => {
     currentChannelId.value = channelId
   }
 
-  function setJoinableChannels(items: Channel[]) {
+  function setJoinableChannels(items: any[]) {
     joinableChannels.value = items
   }
 
@@ -122,7 +120,7 @@ export const useChannelStore = defineStore('channelStore', () => {
     joinableChannels.value = []
   }
 
-  function getChannelById(channelId: ChannelId): Channel | undefined {
+  function getChannelById(channelId: ChannelId): any | undefined {
     return _channelsMap.value.get(channelId)
   }
 

@@ -2,9 +2,9 @@
 import { ref, watch, computed, nextTick } from 'vue'
 import { format, isSameYear, isToday, isYesterday } from 'date-fns'
 import { ArrowDown } from 'lucide-vue-next'
-import { useMessageStore } from '../../features/messages/stores/messageStore'
-import { useUnreadStore } from '../../features/unreads/stores/unreadStore'
-import { useChannelStore } from '../../features/channels/stores/channelStore'
+import { useMessageStore } from '@/features/messages/stores/messageStore'
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { usePresence, extractUserIds } from '../../composables/usePresence'
 import MessageItem from './MessageItem.vue'
 

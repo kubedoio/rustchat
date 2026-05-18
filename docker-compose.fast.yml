@@ -7,7 +7,5 @@ services:
       dockerfile: ../docker/backend.Dockerfile.optimized
       additional_contexts:
         cache: /tmp/docker-cache
-      cache_from:
-        - rustchat-backend:cache
       args:
         - BUILDKIT_INLINE_CACHE=1

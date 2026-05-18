@@ -65,6 +65,7 @@ impl<'a> IntegrationRepository<'a> {
     }
 
     /// Create a new incoming webhook
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_incoming_webhook(
         &self,
         team_id: Uuid,
@@ -214,6 +215,7 @@ impl<'a> IntegrationRepository<'a> {
     }
 
     /// Create a new outgoing webhook
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_outgoing_webhook(
         &self,
         team_id: Uuid,
@@ -397,6 +399,7 @@ impl<'a> IntegrationRepository<'a> {
     }
 
     /// Create a new slash command
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_slash_command(
         &self,
         team_id: Uuid,

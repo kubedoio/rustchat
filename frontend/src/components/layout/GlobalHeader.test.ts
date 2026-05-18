@@ -80,7 +80,7 @@ vi.mock('../../features/config/stores/configStore', () => ({
     useConfigStore: () => configStore,
 }))
 
-vi.mock('../../features/teams/stores/teamStore', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
     useTeamStore: () => teamStore,
 }))
 
@@ -88,7 +88,7 @@ vi.mock('../../features/presence', () => ({
     usePresenceStore: () => presenceStore,
 }))
 
-vi.mock('../../features/unreads/stores/unreadStore', () => ({
+vi.mock('@/features/unreads/stores/unreadStore', () => ({
     useUnreadStore: () => unreadStore,
 }))
 

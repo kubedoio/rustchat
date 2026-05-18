@@ -2,6 +2,7 @@
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { normalizeSafeHttpUrl } from '../../../utils/safeUrl'
 
 export type RhsView = 'thread' | 'search' | 'info' | 'saved' | 'pinned' | 'members' | null
 export type Density = 'comfortable' | 'compact'
@@ -70,7 +71,11 @@ export const useUIStore = defineStore('uiStore', () => {
     }
 
     function openVideoCall(url: string) {
-        videoCallUrl.value = url
+        const safeUrl = normalizeSafeHttpUrl(url)
+        if (!safeUrl) {
+            return
+        }
+        videoCallUrl.value = safeUrl
         isVideoCallOpen.value = true
     }
 

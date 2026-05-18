@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { X } from 'lucide-vue-next';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
-import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
+import { useChannelStore } from '@/features/channels/stores/channelStore';
 import { useAuthStore } from '../../features/auth/stores/authStore';
 import { canCreateChannel as canCreateChannelForRole } from '../../features/permissions/capabilities';
 import BaseButton from '../atomic/BaseButton.vue';

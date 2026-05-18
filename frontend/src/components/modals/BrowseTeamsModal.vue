@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { X, Users, ArrowRight, Check } from 'lucide-vue-next';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
 import { useToast } from '../../composables/useToast';
 
 const props = defineProps<{

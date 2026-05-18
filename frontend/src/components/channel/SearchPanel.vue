@@ -2,8 +2,8 @@
 import { ref, watch } from 'vue'
 import { Search, ExternalLink } from 'lucide-vue-next'
 import { format } from 'date-fns'
-import type { Message } from '../../features/messages/stores/messageStore'
-import { useMessageStore } from '../../features/messages/stores/messageStore'
+import type { Message } from '@/features/messages/stores/messageStore'
+import { useMessageStore } from '@/features/messages/stores/messageStore'
 
 
 const props = defineProps<{

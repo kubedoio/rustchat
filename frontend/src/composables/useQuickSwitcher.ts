@@ -4,8 +4,8 @@
 
 import { ref, computed } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { useTeamStore } from '../features/teams/stores/teamStore'
-import { useChannelStore } from '../features/channels/stores/channelStore'
+import { useTeamStore } from '@/features/teams/stores/teamStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
 
 export interface QuickSwitcherItem {
   id: string

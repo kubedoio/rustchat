@@ -50,6 +50,7 @@ impl<'a> PlaybookRepository<'a> {
     }
 
     /// Create a new playbook
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_playbook(
         &self,
         team_id: Uuid,
@@ -125,6 +126,7 @@ impl<'a> PlaybookRepository<'a> {
     }
 
     /// Update a playbook
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_playbook(
         &self,
         id: Uuid,
@@ -302,6 +304,7 @@ impl<'a> PlaybookRepository<'a> {
     }
 
     /// Create a task
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_task(
         &self,
         checklist_id: Uuid,
@@ -527,6 +530,7 @@ impl<'a> PlaybookRepository<'a> {
     }
 
     /// Update a run task
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_run_task(
         &self,
         run_id: Uuid,

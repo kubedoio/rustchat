@@ -193,8 +193,8 @@ export function postToMessage(post: Post): Message {
       url: f.url,
       size: f.size,
       mimeType: f.mime_type,
-      width: (f as Record<string, unknown>).width as number | undefined,
-      height: (f as Record<string, unknown>).height as number | undefined
+      width: (f as unknown as Record<string, unknown>).width as number | undefined,
+      height: (f as unknown as Record<string, unknown>).height as number | undefined
     })),
     reactions: (rawPost.reactions || []).map((r: unknown) => {
       const reaction = r as Record<string, unknown>

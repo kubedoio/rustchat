@@ -12,7 +12,7 @@ import { useWebSocket } from './composables/useWebSocket'
 import { useSingleActiveTab } from './composables/useSingleActiveTab'
 import { useUIStore } from './stores/ui'
 import { useAuthStore } from './stores/auth'
-import { useUnreadStore } from './stores/unreads'
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
 import ActiveCall from './components/calls/ActiveCall.vue'
 import IncomingCallModal from './components/calls/IncomingCallModal.vue'
 import { useConfigStore } from './stores/config'
@@ -73,7 +73,7 @@ watch([() => authStore.isAuthenticated, isActiveTab], async ([isAuth, isActive])
   
   <!-- Connection status banner (States 1 & 2) -->
   <ConnectionStatusBar
-    v-if="connectionStatus !== 'connected' && connectionStatus !== 'failed'"
+    v-if="authStore.isAuthenticated && connectionStatus !== 'connected' && connectionStatus !== 'failed'"
     :status="connectionStatus"
     :next-retry-in="nextRetryIn"
     @retry="handleRetryConnection"
@@ -81,7 +81,7 @@ watch([() => authStore.isAuthenticated, isActiveTab], async ([isAuth, isActive])
   
   <!-- Connection lost modal (State 3) -->
   <ConnectionLostModal
-    v-if="connectionStatus === 'failed'"
+    v-if="authStore.isAuthenticated && connectionStatus === 'failed'"
     @reconnect="handleRetryConnection"
     @refresh="handleRefreshPage"
   />
@@ -95,8 +95,8 @@ watch([() => authStore.isAuthenticated, isActiveTab], async ([isAuth, isActive])
   <!-- Main content with dimming when disconnected -->
   <div 
     :class="{ 
-      'opacity-60': connectionStatus === 'disconnected',
-      'opacity-80': connectionStatus === 'reconnecting'
+      'opacity-60': authStore.isAuthenticated && connectionStatus === 'disconnected',
+      'opacity-80': authStore.isAuthenticated && connectionStatus === 'reconnecting'
     }"
     class="transition-opacity duration-500"
   >

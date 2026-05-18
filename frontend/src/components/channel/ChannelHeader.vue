@@ -2,7 +2,7 @@
 import { Users, Search, Hash, Lock, Phone, Bookmark, MoreVertical, LogOut, Info, Pin, PhoneCall, PanelLeft } from 'lucide-vue-next'
 import { ref, computed } from 'vue';
 import { useCallsStore } from '../../features/calls/stores/callStore';
-import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useChannelStore } from '@/features/channels/stores/channelStore';
 import { useAuthStore } from '../../features/auth/stores/authStore';
 import { useUIStore } from '../../features/ui/stores/uiStore';
 import { useBreakpoints } from '../../composables/useBreakpoints';

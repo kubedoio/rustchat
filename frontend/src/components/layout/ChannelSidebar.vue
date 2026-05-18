@@ -3,11 +3,11 @@ import { ref, computed, watch, onMounted } from 'vue';
 import {
   Hash, Lock, ChevronDown, ChevronRight, Plus, MessageCircle, Settings, Compass, Shield, Check, LogOut, MoreVertical
 } from 'lucide-vue-next';
-import { useTeamStore } from '../../features/teams/stores/teamStore';
-import { useChannelStore } from '../../features/channels/stores/channelStore';
+import { useTeamStore } from '@/features/teams/stores/teamStore';
+import { useChannelStore } from '@/features/channels/stores/channelStore';
 import { useAuthStore } from '../../features/auth/stores/authStore';
-import { useUnreadStore } from '../../features/unreads/stores/unreadStore';
-import { useChannelPreferencesStore } from '../../features/channels/stores/channelPreferencesStore';
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore';
+import { useChannelPreferencesStore } from '@/features/channels/stores/channelPreferencesStore';
 import { usePresenceStore } from '../../features/presence';
 import CreateChannelModal from '../modals/CreateChannelModal.vue';
 import DirectMessageModal from '../modals/DirectMessageModal.vue';
@@ -224,7 +224,7 @@ async function markChannelAsRead(channelId: string) {
     // Clear counts locally first (optimistic)
     channelStore.clearCounts(channelId);
     // Also call API
-    const { useUnreadStore } = await import('../../stores/unreads');
+    const { useUnreadStore } = await import('@/features/unreads/stores/unreadStore');
     const store = useUnreadStore();
     await store.markAsRead(channelId);
   } catch (error) {

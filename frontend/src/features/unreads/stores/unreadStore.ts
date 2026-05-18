@@ -24,8 +24,8 @@ export interface UnreadOverview {
 }
 
 export interface ReadState {
-    last_read_message_id: number | null
-    first_unread_message_id: number | null
+    last_read_message_id: string | number | null
+    first_unread_message_id: string | number | null
 }
 
 export const useUnreadStore = defineStore('unreadStore', () => {

@@ -1,19 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
+
+import { reactive } from 'vue'
 
 const getMembersMock = vi.fn()
 
-const authStore = {
+const authStore = reactive({
     user: {
         id: 'user-1',
         role: 'member',
     } as { id: string; role: string } | null,
-}
+})
 
-const teamStore = {
+const teamStore = reactive({
     currentTeamId: 'team-1',
     members: [] as Array<{ user_id: string; role: string }>,
-}
+})
 
 vi.mock('../../api/channels', () => ({
     channelsApi: {
@@ -21,11 +24,11 @@ vi.mock('../../api/channels', () => ({
     },
 }))
 
-vi.mock('../../stores/auth', () => ({
+vi.mock('../../features/auth/stores/authStore', () => ({
     useAuthStore: () => authStore,
 }))
 
-vi.mock('../../stores/teams', () => ({
+vi.mock('@/features/teams/stores/teamStore', () => ({
     useTeamStore: () => teamStore,
 }))
 
@@ -37,6 +40,7 @@ async function flushPromises() {
 
 describe('permission capabilities', () => {
     beforeEach(async () => {
+        setActivePinia(createPinia())
         vi.clearAllMocks()
         authStore.user = {
             id: 'user-1',
