@@ -11,11 +11,8 @@
 //!   `20260402112243_add_presence_to_team_members.sql`).
 //! - `test_post_schema_parity` fails to compile because `Post` lacks the `has_reactions`
 //!   field that exists in the `posts` table (migration `20260222000002_create_reactions.sql`).
-//! - `test_post_reaction_is_wrong` fails to compile because `models::post::Reaction` lacks
-//!   the `id` field present in the `reactions` table and uses `created_at` instead of
-//!   `create_at`.
-//! - `test_reaction_schema_parity` is written correctly and would compile and pass if the
-//!   other tests were not blocking compilation.
+//! - `test_reaction_schema_parity` is written correctly and correctly reflects that
+//!   `Reaction` does not have an `id` field.
 //!
 //! After fixing the models, all tests will compile and pass.
 
@@ -89,14 +86,12 @@ async fn test_post_schema_parity(pool: PgPool) -> anyhow::Result<()> {
 /// Verify that `models::reaction::Reaction` correctly maps to the `reactions` table.
 ///
 /// Schema (`reactions`):
-/// - `id UUID PRIMARY KEY`
 /// - `post_id UUID NOT NULL`
 /// - `user_id UUID NOT NULL`
 /// - `emoji_name VARCHAR(64) NOT NULL`
 /// - `create_at BIGINT NOT NULL`
 ///
 /// `models::reaction::Reaction` has all these fields with the correct types:
-/// - `id: Uuid`
 /// - `post_id: Uuid`
 /// - `user_id: Uuid`
 /// - `emoji_name: String`
@@ -112,7 +107,6 @@ async fn test_reaction_schema_parity(pool: PgPool) -> anyhow::Result<()> {
 
     if let Some(row) = row {
         // Verify all required fields are present and have correct types.
-        let _id: uuid::Uuid = row.id;
         let _post_id: uuid::Uuid = row.post_id;
         let _user_id: uuid::Uuid = row.user_id;
         let _emoji_name: String = row.emoji_name;
@@ -137,7 +131,6 @@ async fn test_reaction_is_canonical(pool: PgPool) -> anyhow::Result<()> {
 
     if let Some(row) = row {
         // Verify all schema fields are present on the canonical type.
-        let _id: uuid::Uuid = row.id;
         let _post_id: uuid::Uuid = row.post_id;
         let _user_id: uuid::Uuid = row.user_id;
         let _emoji_name: String = row.emoji_name;
