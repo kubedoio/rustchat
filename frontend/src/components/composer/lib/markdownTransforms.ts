@@ -378,11 +378,29 @@ export function isInCodeBlock(text: string, cursorPos: number): boolean {
  * Used for preview rendering
  */
 export function formatForPreview(text: string): string {
+    const escapeHtml = (value: string) => value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+
+    const safeHref = (value: string) => {
+        try {
+            const url = new URL(value, 'https://localhost')
+            return url.protocol === 'http:' || url.protocol === 'https:' ? escapeHtml(value) : '#'
+        } catch {
+            return '#'
+        }
+    }
+
     return text
         // Escape HTML
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
         // Bold
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         // Italic
@@ -392,7 +410,11 @@ export function formatForPreview(text: string): string {
         // Inline code
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         // Links
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+        .replace(
+            /\[([^\]]+)\]\(([^)]+)\)/g,
+            (_match, label: string, href: string) =>
+                `<a href="${safeHref(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        )
         // Line breaks
         .replace(/\n/g, '<br>')
 }

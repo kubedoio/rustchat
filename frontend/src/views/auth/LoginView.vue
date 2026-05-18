@@ -8,6 +8,7 @@ import api from '../../api/client'
 import { useConfigStore } from '../../features/config/stores/configStore'
 import type { SsoProviderInfo } from '../../api/admin'
 import { getApiErrorMessage } from '@/core/errors/errorUtils'
+import { normalizeSafeHttpUrl } from '../../utils/safeUrl'
 
 const auth = useAuthStore()
 const configStore = useConfigStore()
@@ -55,12 +56,20 @@ async function handleLogin() {
 }
 
 function loginWithSSO(provider: SsoProviderInfo) {
-  // Include redirect_uri to return to home after login
-  const redirectUri = encodeURIComponent('/')
+  const loginUrl = normalizeSafeHttpUrl(provider.login_url)
+  if (!loginUrl) {
+    error.value = 'Invalid SSO provider URL'
+    return
+  }
+
   // Detect mobile devices (iOS/Android)
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-  const mobileParam = isMobile ? '&mobile=true' : ''
-  window.location.href = `${provider.login_url}?redirect_uri=${redirectUri}${mobileParam}`
+  const url = new URL(loginUrl)
+  url.searchParams.set('redirect_uri', '/')
+  if (isMobile) {
+    url.searchParams.set('mobile', 'true')
+  }
+  window.location.href = url.toString()
 }
 
 function getProviderIcon(providerType: string): string {

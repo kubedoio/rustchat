@@ -16,6 +16,7 @@ import ImageGallery from '../atomic/ImageGallery.vue'
 import { getEmojiChar, getPreferredEmojiName, getReactionEmojiKey } from '../../utils/emoji'
 import type { FileUploadResponse } from '../../api/files'
 import { useMarkdownRenderer } from '../../composables/useMarkdownRenderer'
+import { normalizeSafeHttpUrl } from '../../utils/safeUrl'
 
 const props = defineProps<{
   message: Message
@@ -75,11 +76,13 @@ const isCallsProtocol = computed(() => props.message.props?.type === 'custom_com
 function joinCall() {
   if (!props.message.props) return
   const { meeting_url, mode } = props.message.props
+  const safeMeetingUrl = normalizeSafeHttpUrl(meeting_url)
+  if (!safeMeetingUrl) return
 
   if (mode === 'embed_iframe') {
-    uiStore.openVideoCall(meeting_url)
+    uiStore.openVideoCall(safeMeetingUrl)
   } else {
-    window.open(meeting_url, '_blank', 'noopener,noreferrer')
+    window.open(safeMeetingUrl, '_blank', 'noopener,noreferrer')
   }
 }
 
