@@ -9,6 +9,7 @@ use crate::models::{
 };
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 use crate::services::activity;
+use regex::Regex;
 
 #[derive(Debug, Default)]
 pub struct PostsQuery {
@@ -272,22 +273,8 @@ pub async fn create_post(
     // Increment unread counts in Redis for other members
     let _ = crate::services::unreads::increment_unreads(state, channel_id, user_id, post.seq).await;
 
-    // Parse mentions (simple parsing for now)
-    let mentions: Vec<String> = response
-        .message
-        .split_whitespace()
-        .filter_map(|word| {
-            if word.starts_with('@') && word.len() > 1 {
-                Some(
-                    word[1..]
-                        .trim_matches(|c: char| !c.is_alphanumeric())
-                        .to_string(),
-                )
-            } else {
-                None
-            }
-        })
-        .collect();
+    // Parse mentions using regex, excluding code blocks and URLs
+    let mentions = parse_mentions(&response.message);
 
     if !mentions.is_empty() {
         // We could store these in the DB if we wanted persistent notifications
@@ -1036,6 +1023,41 @@ pub async fn get_thread(
         posts: posts_map,
         next_cursor,
     })
+}
+
+/// Parse @mentions from a message, excluding code blocks and URLs.
+fn parse_mentions(message: &str) -> Vec<String> {
+    let mention_re = Regex::new(r"@([a-zA-Z0-9_\-\.]+)").expect("valid regex");
+    let mut mentions = Vec::new();
+    let mut in_code_block = false;
+
+    for line in message.lines() {
+        // Track fenced code blocks (```)
+        if line.trim_start().starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            continue;
+        }
+
+        // Find mentions in this line, skipping inline code segments
+        for mat in mention_re.find_iter(line) {
+            let start = mat.start();
+            let prefix = &line[..start];
+            // Skip inline code: odd number of backticks before mention
+            if prefix.matches('`').count() % 2 == 1 {
+                continue;
+            }
+            // Skip URLs (http://... or https://...)
+            if prefix.ends_with("http://") || prefix.ends_with("https://") {
+                continue;
+            }
+            mentions.push(mat.as_str()[1..].to_string());
+        }
+    }
+
+    mentions
 }
 
 #[cfg(test)]

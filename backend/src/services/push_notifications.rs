@@ -285,7 +285,7 @@ async fn send_via_push_proxy(
     if let Ok(auth_key) = std::env::var("PUSH_PROXY_AUTH_KEY") {
         if !auth_key.is_empty() {
             let mut mac = Hmac::<Sha256>::new_from_slice(auth_key.as_bytes())
-                .expect("HMAC can take key of any size");
+                .map_err(|e| PushNotificationError::ProxyError(format!("Invalid push proxy auth key: {}", e)))?;
             mac.update(sig_input.as_bytes());
             let signature = hex::encode(mac.finalize().into_bytes());
 

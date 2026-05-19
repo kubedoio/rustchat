@@ -15,7 +15,7 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo 'fn main() {}' > src/main.rs
 
 # Build dependencies only (cached layer)
-RUN cargo build && rm -rf src
+RUN cargo build --release && rm -rf src
 
 # Copy actual source
 COPY src ./src
@@ -26,8 +26,8 @@ COPY migrations ./migrations
 ENV SQLX_OFFLINE=true
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     touch src/main.rs && \
-    cargo build && \
-    cp /app/target/debug/rustchat /tmp/rustchat
+    cargo build --release && \
+    cp /app/target/release/rustchat /tmp/rustchat
 
 # Runtime stage
 FROM alpine:3.23
