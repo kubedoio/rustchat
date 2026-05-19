@@ -565,7 +565,7 @@ pub async fn populate_files(state: &AppState, posts: &mut [PostResponse]) -> Api
 
     // 2. Fetch file infos
     let files: Vec<crate::models::FileInfo> =
-        sqlx::query_as("SELECT * FROM files WHERE id = ANY($1)")
+        sqlx::query_as("SELECT id, uploader_id, channel_id, post_id, name, key, mime_type, size, backend, width, height, has_thumbnail, thumbnail_key, sha256, created_at FROM files WHERE id = ANY($1)")
             .bind(&all_file_ids)
             .fetch_all(&state.db)
             .await?;

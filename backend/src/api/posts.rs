@@ -130,12 +130,13 @@ async fn list_posts(
 
     let sql = format!(
         r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+        SELECT p.id as id, p.channel_id as channel_id, p.user_id as user_id, p.root_post_id as root_post_id, 
+               p.message as message, COALESCE(p.props, '{{}}'::jsonb) as props, COALESCE(p.file_ids, '{{}}'::uuid[]) as file_ids,
+               p.is_pinned as is_pinned, p.created_at as created_at, p.edited_at as edited_at, p.deleted_at as deleted_at,
                p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
+               p.last_reply_at as last_reply_at, p.seq as seq,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'Deleted user' ELSE u.username END as username,
-               u.avatar_url,
+               u.avatar_url as avatar_url,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email
         FROM posts p
         JOIN channels c ON p.channel_id = c.id
@@ -578,12 +579,13 @@ async fn get_saved_posts(
 ) -> ApiResult<Json<Vec<PostResponse>>> {
     let posts: Vec<PostResponse> = sqlx::query_as(
         r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+        SELECT p.id as id, p.channel_id as channel_id, p.user_id as user_id, p.root_post_id as root_post_id, 
+               p.message as message, COALESCE(p.props, '{}'::jsonb) as props, COALESCE(p.file_ids, '{}'::uuid[]) as file_ids,
+               p.is_pinned as is_pinned, p.created_at as created_at, p.edited_at as edited_at, p.deleted_at as deleted_at,
                p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
+               p.last_reply_at as last_reply_at, p.seq as seq,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'Deleted user' ELSE u.username END as username,
-               u.avatar_url,
+               u.avatar_url as avatar_url,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email
         FROM saved_posts s
         JOIN posts p ON s.post_id = p.id

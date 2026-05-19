@@ -158,6 +158,18 @@ const router = createRouter({
     ]
 })
 
+let oauthRedirectExchangeInFlight = false
+
+function clearOAuthRedirectParams() {
+    const urlParams = new URLSearchParams(window.location.search)
+    urlParams.delete('code')
+    urlParams.delete('oauth')
+
+    const remaining = urlParams.toString()
+    const newUrl = `${window.location.pathname}${remaining ? `?${remaining}` : ''}${window.location.hash}`
+    window.history.replaceState({}, document.title, newUrl)
+}
+
 router.beforeEach(async (to, _from, next) => {
     // Handle OAuth redirects before auth checks.
     const urlParams = new URLSearchParams(window.location.search)
@@ -165,6 +177,24 @@ router.beforeEach(async (to, _from, next) => {
     const oauth = urlParams.get('oauth')
     const auth = useAuthStore()
     if (code || oauth === '1') {
+        const exchangeAttemptKey = `oauth_exchange_attempted:${window.location.pathname}${window.location.search}`
+
+        if (auth.token) {
+            clearOAuthRedirectParams()
+        } else if (sessionStorage.getItem(exchangeAttemptKey)) {
+            clearOAuthRedirectParams()
+            next('/login?error=oauth_failed')
+            return
+        }
+
+        if (oauthRedirectExchangeInFlight) {
+            next(false)
+            return
+        }
+
+        oauthRedirectExchangeInFlight = true
+        sessionStorage.setItem(exchangeAttemptKey, '1')
+
         try {
             const response = code
                 ? await client.post('/oauth2/exchange', { code })
@@ -177,18 +207,18 @@ router.beforeEach(async (to, _from, next) => {
 
             auth.token = accessToken
             await auth.fetchMe()
+            sessionStorage.removeItem(exchangeAttemptKey)
 
-            urlParams.delete('code')
-            urlParams.delete('oauth')
-            const remaining = urlParams.toString()
-            const newUrl = `${window.location.pathname}${remaining ? `?${remaining}` : ''}${window.location.hash}`
-            window.history.replaceState({}, document.title, newUrl)
+            clearOAuthRedirectParams()
         } catch (error) {
             console.error('OAuth redirect handling failed', error)
             auth.token = ''
             auth.user = null
+            clearOAuthRedirectParams()
             next('/login?error=oauth_failed')
             return
+        } finally {
+            oauthRedirectExchangeInFlight = false
         }
     }
 

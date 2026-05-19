@@ -80,7 +80,9 @@ impl PostRepository {
 
     /// Common SELECT columns for post queries with user JOIN
     const POST_COLUMNS: &'static str = r#"
-        p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
+        p.id, p.channel_id, p.user_id, p.root_post_id, p.message, 
+        COALESCE(p.props, '{}'::jsonb) as props, 
+        COALESCE(p.file_ids, '{}'::uuid[]) as file_ids,
         p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
         p.reply_count::int8 as reply_count, p.last_reply_at, p.seq,
         u.username, u.avatar_url, u.email
@@ -447,7 +449,9 @@ impl PostRepository {
 
     /// Get file info for a list of file IDs
     pub async fn get_post_files(&self, file_ids: &[Uuid]) -> ApiResult<Vec<FileInfo>> {
-        let files = sqlx::query_as("SELECT * FROM files WHERE id = ANY($1)")
+        let files = sqlx::query_as(
+            "SELECT id, uploader_id, channel_id, post_id, name, key, mime_type, size, backend, width, height, has_thumbnail, thumbnail_key, sha256, created_at FROM files WHERE id = ANY($1)",
+        )
             .bind(file_ids)
             .fetch_all(&self.db)
             .await?;
@@ -1601,8 +1605,8 @@ impl PostRepository {
             r#"
             INSERT INTO reactions (post_id, user_id, emoji_name)
             VALUES ($1, $2, $3)
-            ON CONFLICT (post_id, user_id, emoji_name) DO UPDATE SET create_at = extract(epoch from now()) * 1000
-            RETURNING *
+            ON CONFLICT (post_id, user_id, emoji_name) DO UPDATE SET create_at = (EXTRACT(epoch FROM now()) * 1000)
+            RETURNING post_id, user_id, emoji_name, create_at
             "#,
         )
         .bind(post_id)
