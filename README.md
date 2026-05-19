@@ -5,7 +5,7 @@
 > RustChat is a self-hosted collaboration platform with a Rust backend and Vue web client. It is under active development and moving toward a supported self-hosted product.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/Rust-1.92%2B-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.95%2B-orange.svg)](https://www.rust-lang.org/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3.5%2B-green.svg)](https://vuejs.org/)
 
 ---

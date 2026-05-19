@@ -14,7 +14,7 @@ For the detailed GitHub workflow (fork, branch, PR, reviews), see [docs/contribu
 
 ## Prerequisites
 
-- Rust `1.92+` (see `backend/Cargo.toml`)
+- Rust `1.95+` (see `backend/Cargo.toml`)
 - Node.js `24+` (see `frontend/package.json` engines)
 - Docker + Docker Compose
 
