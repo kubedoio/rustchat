@@ -17,7 +17,11 @@
     "test:unit": "vitest run src/utils/emoji.test.ts src/utils/directMessage.test.ts src/features/auth/stores/authStore.test.ts src/stores/messages.test.ts src/composables/useUserSummary.test.ts src/features/presence/statusExpiry.test.ts src/features/permissions/capabilities.test.ts src/features/permissions/permissionsUi.test.ts src/components/layout/GlobalHeader.test.ts src/components/channel/ChannelHeader.test.ts src/components/modals/CreateChannelModal.test.ts src/components/atomic/BaseButton.test.ts src/components/atomic/BaseInput.test.ts src/components/ui/ConnectionStatusBar.test.ts src/components/ui/ToastManager.test.ts src/components/ui/RcAvatar.test.ts src/components/atomic/FilePreview.test.ts src/components/atomic/EmojiPicker.test.ts src/components/atomic/ImageGallery.test.ts",
     "test:e2e": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test",
     "test:e2e:settings-parity": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test e2e/settings_parity.spec.ts --project=chromium",
-    "test:e2e:settings-parity:update": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test e2e/settings_parity.spec.ts --project=chromium --update-snapshots"
+    "test:e2e:settings-parity:update": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test e2e/settings_parity.spec.ts --project=chromium --update-snapshots",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{js,ts,vue,css,json}\"",
+    "format:check": "prettier --check \"src/**/*.{js,ts,vue,css,json}\""
   },
   "dependencies": {
     "@tiptap/extension-placeholder": "^3.23.4",
@@ -54,6 +58,13 @@
     "typescript": "~5.9.3",
     "vite": "^7.3.3",
     "vitest": "^4.1.6",
-    "vue-tsc": "^3.2.9"
+    "vue-tsc": "^3.2.9",
+    "eslint": "^9.0.0",
+    "@eslint/js": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "eslint-plugin-vue": "^10.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-prettier": "^5.5.0",
+    "prettier": "^3.5.0"
   }
 }
