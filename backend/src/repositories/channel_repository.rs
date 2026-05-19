@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -958,6 +960,32 @@ impl<'a> ChannelRepository<'a> {
         .bind(viewer_id)
         .fetch_optional(self.pool)
         .await
+    }
+
+    /// Batch-get display names for multiple direct channels.
+    pub async fn get_dm_display_names(
+        &self,
+        channel_ids: &[Uuid],
+        viewer_id: Uuid,
+    ) -> Result<HashMap<Uuid, String>, sqlx::Error> {
+        if channel_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let rows: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"
+            SELECT cm.channel_id, COALESCE(NULLIF(u.display_name, ''), u.username)
+            FROM channel_members cm
+            JOIN users u ON u.id = cm.user_id
+            WHERE cm.channel_id = ANY($1)
+              AND cm.user_id <> $2
+            "#
+        )
+        .bind(channel_ids)
+        .bind(viewer_id)
+        .fetch_all(self.pool)
+        .await?;
+
+        Ok(rows.into_iter().collect())
     }
 
     /// Update channel_reads for a user, setting last_read to the latest post seq.

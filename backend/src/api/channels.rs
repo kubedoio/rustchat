@@ -15,6 +15,7 @@ use crate::error::{ApiResult, AppError};
 use crate::models::{
     normalize_avatar_url, Channel, ChannelMember, ChannelType, CreateChannel, UpdateChannel,
 };
+use crate::api::v4::users::hydrate_dm_display_names_batch;
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
 use crate::repositories::{AdminRepository, ChannelRepository, UserRepository};
 
@@ -159,13 +160,12 @@ async fn list_channels(
     }
 
     // Default behavior: List channels user is a member of
-    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+    let repo = ChannelRepository::new(&state.db);
+    let mut channels: Vec<Channel> = repo
         .list_for_user(query.team_id, auth.user_id, include_archived)
         .await?;
 
-    for channel in &mut channels {
-        hydrate_direct_channel_display_name(&state, auth.user_id, channel).await?;
-    }
+    hydrate_dm_display_names_batch(&repo, &mut channels, auth.user_id).await;
 
     Ok(Json(channels))
 }

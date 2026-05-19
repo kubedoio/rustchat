@@ -73,7 +73,7 @@ pub use members::{get_team_members_for_user, my_team_members};
 
 // Re-exports from user_channels module
 pub use user_channels::{
-    get_channels_for_user, get_team_channels_for_user, hydrate_direct_channel_display_name,
+    get_channels_for_user, get_team_channels_for_user, hydrate_dm_display_names_batch,
     my_channels, my_team_channels, my_team_channels_not_members, resolve_team_id, MyChannelsQuery,
     MyTeamChannelsQuery, NotMembersQuery,
 };

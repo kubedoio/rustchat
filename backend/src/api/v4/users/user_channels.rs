@@ -7,7 +7,7 @@ use crate::api::AppState;
 use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE};
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::parse_mm_or_uuid, models as mm};
-use crate::models::channel::Channel;
+use crate::models::channel::{Channel, ChannelType};
 use crate::repositories::{ChannelRepository, TeamRepository};
 
 /// Resolves a team identifier to a UUID.
@@ -27,23 +27,31 @@ pub async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<U
     Ok(id)
 }
 
-pub async fn hydrate_direct_channel_display_name(
-    state: &AppState,
+pub async fn hydrate_dm_display_names_batch(
+    repo: &ChannelRepository<'_>,
+    channels: &mut [Channel],
     viewer_id: Uuid,
-    channel: &mut Channel,
-) -> ApiResult<()> {
-    // For Direct channels, ALWAYS compute display_name from the other participant
-    // This ensures each user sees the other person's name, not their own
-    if channel.channel_type != crate::models::channel::ChannelType::Direct {
-        return Ok(());
+) {
+    let dm_ids: Vec<Uuid> = channels
+        .iter()
+        .filter(|c| c.channel_type == ChannelType::Direct)
+        .map(|c| c.id)
+        .collect();
+
+    if dm_ids.is_empty() {
+        return;
     }
 
-    let display_name = ChannelRepository::new(&state.db)
-        .get_dm_display_name(channel.id, viewer_id)
-        .await?;
-
-    channel.display_name = display_name.or_else(|| Some("Direct Message".to_string()));
-    Ok(())
+    match repo.get_dm_display_names(&dm_ids, viewer_id).await {
+        Ok(names) => {
+            for channel in channels.iter_mut().filter(|c| c.channel_type == ChannelType::Direct) {
+                channel.display_name = names.get(&channel.id).cloned();
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to batch hydrate DM display names");
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -79,7 +87,8 @@ pub async fn my_team_channels(
         None
     };
 
-    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+    let repo = ChannelRepository::new(&state.db);
+    let mut channels: Vec<Channel> = repo
         .list_team_channels_for_user(team_id, auth.user_id, query.include_deleted, last_delete_ts)
         .await?;
 
@@ -90,9 +99,7 @@ pub async fn my_team_channels(
         "Found channels for user"
     );
 
-    for channel in &mut channels {
-        hydrate_direct_channel_display_name(&state, auth.user_id, channel).await?;
-    }
+    hydrate_dm_display_names_batch(&repo, &mut channels, auth.user_id).await;
 
     let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
     Ok(Json(mm_channels))
@@ -105,13 +112,12 @@ pub async fn get_team_channels_for_user(
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
     let user_id = super::user_sidebar_categories::resolve_user_id(&user_id, &auth)?;
     let team_id = resolve_team_id(&state, &team_id).await?;
-    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+    let repo = ChannelRepository::new(&state.db);
+    let mut channels: Vec<Channel> = repo
         .list_team_channels_for_user(team_id, user_id, true, None)
         .await?;
 
-    for channel in &mut channels {
-        hydrate_direct_channel_display_name(&state, user_id, channel).await?;
-    }
+    hydrate_dm_display_names_batch(&repo, &mut channels, user_id).await;
 
     let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
     Ok(Json(mm_channels))
@@ -134,13 +140,12 @@ pub async fn my_channels(
         None
     };
 
-    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+    let repo = ChannelRepository::new(&state.db);
+    let mut channels: Vec<Channel> = repo
         .list_user_channels(auth.user_id, since)
         .await?;
 
-    for channel in &mut channels {
-        hydrate_direct_channel_display_name(&state, auth.user_id, channel).await?;
-    }
+    hydrate_dm_display_names_batch(&repo, &mut channels, auth.user_id).await;
 
     let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
     Ok(Json(mm_channels))
@@ -152,13 +157,12 @@ pub async fn get_channels_for_user(
     axum::extract::Path(user_id): axum::extract::Path<String>,
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
     let user_id = super::user_sidebar_categories::resolve_user_id(&user_id, &auth)?;
-    let mut channels: Vec<Channel> = ChannelRepository::new(&state.db)
+    let repo = ChannelRepository::new(&state.db);
+    let mut channels: Vec<Channel> = repo
         .list_user_channels(user_id, None)
         .await?;
 
-    for channel in &mut channels {
-        hydrate_direct_channel_display_name(&state, user_id, channel).await?;
-    }
+    hydrate_dm_display_names_batch(&repo, &mut channels, user_id).await;
 
     let mm_channels: Vec<mm::Channel> = channels.into_iter().map(|c| c.into()).collect();
     Ok(Json(mm_channels))
