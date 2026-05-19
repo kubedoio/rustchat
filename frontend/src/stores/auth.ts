@@ -17,7 +17,7 @@ import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
 import { useTeamStore } from '@/features/teams/stores/teamStore'
 import { useChannelPreferencesStore } from '@/features/channels/stores/channelPreferencesStore'
-import { useUIStore } from './ui'
+import { useUIStore } from '../features/ui/stores/uiStore'
 import { useCallsStore } from './calls'
 
 type LogoutReason = 'manual' | 'expired' | 'unauthorized'
