@@ -1637,7 +1637,7 @@ impl PostRepository {
         post_ids: &[Uuid],
     ) -> ApiResult<Vec<crate::models::reaction::Reaction>> {
         let reactions = sqlx::query_as::<_, crate::models::reaction::Reaction>(
-            "SELECT * FROM reactions WHERE post_id = ANY($1) ORDER BY create_at",
+            "SELECT post_id, user_id, emoji_name, create_at FROM reactions WHERE post_id = ANY($1) ORDER BY create_at",
         )
         .bind(post_ids)
         .fetch_all(&self.db)
@@ -1684,7 +1684,7 @@ impl PostRepository {
         emoji_name: &str,
     ) -> Result<Option<crate::models::reaction::Reaction>, sqlx::Error> {
         sqlx::query_as::<_, crate::models::reaction::Reaction>(
-            "SELECT * FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
+            "SELECT post_id, user_id, emoji_name, create_at FROM reactions WHERE user_id = $1 AND post_id = $2 AND emoji_name = $3",
         )
         .bind(user_id)
         .bind(post_id)

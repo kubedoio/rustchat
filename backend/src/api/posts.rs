@@ -103,38 +103,30 @@ async fn list_posts(
 
     // Build SQL query safely without format!() for dynamic parts
     // Use separate condition arrays that we track in parallel with bound values
-    let mut conditions: Vec<&'static str> = Vec::new();
+    let mut conditions: Vec<String> = Vec::new();
     let mut arg_index: usize = 2;
 
     if query.is_pinned.is_some() {
-        conditions.push(" AND p.is_pinned = $2");
-        arg_index = 3;
+        conditions.push(format!(" AND p.is_pinned = ${}", arg_index));
+        arg_index += 1;
     }
 
     if query.q.is_some() {
-        conditions.push(" AND p.message ILIKE $3");
-        arg_index = 4;
+        conditions.push(format!(" AND p.message ILIKE ${}", arg_index));
+        arg_index += 1;
     }
 
     if query.before.is_some() {
-        conditions.push(" AND p.created_at < (SELECT created_at FROM posts WHERE id = $4)");
-        arg_index = 5;
+        conditions.push(format!(" AND p.created_at < (SELECT created_at FROM posts WHERE id = ${})", arg_index));
+        arg_index += 1;
     } else if query.after.is_some() {
-        conditions.push(" AND p.created_at > (SELECT created_at FROM posts WHERE id = $4)");
-        arg_index = 5;
+        conditions.push(format!(" AND p.created_at > (SELECT created_at FROM posts WHERE id = ${})", arg_index));
+        arg_index += 1;
     }
 
     // Determine ORDER BY direction (validated, not user-input)
     let order_dir = if query.after.is_some() { "ASC" } else { "DESC" };
-    let limit_placeholder = if arg_index == 2 {
-        "$2"
-    } else if arg_index == 3 {
-        "$3"
-    } else if arg_index == 4 {
-        "$4"
-    } else {
-        "$5"
-    };
+    let limit_placeholder = format!("${}", arg_index);
 
     let sql = format!(
         r#"
