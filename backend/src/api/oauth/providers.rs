@@ -7,7 +7,6 @@ use super::utils::send_with_retry;
 
 /// Token response from OAuth provider
 #[derive(Debug, serde::Deserialize)]
-#[allow(dead_code)]
 pub(crate) struct TokenResponse {
     access_token: String,
     token_type: String,
@@ -19,7 +18,6 @@ pub(crate) struct TokenResponse {
 
 /// User info from OIDC userinfo endpoint
 #[derive(Debug, serde::Deserialize)]
-#[allow(dead_code)]
 pub(crate) struct UserInfoResponse {
     sub: String,
     email: Option<String>,
@@ -35,7 +33,6 @@ pub(crate) struct UserInfoResponse {
 
 /// Claims from ID token
 #[derive(Debug, serde::Deserialize)]
-#[allow(dead_code)]
 pub(crate) struct IdTokenClaims {
     iss: String,
     sub: String,
@@ -57,7 +54,6 @@ pub(crate) struct IdTokenClaims {
 
 /// GitHub user info
 #[derive(Debug, serde::Deserialize)]
-#[allow(dead_code)]
 pub(crate) struct GitHubUser {
     id: i64,
     login: String,

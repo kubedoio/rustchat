@@ -171,22 +171,3 @@ pub(crate) async fn check_channel_permission(
 
     Ok(())
 }
-#[allow(dead_code)]
-pub(crate) async fn is_dm_or_gm_channel(state: &AppState, channel_id: Uuid) -> ApiResult<bool> {
-    let channel_type: Option<String> =
-        sqlx::query_scalar("SELECT type::text FROM channels WHERE id = $1")
-            .bind(channel_id)
-            .fetch_optional(&state.db)
-            .await
-            .map_err(|e| AppError::Internal(format!("Database error: {}", e)))?;
-
-    let Some(channel_type) = channel_type else {
-        return Ok(false);
-    };
-
-    let normalized = channel_type.trim().to_ascii_lowercase();
-    Ok(matches!(
-        normalized.as_str(),
-        "direct" | "group" | "d" | "g"
-    ))
-}

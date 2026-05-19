@@ -250,7 +250,6 @@ fn map_circuit_error(err: CircuitError<AppError>) -> AppError {
 /// OpenID Connect Discovery response
 /// See: https://openid.net/specs/openid-connect-discovery-1_0.html
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct OpenIdConfiguration {
     pub issuer: String,
     pub authorization_endpoint: String,

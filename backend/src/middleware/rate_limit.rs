@@ -203,7 +203,7 @@ pub async fn websocket_ip_rate_limit(
 // `check_rate_limit` provides per-account sliding window rate limiting.
 // IP-level rate limiting is handled by the middleware functions above.
 
-/// Legacy rate limit configuration (stub)
+/// Per-account sliding-window rate limit configuration for auth endpoints
 #[derive(Debug, Clone, Copy)]
 pub struct RateLimitConfig {
     pub window_secs: u64,
@@ -211,7 +211,7 @@ pub struct RateLimitConfig {
 }
 
 impl RateLimitConfig {
-    /// Create config for auth endpoints (stub)
+    /// Create config for auth endpoints
     pub fn auth_per_minute(max_requests: u32) -> Self {
         Self {
             window_secs: 60,
@@ -220,7 +220,7 @@ impl RateLimitConfig {
     }
 }
 
-/// Legacy rate limit check result (stub)
+/// Rate limit check result for auth endpoints
 #[derive(Debug, Clone, Copy)]
 pub struct RateLimitResult {
     pub allowed: bool,

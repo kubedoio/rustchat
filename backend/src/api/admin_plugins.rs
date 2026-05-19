@@ -22,7 +22,6 @@ pub fn router() -> Router<AppState> {
 // ============ Plugins - RustChat Calls Plugin ============
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[allow(dead_code)]
 pub struct CallsPluginConfig {
     pub enabled: bool,
     pub turn_server_enabled: bool,

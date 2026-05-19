@@ -6,14 +6,12 @@ use axum::{
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use super::ensure_team_member;
 use super::utils::parse_body;
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::parse_mm_or_uuid, models as mm};
 use crate::models::{Channel, Team};
-use uuid::Uuid;
 
 /// POST /teams/{team_id}/channels/search - Search channels in a team
 #[derive(Deserialize)]
@@ -80,34 +78,3 @@ pub async fn search_teams(
     Ok(Json(teams.into_iter().map(|t| t.into()).collect()))
 }
 
-#[allow(dead_code)]
-pub async fn search_team_channels(
-    state: &AppState,
-    user_id: Uuid,
-    team_id: &str,
-    term: &str,
-    limit: i64,
-) -> ApiResult<Vec<mm::Channel>> {
-    let team_id = parse_mm_or_uuid(team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
-    ensure_team_member(state, team_id, user_id).await?;
-    let search_term = format!("%{}%", term.to_lowercase());
-    let channels: Vec<Channel> = sqlx::query_as(
-        r#"
-        SELECT DISTINCT c.* FROM channels c
-        LEFT JOIN channel_members cm ON c.id = cm.channel_id AND cm.user_id = $2
-        WHERE c.team_id = $1
-          AND (LOWER(c.name) LIKE $3 OR LOWER(c.display_name) LIKE $3)
-          AND (c.type = 'public' OR cm.user_id IS NOT NULL)
-        ORDER BY COALESCE(c.display_name, c.name) ASC
-        LIMIT $4
-        "#,
-    )
-    .bind(team_id)
-    .bind(user_id)
-    .bind(&search_term)
-    .bind(limit)
-    .fetch_all(&state.db)
-    .await?;
-    Ok(channels.into_iter().map(|c| c.into()).collect())
-}

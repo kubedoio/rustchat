@@ -20,14 +20,12 @@ pub struct PostsQuery {
     pub after: Option<Uuid>,
 }
 
-/// Create a new post
-pub async fn create_post(
+async fn validate_create_post(
     state: &AppState,
     user_id: Uuid,
     channel_id: Uuid,
-    input: CreatePost,
-    client_msg_id: Option<String>,
-) -> ApiResult<PostResponse> {
+    input: &CreatePost,
+) -> ApiResult<Option<Uuid>> {
     ensure_permission(state, user_id, "post.create").await?;
 
     // Check membership
@@ -66,7 +64,16 @@ pub async fn create_post(
         }
     }
 
-    // Insert post
+    Ok(root_post_id)
+}
+
+async fn insert_post(
+    state: &AppState,
+    user_id: Uuid,
+    channel_id: Uuid,
+    input: &CreatePost,
+    root_post_id: Option<Uuid>,
+) -> ApiResult<Post> {
     let post: Post = sqlx::query_as(
         r#"
         INSERT INTO posts (channel_id, user_id, root_post_id, message, props, file_ids)
@@ -81,72 +88,88 @@ pub async fn create_post(
     .bind(user_id)
     .bind(root_post_id)
     .bind(&input.message)
-    .bind(input.props.unwrap_or(serde_json::json!({})))
+    .bind(input.props.clone().unwrap_or(serde_json::json!({})))
     .bind(&input.file_ids)
     .fetch_one(&state.db)
     .await?;
 
-    // If this is a reply, update the root post
-    if let Some(r_id) = root_post_id {
-        sqlx::query(
-            "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1",
-        )
-        .bind(r_id)
-        .execute(&state.db)
-        .await?;
+    Ok(post)
+}
 
-        // Create reply/thread_reply activity for the parent post author
-        let parent_info: Option<(Uuid, Option<Uuid>)> =
-            sqlx::query_as("SELECT user_id, root_post_id FROM posts WHERE id = $1")
-                .bind(r_id)
-                .fetch_optional(&state.db)
-                .await
-                .ok()
-                .flatten();
+async fn handle_reply_side_effects(
+    state: &AppState,
+    user_id: Uuid,
+    channel_id: Uuid,
+    post: &Post,
+    root_post_id: Uuid,
+    message: &str,
+) -> ApiResult<()> {
+    sqlx::query(
+        "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1",
+    )
+    .bind(root_post_id)
+    .execute(&state.db)
+    .await?;
 
-        if let Some((parent_user_id, parent_root_id)) = parent_info {
-            if parent_user_id != user_id {
-                let team_id_for_reply: Option<Uuid> =
-                    sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-                        .bind(channel_id)
-                        .fetch_optional(&state.db)
-                        .await
-                        .ok()
-                        .flatten();
+    // Create reply/thread_reply activity for the parent post author
+    let parent_info: Option<(Uuid, Option<Uuid>)> =
+        sqlx::query_as("SELECT user_id, root_post_id FROM posts WHERE id = $1")
+            .bind(root_post_id)
+            .fetch_optional(&state.db)
+            .await
+            .ok()
+            .flatten();
 
-                if let Some(team_id) = team_id_for_reply {
-                    if parent_root_id.is_some() {
-                        // Parent is itself a reply, this is a thread reply
-                        let _ = activity::create_thread_reply_activity(
-                            state,
-                            parent_user_id,
-                            user_id,
-                            channel_id,
-                            team_id,
-                            post.id,
-                            r_id,
-                            &input.message,
-                        )
-                        .await;
-                    } else {
-                        // Parent is a root post, this is a direct reply
-                        let _ = activity::create_reply_activity(
-                            state,
-                            parent_user_id,
-                            user_id,
-                            channel_id,
-                            team_id,
-                            post.id,
-                            &input.message,
-                        )
-                        .await;
-                    }
+    if let Some((parent_user_id, parent_root_id)) = parent_info {
+        if parent_user_id != user_id {
+            let team_id_for_reply: Option<Uuid> =
+                sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
+                    .bind(channel_id)
+                    .fetch_optional(&state.db)
+                    .await
+                    .ok()
+                    .flatten();
+
+            if let Some(team_id) = team_id_for_reply {
+                if parent_root_id.is_some() {
+                    // Parent is itself a reply, this is a thread reply
+                    let _ = activity::create_thread_reply_activity(
+                        state,
+                        parent_user_id,
+                        user_id,
+                        channel_id,
+                        team_id,
+                        post.id,
+                        root_post_id,
+                        message,
+                    )
+                    .await;
+                } else {
+                    // Parent is a root post, this is a direct reply
+                    let _ = activity::create_reply_activity(
+                        state,
+                        parent_user_id,
+                        user_id,
+                        channel_id,
+                        team_id,
+                        post.id,
+                        message,
+                    )
+                    .await;
                 }
             }
         }
     }
 
-    // Fetch user details
+    Ok(())
+}
+
+async fn build_post_response(
+    state: &AppState,
+    post: Post,
+    user_id: Uuid,
+    client_msg_id: Option<String>,
+) -> ApiResult<PostResponse> {
     #[derive(sqlx::FromRow)]
     struct PostUser {
         username: String,
@@ -159,9 +182,6 @@ pub async fn create_post(
             .bind(user_id)
             .fetch_one(&state.db)
             .await?;
-
-    // Store username for later use in push notifications
-    let username_for_push = user.username.clone();
 
     let mut response = PostResponse {
         id: post.id,
@@ -193,7 +213,15 @@ pub async fn create_post(
         populate_files(state, std::slice::from_mut(&mut response)).await?;
     }
 
-    // Broadcast new message
+    Ok(response)
+}
+
+async fn broadcast_new_post(
+    state: &AppState,
+    channel_id: Uuid,
+    response: &PostResponse,
+    root_post_id: Option<Uuid>,
+) {
     let event_type = if root_post_id.is_some() {
         EventType::ThreadReplyCreated
     } else {
@@ -218,7 +246,7 @@ pub async fn create_post(
             serde_json::json!({
                 "id": r_id,
                 "reply_count_inc": 1,
-                "last_reply_at": post.created_at
+                "last_reply_at": response.created_at
             }),
             Some(channel_id),
         )
@@ -230,7 +258,15 @@ pub async fn create_post(
         });
         state.ws_hub.broadcast(root_update).await;
     }
+}
 
+async fn run_post_automation(
+    state: &AppState,
+    channel_id: Uuid,
+    user_id: Uuid,
+    response: &PostResponse,
+    root_post_id: Option<Uuid>,
+) {
     // Check for playbook triggers
     if root_post_id.is_none() {
         let _ = check_playbook_triggers(state, channel_id, &response.message).await;
@@ -266,13 +302,15 @@ pub async fn create_post(
             .await;
         }
     }
+}
 
-    // Ensure DM membership for recipient if they left
-    let _ = ensure_dm_membership(state, channel_id).await;
-
-    // Increment unread counts in Redis for other members
-    let _ = crate::services::unreads::increment_unreads(state, channel_id, user_id, post.seq).await;
-
+async fn handle_mentions(
+    state: &AppState,
+    channel_id: Uuid,
+    user_id: Uuid,
+    post_id: Uuid,
+    response: &mut PostResponse,
+) -> ApiResult<Vec<String>> {
     // Parse mentions using regex, excluding code blocks and URLs
     let mentions = parse_mentions(&response.message);
 
@@ -282,12 +320,12 @@ pub async fn create_post(
         // but the frontend already parses them from the message string.
         // Let's at least update the props to include mentions metadata.
         let mut props = response.props.as_object().cloned().unwrap_or_default();
-        props.insert("mentions".to_string(), serde_json::json!(mentions));
+        props.insert("mentions".to_string(), serde_json::json!(&mentions));
 
         // Update DB with the new props
         sqlx::query("UPDATE posts SET props = $1 WHERE id = $2")
             .bind(serde_json::Value::Object(props.clone()))
-            .bind(post.id)
+            .bind(post_id)
             .execute(&state.db)
             .await
             .ok();
@@ -339,7 +377,7 @@ pub async fn create_post(
                         user_id,
                         channel_id,
                         team_id,
-                        post.id,
+                        post_id,
                         &response.message,
                     )
                     .await;
@@ -348,7 +386,18 @@ pub async fn create_post(
         }
     }
 
-    // Send push notifications for mentions and DMs
+    Ok(mentions)
+}
+
+async fn send_push_notifications(
+    state: &AppState,
+    channel_id: Uuid,
+    user_id: Uuid,
+    _post_id: Uuid,
+    response: &PostResponse,
+    mentions: &[String],
+    username_for_push: String,
+) {
     // Get channel info for push notifications
     let channel_info: Option<(String, String, String)> = sqlx::query_as(
         "SELECT c.name, c.display_name, c.type::text as channel_type FROM channels c WHERE c.id = $1"
@@ -361,7 +410,7 @@ pub async fn create_post(
 
     if let Some((channel_name, channel_display_name, channel_type)) = channel_info {
         let is_dm = channel_type == "direct";
-        let sender_name = username_for_push.clone();
+        let sender_name = username_for_push;
         let message_preview = truncate_preview(&response.message, 100);
 
         // Get channel members to notify
@@ -448,6 +497,36 @@ pub async fn create_post(
             });
         }
     }
+}
+
+/// Create a new post
+pub async fn create_post(
+    state: &AppState,
+    user_id: Uuid,
+    channel_id: Uuid,
+    input: CreatePost,
+    client_msg_id: Option<String>,
+) -> ApiResult<PostResponse> {
+    let root_post_id = validate_create_post(state, user_id, channel_id, &input).await?;
+    let post = insert_post(state, user_id, channel_id, &input, root_post_id).await?;
+
+    if let Some(r_id) = root_post_id {
+        handle_reply_side_effects(state, user_id, channel_id, &post, r_id, &input.message).await?;
+    }
+
+    let mut response = build_post_response(state, post, user_id, client_msg_id).await?;
+
+    // MENTIONS BEFORE BROADCAST (bug fix)
+    let mentions = handle_mentions(state, channel_id, user_id, response.id, &mut response).await?;
+
+    broadcast_new_post(state, channel_id, &response, root_post_id).await;
+    run_post_automation(state, channel_id, user_id, &response, root_post_id).await;
+
+    let _ = ensure_dm_membership(state, channel_id).await;
+    let _ = crate::services::unreads::increment_unreads(state, channel_id, user_id, response.seq).await;
+
+    let username_for_push = response.username.clone().unwrap_or_default();
+    send_push_notifications(state, channel_id, user_id, response.id, &response, &mentions, username_for_push).await;
 
     Ok(response)
 }

@@ -4,10 +4,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use std::collections::HashMap;
-
 use super::{encode_mm_id, mm, parse_mm_or_uuid, ApiResult, AppState, MmAuthUser};
-use crate::api::v4::posts::reactions_for_posts;
 use crate::models::post::PostResponse;
 use crate::repositories::PostRepository;
 use serde_json::json;
@@ -97,11 +94,6 @@ pub async fn get_posts(
 
     crate::services::posts::populate_files(&state, &mut posts).await?;
 
-    let mut order = Vec::new();
-    let mut posts_map: HashMap<String, mm::Post> = HashMap::new();
-    let mut post_ids = Vec::new();
-    let mut id_map = Vec::new();
-
     // Determine prev/next post IDs for pagination hints
     let (prev_post_id, next_post_id) = if !posts.is_empty() {
         let first_id = encode_mm_id(posts.first().unwrap().id);
@@ -118,28 +110,7 @@ pub async fn get_posts(
         (String::new(), String::new())
     };
 
-    for p in posts {
-        let id = encode_mm_id(p.id);
-        post_ids.push(p.id);
-        id_map.push((p.id, id.clone()));
-        order.push(id.clone());
-        posts_map.insert(id, p.into());
-    }
-
-    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
-    for (post_uuid, post_id) in id_map {
-        if let Some(reactions) = reactions_map.get(&post_uuid) {
-            if !reactions.is_empty() {
-                if let Some(post) = posts_map.get_mut(&post_id) {
-                    let mut metadata = post.metadata.take().unwrap_or_else(|| json!({}));
-                    if let Some(obj) = metadata.as_object_mut() {
-                        obj.insert("reactions".to_string(), json!(reactions));
-                    }
-                    post.metadata = Some(metadata);
-                }
-            }
-        }
-    }
+    let (order, posts_map) = crate::api::v4::posts::build_mm_posts_map(&state, posts).await?;
 
     Ok(Json(mm::PostList {
         order,
@@ -184,33 +155,7 @@ pub async fn get_pinned_posts(
 
     crate::services::posts::populate_files(&state, &mut posts).await?;
 
-    let mut order = Vec::new();
-    let mut posts_map: HashMap<String, mm::Post> = HashMap::new();
-    let mut post_ids = Vec::new();
-    let mut id_map = Vec::new();
-
-    for p in posts {
-        let id = encode_mm_id(p.id);
-        post_ids.push(p.id);
-        id_map.push((p.id, id.clone()));
-        order.push(id.clone());
-        posts_map.insert(id, p.into());
-    }
-
-    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
-    for (post_uuid, post_id) in id_map {
-        if let Some(reactions) = reactions_map.get(&post_uuid) {
-            if !reactions.is_empty() {
-                if let Some(post) = posts_map.get_mut(&post_id) {
-                    let mut metadata = post.metadata.take().unwrap_or_else(|| json!({}));
-                    if let Some(obj) = metadata.as_object_mut() {
-                        obj.insert("reactions".to_string(), json!(reactions));
-                    }
-                    post.metadata = Some(metadata);
-                }
-            }
-        }
-    }
+    let (order, posts_map) = crate::api::v4::posts::build_mm_posts_map(&state, posts).await?;
 
     Ok(Json(mm::PostList {
         order,

@@ -20,8 +20,6 @@ pub struct S3Client {
     client: Client,
     bucket: String,
     endpoint: Option<String>,
-    #[allow(dead_code)]
-    public_endpoint: Option<String>,
     public_client: Option<Client>,
 }
 
@@ -83,7 +81,6 @@ impl S3Client {
             client,
             bucket,
             endpoint,
-            public_endpoint,
             public_client,
         }
     }

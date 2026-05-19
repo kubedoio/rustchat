@@ -56,12 +56,6 @@ pub mod usage;
 pub mod users;
 pub mod websocket;
 
-#[allow(dead_code)]
-pub fn router(state: AppState) -> Router<AppState> {
-    // Default limits for backward compatibility
-    router_with_body_limits(state, 64 * 1024, 1024 * 1024, 50 * 1024 * 1024)
-}
-
 /// Create v4 router with configurable body size limits
 ///
 /// # Arguments
