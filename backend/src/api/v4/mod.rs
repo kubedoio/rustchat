@@ -209,6 +209,7 @@ mod tests {
 
     #[test]
     fn v4_router_builds_without_overlaps() {
-        let _builder: fn(AppState) -> axum::Router<AppState> = router;
+        let _builder: fn(AppState, usize, usize, usize) -> axum::Router<AppState> =
+            router_with_body_limits;
     }
 }

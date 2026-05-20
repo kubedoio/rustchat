@@ -198,7 +198,7 @@ async fn build_post_response(
         username: Some(user.username),
         avatar_url: user.avatar_url,
         email: Some(user.email),
-        reply_count: post.reply_count as i64,
+        reply_count: post.reply_count,
         last_reply_at: post.last_reply_at,
         files: vec![],
         reactions: vec![],
