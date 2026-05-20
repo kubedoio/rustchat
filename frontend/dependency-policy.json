@@ -72,6 +72,10 @@
     }
   },
   "directDevDependencies": {
+    "@eslint/js": {
+      "category": "editor-format-tooling-critical",
+      "reason": "ESLint recommended rules config utility."
+    },
     "@playwright/test": {
       "category": "build-tool-critical",
       "reason": "End-to-end and visual regression testing framework."
@@ -104,6 +108,22 @@
       "category": "build-tool-critical",
       "reason": "Base TypeScript configuration preset for Vue projects."
     },
+    "eslint": {
+      "category": "editor-format-tooling-critical",
+      "reason": "Pluggable JavaScript linter to enforce code style and catch bugs."
+    },
+    "eslint-config-prettier": {
+      "category": "editor-format-tooling-critical",
+      "reason": "Turns off all rules that are unnecessary or might conflict with Prettier."
+    },
+    "eslint-plugin-prettier": {
+      "category": "editor-format-tooling-critical",
+      "reason": "Runs Prettier as an ESLint rule and reports differences as individual ESLint issues."
+    },
+    "eslint-plugin-vue": {
+      "category": "editor-format-tooling-critical",
+      "reason": "Official ESLint plugin for Vue.js code style rules."
+    },
     "jsdom": {
       "category": "build-tool-critical",
       "reason": "DOM environment for frontend unit and integration-style tests."
@@ -112,6 +132,10 @@
       "category": "build-tool-critical",
       "reason": "CSS transformation pipeline used by Vite and Tailwind."
     },
+    "prettier": {
+      "category": "editor-format-tooling-critical",
+      "reason": "Opinionated code formatter to enforce consistent style."
+    },
     "tailwindcss": {
       "category": "build-tool-critical",
       "reason": "Primary utility CSS framework for the frontend."
@@ -119,6 +143,10 @@
     "typescript": {
       "category": "build-tool-critical",
       "reason": "Type checking and type-driven build support for the frontend."
+    },
+    "typescript-eslint": {
+      "category": "editor-format-tooling-critical",
+      "reason": "Tooling which enables ESLint to support TypeScript."
     },
     "vite": {
       "category": "build-tool-critical",
