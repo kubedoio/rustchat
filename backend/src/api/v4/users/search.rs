@@ -11,13 +11,14 @@ use super::user_channels::resolve_team_id;
 use super::utils::{UsersByIdsRequest, UsersByUsernamesRequest};
 use super::MmAuthUser;
 use crate::api::AppState;
+use crate::auth::policy::permissions;
 use crate::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE};
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{
     id::{encode_mm_id, parse_mm_or_uuid},
     models as mm,
 };
-use crate::models::User;
+use crate::models::{ChannelType, User};
 use crate::repositories::{ChannelRepository, TeamRepository, UserRepository};
 
 #[derive(Deserialize)]
@@ -222,6 +223,10 @@ pub async fn get_user_by_email(
 #[derive(Deserialize)]
 pub struct UsersQuery {
     pub in_channel: Option<String>,
+    pub in_team: Option<String>,
+    pub not_in_channel: Option<String>,
+    pub not_in_team: Option<String>,
+    pub without_team: Option<bool>,
     pub page: Option<i64>,
     pub per_page: Option<i64>,
 }
@@ -231,29 +236,105 @@ pub async fn list_users(
     auth: MmAuthUser,
     Query(query): Query<UsersQuery>,
 ) -> ApiResult<Json<Vec<mm::User>>> {
-    let channel_id = match query.in_channel.as_deref() {
-        Some(id) => parse_mm_or_uuid(id)
-            .ok_or_else(|| AppError::BadRequest("Invalid in_channel".to_string()))?,
-        None => return Ok(Json(vec![])),
-    };
-
     let page = query.page.unwrap_or(0).max(0);
-    let per_page = query.per_page.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE);
+    let per_page = query
+        .per_page
+        .unwrap_or(DEFAULT_PAGE_SIZE)
+        .clamp(1, MAX_PAGE_SIZE);
     let offset = page * per_page;
 
-    let is_member = ChannelRepository::new(&state.db)
-        .is_channel_member(channel_id, auth.user_id)
-        .await?;
+    let users = if let Some(in_channel) = query.in_channel.as_deref() {
+        let channel_id = parse_mm_or_uuid(in_channel)
+            .ok_or_else(|| AppError::BadRequest("Invalid in_channel".to_string()))?;
 
-    if !is_member {
-        return Err(AppError::Forbidden(
-            "Not a member of this channel".to_string(),
-        ));
-    }
+        let is_member = ChannelRepository::new(&state.db)
+            .is_channel_member(channel_id, auth.user_id)
+            .await?;
 
-    let users = UserRepository::new(&state.db)
-        .list_channel_members_paginated(channel_id, per_page, offset)
-        .await?;
+        if !is_member {
+            return Err(AppError::Forbidden(
+                "Not a member of this channel".to_string(),
+            ));
+        }
+
+        UserRepository::new(&state.db)
+            .list_channel_members_paginated(channel_id, per_page, offset)
+            .await?
+    } else if let Some(in_team) = query.in_team.as_deref() {
+        let team_id = resolve_team_id(&state, in_team).await?;
+
+        let is_member = TeamRepository::new(&state.db)
+            .is_team_member(team_id, auth.user_id)
+            .await?;
+
+        if !is_member {
+            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+        }
+
+        if let Some(not_in_channel) = query.not_in_channel.as_deref() {
+            let channel_id = parse_mm_or_uuid(not_in_channel)
+                .ok_or_else(|| AppError::BadRequest("Invalid not_in_channel".to_string()))?;
+
+            let channel_repo = ChannelRepository::new(&state.db);
+            let channel = channel_repo
+                .get_by_id_optional(channel_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+
+            if channel.team_id != team_id {
+                return Err(AppError::BadRequest(
+                    "not_in_channel must belong to in_team".to_string(),
+                ));
+            }
+
+            let is_channel_member = channel_repo
+                .is_channel_member(channel_id, auth.user_id)
+                .await?;
+
+            if channel.channel_type != ChannelType::Public
+                && !is_channel_member
+                && !auth.has_permission(&permissions::SYSTEM_MANAGE)
+                && !auth.has_permission(&permissions::ADMIN_FULL)
+            {
+                return Err(AppError::Forbidden(
+                    "Not a member of this channel".to_string(),
+                ));
+            }
+
+            UserRepository::new(&state.db)
+                .list_team_members_not_in_channel_paginated(team_id, channel_id, per_page, offset)
+                .await?
+        } else {
+            UserRepository::new(&state.db)
+                .list_team_members_paginated(team_id, per_page, offset)
+                .await?
+        }
+    } else if let Some(not_in_team) = query.not_in_team.as_deref() {
+        let team_id = resolve_team_id(&state, not_in_team).await?;
+
+        let is_member = TeamRepository::new(&state.db)
+            .is_team_member(team_id, auth.user_id)
+            .await?;
+
+        if !is_member
+            && !auth.has_permission(&permissions::SYSTEM_MANAGE)
+            && !auth.has_permission(&permissions::ADMIN_FULL)
+        {
+            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+        }
+
+        UserRepository::new(&state.db)
+            .list_users_not_in_team_paginated(auth.org_id, team_id, per_page, offset)
+            .await?
+    } else if query.without_team.unwrap_or(false) {
+        UserRepository::new(&state.db)
+            .list_users_without_team_paginated(auth.org_id, per_page, offset)
+            .await?
+    } else {
+        UserRepository::new(&state.db)
+            .list_users(auth.org_id, None, per_page, offset)
+            .await?
+    };
 
     let mm_users: Vec<mm::User> = users.into_iter().map(|u| u.into()).collect();
     Ok(Json(mm_users))

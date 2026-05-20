@@ -1075,4 +1075,160 @@ impl<'a> UserRepository<'a> {
 
         Ok(())
     }
+
+    /// List active members of a team with pagination.
+    pub async fn list_team_members_paginated(
+        &self,
+        team_id: Uuid,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<User>, sqlx::Error> {
+        sqlx::query_as::<_, User>(
+            r#"
+            SELECT u.*
+            FROM users u
+            JOIN team_members tm ON u.id = tm.user_id
+            WHERE tm.team_id = $1 AND u.is_active = true
+            ORDER BY u.username ASC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(team_id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// List active members of a team who are not members of a channel with pagination.
+    pub async fn list_team_members_not_in_channel_paginated(
+        &self,
+        team_id: Uuid,
+        channel_id: Uuid,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<User>, sqlx::Error> {
+        sqlx::query_as::<_, User>(
+            r#"
+            SELECT u.*
+            FROM users u
+            JOIN team_members tm ON u.id = tm.user_id
+            LEFT JOIN channel_members cm ON u.id = cm.user_id AND cm.channel_id = $2
+            WHERE tm.team_id = $1 AND cm.user_id IS NULL AND u.is_active = true
+            ORDER BY u.username ASC
+            LIMIT $3 OFFSET $4
+            "#,
+        )
+        .bind(team_id)
+        .bind(channel_id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// List users who are not members of a team with pagination.
+    pub async fn list_users_not_in_team_paginated(
+        &self,
+        org_id: Option<Uuid>,
+        team_id: Uuid,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<User>, sqlx::Error> {
+        match org_id {
+            Some(org_id) => {
+                sqlx::query_as::<_, User>(
+                    r#"
+                    SELECT u.*
+                    FROM users u
+                    WHERE u.org_id = $1
+                      AND u.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM team_members tm
+                          WHERE tm.team_id = $2 AND tm.user_id = u.id
+                      )
+                    ORDER BY u.created_at DESC
+                    LIMIT $3 OFFSET $4
+                    "#,
+                )
+                .bind(org_id)
+                .bind(team_id)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.pool)
+                .await
+            }
+            None => {
+                sqlx::query_as::<_, User>(
+                    r#"
+                    SELECT u.*
+                    FROM users u
+                    WHERE u.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM team_members tm
+                          WHERE tm.team_id = $1 AND tm.user_id = u.id
+                      )
+                    ORDER BY u.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                )
+                .bind(team_id)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.pool)
+                .await
+            }
+        }
+    }
+
+    /// List users who do not belong to any team with pagination.
+    pub async fn list_users_without_team_paginated(
+        &self,
+        org_id: Option<Uuid>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<User>, sqlx::Error> {
+        match org_id {
+            Some(org_id) => {
+                sqlx::query_as::<_, User>(
+                    r#"
+                    SELECT u.*
+                    FROM users u
+                    WHERE u.org_id = $1
+                      AND u.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM team_members tm WHERE tm.user_id = u.id
+                      )
+                    ORDER BY u.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                )
+                .bind(org_id)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.pool)
+                .await
+            }
+            None => {
+                sqlx::query_as::<_, User>(
+                    r#"
+                    SELECT u.*
+                    FROM users u
+                    WHERE u.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM team_members tm WHERE tm.user_id = u.id
+                      )
+                    ORDER BY u.created_at DESC
+                    LIMIT $1 OFFSET $2
+                    "#,
+                )
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.pool)
+                .await
+            }
+        }
+    }
 }
