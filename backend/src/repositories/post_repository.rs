@@ -1508,14 +1508,18 @@ impl PostRepository {
         user_id: Uuid,
         channel_id: Uuid,
     ) -> ApiResult<Option<i64>> {
-        let last_read: Option<i64> = sqlx::query_scalar(
+        // last_read_message_id is a nullable BIGINT column, so we must decode
+        // as Option<i64> to avoid "unexpected null" errors when the row exists
+        // but the value is NULL. fetch_optional then gives Option<Option<i64>>,
+        // which we flatten.
+        let last_read: Option<Option<i64>> = sqlx::query_scalar::<_, Option<i64>>(
             "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
         )
         .bind(user_id)
         .bind(channel_id)
         .fetch_optional(&self.db)
         .await?;
-        Ok(last_read)
+        Ok(last_read.flatten())
     }
 
     /// Get first unread seq in a channel (optionally after a specific seq)
