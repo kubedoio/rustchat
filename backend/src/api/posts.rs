@@ -103,47 +103,40 @@ async fn list_posts(
 
     // Build SQL query safely without format!() for dynamic parts
     // Use separate condition arrays that we track in parallel with bound values
-    let mut conditions: Vec<&'static str> = Vec::new();
+    let mut conditions: Vec<String> = Vec::new();
     let mut arg_index: usize = 2;
 
     if query.is_pinned.is_some() {
-        conditions.push(" AND p.is_pinned = $2");
-        arg_index = 3;
+        conditions.push(format!(" AND p.is_pinned = ${}", arg_index));
+        arg_index += 1;
     }
 
     if query.q.is_some() {
-        conditions.push(" AND p.message ILIKE $3");
-        arg_index = 4;
+        conditions.push(format!(" AND p.message ILIKE ${}", arg_index));
+        arg_index += 1;
     }
 
     if query.before.is_some() {
-        conditions.push(" AND p.created_at < (SELECT created_at FROM posts WHERE id = $4)");
-        arg_index = 5;
+        conditions.push(format!(" AND p.created_at < (SELECT created_at FROM posts WHERE id = ${})", arg_index));
+        arg_index += 1;
     } else if query.after.is_some() {
-        conditions.push(" AND p.created_at > (SELECT created_at FROM posts WHERE id = $4)");
-        arg_index = 5;
+        conditions.push(format!(" AND p.created_at > (SELECT created_at FROM posts WHERE id = ${})", arg_index));
+        arg_index += 1;
     }
 
     // Determine ORDER BY direction (validated, not user-input)
     let order_dir = if query.after.is_some() { "ASC" } else { "DESC" };
-    let limit_placeholder = if arg_index == 2 {
-        "$2"
-    } else if arg_index == 3 {
-        "$3"
-    } else if arg_index == 4 {
-        "$4"
-    } else {
-        "$5"
-    };
+    let limit_placeholder = format!("${}", arg_index);
 
     let sql = format!(
         r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+        SELECT p.id as id, p.channel_id as channel_id, p.user_id as user_id, p.root_post_id as root_post_id, 
+               p.message as message, COALESCE(p.props, '{{}}'::jsonb) as props, COALESCE(p.file_ids, '{{}}'::uuid[]) as file_ids,
+               p.is_pinned as is_pinned, p.created_at as created_at, p.edited_at as edited_at, p.deleted_at as deleted_at,
                p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
+               p.last_reply_at as last_reply_at, p.seq as seq,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'Deleted user' ELSE u.username END as username,
-               u.avatar_url,
+               u.avatar_url as avatar_url,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email
         FROM posts p
         JOIN channels c ON p.channel_id = c.id
@@ -586,12 +579,13 @@ async fn get_saved_posts(
 ) -> ApiResult<Json<Vec<PostResponse>>> {
     let posts: Vec<PostResponse> = sqlx::query_as(
         r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
+        SELECT p.id as id, p.channel_id as channel_id, p.user_id as user_id, p.root_post_id as root_post_id, 
+               p.message as message, COALESCE(p.props, '{}'::jsonb) as props, COALESCE(p.file_ids, '{}'::uuid[]) as file_ids,
+               p.is_pinned as is_pinned, p.created_at as created_at, p.edited_at as edited_at, p.deleted_at as deleted_at,
                p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
+               p.last_reply_at as last_reply_at, p.seq as seq,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'Deleted user' ELSE u.username END as username,
-               u.avatar_url,
+               u.avatar_url as avatar_url,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email
         FROM saved_posts s
         JOIN posts p ON s.post_id = p.id

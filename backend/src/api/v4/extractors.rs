@@ -15,9 +15,7 @@ use crate::error::AppError;
 
 pub struct MmAuthUser {
     pub user_id: Uuid,
-    #[allow(dead_code)]
     pub email: String,
-    #[allow(dead_code)]
     pub role: String,
     #[allow(dead_code)]
     pub org_id: Option<Uuid>,

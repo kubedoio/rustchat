@@ -88,7 +88,7 @@ impl ConnectionState {
             timestamp: Instant::now(),
         };
 
-        let mut buffer = self.message_buffer.lock().unwrap();
+        let mut buffer = self.message_buffer.lock().expect("mutex poisoned");
 
         // If buffer is full, remove oldest message (FIFO)
         if buffer.len() >= MESSAGE_BUFFER_SIZE {
@@ -98,7 +98,7 @@ impl ConnectionState {
         buffer.push_back(msg);
 
         // Update last activity
-        *self.last_activity.lock().unwrap() = Instant::now();
+        *self.last_activity.lock().expect("mutex poisoned") = Instant::now();
 
         trace!(
             connection_id = %self.connection_id,
@@ -110,7 +110,7 @@ impl ConnectionState {
 
     /// Get messages with sequence number greater than `since_seq`
     pub fn get_missed_messages(&self, since_seq: i64) -> Vec<SequencedMessage> {
-        let buffer = self.message_buffer.lock().unwrap();
+        let buffer = self.message_buffer.lock().expect("mutex poisoned");
         buffer
             .iter()
             .filter(|msg| msg.seq > since_seq)
@@ -121,7 +121,7 @@ impl ConnectionState {
     /// Mark connection as inactive (disconnected)
     pub fn mark_inactive(&self) {
         self.is_active.store(false, Ordering::SeqCst);
-        *self.last_activity.lock().unwrap() = Instant::now();
+        *self.last_activity.lock().expect("mutex poisoned") = Instant::now();
         debug!(
             connection_id = %self.connection_id,
             user_id = %self.user_id,
@@ -132,7 +132,7 @@ impl ConnectionState {
     /// Mark connection as active (reconnected)
     pub fn mark_active(&self) {
         self.is_active.store(true, Ordering::SeqCst);
-        *self.last_activity.lock().unwrap() = Instant::now();
+        *self.last_activity.lock().expect("mutex poisoned") = Instant::now();
         debug!(
             connection_id = %self.connection_id,
             user_id = %self.user_id,
@@ -142,7 +142,7 @@ impl ConnectionState {
 
     /// Update last activity timestamp
     pub fn touch(&self) {
-        *self.last_activity.lock().unwrap() = Instant::now();
+        *self.last_activity.lock().expect("mutex poisoned") = Instant::now();
     }
 
     /// Check if this connection has expired (inactive for too long)
@@ -150,7 +150,7 @@ impl ConnectionState {
         if self.is_active.load(Ordering::SeqCst) {
             return false;
         }
-        let last_activity = *self.last_activity.lock().unwrap();
+        let last_activity = *self.last_activity.lock().expect("mutex poisoned");
         Instant::now().duration_since(last_activity) > CONNECTION_TTL
     }
 
@@ -471,7 +471,7 @@ mod tests {
             state.buffer_message(i, json!({"test": i}));
         }
 
-        let buffer = state.message_buffer.lock().unwrap();
+        let buffer = state.message_buffer.lock().expect("mutex poisoned");
         assert_eq!(buffer.len(), MESSAGE_BUFFER_SIZE);
     }
 

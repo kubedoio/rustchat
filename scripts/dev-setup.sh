@@ -67,10 +67,10 @@ command -v docker compose >/dev/null 2>&1 || { echo "ERROR: Docker Compose is re
 if command -v rustc >/dev/null 2>&1; then
   RUST_VERSION=$(rustc --version)
   echo "Rust: ${RUST_VERSION}"
-  # Check minimum version (1.92+)
+  # Check minimum version (1.95+)
   RUST_NUM=$(echo "$RUST_VERSION" | sed 's/rustc //' | cut -d. -f1,2 | tr -d '.')
-  if [[ "$RUST_NUM" -lt "192" ]]; then
-    echo "WARNING: Rust 1.92+ required. Current: ${RUST_VERSION}"
+  if [[ "$RUST_NUM" -lt "195" ]]; then
+    echo "WARNING: Rust 1.95+ required. Current: ${RUST_VERSION}"
     echo "  Update with: rustup update"
   fi
 else

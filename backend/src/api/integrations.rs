@@ -27,18 +27,8 @@ use std::time::Duration;
 
 /// Generate a secure random token
 fn generate_token() -> String {
-    use std::collections::hash_map::RandomState;
-    use std::hash::{BuildHasher, Hasher};
-
-    let mut token = String::with_capacity(32);
-    let hasher_builder = RandomState::new();
-    for _ in 0..4 {
-        let mut hasher = hasher_builder.build_hasher();
-        hasher.write_u128(uuid::Uuid::new_v4().as_u128());
-        token.push_str(&format!("{:016x}", hasher.finish()));
-    }
-    token.truncate(32);
-    token
+    use rand::distributions::{Alphanumeric, DistString};
+    Alphanumeric.sample_string(&mut rand::thread_rng(), 32)
 }
 
 /// Build integrations routes

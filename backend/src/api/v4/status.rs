@@ -213,11 +213,6 @@ pub struct UpdateStatusRequest {
 /// Full status update request (includes custom status)
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpdateMyStatusRequest {
-    // Legacy fields for backwards compatibility
-    #[allow(dead_code)]
-    #[serde(default)]
-    pub user_id: Option<String>,
-
     #[serde(default)]
     pub status: Option<String>,
     #[serde(default)]

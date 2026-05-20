@@ -56,12 +56,6 @@ pub mod usage;
 pub mod users;
 pub mod websocket;
 
-#[allow(dead_code)]
-pub fn router(state: AppState) -> Router<AppState> {
-    // Default limits for backward compatibility
-    router_with_body_limits(state, 64 * 1024, 1024 * 1024, 50 * 1024 * 1024)
-}
-
 /// Create v4 router with configurable body size limits
 ///
 /// # Arguments
@@ -215,6 +209,7 @@ mod tests {
 
     #[test]
     fn v4_router_builds_without_overlaps() {
-        let _builder: fn(AppState) -> axum::Router<AppState> = router;
+        let _builder: fn(AppState, usize, usize, usize) -> axum::Router<AppState> =
+            router_with_body_limits;
     }
 }

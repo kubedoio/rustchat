@@ -149,8 +149,13 @@ impl TurnCredentialGenerator {
     fn hmac_sha1(&self, key: &str, message: &str) -> Vec<u8> {
         type HmacSha1 = Hmac<Sha1>;
 
-        let mut mac =
-            HmacSha1::new_from_slice(key.as_bytes()).expect("HMAC can take key of any size");
+        let mut mac = match HmacSha1::new_from_slice(key.as_bytes()) {
+            Ok(mac) => mac,
+            Err(_) => {
+                tracing::warn!("TURN secret key has invalid length for HMAC; returning empty MAC");
+                return Vec::new();
+            }
+        };
         mac.update(message.as_bytes());
 
         mac.finalize().into_bytes().to_vec()

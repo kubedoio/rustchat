@@ -670,24 +670,23 @@ async fn find_member_calls_for_user(
     user_id: Uuid,
 ) -> Result<Vec<CallState>, String> {
     let calls = state.call_state_manager.get_all_calls().await;
-    let mut member_calls = Vec::new();
-
-    for call in calls {
-        let member: Option<(Uuid,)> = sqlx::query_as(
-            "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2",
-        )
-        .bind(call.channel_id)
-        .bind(user_id)
-        .fetch_optional(&state.db)
-        .await
-        .map_err(|e| format!("Database error while resolving call membership: {e}"))?;
-
-        if member.is_some() {
-            member_calls.push(call);
-        }
+    if calls.is_empty() {
+        return Ok(vec![]);
     }
 
-    Ok(member_calls)
+    let channel_ids: Vec<Uuid> = calls.iter().map(|c| c.channel_id).collect();
+
+    let rows: Vec<(Uuid,)> = sqlx::query_as(
+        "SELECT channel_id FROM channel_members WHERE user_id = $1 AND channel_id = ANY($2)",
+    )
+    .bind(user_id)
+    .bind(&channel_ids)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| format!("Database error while resolving call membership: {e}"))?;
+
+    let allowed: HashSet<Uuid> = rows.into_iter().map(|r| r.0).collect();
+    Ok(calls.into_iter().filter(|c| allowed.contains(&c.channel_id)).collect())
 }
 fn resolve_ws_session_uuid(connection_id: &str, data: Option<&Value>) -> Result<Uuid, String> {
     let default_session_id = Uuid::parse_str(connection_id)

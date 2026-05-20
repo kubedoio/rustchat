@@ -6,6 +6,7 @@ import { useMessageStore } from '@/features/messages/stores/messageStore'
 import { useUIStore } from '../../features/ui/stores/uiStore'
 import { useAuthStore } from '../../features/auth/stores/authStore'
 import { useTeamStore } from '@/features/teams/stores/teamStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { useWebSocket } from '../../composables/useWebSocket'
 import RcAvatar from '../ui/RcAvatar.vue'
 import FilePreview from '../atomic/FilePreview.vue'
@@ -18,6 +19,7 @@ const messageStore = useMessageStore()
 const uiStore = useUIStore()
 const authStore = useAuthStore()
 const teamStore = useTeamStore()
+const channelStore = useChannelStore()
 
 const { sendMessage } = useWebSocket()
 const { renderMarkdown } = useMarkdownRenderer()
@@ -41,14 +43,9 @@ function openGallery(file: FileUploadResponse, allFiles: FileUploadResponse[]) {
 }
 
 const parentMessage = computed(() => {
-    if (!uiStore.rhsContextId) return null
-    for (const channelId in messageStore.messagesByChannel) {
-        const messages = messageStore.messagesByChannel[channelId]
-        if (!messages) continue;
-        const msg = messages.find(m => m.id === uiStore.rhsContextId)
-        if (msg) return msg
-    }
-    return null
+    if (!uiStore.rhsContextId || !channelStore.currentChannelId) return null
+    const messages = messageStore.messagesByChannel[channelStore.currentChannelId]
+    return messages?.find(m => m.id === uiStore.rhsContextId) || null
 })
 
 const replies = computed(() => {
@@ -56,8 +53,10 @@ const replies = computed(() => {
     return messageStore.repliesByThread[uiStore.rhsContextId] || []
 })
 
-watch(() => uiStore.rhsContextId, async (newId) => {
-    if (newId && uiStore.rhsView === 'thread') {
+watch(
+  () => [uiStore.rhsContextId, uiStore.rhsView, channelStore.currentChannelId, parentMessage.value?.id] as const,
+  async ([newId, view]) => {
+    if (newId && view === 'thread' && parentMessage.value) {
         loading.value = true
         try {
             await messageStore.fetchThread(newId)
@@ -75,7 +74,9 @@ watch(() => uiStore.rhsContextId, async (newId) => {
             loading.value = false
         }
     }
-}, { immediate: true })
+  },
+  { immediate: true }
+)
 
 async function sendReply() {
     if (!replyContent.value.trim() || !parentMessage.value) return

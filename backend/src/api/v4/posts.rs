@@ -8,6 +8,7 @@ use axum::{
 use chrono::Utc;
 use serde::Deserialize;
 use serde_json::json;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
@@ -33,6 +34,43 @@ use search::{search_posts_all_teams, search_team_posts};
 use unread::{
     delete_acknowledgement_for_post, get_posts_around_unread, save_acknowledgement_for_post,
 };
+
+/// Convert Vec<PostResponse> into a Mattermost-compatible ordered map,
+/// fetching and attaching reactions automatically.
+pub async fn build_mm_posts_map(
+    state: &AppState,
+    posts: Vec<crate::models::post::PostResponse>,
+) -> ApiResult<(Vec<String>, HashMap<String, mm::Post>)> {
+    let mut order = Vec::with_capacity(posts.len());
+    let mut posts_map = HashMap::with_capacity(posts.len());
+    let mut post_ids = Vec::with_capacity(posts.len());
+    let mut id_map = Vec::with_capacity(posts.len());
+
+    for p in posts {
+        let id = encode_mm_id(p.id);
+        post_ids.push(p.id);
+        id_map.push((p.id, id.clone()));
+        order.push(id.clone());
+        posts_map.insert(id, mm::Post::from(p));
+    }
+
+    let reactions_map = reactions_for_posts(state, &post_ids).await?;
+    for (post_uuid, post_id) in id_map {
+        if let Some(reactions) = reactions_map.get(&post_uuid) {
+            if !reactions.is_empty() {
+                if let Some(post) = posts_map.get_mut(&post_id) {
+                    let mut metadata = post.metadata.take().unwrap_or_else(|| json!({}));
+                    if let Some(obj) = metadata.as_object_mut() {
+                        obj.insert("reactions".to_string(), json!(reactions));
+                    }
+                    post.metadata = Some(metadata);
+                }
+            }
+        }
+    }
+
+    Ok((order, posts_map))
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -767,30 +805,7 @@ async fn get_flagged_posts(
 
     posts::normalize_post_avatar_urls(&mut posts);
 
-    let mut order = Vec::new();
-    let mut posts_map: std::collections::HashMap<String, mm::Post> =
-        std::collections::HashMap::new();
-    let mut post_ids = Vec::new();
-    let mut id_map = Vec::new();
-
-    for p in posts {
-        let id = encode_mm_id(p.id);
-        post_ids.push(p.id);
-        id_map.push((p.id, id.clone()));
-        order.push(id.clone());
-        posts_map.insert(id, p.into());
-    }
-
-    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
-    for (post_uuid, post_id) in id_map {
-        if let Some(reactions) = reactions_map.get(&post_uuid) {
-            if !reactions.is_empty() {
-                if let Some(post) = posts_map.get_mut(&post_id) {
-                    post.metadata = Some(json!({ "reactions": reactions }));
-                }
-            }
-        }
-    }
+    let (order, posts_map) = crate::api::v4::posts::build_mm_posts_map(&state, posts).await?;
 
     Ok(Json(mm::PostList {
         order,
@@ -941,14 +956,6 @@ async fn update_post_message(
     state.ws_hub.broadcast(broadcast).await;
 
     Ok(Json(updated.into()))
-}
-
-/// POST /posts/{post_id}/ack - Acknowledge a post (push notification receipt)
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct AckPostRequest {
-    #[serde(default)]
-    post_id: String,
 }
 
 async fn ack_post(

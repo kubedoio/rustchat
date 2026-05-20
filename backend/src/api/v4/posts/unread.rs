@@ -6,7 +6,7 @@ use axum::{
 use serde::Deserialize;
 
 use super::{
-    encode_mm_id, json, mm, parse_mm_or_uuid, reactions_for_posts, status_ok, ApiResult, AppError,
+    encode_mm_id, mm, parse_mm_or_uuid, status_ok, ApiResult, AppError,
     AppState, MmAuthUser,
 };
 use crate::repositories::{ChannelRepository, PostRepository};
@@ -72,34 +72,7 @@ pub(super) async fn get_posts_around_unread(
 
     crate::services::posts::populate_files(&state, &mut posts).await?;
 
-    let mut order = Vec::new();
-    let mut posts_map: std::collections::HashMap<String, mm::Post> =
-        std::collections::HashMap::new();
-    let mut post_ids = Vec::new();
-    let mut id_map = Vec::new();
-
-    for p in posts {
-        let id = encode_mm_id(p.id);
-        post_ids.push(p.id);
-        id_map.push((p.id, id.clone()));
-        order.push(id.clone());
-        posts_map.insert(id, p.into());
-    }
-
-    let reactions_map = reactions_for_posts(&state, &post_ids).await?;
-    for (post_uuid, post_id) in id_map {
-        if let Some(reactions) = reactions_map.get(&post_uuid) {
-            if !reactions.is_empty() {
-                if let Some(post) = posts_map.get_mut(&post_id) {
-                    let mut metadata = post.metadata.take().unwrap_or_else(|| json!({}));
-                    if let Some(obj) = metadata.as_object_mut() {
-                        obj.insert("reactions".to_string(), json!(reactions));
-                    }
-                    post.metadata = Some(metadata);
-                }
-            }
-        }
-    }
+    let (order, posts_map) = crate::api::v4::posts::build_mm_posts_map(&state, posts).await?;
 
     Ok(Json(mm::PostList {
         order,

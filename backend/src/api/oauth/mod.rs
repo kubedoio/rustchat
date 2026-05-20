@@ -114,17 +114,18 @@ pub(crate) struct UserInfo {
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
+    let rate_limited_state = state.clone();
     let auth_routes = Router::new()
         .route("/oauth2/{provider_key}/login", get(login::oauth_login))
         .route("/oauth2/{provider_key}/callback", get(callback::oauth_callback))
-        .route("/oauth2/exchange", post(exchange::exchange_token))
         .layer(middleware::from_fn_with_state(
-            state,
+            rate_limited_state,
             crate::middleware::rate_limit::auth_ip_rate_limit,
         ));
 
     Router::new()
         .merge(auth_routes)
+        .route("/oauth2/exchange", post(exchange::exchange_token))
         .route("/oauth2/providers", get(login::list_providers))
 }
 

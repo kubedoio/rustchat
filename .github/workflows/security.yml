@@ -17,6 +17,7 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     services:
       postgres:
@@ -75,6 +76,7 @@ jobs:
   cargo-audit-backend:
     name: Cargo Audit (Backend)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
@@ -102,6 +104,7 @@ jobs:
   cargo-audit-push-proxy:
     name: Cargo Audit (Push Proxy)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: push-proxy
@@ -129,6 +132,7 @@ jobs:
   cargo-deny-backend:
     name: Cargo Deny (Backend)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
@@ -156,6 +160,7 @@ jobs:
   cargo-deny-push-proxy:
     name: Cargo Deny (Push Proxy)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: push-proxy
@@ -183,6 +188,7 @@ jobs:
   npm-audit:
     name: npm Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -200,7 +206,9 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run npm audit
-        run: npm audit --audit-level=high --json > dependency-audit.json
+        run: |
+          npm audit --audit-level=high
+          npm audit --audit-level=high --json > dependency-audit.json || true
 
       - name: Upload npm audit results
         if: always()
@@ -214,6 +222,7 @@ jobs:
     name: Dependency Review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 

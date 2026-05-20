@@ -1156,7 +1156,3 @@ async fn cleanup_unlinked_syncable(
     Ok(())
 }
 
-#[allow(dead_code)]
-fn _format_syncable_id(id: Uuid) -> String {
-    encode_mm_id(id)
-}

@@ -45,9 +45,9 @@ export const useCallsStore = defineStore('calls', () => {
         return Object.values(currentCall.value.call.sessions || {})
     })
 
-    const currentChannelCall = computed(() => (channelId: string) => {
+    const currentChannelCall = (channelId: string) => {
         return activeCalls.value.get(channelId)
-    })
+    }
 
     function eventPayload(data: unknown): Record<string, unknown> {
         return data && typeof data === 'object' ? data as Record<string, unknown> : {}

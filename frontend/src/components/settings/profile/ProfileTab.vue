@@ -95,27 +95,20 @@ async function handleSaveProfile() {
   success.value = ''
 
   try {
-    const response = await usersApi.update(auth.user.id, {
+    await v4Api.put('/users/me/patch', {
+      first_name: firstName.value || undefined,
+      last_name: lastName.value || undefined,
+      nickname: nickname.value || undefined,
+      position: position.value || undefined,
+    })
+
+    await usersApi.update(auth.user.id, {
       username: username.value,
       display_name: displayName.value,
       avatar_url: avatarUrl.value,
-      first_name: firstName.value,
-      last_name: lastName.value,
-      nickname: nickname.value,
-      position: position.value,
     })
     
-    // Update local auth state
-    auth.user = {
-      ...auth.user,
-      username: response.data.username,
-      display_name: response.data.display_name,
-      avatar_url: response.data.avatar_url,
-      first_name: firstName.value,
-      last_name: lastName.value,
-      nickname: nickname.value,
-      position: position.value,
-    }
+    await auth.fetchMe()
     success.value = 'Profile updated successfully!'
     setTimeout(() => success.value = '', 3000)
   } catch (e: unknown) {

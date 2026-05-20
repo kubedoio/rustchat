@@ -22,12 +22,14 @@ jobs:
   ci:
     name: CI
     uses: ./.github/workflows/ci.yml
+    timeout-minutes: 60
 
   build-and-push:
     name: Build and push nightly images
     runs-on: ubuntu-latest
     needs: ci
     if: github.ref == 'refs/heads/main'
+    timeout-minutes: 90
 
     strategy:
       fail-fast: false

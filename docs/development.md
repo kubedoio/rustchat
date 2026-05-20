@@ -6,7 +6,7 @@ This guide covers running RustChat from source for daily development.
 
 | Tool | Version | Install | Check |
 |------|---------|---------|-------|
-| Rust | 1.92+ | [rustup.rs](https://rustup.rs/) | `rustc --version` |
+| Rust | 1.95+ | [rustup.rs](https://rustup.rs/) | `rustc --version` |
 | Node.js | 24+ | [nodejs.org](https://nodejs.org/) | `node --version` |
 | Docker + Compose | 24.0+ / 2.20+ | [Docker Desktop](https://docs.docker.com/get-docker/) | `docker compose version` |
 | sqlx-cli | latest | `cargo install sqlx-cli --no-default-features --features postgres` | `sqlx --version` |

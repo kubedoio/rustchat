@@ -107,6 +107,15 @@ function handleOpenProfile(userId: string) {
 // Save RHS state when channel changes or panel closes
 watch(() => uiStore.rhsView, (view) => {
     if (channelId.value && view) {
+        if (view === 'thread') {
+            const contextId = uiStore.rhsContextId
+            const messages = messageStore.messagesByChannel[channelId.value] || []
+            if (!contextId || !messages.some(message => message.id === contextId)) {
+                delete rhsStateByChannel.value[channelId.value]
+                return
+            }
+        }
+
         rhsStateByChannel.value[channelId.value] = {
             view,
             contextId: uiStore.rhsContextId || undefined
@@ -115,24 +124,49 @@ watch(() => uiStore.rhsView, (view) => {
 })
 
 // Restore RHS state when channel changes
-watch(channelId, (newId, oldId) => {
+watch(channelId, async (newId, oldId) => {
     if (oldId) {
         unsubscribe(oldId);
         // Save state for old channel
         if (uiStore.rhsView) {
+            if (uiStore.rhsView === 'thread') {
+                const contextId = uiStore.rhsContextId
+                const messages = messageStore.messagesByChannel[oldId] || []
+                if (!contextId || !messages.some(message => message.id === contextId)) {
+                    delete rhsStateByChannel.value[oldId]
+                } else {
+                    rhsStateByChannel.value[oldId] = {
+                        view: uiStore.rhsView,
+                        contextId: contextId
+                    }
+                }
+            } else {
             rhsStateByChannel.value[oldId] = {
                 view: uiStore.rhsView,
                 contextId: uiStore.rhsContextId || undefined
             }
+            }
         }
     }
     if (newId) {
-        messageStore.fetchMessages(newId);
+        await messageStore.fetchMessages(newId);
         subscribe(newId);
         
         // Restore RHS state for this channel
         const savedState = rhsStateByChannel.value[newId]
         if (savedState?.view) {
+            if (savedState.view === 'thread') {
+                const messages = messageStore.messagesByChannel[newId] || []
+                if (!savedState.contextId || !messages.some(message => message.id === savedState.contextId)) {
+                    delete rhsStateByChannel.value[newId]
+                    if (uiStore.rhsView === 'thread') {
+                        uiStore.closeRhs()
+                    }
+                    showChannelSettings.value = false;
+                    return
+                }
+            }
+
             // Small delay to ensure UI is ready
             setTimeout(() => {
                 uiStore.openRhs(savedState.view, savedState.contextId)

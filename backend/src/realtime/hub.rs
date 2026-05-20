@@ -25,6 +25,10 @@ pub struct WsHub {
     channel_subscriptions: RwLock<HashMap<Uuid, Vec<Uuid>>>, // channel_id -> user_ids
     /// User subscriptions to teams
     team_subscriptions: RwLock<HashMap<Uuid, Vec<Uuid>>>, // team_id -> user_ids
+    /// Reverse index: user_id -> channel_ids
+    user_channel_subscriptions: RwLock<HashMap<Uuid, Vec<Uuid>>>,
+    /// Reverse index: user_id -> team_ids
+    user_team_subscriptions: RwLock<HashMap<Uuid, Vec<Uuid>>>,
     /// User presence status
     presence: RwLock<HashMap<Uuid, String>>,
     /// Usernames cache
@@ -39,6 +43,8 @@ impl WsHub {
             connections: RwLock::new(HashMap::new()),
             channel_subscriptions: RwLock::new(HashMap::new()),
             team_subscriptions: RwLock::new(HashMap::new()),
+            user_channel_subscriptions: RwLock::new(HashMap::new()),
+            user_team_subscriptions: RwLock::new(HashMap::new()),
             presence: RwLock::new(HashMap::new()),
             usernames: RwLock::new(HashMap::new()),
             cluster_broadcast: RwLock::new(None),
@@ -98,44 +104,125 @@ impl WsHub {
 
             let mut usernames = self.usernames.write().await;
             usernames.remove(&user_id);
-        }
 
-        // Note: We don't eagerly remove from subscriptions here as it requires scanning all maps.
-        // Lazy cleanup happens if we implement a periodic cleaner or just rely on 'connections' check.
-        // For accurate tracking, we might want to maintain a reverse map user_id -> [channels/teams].
+            drop(presence);
+            drop(usernames);
+
+            // Clean up channel subscriptions using reverse index
+            let user_channels: Vec<Uuid> = {
+                let mut rev = self.user_channel_subscriptions.write().await;
+                rev.remove(&user_id).unwrap_or_default()
+            };
+
+            if !user_channels.is_empty() {
+                let mut subs = self.channel_subscriptions.write().await;
+                for channel_id in user_channels {
+                    if let Some(users) = subs.get_mut(&channel_id) {
+                        users.retain(|&id| id != user_id);
+                        if users.is_empty() {
+                            subs.remove(&channel_id);
+                        }
+                    }
+                }
+            }
+
+            // Clean up team subscriptions using reverse index
+            let user_teams: Vec<Uuid> = {
+                let mut rev = self.user_team_subscriptions.write().await;
+                rev.remove(&user_id).unwrap_or_default()
+            };
+
+            if !user_teams.is_empty() {
+                let mut subs = self.team_subscriptions.write().await;
+                for team_id in user_teams {
+                    if let Some(users) = subs.get_mut(&team_id) {
+                        users.retain(|&id| id != user_id);
+                        if users.is_empty() {
+                            subs.remove(&team_id);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Subscribe user to a channel
     pub async fn subscribe_channel(&self, user_id: Uuid, channel_id: Uuid) {
-        let mut subs = self.channel_subscriptions.write().await;
-        let users = subs.entry(channel_id).or_insert_with(Vec::new);
-        if !users.contains(&user_id) {
-            users.push(user_id);
+        {
+            let mut subs = self.channel_subscriptions.write().await;
+            let users = subs.entry(channel_id).or_insert_with(Vec::new);
+            if !users.contains(&user_id) {
+                users.push(user_id);
+            }
+        }
+        {
+            let mut rev = self.user_channel_subscriptions.write().await;
+            let channels = rev.entry(user_id).or_insert_with(Vec::new);
+            if !channels.contains(&channel_id) {
+                channels.push(channel_id);
+            }
         }
     }
 
     /// Unsubscribe user from a channel
     pub async fn unsubscribe_channel(&self, user_id: Uuid, channel_id: Uuid) {
-        let mut subs = self.channel_subscriptions.write().await;
-        if let Some(users) = subs.get_mut(&channel_id) {
-            users.retain(|&id| id != user_id);
+        {
+            let mut subs = self.channel_subscriptions.write().await;
+            if let Some(users) = subs.get_mut(&channel_id) {
+                users.retain(|&id| id != user_id);
+                if users.is_empty() {
+                    subs.remove(&channel_id);
+                }
+            }
+        }
+        {
+            let mut rev = self.user_channel_subscriptions.write().await;
+            if let Some(channels) = rev.get_mut(&user_id) {
+                channels.retain(|&id| id != channel_id);
+                if channels.is_empty() {
+                    rev.remove(&user_id);
+                }
+            }
         }
     }
 
     /// Subscribe user to a team
     pub async fn subscribe_team(&self, user_id: Uuid, team_id: Uuid) {
-        let mut subs = self.team_subscriptions.write().await;
-        let users = subs.entry(team_id).or_insert_with(Vec::new);
-        if !users.contains(&user_id) {
-            users.push(user_id);
+        {
+            let mut subs = self.team_subscriptions.write().await;
+            let users = subs.entry(team_id).or_insert_with(Vec::new);
+            if !users.contains(&user_id) {
+                users.push(user_id);
+            }
+        }
+        {
+            let mut rev = self.user_team_subscriptions.write().await;
+            let teams = rev.entry(user_id).or_insert_with(Vec::new);
+            if !teams.contains(&team_id) {
+                teams.push(team_id);
+            }
         }
     }
 
     /// Unsubscribe user from a team
     pub async fn unsubscribe_team(&self, user_id: Uuid, team_id: Uuid) {
-        let mut subs = self.team_subscriptions.write().await;
-        if let Some(users) = subs.get_mut(&team_id) {
-            users.retain(|&id| id != user_id);
+        {
+            let mut subs = self.team_subscriptions.write().await;
+            if let Some(users) = subs.get_mut(&team_id) {
+                users.retain(|&id| id != user_id);
+                if users.is_empty() {
+                    subs.remove(&team_id);
+                }
+            }
+        }
+        {
+            let mut rev = self.user_team_subscriptions.write().await;
+            if let Some(teams) = rev.get_mut(&user_id) {
+                teams.retain(|&id| id != team_id);
+                if teams.is_empty() {
+                    rev.remove(&user_id);
+                }
+            }
         }
     }
 
@@ -285,6 +372,8 @@ impl Default for WsHub {
             connections: RwLock::new(HashMap::new()),
             channel_subscriptions: RwLock::new(HashMap::new()),
             team_subscriptions: RwLock::new(HashMap::new()),
+            user_channel_subscriptions: RwLock::new(HashMap::new()),
+            user_team_subscriptions: RwLock::new(HashMap::new()),
             presence: RwLock::new(HashMap::new()),
             usernames: RwLock::new(HashMap::new()),
             cluster_broadcast: RwLock::new(None),
@@ -379,5 +468,88 @@ mod tests {
             other_msg.is_err(),
             "other users should not receive direct message"
         );
+    }
+
+    #[tokio::test]
+    async fn channel_subscription_cleaned_on_last_disconnect() {
+        let hub = WsHub::new();
+        let user = Uuid::new_v4();
+        let channel = Uuid::new_v4();
+
+        let (_conn, _rx) = hub.add_connection(user, "u".to_string()).await;
+        hub.subscribe_channel(user, channel).await;
+        hub.remove_connection(user, _conn).await;
+
+        let subs = hub.channel_subscriptions.read().await;
+        assert!(!subs.contains_key(&channel));
+    }
+
+    #[tokio::test]
+    async fn channel_subscription_not_cleaned_when_other_connections_remain() {
+        let hub = WsHub::new();
+        let user = Uuid::new_v4();
+        let channel = Uuid::new_v4();
+
+        let (conn1, _rx1) = hub.add_connection(user, "u".to_string()).await;
+        let (conn2, _rx2) = hub.add_connection(user, "u".to_string()).await;
+        hub.subscribe_channel(user, channel).await;
+
+        hub.remove_connection(user, conn1).await;
+        {
+            let subs = hub.channel_subscriptions.read().await;
+            assert!(subs.get(&channel).unwrap().contains(&user));
+        }
+
+        hub.remove_connection(user, conn2).await;
+        let subs = hub.channel_subscriptions.read().await;
+        assert!(!subs.contains_key(&channel));
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_channel_removes_empty_entry() {
+        let hub = WsHub::new();
+        let user = Uuid::new_v4();
+        let channel = Uuid::new_v4();
+
+        let (_conn, _rx) = hub.add_connection(user, "u".to_string()).await;
+        hub.subscribe_channel(user, channel).await;
+        hub.unsubscribe_channel(user, channel).await;
+
+        let subs = hub.channel_subscriptions.read().await;
+        assert!(!subs.contains_key(&channel));
+
+        let rev = hub.user_channel_subscriptions.read().await;
+        assert!(!rev.contains_key(&user));
+    }
+
+    #[tokio::test]
+    async fn team_subscription_cleaned_on_last_disconnect() {
+        let hub = WsHub::new();
+        let user = Uuid::new_v4();
+        let team = Uuid::new_v4();
+
+        let (_conn, _rx) = hub.add_connection(user, "u".to_string()).await;
+        hub.subscribe_team(user, team).await;
+        hub.remove_connection(user, _conn).await;
+
+        let subs = hub.team_subscriptions.read().await;
+        assert!(!subs.contains_key(&team));
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_team_removes_empty_entry() {
+        let hub = WsHub::new();
+        let user = Uuid::new_v4();
+        let team = Uuid::new_v4();
+
+        let (_conn, _rx) = hub.add_connection(user, "u".to_string()).await;
+        hub.subscribe_team(user, team).await;
+        hub.unsubscribe_team(user, team).await;
+
+        let subs = hub.team_subscriptions.read().await;
+        assert!(!subs.contains_key(&team));
+
+        let rev = hub.user_team_subscriptions.read().await;
+        assert!(!rev.contains_key(&user));
     }
 }

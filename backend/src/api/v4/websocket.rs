@@ -26,6 +26,7 @@ use tracing::{debug, error, info, trace, warn};
 use uuid::Uuid;
 
 use crate::api::v4::calls_plugin;
+use crate::api::v4::users::hydrate_dm_display_names_batch;
 use crate::api::websocket_core::{self, EnvelopeCommandOptions};
 use crate::api::AppState;
 use crate::mattermost_compat::{
@@ -33,7 +34,7 @@ use crate::mattermost_compat::{
     mappers::map_channel_role,
     models as mm,
 };
-use crate::models::channel::{Channel, ChannelType};
+use crate::models::channel::Channel;
 use crate::realtime::{
     websocket_actor::{close_codes, WebSocketActor, WsEvent},
     WsBroadcast, WsEnvelope,
@@ -844,9 +845,8 @@ async fn build_reconnect_snapshot(
     .fetch_all(&state.db)
     .await?;
 
-    for channel in &mut channels {
-        hydrate_direct_channel_display_name(state, user_id, channel).await?;
-    }
+    let repo = crate::repositories::ChannelRepository::new(&state.db);
+    hydrate_dm_display_names_batch(&repo, &mut channels, user_id).await;
 
     let mm_channels: Vec<mm::Channel> = channels.iter().cloned().map(Into::into).collect();
     let channel_ids: Vec<Uuid> = channels.iter().map(|c| c.id).collect();
@@ -1039,34 +1039,7 @@ fn normalize_notify_props_for_snapshot(value: serde_json::Value) -> serde_json::
     value
 }
 
-async fn hydrate_direct_channel_display_name(
-    state: &AppState,
-    viewer_id: Uuid,
-    channel: &mut Channel,
-) -> Result<(), sqlx::Error> {
-    if channel.channel_type != ChannelType::Direct {
-        return Ok(());
-    }
 
-    let display_name: Option<String> = sqlx::query_scalar(
-        r#"
-        SELECT COALESCE(NULLIF(u.display_name, ''), u.username)
-        FROM channel_members cm
-        JOIN users u ON u.id = cm.user_id
-        WHERE cm.channel_id = $1
-          AND cm.user_id <> $2
-        ORDER BY u.username ASC
-        LIMIT 1
-        "#,
-    )
-    .bind(channel.id)
-    .bind(viewer_id)
-    .fetch_optional(&state.db)
-    .await?;
-
-    channel.display_name = display_name.or_else(|| Some("Direct Message".to_string()));
-    Ok(())
-}
 
 fn extract_typing_channel_id(value: &serde_json::Value) -> Option<Uuid> {
     value
