@@ -155,15 +155,13 @@ async fn setup_context() -> TestContext {
     }
 
     let channel_id = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO channels (id, team_id, name, type) VALUES ($1, $2, $3, 'public')",
-    )
-    .bind(channel_id)
-    .bind(team_id)
-    .bind(format!("unread-chan-{}", &channel_id.to_string()[..8]))
-    .execute(&app.db_pool)
-    .await
-    .expect("failed to create channel");
+    sqlx::query("INSERT INTO channels (id, team_id, name, type) VALUES ($1, $2, $3, 'public')")
+        .bind(channel_id)
+        .bind(team_id)
+        .bind(format!("unread-chan-{}", &channel_id.to_string()[..8]))
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to create channel");
 
     for uid in [sender_id, receiver_id] {
         sqlx::query("INSERT INTO channel_members (channel_id, user_id, role, notify_props) VALUES ($1, $2, 'member', '{}')")
@@ -240,7 +238,10 @@ async fn increment_unreads_updates_counts() {
 
     // Verify receiver starts with 0 unreads (no posts yet)
     let before = get_channel_unread(&ctx.app, &ctx.receiver_token, ctx.channel_id).await;
-    assert_eq!(before["msg_count"], 0, "receiver should start with 0 unreads");
+    assert_eq!(
+        before["msg_count"], 0,
+        "receiver should start with 0 unreads"
+    );
 
     // Sender creates a post
     create_post(&ctx.app, &ctx.sender_token, ctx.channel_id, "Hello world").await;
@@ -272,13 +273,14 @@ async fn increment_unreads_skips_sender() {
     );
 
     // Verify via channel_reads table that sender was advanced to their post seq
-    let last_read: Option<i64> =
-        sqlx::query_scalar("SELECT last_read_message_id FROM channel_reads WHERE channel_id = $1 AND user_id = $2")
-            .bind(ctx.channel_id)
-            .bind(ctx.sender_id)
-            .fetch_optional(&ctx.app.db_pool)
-            .await
-            .expect("failed to query channel_reads");
+    let last_read: Option<i64> = sqlx::query_scalar(
+        "SELECT last_read_message_id FROM channel_reads WHERE channel_id = $1 AND user_id = $2",
+    )
+    .bind(ctx.channel_id)
+    .bind(ctx.sender_id)
+    .fetch_optional(&ctx.app.db_pool)
+    .await
+    .expect("failed to query channel_reads");
 
     assert!(
         last_read.is_some() && last_read.unwrap() > 0,

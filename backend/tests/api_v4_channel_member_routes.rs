@@ -311,3 +311,51 @@ async fn mm_channel_unread_returns_root_and_team_fields() {
     assert_eq!(unread_body["mention_count"], 1);
     assert_eq!(unread_body["mention_count_root"], 1);
 }
+
+#[tokio::test]
+async fn mm_channel_member_leave_with_me() {
+    let ctx = setup_mm_user().await;
+    let (_team_id, channel_id) = setup_team_channel(&ctx).await;
+
+    // Verify user is a member
+    let member_res = ctx
+        .app
+        .api_client
+        .get(format!(
+            "{}/api/v4/channels/{}/members/me",
+            &ctx.app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, member_res.status().as_u16());
+
+    // Leave the channel using "me" placeholder
+    let leave_res = ctx
+        .app
+        .api_client
+        .delete(format!(
+            "{}/api/v4/channels/{}/members/me",
+            &ctx.app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, leave_res.status().as_u16());
+
+    // Verify user is no longer a member
+    let member_res_after = ctx
+        .app
+        .api_client
+        .get(format!(
+            "{}/api/v4/channels/{}/members/me",
+            &ctx.app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(403, member_res_after.status().as_u16());
+}

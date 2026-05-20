@@ -24,9 +24,7 @@ impl<'a> OAuthRepository<'a> {
     }
 
     /// List active SSO configs for legacy provider resolution
-    pub async fn list_legacy_providers(
-        &self,
-    ) -> Result<Vec<LegacyProviderRow>, sqlx::Error> {
+    pub async fn list_legacy_providers(&self) -> Result<Vec<LegacyProviderRow>, sqlx::Error> {
         sqlx::query_as::<_, LegacyProviderRow>(
             r#"
             SELECT provider_key, provider_type, provider
@@ -116,10 +114,7 @@ impl<'a> OAuthRepository<'a> {
     }
 
     /// Get a user by email (case-insensitive)
-    pub async fn get_user_by_email(
-        &self,
-        email: &str,
-    ) -> Result<Option<User>, sqlx::Error> {
+    pub async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
             "SELECT * FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL",
         )
@@ -133,12 +128,10 @@ impl<'a> OAuthRepository<'a> {
         &self,
         user_id: Uuid,
     ) -> Result<Option<(Option<String>, Option<String>)>, sqlx::Error> {
-        sqlx::query_as(
-            "SELECT auth_provider, auth_provider_id FROM users WHERE id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(self.pool)
-        .await
+        sqlx::query_as("SELECT auth_provider, auth_provider_id FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(self.pool)
+            .await
     }
 
     /// Update user's last login and optionally sync role

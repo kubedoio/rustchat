@@ -7,14 +7,14 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::ApiResult;
+use crate::models::email::{
+    EmailEvent, EmailTemplateFamily, EmailTemplateVersion, MailProviderSettings, MailProviderType,
+    NotificationWorkflow, TemplateVariable, TlsMode, WorkflowPolicy,
+};
 use crate::models::{
     AdminChannelResponse, AdminTeamResponse, AuditLog, AuditLogQuery, Channel, ChannelType,
     CreateRetentionPolicy, CreateSsoConfig, Permission, RetentionPolicy, ServerConfig, SsoConfig,
     TeamMember, TeamMemberResponse, UpdateSsoConfig,
-};
-use crate::models::email::{
-    EmailEvent, EmailTemplateFamily, EmailTemplateVersion, MailProviderSettings,
-    MailProviderType, NotificationWorkflow, TemplateVariable, TlsMode, WorkflowPolicy,
 };
 
 /// Repository for admin-related database operations
@@ -545,11 +545,10 @@ impl<'a> AdminRepository<'a> {
 
     /// Get a user by ID
     pub async fn get_user_by_id(&self, id: Uuid) -> ApiResult<Option<crate::models::User>> {
-        let user: Option<crate::models::User> =
-            sqlx::query_as("SELECT * FROM users WHERE id = $1")
-                .bind(id)
-                .fetch_optional(self.pool)
-                .await?;
+        let user: Option<crate::models::User> = sqlx::query_as("SELECT * FROM users WHERE id = $1")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await?;
 
         Ok(user)
     }
@@ -1411,11 +1410,12 @@ impl<'a> AdminRepository<'a> {
 
     /// Count channels with optional team filter
     pub async fn count_channels(&self, team_id: Option<Uuid>) -> ApiResult<i64> {
-        let total: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM channels WHERE ($1::UUID IS NULL OR team_id = $1)")
-                .bind(team_id)
-                .fetch_one(self.pool)
-                .await?;
+        let total: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM channels WHERE ($1::UUID IS NULL OR team_id = $1)",
+        )
+        .bind(team_id)
+        .fetch_one(self.pool)
+        .await?;
 
         Ok(total.0)
     }
@@ -1450,11 +1450,7 @@ impl<'a> AdminRepository<'a> {
     }
 
     /// Update a channel's display_name
-    pub async fn update_channel_display_name(
-        &self,
-        id: Uuid,
-        display_name: &str,
-    ) -> ApiResult<()> {
+    pub async fn update_channel_display_name(&self, id: Uuid, display_name: &str) -> ApiResult<()> {
         sqlx::query("UPDATE channels SET display_name = $1 WHERE id = $2")
             .bind(display_name)
             .bind(id)
@@ -1488,11 +1484,10 @@ impl<'a> AdminRepository<'a> {
 
     /// Get a channel by ID
     pub async fn get_channel_by_id(&self, id: Uuid) -> ApiResult<Option<Channel>> {
-        let channel: Option<Channel> =
-            sqlx::query_as("SELECT * FROM channels WHERE id = $1")
-                .bind(id)
-                .fetch_optional(self.pool)
-                .await?;
+        let channel: Option<Channel> = sqlx::query_as("SELECT * FROM channels WHERE id = $1")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await?;
 
         Ok(channel)
     }

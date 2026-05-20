@@ -17,10 +17,7 @@ use crate::services::oauth_token_exchange::{
 };
 
 use super::providers::{exchange_github_token, exchange_oidc_token};
-use super::utils::{
-    append_query_param, build_exchange_code_cookie, get_site_url,
-    oauth_state_key,
-};
+use super::utils::{append_query_param, build_exchange_code_cookie, get_site_url, oauth_state_key};
 use super::{OAuthCallbackQuery, OAuthStatePayload, UserInfo, OAUTH_STATE_TTL_SECONDS};
 
 /// Handle OAuth callback from provider

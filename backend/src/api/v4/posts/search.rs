@@ -5,10 +5,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use super::{
-    mm, parse_body, parse_mm_or_uuid, ApiResult, AppError,
-    AppState, MmAuthUser,
-};
+use super::{mm, parse_body, parse_mm_or_uuid, ApiResult, AppError, AppState, MmAuthUser};
 
 #[derive(Deserialize)]
 struct SearchPostsRequest {

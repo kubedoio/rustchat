@@ -414,7 +414,8 @@ async fn dm_acl_enabled_blocks_direct_channel_without_shared_keycloak_group() {
     let creator_id = user_id_by_email(&app, &creator_email).await;
     let other_id = user_id_by_email(&app, &other_email).await;
 
-    ensure_team_membership(&app, org_id, &[creator_id, other_id]).await;
+    ensure_team_membership(&app, org_id, &[creator_id]).await;
+    ensure_team_membership(&app, org_id, &[other_id]).await;
 
     let creator_login = login_v1(&app, &creator_email, password).await;
     assert_eq!(creator_login.status(), StatusCode::OK);
@@ -472,6 +473,35 @@ async fn dm_acl_enabled_allows_direct_channel_with_shared_keycloak_group() {
     .execute(&app.db_pool)
     .await
     .expect("Failed to enable DM ACL for group");
+
+    let creator_login = login_v1(&app, &creator_email, password).await;
+    assert_eq!(creator_login.status(), StatusCode::OK);
+    let creator_body: serde_json::Value = creator_login.json().await.expect("Invalid login body");
+    let creator_token = creator_body["token"].as_str().expect("Missing token");
+
+    let response = create_direct_channel(&app, creator_token, &[creator_id, other_id]).await;
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn dm_acl_enabled_allows_direct_channel_with_shared_team_membership() {
+    let mut cfg = test_config();
+    cfg.messaging.dm_acl_enabled = true;
+    let app = spawn_app_with_config(cfg).await;
+
+    let org_id = create_org(&app, "DM ACL Team Allow Org").await;
+
+    let creator_email = format!("{}@example.com", unique_slug("creator"));
+    let other_email = format!("{}@example.com", unique_slug("other"));
+    let password = "Str0ngPassw0rd!";
+
+    register_user(&app, org_id, &creator_email, password).await;
+    register_user(&app, org_id, &other_email, password).await;
+
+    let creator_id = user_id_by_email(&app, &creator_email).await;
+    let other_id = user_id_by_email(&app, &other_email).await;
+
+    ensure_team_membership(&app, org_id, &[creator_id, other_id]).await;
 
     let creator_login = login_v1(&app, &creator_email, password).await;
     assert_eq!(creator_login.status(), StatusCode::OK);

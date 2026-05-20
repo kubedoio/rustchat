@@ -14,10 +14,7 @@ impl<'a> BookmarkRepository<'a> {
     }
 
     /// List active bookmarks for a channel, ordered by sort_order then create_at.
-    pub async fn list_for_channel(
-        &self,
-        channel_id: Uuid,
-    ) -> ApiResult<Vec<ChannelBookmark>> {
+    pub async fn list_for_channel(&self, channel_id: Uuid) -> ApiResult<Vec<ChannelBookmark>> {
         let bookmarks = sqlx::query_as::<_, ChannelBookmark>(
             r#"
             SELECT id, channel_id, owner_id, type, display_name, link_url, file_id, emoji, sort_order, image_url, create_at, update_at, delete_at
@@ -152,7 +149,7 @@ impl<'a> BookmarkRepository<'a> {
         delete_at: i64,
     ) -> ApiResult<()> {
         sqlx::query(
-            "UPDATE channel_bookmarks SET delete_at = $3 WHERE id = $1 AND channel_id = $2"
+            "UPDATE channel_bookmarks SET delete_at = $3 WHERE id = $1 AND channel_id = $2",
         )
         .bind(bookmark_id)
         .bind(channel_id)

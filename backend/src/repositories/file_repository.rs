@@ -128,11 +128,7 @@ impl<'a> FileRepository<'a> {
     }
 
     /// Search files globally for a user.
-    pub async fn search(
-        &self,
-        user_id: Uuid,
-        pattern: &str,
-    ) -> ApiResult<Vec<FileInfo>> {
+    pub async fn search(&self, user_id: Uuid, pattern: &str) -> ApiResult<Vec<FileInfo>> {
         let files = sqlx::query_as::<_, FileInfo>(
             r#"
             SELECT f.* FROM files f

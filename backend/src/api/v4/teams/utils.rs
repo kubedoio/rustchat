@@ -60,7 +60,10 @@ pub fn pagination_from_group_query(query: &GroupAssociationQuery) -> (bool, usiz
     let _ = query.include_member_count.unwrap_or(false);
     let paginate = query.paginate.unwrap_or(true);
     let page = query.page.unwrap_or(0).max(0) as usize;
-    let per_page = query.per_page.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE) as usize;
+    let per_page = query
+        .per_page
+        .unwrap_or(DEFAULT_PAGE_SIZE)
+        .clamp(1, MAX_PAGE_SIZE) as usize;
     let offset = page.saturating_mul(per_page);
     (paginate, offset, per_page)
 }

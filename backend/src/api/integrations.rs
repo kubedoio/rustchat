@@ -9,9 +9,9 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
-use crate::calls::state::{CallState, Participant};
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
+use crate::calls::state::{CallState, Participant};
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::encode_mm_id;
 use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, RetryConfig};

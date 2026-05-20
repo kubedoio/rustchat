@@ -171,3 +171,98 @@ async fn mm_user_team_and_channel_routes() {
     assert_eq!(team_channels_body.as_array().unwrap().len(), 1);
     assert_eq!(team_channels_body[0]["id"], encode_mm_id(channel_id));
 }
+
+#[tokio::test]
+async fn mm_list_users_team_filters() {
+    let ctx = setup_mm_user().await;
+    let (team_id, channel_id) = setup_team_channel(&ctx).await;
+
+    // Register User B under the same organization
+    let user_data_b = json!({
+        "username": "mmuserteamsb",
+        "email": "mmuserteamsb@example.com",
+        "password": "Password123!",
+        "display_name": "MM User Teams B",
+        "org_id": ctx.org_id
+    });
+
+    ctx.app
+        .api_client
+        .post(format!("{}/api/v1/auth/register", &ctx.app.address))
+        .json(&user_data_b)
+        .send()
+        .await
+        .expect("Failed to register user B.");
+
+    let user_b_uuid: Uuid =
+        sqlx::query_scalar("SELECT id FROM users WHERE username = 'mmuserteamsb'")
+            .fetch_one(&ctx.app.db_pool)
+            .await
+            .unwrap();
+
+    // Add User B to the team
+    sqlx::query("INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'member')")
+        .bind(team_id)
+        .bind(user_b_uuid)
+        .execute(&ctx.app.db_pool)
+        .await
+        .unwrap();
+
+    // 1. Query with in_team filter. Should return both mmuserteams and mmuserteamsb
+    let list_res = ctx
+        .app
+        .api_client
+        .get(format!(
+            "{}/api/v4/users?in_team={}",
+            &ctx.app.address, team_id
+        ))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(200, list_res.status().as_u16());
+    let list_body: serde_json::Value = list_res.json().await.unwrap();
+    let users = list_body.as_array().expect("Expected JSON array response");
+
+    assert!(
+        users.len() >= 2,
+        "Expected at least 2 team members, got: {:?}",
+        users
+    );
+
+    let usernames: Vec<&str> = users
+        .iter()
+        .map(|u| u["username"].as_str().unwrap())
+        .collect();
+    assert!(usernames.contains(&"mmuserteams"));
+    assert!(usernames.contains(&"mmuserteamsb"));
+
+    // 2. Query with in_team and not_in_channel filters.
+    // User A (mmuserteams / ctx.user_uuid) is inside channel_id, but User B (mmuserteamsb) is not.
+    // Therefore, searching not_in_channel should return User B but NOT User A.
+    let list_not_in_chan_res = ctx
+        .app
+        .api_client
+        .get(format!(
+            "{}/api/v4/users?in_team={}&not_in_channel={}",
+            &ctx.app.address, team_id, channel_id
+        ))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(200, list_not_in_chan_res.status().as_u16());
+    let not_in_chan_body: serde_json::Value = list_not_in_chan_res.json().await.unwrap();
+    let users_not_in_chan = not_in_chan_body
+        .as_array()
+        .expect("Expected JSON array response");
+
+    let usernames_not_in_chan: Vec<&str> = users_not_in_chan
+        .iter()
+        .map(|u| u["username"].as_str().unwrap())
+        .collect();
+    assert!(!usernames_not_in_chan.contains(&"mmuserteams"));
+    assert!(usernames_not_in_chan.contains(&"mmuserteamsb"));
+}

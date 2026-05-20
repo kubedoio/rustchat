@@ -140,9 +140,15 @@ pub async fn get_threads_internal(
         .list_threads_for_user_in_team(user_id, team_id, query.unread, per_page, offset)
         .await?;
 
-    let total = repo.count_threads_for_user_in_team(user_id, team_id).await?;
-    let total_unread_threads = repo.count_unread_threads_for_user_in_team(user_id, team_id).await?;
-    let total_unread_mentions = repo.sum_unread_mentions_for_user_in_team(user_id, team_id).await?;
+    let total = repo
+        .count_threads_for_user_in_team(user_id, team_id)
+        .await?;
+    let total_unread_threads = repo
+        .count_unread_threads_for_user_in_team(user_id, team_id)
+        .await?;
+    let total_unread_mentions = repo
+        .sum_unread_mentions_for_user_in_team(user_id, team_id)
+        .await?;
 
     let mm_threads: Vec<mm::Thread> = threads
         .into_iter()
@@ -245,8 +251,14 @@ pub async fn get_thread_internal(
     Ok(Json(mm::Thread {
         id: encode_mm_id(thread.id),
         reply_count: thread.reply_count,
-        last_reply_at: thread.last_reply_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
-        last_viewed_at: thread.last_read_at.map(|dt| dt.timestamp_millis()).unwrap_or(0),
+        last_reply_at: thread
+            .last_reply_at
+            .map(|dt| dt.timestamp_millis())
+            .unwrap_or(0),
+        last_viewed_at: thread
+            .last_read_at
+            .map(|dt| dt.timestamp_millis())
+            .unwrap_or(0),
         participants: vec![],
         post: mm::PostInThread {
             id: encode_mm_id(thread.id),
@@ -388,7 +400,8 @@ pub async fn set_thread_unread(
 
     let last_read_at = post_created_at.map(|dt| dt - Duration::milliseconds(1));
 
-    repo.set_thread_unread(user_id, thread_id, last_read_at).await?;
+    repo.set_thread_unread(user_id, thread_id, last_read_at)
+        .await?;
 
     get_thread_internal(
         State(state),

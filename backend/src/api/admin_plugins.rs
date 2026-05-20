@@ -1,10 +1,6 @@
 //! Admin plugin configuration endpoints
 
-use axum::{
-    extract::State,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, routing::get, Json, Router};
 
 use crate::api::admin::require_admin;
 use crate::api::AppState;
@@ -12,11 +8,10 @@ use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 
 pub fn router() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/admin/plugins/calls",
-            get(get_calls_plugin_config).put(update_calls_plugin_config),
-        )
+    Router::new().route(
+        "/admin/plugins/calls",
+        get(get_calls_plugin_config).put(update_calls_plugin_config),
+    )
 }
 
 // ============ Plugins - RustChat Calls Plugin ============
@@ -219,4 +214,3 @@ pub async fn update_calls_plugin_config(
         },
     }))
 }
-

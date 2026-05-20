@@ -44,7 +44,9 @@ pub async fn get_channel_members(
     let repo = ChannelRepository::new(&state.db);
     repo.require_member(channel_id, auth.user_id)
         .await
-        .map_err(|_| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+        .map_err(|_| {
+            crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+        })?;
 
     let rows = fetch_channel_member_compat_rows(&state, channel_id, None).await?;
     let mm_members = rows
@@ -158,9 +160,35 @@ pub async fn remove_channel_member(
     let channel_id = parse_mm_or_uuid(&path.channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
 
-    let user_id = parse_mm_or_uuid(&path.user_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = if path.user_id == "me" {
+        auth.user_id
+    } else {
+        parse_mm_or_uuid(&path.user_id)
+            .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?
+    };
 
+    remove_channel_member_by_id(state, auth, channel_id, user_id).await
+}
+
+/// DELETE /channels/{channel_id}/members/me - Leave a channel.
+pub async fn remove_channel_member_me(
+    State(state): State<AppState>,
+    auth: MmAuthUser,
+    Path(channel_id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    let channel_id = parse_mm_or_uuid(&channel_id)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+
+    let user_id = auth.user_id;
+    remove_channel_member_by_id(state, auth, channel_id, user_id).await
+}
+
+async fn remove_channel_member_by_id(
+    state: AppState,
+    auth: MmAuthUser,
+    channel_id: uuid::Uuid,
+    user_id: uuid::Uuid,
+) -> ApiResult<impl IntoResponse> {
     // Users may remove themselves; to remove others, channel or system admin is required
     if auth.user_id != user_id {
         ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
@@ -206,13 +234,19 @@ pub async fn get_channel_member_by_id(
 ) -> ApiResult<Json<mm::ChannelMember>> {
     let channel_id = parse_mm_or_uuid(&path.channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    let user_id = parse_mm_or_uuid(&path.user_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = if path.user_id == "me" {
+        auth.user_id
+    } else {
+        parse_mm_or_uuid(&path.user_id)
+            .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?
+    };
 
     let repo = ChannelRepository::new(&state.db);
     repo.require_member(channel_id, auth.user_id)
         .await
-        .map_err(|_| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+        .map_err(|_| {
+            crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+        })?;
 
     let rows = fetch_channel_member_compat_rows(&state, channel_id, Some(&[user_id])).await?;
     let row = rows
@@ -239,7 +273,9 @@ pub async fn get_channel_members_by_ids(
     let repo = ChannelRepository::new(&state.db);
     repo.require_member(channel_id, auth.user_id)
         .await
-        .map_err(|_| crate::error::AppError::Forbidden("Not a member of this channel".to_string()))?;
+        .map_err(|_| {
+            crate::error::AppError::Forbidden("Not a member of this channel".to_string())
+        })?;
 
     let input: ChannelMemberIdsRequest =
         super::utils::parse_body(&headers, &body, "Invalid ids body")?;
@@ -271,8 +307,12 @@ pub async fn update_channel_member_roles(
 ) -> ApiResult<Json<mm::ChannelMember>> {
     let channel_id = parse_mm_or_uuid(&path.channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    let user_id = parse_mm_or_uuid(&path.user_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = if path.user_id == "me" {
+        auth.user_id
+    } else {
+        parse_mm_or_uuid(&path.user_id)
+            .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?
+    };
 
     // Only channel admins or system admins may change member roles
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
@@ -308,8 +348,12 @@ pub async fn update_channel_member_notify_props(
 ) -> ApiResult<Json<serde_json::Value>> {
     let channel_id = parse_mm_or_uuid(&path.channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    let user_id = parse_mm_or_uuid(&path.user_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = if path.user_id == "me" {
+        auth.user_id
+    } else {
+        parse_mm_or_uuid(&path.user_id)
+            .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?
+    };
 
     if user_id != auth.user_id {
         return Err(crate::error::AppError::Forbidden(
@@ -342,8 +386,12 @@ pub async fn update_channel_member_scheme_roles(
 ) -> ApiResult<impl IntoResponse> {
     let channel_id = parse_mm_or_uuid(&channel_id)
         .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    let target_user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?;
+    let target_user_id = if user_id == "me" {
+        auth.user_id
+    } else {
+        parse_mm_or_uuid(&user_id)
+            .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?
+    };
 
     // Only channel admins or system admins may change member scheme roles
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;

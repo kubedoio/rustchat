@@ -16,11 +16,10 @@ impl<'a> SystemRepository<'a> {
 
     /// Get the default server configuration.
     pub async fn get_server_config(&self) -> ApiResult<ServerConfig> {
-        let config = sqlx::query_as::<_, ServerConfig>(
-            "SELECT * FROM server_config WHERE id = 'default'"
-        )
-        .fetch_one(self.pool)
-        .await?;
+        let config =
+            sqlx::query_as::<_, ServerConfig>("SELECT * FROM server_config WHERE id = 'default'")
+                .fetch_one(self.pool)
+                .await?;
         Ok(config)
     }
 
@@ -54,21 +53,15 @@ impl<'a> SystemRepository<'a> {
         &self,
         user_id: Uuid,
     ) -> ApiResult<Vec<(Option<String>, Option<String>)>> {
-        let rows = sqlx::query_as(
-            "SELECT token, platform FROM user_devices WHERE user_id = $1"
-        )
-        .bind(user_id)
-        .fetch_all(self.pool)
-        .await?;
+        let rows = sqlx::query_as("SELECT token, platform FROM user_devices WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_all(self.pool)
+            .await?;
         Ok(rows)
     }
 
     /// Update the site name in the default server config.
-    pub async fn update_site_name(
-        &self,
-        site_name: &str,
-        updated_by: Uuid,
-    ) -> ApiResult<()> {
+    pub async fn update_site_name(&self, site_name: &str, updated_by: Uuid) -> ApiResult<()> {
         sqlx::query(
             "UPDATE server_config SET site = jsonb_set(site, '{site_name}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
         )
@@ -96,11 +89,7 @@ impl<'a> SystemRepository<'a> {
     }
 
     /// Update the SMTP host in the default server config.
-    pub async fn update_smtp_host(
-        &self,
-        host: &str,
-        updated_by: Uuid,
-    ) -> ApiResult<()> {
+    pub async fn update_smtp_host(&self, host: &str, updated_by: Uuid) -> ApiResult<()> {
         sqlx::query(
             "UPDATE server_config SET email = jsonb_set(email, '{smtp_host}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
         )
@@ -112,11 +101,7 @@ impl<'a> SystemRepository<'a> {
     }
 
     /// Update the SMTP port in the default server config.
-    pub async fn update_smtp_port(
-        &self,
-        port: &str,
-        updated_by: Uuid,
-    ) -> ApiResult<()> {
+    pub async fn update_smtp_port(&self, port: &str, updated_by: Uuid) -> ApiResult<()> {
         sqlx::query(
             "UPDATE server_config SET email = jsonb_set(email, '{smtp_port}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
         )
@@ -128,11 +113,7 @@ impl<'a> SystemRepository<'a> {
     }
 
     /// Update the from address in the default server config.
-    pub async fn update_from_address(
-        &self,
-        from: &str,
-        updated_by: Uuid,
-    ) -> ApiResult<()> {
+    pub async fn update_from_address(&self, from: &str, updated_by: Uuid) -> ApiResult<()> {
         sqlx::query(
             "UPDATE server_config SET email = jsonb_set(email, '{from_address}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
         )
@@ -144,11 +125,7 @@ impl<'a> SystemRepository<'a> {
     }
 
     /// Update the webhooks enabled flag in the default server config.
-    pub async fn update_enable_webhooks(
-        &self,
-        enabled: bool,
-        updated_by: Uuid,
-    ) -> ApiResult<()> {
+    pub async fn update_enable_webhooks(&self, enabled: bool, updated_by: Uuid) -> ApiResult<()> {
         sqlx::query(
             "UPDATE server_config SET integrations = jsonb_set(integrations, '{enable_webhooks}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
         )
@@ -192,11 +169,7 @@ impl<'a> SystemRepository<'a> {
     }
 
     /// Update the file retention days in the default server config.
-    pub async fn update_file_retention_days(
-        &self,
-        days: i64,
-        updated_by: Uuid,
-    ) -> ApiResult<()> {
+    pub async fn update_file_retention_days(&self, days: i64, updated_by: Uuid) -> ApiResult<()> {
         sqlx::query(
             "UPDATE server_config SET compliance = jsonb_set(compliance, '{file_retention_days}', $1, true), updated_at = NOW(), updated_by = $2 WHERE id = 'default'"
         )
@@ -209,11 +182,10 @@ impl<'a> SystemRepository<'a> {
 
     /// Get the site URL from the default server config.
     pub async fn get_site_url(&self) -> Result<Option<String>, sqlx::Error> {
-        let url: Option<String> = sqlx::query_scalar(
-            "SELECT site->>'site_url' FROM server_config WHERE id = 'default'",
-        )
-        .fetch_optional(self.pool)
-        .await?;
+        let url: Option<String> =
+            sqlx::query_scalar("SELECT site->>'site_url' FROM server_config WHERE id = 'default'")
+                .fetch_optional(self.pool)
+                .await?;
 
         Ok(url.filter(|u| !u.is_empty()))
     }

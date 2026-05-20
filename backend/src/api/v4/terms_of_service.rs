@@ -177,7 +177,13 @@ async fn update_terms(
     }
 
     let updated = repo
-        .update_terms(id, &req.title, &req.content, &req.summary, &req.effective_date)
+        .update_terms(
+            id,
+            &req.title,
+            &req.content,
+            &req.summary,
+            &req.effective_date,
+        )
         .await?;
 
     Ok(Json(updated))

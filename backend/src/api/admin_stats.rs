@@ -27,7 +27,10 @@ pub struct SystemStats {
     pub files_count: i64,
 }
 
-pub async fn get_stats(State(state): State<AppState>, auth: AuthUser) -> ApiResult<Json<SystemStats>> {
+pub async fn get_stats(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> ApiResult<Json<SystemStats>> {
     require_admin(&auth)?;
 
     let total_users: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")
@@ -247,4 +250,3 @@ fn check_disk(path: &str) -> DiskHealth {
         }
     }
 }
-

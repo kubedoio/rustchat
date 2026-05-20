@@ -105,7 +105,14 @@ async fn upload_file(
                     .map_err(|e| AppError::Internal(format!("temp file write error: {}", e)))?;
             }
 
-            file_info = Some((filename, content_type, TempFile(temp_path), size, hex::encode(hasher.finalize()), head));
+            file_info = Some((
+                filename,
+                content_type,
+                TempFile(temp_path),
+                size,
+                hex::encode(hasher.finalize()),
+                head,
+            ));
             break;
         }
     }
@@ -141,16 +148,18 @@ async fn upload_file(
 
     // Save metadata to DB
     let file_repo = FileRepository::new(&state.db);
-    let file_info = file_repo.create_simple(
-        file_id,
-        auth.user_id,
-        query.channel_id,
-        &filename,
-        &key,
-        &content_type,
-        size_i64,
-        &hash,
-    ).await?;
+    let file_info = file_repo
+        .create_simple(
+            file_id,
+            auth.user_id,
+            query.channel_id,
+            &filename,
+            &key,
+            &content_type,
+            size_i64,
+            &hash,
+        )
+        .await?;
 
     // Generate download URL
     let url = state.s3_client.presigned_download_url(&key, 3600).await?;
@@ -192,13 +201,15 @@ async fn upload_file(
 
                 // Update metadata in DB
                 let file_repo = FileRepository::new(&state_clone.db);
-                let _ = file_repo.update_dimensions(
-                    file_id,
-                    width,
-                    height,
-                    has_thumbnail,
-                    thumbnail_key.as_deref(),
-                ).await;
+                let _ = file_repo
+                    .update_dimensions(
+                        file_id,
+                        width,
+                        height,
+                        has_thumbnail,
+                        thumbnail_key.as_deref(),
+                    )
+                    .await;
             }
             let _ = tokio::fs::remove_file(&path_clone).await;
         });
@@ -252,7 +263,9 @@ async fn get_file(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<FileInfo>> {
     let file_repo = FileRepository::new(&state.db);
-    let file = file_repo.get_by_id(id).await?
+    let file = file_repo
+        .get_by_id(id)
+        .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
 
     check_file_access(&state, &file, auth.user_id).await?;
@@ -267,7 +280,9 @@ async fn download_file(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let file_repo = FileRepository::new(&state.db);
-    let file = file_repo.get_by_id(id).await?
+    let file = file_repo
+        .get_by_id(id)
+        .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
 
     check_file_access(&state, &file, auth.user_id).await?;
@@ -291,7 +306,9 @@ async fn delete_file(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let file_repo = FileRepository::new(&state.db);
-    let file = file_repo.get_by_id(id).await?
+    let file = file_repo
+        .get_by_id(id)
+        .await?
         .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
 
     // Only uploader or admin can delete

@@ -11,7 +11,9 @@ use crate::api::{admin::require_admin, AppState};
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, RetryConfig};
-use crate::models::{CreateSsoConfig, SsoConfig, SsoConfigResponse, SsoProviderType, SsoTestResult, UpdateSsoConfig};
+use crate::models::{
+    CreateSsoConfig, SsoConfig, SsoConfigResponse, SsoProviderType, SsoTestResult, UpdateSsoConfig,
+};
 use crate::repositories::AdminRepository;
 use crate::services::oidc_discovery::OidcDiscoveryService;
 use std::time::Duration;

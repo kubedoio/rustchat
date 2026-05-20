@@ -12,9 +12,9 @@ use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    CreateChecklist, CreatePlaybook, CreateStatusUpdate, CreateTask, Playbook,
-    PlaybookChecklist, PlaybookFull, PlaybookRun, PlaybookTask, RunStatusUpdate,
-    RunTask, RunWithTasks, StartRun, UpdatePlaybook, UpdateRun, UpdateRunTask,
+    CreateChecklist, CreatePlaybook, CreateStatusUpdate, CreateTask, Playbook, PlaybookChecklist,
+    PlaybookFull, PlaybookRun, PlaybookTask, RunStatusUpdate, RunTask, RunWithTasks, StartRun,
+    UpdatePlaybook, UpdateRun, UpdateRunTask,
 };
 use crate::repositories::{calculate_progress, PlaybookRepository};
 
@@ -315,7 +315,7 @@ async fn start_run(
         let channel = sqlx::query_as::<_, crate::models::Channel>(
             r#"
             INSERT INTO channels (team_id, name, display_name, purpose, type, creator_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5::channel_type, $6)
             RETURNING *
             "#,
         )

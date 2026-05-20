@@ -3,11 +3,11 @@
 //! Implements the com.mattermost.calls plugin interface for Mattermost Mobile compatibility.
 //! Routes are mounted under /plugins/com.mattermost.calls/
 
+use crate::api::AppState;
 use axum::{
     routing::{get, post},
     Router,
 };
-use crate::api::AppState;
 
 pub mod commands;
 mod turn;
@@ -42,10 +42,19 @@ mod websocket;
 pub fn router() -> Router<AppState> {
     Router::new()
         // Plugin info endpoints
-        .route("/plugins/com.mattermost.calls/version", get(config::get_version))
-        .route("/plugins/com.mattermost.calls/config", get(config::get_config))
+        .route(
+            "/plugins/com.mattermost.calls/version",
+            get(config::get_version),
+        )
+        .route(
+            "/plugins/com.mattermost.calls/config",
+            get(config::get_config),
+        )
         // Channels with calls enabled
-        .route("/plugins/com.mattermost.calls/channels", get(channels::get_channels))
+        .route(
+            "/plugins/com.mattermost.calls/channels",
+            get(channels::get_channels),
+        )
         // Avoid overlap with /api/v4/plugins/{plugin_id}/enable|disable mutation routes.
         .route(
             "/plugins/com.mattermost.calls/enable",

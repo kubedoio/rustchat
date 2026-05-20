@@ -9,8 +9,8 @@ use crate::api::AppState;
 use crate::error::AppError;
 use crate::services::oauth_token_exchange::{exchange_code, ExchangeError};
 
-use super::{ExchangeRequest, ExchangeResponse, OAUTH_EXCHANGE_COOKIE};
 use super::utils::{clear_exchange_code_cookie, read_cookie_value};
+use super::{ExchangeRequest, ExchangeResponse, OAUTH_EXCHANGE_COOKIE};
 
 /// Exchange a one-time code for a JWT token
 pub async fn exchange_token(
@@ -18,8 +18,9 @@ pub async fn exchange_token(
     headers: HeaderMap,
     Json(input): Json<ExchangeRequest>,
 ) -> Result<Response, AppError> {
-    let clear_cookie = HeaderValue::from_str(&clear_exchange_code_cookie(state.config.is_production()))
-        .map_err(|e| AppError::Internal(format!("Failed to clear exchange cookie: {}", e)))?;
+    let clear_cookie =
+        HeaderValue::from_str(&clear_exchange_code_cookie(state.config.is_production()))
+            .map_err(|e| AppError::Internal(format!("Failed to clear exchange cookie: {}", e)))?;
 
     let code = match input
         .code
@@ -131,6 +132,8 @@ pub async fn exchange_token(
 
 fn error_with_clear_cookie(error: AppError, clear_cookie: HeaderValue) -> Response {
     let mut response = error.into_response();
-    response.headers_mut().insert(header::SET_COOKIE, clear_cookie);
+    response
+        .headers_mut()
+        .insert(header::SET_COOKIE, clear_cookie);
     response
 }

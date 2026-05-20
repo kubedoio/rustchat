@@ -7,11 +7,11 @@ use serde::Deserialize;
 use sqlx::FromRow;
 use uuid::Uuid;
 
+use crate::api::admin::require_admin;
 use crate::api::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::ApiResult;
-use crate::api::admin::require_admin;
 use crate::services::membership_policies::{
     AutoMembershipPolicyAudit, CreatePolicyRequest, PolicyRepository, PolicyWithTargets,
     UpdatePolicyRequest,

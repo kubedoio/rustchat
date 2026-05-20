@@ -115,7 +115,7 @@ impl<'a> IntegrationRepository<'a> {
                 .await
             } else {
                 sqlx::query_as::<_, IncomingWebhook>(
-                    "SELECT * FROM incoming_webhooks WHERE team_id = $1 LIMIT $2 OFFSET $3"
+                    "SELECT * FROM incoming_webhooks WHERE team_id = $1 LIMIT $2 OFFSET $3",
                 )
                 .bind(tid)
                 .bind(limit)
@@ -126,7 +126,7 @@ impl<'a> IntegrationRepository<'a> {
         } else {
             if let Some(cid) = creator_id {
                 sqlx::query_as::<_, IncomingWebhook>(
-                    "SELECT * FROM incoming_webhooks WHERE creator_id = $1 LIMIT $2 OFFSET $3"
+                    "SELECT * FROM incoming_webhooks WHERE creator_id = $1 LIMIT $2 OFFSET $3",
                 )
                 .bind(cid)
                 .bind(limit)
@@ -135,7 +135,7 @@ impl<'a> IntegrationRepository<'a> {
                 .await
             } else {
                 sqlx::query_as::<_, IncomingWebhook>(
-                    "SELECT * FROM incoming_webhooks LIMIT $1 OFFSET $2"
+                    "SELECT * FROM incoming_webhooks LIMIT $1 OFFSET $2",
                 )
                 .bind(limit)
                 .bind(offset)
@@ -274,7 +274,7 @@ impl<'a> IntegrationRepository<'a> {
                 .await
             } else {
                 sqlx::query_as::<_, OutgoingWebhook>(
-                    "SELECT * FROM outgoing_webhooks WHERE team_id = $1 LIMIT $2 OFFSET $3"
+                    "SELECT * FROM outgoing_webhooks WHERE team_id = $1 LIMIT $2 OFFSET $3",
                 )
                 .bind(tid)
                 .bind(limit)
@@ -285,7 +285,7 @@ impl<'a> IntegrationRepository<'a> {
         } else {
             if let Some(cid) = creator_id {
                 sqlx::query_as::<_, OutgoingWebhook>(
-                    "SELECT * FROM outgoing_webhooks WHERE creator_id = $1 LIMIT $2 OFFSET $3"
+                    "SELECT * FROM outgoing_webhooks WHERE creator_id = $1 LIMIT $2 OFFSET $3",
                 )
                 .bind(cid)
                 .bind(limit)
@@ -294,7 +294,7 @@ impl<'a> IntegrationRepository<'a> {
                 .await
             } else {
                 sqlx::query_as::<_, OutgoingWebhook>(
-                    "SELECT * FROM outgoing_webhooks LIMIT $1 OFFSET $2"
+                    "SELECT * FROM outgoing_webhooks LIMIT $1 OFFSET $2",
                 )
                 .bind(limit)
                 .bind(offset)
@@ -454,10 +454,7 @@ impl<'a> IntegrationRepository<'a> {
     }
 
     /// List bots by owner
-    pub async fn list_bots_by_owner(
-        &self,
-        owner_id: Uuid,
-    ) -> Result<Vec<Bot>, sqlx::Error> {
+    pub async fn list_bots_by_owner(&self, owner_id: Uuid) -> Result<Vec<Bot>, sqlx::Error> {
         sqlx::query_as::<_, Bot>("SELECT * FROM bots WHERE owner_id = $1 ORDER BY created_at DESC")
             .bind(owner_id)
             .fetch_all(self.pool)
@@ -473,11 +470,7 @@ impl<'a> IntegrationRepository<'a> {
     }
 
     /// Create a bot user account
-    pub async fn create_bot_user(
-        &self,
-        username: &str,
-        email: &str,
-    ) -> Result<Uuid, sqlx::Error> {
+    pub async fn create_bot_user(&self, username: &str, email: &str) -> Result<Uuid, sqlx::Error> {
         let row: (Uuid,) = sqlx::query_as(
             r#"
             INSERT INTO users (username, email, password_hash, is_bot, role)
@@ -516,10 +509,7 @@ impl<'a> IntegrationRepository<'a> {
     }
 
     /// Delete a bot
-    pub async fn delete_bot(
-        &self,
-        id: Uuid,
-    ) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
+    pub async fn delete_bot(&self, id: Uuid) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
         sqlx::query("DELETE FROM bots WHERE id = $1")
             .bind(id)
             .execute(self.pool)
@@ -529,10 +519,7 @@ impl<'a> IntegrationRepository<'a> {
     // ========== Bot Tokens ==========
 
     /// List tokens for a bot
-    pub async fn list_bot_tokens(
-        &self,
-        bot_id: Uuid,
-    ) -> Result<Vec<BotToken>, sqlx::Error> {
+    pub async fn list_bot_tokens(&self, bot_id: Uuid) -> Result<Vec<BotToken>, sqlx::Error> {
         sqlx::query_as::<_, BotToken>(
             "SELECT * FROM bot_tokens WHERE bot_id = $1 ORDER BY created_at DESC",
         )

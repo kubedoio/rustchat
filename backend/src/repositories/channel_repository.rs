@@ -691,7 +691,7 @@ impl<'a> ChannelRepository<'a> {
         let channel: Channel = sqlx::query_as(
             r#"
             INSERT INTO channels (team_id, type, name, display_name, purpose, header, creator_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES ($1, $2::channel_type, $3, $4, $5, $6, $7)
             RETURNING *
             "#,
         )
@@ -710,7 +710,7 @@ impl<'a> ChannelRepository<'a> {
     /// Update channel privacy (type)
     pub async fn update_privacy(&self, id: Uuid, channel_type: &str) -> ApiResult<Channel> {
         let channel: Channel = sqlx::query_as(
-            r#"UPDATE channels SET type = $2, updated_at = NOW() WHERE id = $1 RETURNING *"#,
+            r#"UPDATE channels SET type = $2::channel_type, updated_at = NOW() WHERE id = $1 RETURNING *"#,
         )
         .bind(id)
         .bind(channel_type)
@@ -978,7 +978,7 @@ impl<'a> ChannelRepository<'a> {
             JOIN users u ON u.id = cm.user_id
             WHERE cm.channel_id = ANY($1)
               AND cm.user_id <> $2
-            "#
+            "#,
         )
         .bind(channel_ids)
         .bind(viewer_id)

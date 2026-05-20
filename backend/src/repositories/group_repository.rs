@@ -357,10 +357,7 @@ impl<'a> GroupRepository<'a> {
         .await
     }
 
-    pub async fn restore_group(
-        &self,
-        group_id: Uuid,
-    ) -> Result<Option<GroupListRow>, sqlx::Error> {
+    pub async fn restore_group(&self, group_id: Uuid) -> Result<Option<GroupListRow>, sqlx::Error> {
         sqlx::query_as::<_, GroupListRow>(
             r#"
             UPDATE groups
@@ -610,10 +607,7 @@ impl<'a> GroupRepository<'a> {
 
     // --- Group-team/channel linking ---
 
-    pub async fn get_team_meta(
-        &self,
-        team_id: Uuid,
-    ) -> Result<Option<TeamMetaRow>, sqlx::Error> {
+    pub async fn get_team_meta(&self, team_id: Uuid) -> Result<Option<TeamMetaRow>, sqlx::Error> {
         sqlx::query_as::<_, TeamMetaRow>(
             r#"
             SELECT id, name, display_name, is_public
@@ -669,10 +663,7 @@ impl<'a> GroupRepository<'a> {
         .await
     }
 
-    pub async fn get_channel_team_id(
-        &self,
-        channel_id: Uuid,
-    ) -> Result<Option<Uuid>, sqlx::Error> {
+    pub async fn get_channel_team_id(&self, channel_id: Uuid) -> Result<Option<Uuid>, sqlx::Error> {
         sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
             .bind(channel_id)
             .fetch_optional(self.pool)

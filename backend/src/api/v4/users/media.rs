@@ -6,9 +6,9 @@ use axum::{
 
 use super::MmAuthUser;
 use crate::api::AppState;
+use crate::constants::MAX_IMAGE_SIZE;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
-use crate::constants::MAX_IMAGE_SIZE;
 use crate::models::legacy_avatar_key_from_url;
 
 /// GET /users/{user_id}/image - Get user profile image (requires auth)

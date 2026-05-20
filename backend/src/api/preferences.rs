@@ -321,7 +321,12 @@ async fn create_status_preset(
 ) -> ApiResult<Json<StatusPreset>> {
     let repo = UserRepository::new(&state.db);
     let preset = repo
-        .create_status_preset(auth.user_id, &payload.emoji, &payload.text, payload.duration_minutes)
+        .create_status_preset(
+            auth.user_id,
+            &payload.emoji,
+            &payload.text,
+            payload.duration_minutes,
+        )
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(preset))

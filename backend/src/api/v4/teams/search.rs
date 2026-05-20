@@ -77,4 +77,3 @@ pub async fn search_teams(
 
     Ok(Json(teams.into_iter().map(|t| t.into()).collect()))
 }
-

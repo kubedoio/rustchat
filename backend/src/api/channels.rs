@@ -9,13 +9,13 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
+use crate::api::v4::users::hydrate_dm_display_names_batch;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
     normalize_avatar_url, Channel, ChannelMember, ChannelType, CreateChannel, UpdateChannel,
 };
-use crate::api::v4::users::hydrate_dm_display_names_batch;
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
 use crate::repositories::{AdminRepository, ChannelRepository, UserRepository};
 

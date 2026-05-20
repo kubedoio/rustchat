@@ -55,10 +55,7 @@ impl<'a> UploadRepository<'a> {
     }
 
     /// Get an active upload session by ID.
-    pub async fn get_session(
-        &self,
-        id: Uuid,
-    ) -> Result<Option<UploadSessionRow>, sqlx::Error> {
+    pub async fn get_session(&self, id: Uuid) -> Result<Option<UploadSessionRow>, sqlx::Error> {
         sqlx::query_as(
             r#"
             SELECT id, user_id, channel_id, filename, file_size, file_offset, created_at

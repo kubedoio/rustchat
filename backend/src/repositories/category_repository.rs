@@ -40,11 +40,7 @@ impl<'a> CategoryRepository<'a> {
     }
 
     /// List non-deleted categories for a user in a team.
-    pub async fn list_for_user(
-        &self,
-        user_id: Uuid,
-        team_id: Uuid,
-    ) -> ApiResult<Vec<CategoryRow>> {
+    pub async fn list_for_user(&self, user_id: Uuid, team_id: Uuid) -> ApiResult<Vec<CategoryRow>> {
         let rows = sqlx::query_as::<_, CategoryRow>(
             "SELECT * FROM channel_categories WHERE user_id = $1 AND team_id = $2 AND delete_at = 0"
         )
@@ -56,10 +52,7 @@ impl<'a> CategoryRepository<'a> {
     }
 
     /// Get channel IDs assigned to a category, ordered by sort_order.
-    pub async fn get_channel_ids(
-        &self,
-        category_id: Uuid,
-    ) -> ApiResult<Vec<Uuid>> {
+    pub async fn get_channel_ids(&self, category_id: Uuid) -> ApiResult<Vec<Uuid>> {
         let ids = sqlx::query_scalar(
             "SELECT channel_id FROM channel_category_channels WHERE category_id = $1 ORDER BY sort_order ASC"
         )
@@ -97,11 +90,7 @@ impl<'a> CategoryRepository<'a> {
     }
 
     /// Get the next available sort_order for a user's categories in a team.
-    pub async fn get_next_sort_order(
-        &self,
-        user_id: Uuid,
-        team_id: Uuid,
-    ) -> ApiResult<i32> {
+    pub async fn get_next_sort_order(&self, user_id: Uuid, team_id: Uuid) -> ApiResult<i32> {
         let next_order: i32 = sqlx::query_scalar(
             "SELECT (COALESCE(MAX(sort_order), -1) + 1)::INT FROM channel_categories WHERE user_id = $1 AND team_id = $2"
         )
@@ -358,11 +347,7 @@ impl<'a> CategoryRepository<'a> {
     }
 
     /// Soft-delete a category.
-    pub async fn soft_delete(
-        &self,
-        category_id: Uuid,
-        delete_at: i64,
-    ) -> ApiResult<()> {
+    pub async fn soft_delete(&self, category_id: Uuid, delete_at: i64) -> ApiResult<()> {
         sqlx::query("UPDATE channel_categories SET delete_at = $2 WHERE id = $1")
             .bind(category_id)
             .bind(delete_at)

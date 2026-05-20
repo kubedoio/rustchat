@@ -81,12 +81,7 @@ impl TestApp {
         }
     }
 
-    pub async fn send_ws_command(
-        &self,
-        ws: &mut WsStream,
-        command: &str,
-        data: serde_json::Value,
-    ) {
+    pub async fn send_ws_command(&self, ws: &mut WsStream, command: &str, data: serde_json::Value) {
         let payload = serde_json::json!({
             "type": "command",
             "event": command,

@@ -4,9 +4,11 @@ use uuid::Uuid;
 
 use super::MmAuthUser;
 use super::{encode_mm_id, mm};
-use crate::repositories::channel_repository::{ChannelWithTeamDataResponse, ChannelWithTeamDataRow};
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
+use crate::repositories::channel_repository::{
+    ChannelWithTeamDataResponse, ChannelWithTeamDataRow,
+};
 
 pub fn map_channel_with_team_data_row(row: ChannelWithTeamDataRow) -> ChannelWithTeamDataResponse {
     use crate::models::Channel;

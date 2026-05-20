@@ -117,7 +117,10 @@ pub fn router(state: AppState) -> Router<AppState> {
     let rate_limited_state = state.clone();
     let auth_routes = Router::new()
         .route("/oauth2/{provider_key}/login", get(login::oauth_login))
-        .route("/oauth2/{provider_key}/callback", get(callback::oauth_callback))
+        .route(
+            "/oauth2/{provider_key}/callback",
+            get(callback::oauth_callback),
+        )
         .layer(middleware::from_fn_with_state(
             rate_limited_state,
             crate::middleware::rate_limit::auth_ip_rate_limit,

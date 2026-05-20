@@ -60,7 +60,7 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/channels/{channel_id}/members/me",
-            get(members::get_channel_member_me),
+            get(members::get_channel_member_me).delete(members::remove_channel_member_me),
         )
         .route(
             "/channels/{channel_id}/members/ids",
