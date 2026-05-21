@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-21
+
 ### Added
 - **WebSocket Disconnection UX**: Progressive disconnection handling to prevent users from acting on stale data.
   - Three visual states: Reconnecting (< 5s), Disconnected (5-30s), Failed (> 30s).

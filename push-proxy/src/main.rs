@@ -29,12 +29,12 @@ use axum::{
     http::{HeaderMap, StatusCode},
     routing::post,
 };
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use bytes::Bytes;
 use hmac::{Hmac, Mac};
-use sha2::{Sha256, Digest};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tracing::{error, info, warn};
@@ -348,8 +348,8 @@ fn validate_hmac(
         hex::encode(hasher.finalize())
     };
     let expected_sig_input = format!("{}:{}:{}", timestamp, nonce, body_hash);
-    let mut mac = Hmac::<Sha256>::new_from_slice(auth_key.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(auth_key.as_bytes()).expect("HMAC can take key of any size");
     mac.update(expected_sig_input.as_bytes());
     let expected_signature = hex::encode(mac.finalize().into_bytes());
 
@@ -663,7 +663,6 @@ mod tests {
     const TEST_AUTH_KEY: &str = "test-secret-key";
 
     fn test_state_without_auth() -> Arc<AppState> {
-
         Arc::new(AppState {
             fcm_client: None,
             apns_client: None,
@@ -687,14 +686,19 @@ mod tests {
     fn make_headers(timestamp: i64, nonce: &str, signature: &str) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert("x-push-proxy-signature", signature.parse().unwrap());
-        headers.insert("x-push-proxy-timestamp", timestamp.to_string().parse().unwrap());
+        headers.insert(
+            "x-push-proxy-timestamp",
+            timestamp.to_string().parse().unwrap(),
+        );
         headers.insert("x-push-proxy-nonce", nonce.parse().unwrap());
         headers
     }
 
     #[tokio::test]
     async fn hmac_valid_request() {
-        let body = Bytes::from(r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#);
+        let body = Bytes::from(
+            r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#,
+        );
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -711,7 +715,9 @@ mod tests {
 
     #[tokio::test]
     async fn hmac_expired_timestamp() {
-        let body = Bytes::from(r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#);
+        let body = Bytes::from(
+            r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#,
+        );
         let timestamp = 1000i64;
         let nonce = "nonce-expired";
         let signature = generate_signature(TEST_AUTH_KEY, timestamp, nonce, &body);
@@ -728,7 +734,9 @@ mod tests {
 
     #[tokio::test]
     async fn hmac_invalid_signature() {
-        let body = Bytes::from(r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#);
+        let body = Bytes::from(
+            r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#,
+        );
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -746,7 +754,9 @@ mod tests {
 
     #[tokio::test]
     async fn hmac_replayed_nonce() {
-        let body = Bytes::from(r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#);
+        let body = Bytes::from(
+            r#"{"token":"t","title":"T","body":"B","platform":"android","type":"message","data":{"channel_id":"c","post_id":"p","type":"message"}}"#,
+        );
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

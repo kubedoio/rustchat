@@ -470,7 +470,8 @@ async fn add_member(
     let target_user_id = if input.user_id == "me" {
         auth.user_id
     } else {
-        input.user_id
+        input
+            .user_id
             .parse::<Uuid>()
             .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
     };
@@ -506,7 +507,11 @@ async fn add_member(
     }
 
     let new_member: ChannelMember = ChannelRepository::new(&state.db)
-        .upsert_member(id, target_user_id, input.role.as_deref().unwrap_or("member"))
+        .upsert_member(
+            id,
+            target_user_id,
+            input.role.as_deref().unwrap_or("member"),
+        )
         .await?;
 
     // Announce join in public channels
