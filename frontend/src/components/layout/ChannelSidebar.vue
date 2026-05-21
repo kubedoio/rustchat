@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, watch, onMounted } from 'vue';
 import {
   Hash, Lock, ChevronDown, ChevronRight, Plus, MessageCircle, Settings, Compass, Shield, Check, LogOut, MoreVertical
@@ -228,7 +229,7 @@ async function markChannelAsRead(channelId: string) {
     const store = useUnreadStore();
     await store.markAsRead(channelId);
   } catch (error) {
-    console.error('Failed to mark channel as read:', error);
+    log.error('Failed to mark channel as read:', error);
   }
 }
 
@@ -246,7 +247,7 @@ async function markAllAsRead() {
     // Call API
     await unreadStore.markAllAsRead();
   } catch (error) {
-    console.error('Failed to mark all as read:', error);
+    log.error('Failed to mark all as read:', error);
   }
 }
 
@@ -272,7 +273,7 @@ function closeContextMenu() {
 }
 
 function handleContextMenuAction(action: string) {
-  console.log('Context menu action:', action);
+  log.debug('Context menu action:', action);
   if (action === 'leave' || action === 'delete') {
     if (contextMenuChannel.value) {
       channelStore.removeChannel(contextMenuChannel.value.id);
@@ -305,7 +306,7 @@ async function handleMoveToCategory(cat: SidebarCategory) {
     await channelRepository.updateCategories(authStore.user.id, teamStore.currentTeamId, [cat]);
     showMoveToModal.value = false;
   } catch (e) {
-    console.error('Failed to move channel:', e);
+    log.error('Failed to move channel:', e);
   }
 }
 
@@ -377,7 +378,7 @@ async function handleLeaveTeam() {
     await teamStore.leaveTeam(teamStore.currentTeam.id);
     showTeamMenu.value = false;
   } catch (e) {
-    console.error('Failed to leave team', e);
+    log.error('Failed to leave team', e);
   }
 }
 </script>

@@ -4,6 +4,7 @@
  * Clear drafts on successful send
  */
 
+import { log } from '@/utils/log';
 import { ref, onMounted } from 'vue'
 
 const STORAGE_KEY_PREFIX = 'rustchat_draft:'
@@ -40,7 +41,7 @@ export function useDraft(channelId: string) {
 
             return data
         } catch (e) {
-            console.error('Failed to load draft:', e)
+            log.error('Failed to load draft:', e)
             return null
         }
     }
@@ -66,7 +67,7 @@ export function useDraft(channelId: string) {
             draft.value = data
             hasDraft.value = true
         } catch (e) {
-            console.error('Failed to save draft:', e)
+            log.error('Failed to save draft:', e)
         }
     }
 
@@ -79,7 +80,7 @@ export function useDraft(channelId: string) {
             draft.value = null
             hasDraft.value = false
         } catch (e) {
-            console.error('Failed to clear draft:', e)
+            log.error('Failed to clear draft:', e)
         }
     }
 

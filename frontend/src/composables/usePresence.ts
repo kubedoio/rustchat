@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { computed, watchEffect } from 'vue'
 import { usePresenceStore } from '../features/presence'
 import type { PresenceStatus } from '../core/entities/User'
@@ -80,7 +81,7 @@ export async function fetchMissingStatuses(userIds: string[]) {
             }
         }
     } catch (e) {
-        console.error('Failed to fetch statuses:', e)
+        log.error('Failed to fetch statuses:', e)
     } finally {
         missingIds.forEach(id => pendingFetches.delete(id))
     }

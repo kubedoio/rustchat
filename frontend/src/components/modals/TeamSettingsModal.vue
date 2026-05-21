@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, watch, computed } from 'vue'
 import { X, Settings, Users, Shield, Trash2, Camera, Copy, Check, Search, Plus, UserMinus, LogOut } from 'lucide-vue-next'
 import BaseButton from '../atomic/BaseButton.vue'
@@ -159,7 +160,7 @@ async function handleSearch() {
     const memberIds = new Set(teamStore.members.map(m => m.user_id))
     searchResults.value = response.data.filter(u => !memberIds.has(u.id))
   } catch (e) {
-    console.error('Search failed', e)
+    log.error('Search failed', e)
   } finally {
     searching.value = false
   }

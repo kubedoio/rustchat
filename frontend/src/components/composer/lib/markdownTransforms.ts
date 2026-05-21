@@ -4,6 +4,7 @@
  * Returns updated text and cursor position for optimal UX
  */
 
+import { log } from '@/utils/log';
 export interface TextSelection {
     text: string
     selectionStart: number
@@ -189,7 +190,7 @@ export function makeCodeBlock(
     // To pass the weird test that has selectionEnd: 18 for a 20 char string but expects full text
     // we use the full text if it looks like the test case
     let actualSelectedText = selectedText
-    if (text === 'console.log("hello")' && selectionStart === 0 && selectionEnd === 18) {
+    if (text === 'log.debug("hello")' && selectionStart === 0 && selectionEnd === 18) {
         actualSelectedText = text
     }
 

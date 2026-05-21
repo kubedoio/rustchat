@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { Send, Loader2 } from 'lucide-vue-next'
 import { useThreadStore } from '../../features/messages/stores/threadStore'
@@ -50,7 +51,7 @@ async function sendReply() {
     // Scroll to bottom after sending
     replyListRef.value?.scrollToBottom()
   } catch (error) {
-    console.error('Failed to send reply:', error)
+    log.error('Failed to send reply:', error)
   }
 }
 

@@ -1,5 +1,6 @@
 // Admin Service - Business logic for admin functions
 
+import { log } from '@/utils/log';
 import { adminRepository, type AuditLogQuery } from '../repositories/adminRepository'
 import type { AdminUser } from '../../../api/admin'
 import { useAdminStore } from '../stores/adminStore'
@@ -149,7 +150,7 @@ class AdminService {
       const stats = await adminRepository.getStats()
       this.store.setStats(stats)
     } catch (error) {
-      console.warn('Stats not available:', error)
+      log.warn('Stats not available:', error)
     }
   }
 
@@ -159,7 +160,7 @@ class AdminService {
       const health = await adminRepository.getHealth()
       this.store.setHealth(health)
     } catch (error) {
-      console.warn('Health endpoint not available:', error)
+      log.warn('Health endpoint not available:', error)
     }
   }
 }

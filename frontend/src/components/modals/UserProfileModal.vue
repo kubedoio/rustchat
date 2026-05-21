@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { computed } from 'vue';
 import { X, Mail, MessageCircle, Briefcase } from 'lucide-vue-next';
 import RcAvatar from '../ui/RcAvatar.vue';
@@ -45,7 +46,7 @@ async function startDirectMessage() {
       router.push('/');
     }
   } catch (e) {
-    console.error('Failed to start DM', e);
+    log.error('Failed to start DM', e);
   }
 }
 

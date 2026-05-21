@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useStorage } from '@vueuse/core';
 import { useChannelStore } from '@/features/channels/stores/channelStore';
@@ -252,7 +253,7 @@ async function onStartAudioCall() {
             await callsStore.startCall(channelId.value)
         }
     } catch (e) {
-        console.error('Failed to start audio call', e);
+        log.error('Failed to start audio call', e);
         alert('Failed to start audio call');
     }
 }

@@ -1,5 +1,6 @@
 // Theme Service - Business logic for appearance/theming
 
+import { log } from '@/utils/log';
 import { themeRepository } from '../repositories/themeRepository'
 import type { Theme, ChatFont, ChatFontSize } from '../types'
 import { THEME_OPTIONS, FONT_OPTIONS, FONT_SIZE_OPTIONS, DARK_THEMES } from '../types'
@@ -140,7 +141,7 @@ class ThemeService {
       this.applyAppearance()
       this.store.setSyncedServerToken(token)
     } catch (error) {
-      console.debug('Failed to sync theme from server', error)
+      log.debug('Failed to sync theme from server', error)
     }
   }
 
@@ -152,7 +153,7 @@ class ThemeService {
     try {
       await themeRepository.saveToServer(this.store.theme, this.store.font, this.store.fontSize)
     } catch (error) {
-      console.debug('Failed to persist theme to server', error)
+      log.debug('Failed to persist theme to server', error)
     }
   }
 

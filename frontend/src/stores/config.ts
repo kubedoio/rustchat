@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { siteApi, type PublicConfig } from '../api/site'
@@ -43,7 +44,7 @@ export const useConfigStore = defineStore('config', () => {
             const { data } = await siteApi.getInfo()
             siteConfig.value = data
         } catch (e) {
-            console.error('Failed to fetch site config', e)
+            log.error('Failed to fetch site config', e)
         }
     }
 

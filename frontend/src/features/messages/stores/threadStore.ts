@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Post } from '../../../api/posts'
@@ -52,7 +53,7 @@ export const useThreadStore = defineStore('thread', () => {
       const savedDraft = localStorage.getItem(`thread_draft_${postId}`)
       if (savedDraft) draft.value = savedDraft
     } catch (error) {
-      console.error('Failed to load thread:', error)
+      log.error('Failed to load thread:', error)
       closeThread()
       throw error
     } finally {
@@ -89,7 +90,7 @@ export const useThreadStore = defineStore('thread', () => {
       cursor.value = response.next_cursor || null
       hasMore.value = !!response.next_cursor
     } catch (error) {
-      console.error('Failed to load more replies:', error)
+      log.error('Failed to load more replies:', error)
     } finally {
       isLoading.value = false
     }
@@ -112,7 +113,7 @@ export const useThreadStore = defineStore('thread', () => {
         parentPost.value.reply_count = (parentPost.value.reply_count || 0) + 1
       }
     } catch (error) {
-      console.error('Failed to send reply:', error)
+      log.error('Failed to send reply:', error)
       throw error
     } finally {
       isSending.value = false

@@ -1,6 +1,7 @@
 // Channel Service - Business logic for channels
 // Handles channel selection, persistence, and orchestration
 
+import { log } from '@/utils/log';
 import { channelRepository, type CreateChannelRequest } from '../repositories/channelRepository'
 import type { Channel, ChannelId } from '../../../core/entities/Channel'
 import type { TeamId } from '../../../core/entities/Team'
@@ -194,7 +195,7 @@ class ChannelService {
       await channelRepository.markAsRead(channelId)
       this.store.clearCounts(channelId)
     } catch (error) {
-      console.error('Failed to mark channel as read:', error)
+      log.error('Failed to mark channel as read:', error)
     }
   }
 
@@ -204,7 +205,7 @@ class ChannelService {
       const counts = await channelRepository.getUnreadCounts()
       this.store.setUnreadCounts(counts)
     } catch (error) {
-      console.error('Failed to load unread counts:', error)
+      log.error('Failed to load unread counts:', error)
     }
   }
 
@@ -223,11 +224,11 @@ class ChannelService {
 
   handleUserJoined(channelId: ChannelId, userId: UserId): void {
     // Could trigger a notification or update member list
-    console.log('User joined channel:', channelId, userId)
+    log.debug('User joined channel:', channelId, userId)
   }
 
   handleUserLeft(channelId: ChannelId, userId: UserId): void {
-    console.log('User left channel:', channelId, userId)
+    log.debug('User left channel:', channelId, userId)
     const authStore = useAuthStore()
     if (authStore.user?.id === userId) {
       this.store.removeChannel(channelId)

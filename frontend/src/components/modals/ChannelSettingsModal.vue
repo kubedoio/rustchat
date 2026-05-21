@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, watch, computed } from 'vue'
 import { X, Hash, Lock, Settings, Users, Trash2, Search, Plus, UserMinus } from 'lucide-vue-next'
 import BaseButton from '../atomic/BaseButton.vue'
@@ -76,7 +77,7 @@ async function fetchMembers() {
     const response = await channelsApi.getMembers(props.channel.id)
     channelMembers.value = response.data
   } catch (e) {
-    console.error('Failed to fetch channel members', e)
+    log.error('Failed to fetch channel members', e)
   } finally {
     membersLoading.value = false
   }

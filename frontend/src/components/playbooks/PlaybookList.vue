@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Clock, Play } from 'lucide-vue-next'
@@ -23,7 +24,7 @@ async function handleStartRun(playbook: any) {
                 router.push(`/runs/${result.run.id}`)
             }
         } catch (e) {
-            console.error('Failed to start run', e)
+            log.error('Failed to start run', e)
         }
     }
 }

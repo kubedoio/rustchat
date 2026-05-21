@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, watch, computed } from 'vue'
 import { Send, MessageSquare } from 'lucide-vue-next'
 import { format } from 'date-fns'
@@ -65,11 +66,11 @@ watch(
                 try {
                     await threadsApi.markAsRead(newId, teamStore.currentTeamId)
                 } catch (e) {
-                    console.error('Failed to mark thread as read:', e)
+                    log.error('Failed to mark thread as read:', e)
                 }
             }
         } catch (e) {
-            console.error('Failed to fetch thread:', e)
+            log.error('Failed to fetch thread:', e)
         } finally {
             loading.value = false
         }
@@ -88,7 +89,7 @@ async function sendReply() {
     try {
         await sendMessage(parentMessage.value.channelId, content, rootId)
     } catch (e) {
-        console.error('Failed to send reply:', e)
+        log.error('Failed to send reply:', e)
         replyContent.value = content
     }
 }

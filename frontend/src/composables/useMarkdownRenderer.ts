@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { ref, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import { replaceEmojiNames } from '../utils/emoji'
@@ -48,7 +49,7 @@ async function loadMarkdownLibs(): Promise<void> {
 
     isReady.value = true
   } catch (error) {
-    console.error('Failed to load markdown libraries:', error)
+    log.error('Failed to load markdown libraries:', error)
   } finally {
     isLoading = false
   }

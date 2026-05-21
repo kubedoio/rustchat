@@ -89,6 +89,7 @@
 </template>
 
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { computed, onMounted, onUnmounted } from 'vue'
 import { Bell, X, Inbox, Loader2 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
@@ -134,7 +135,7 @@ async function handleMarkRead(activityId: string) {
   try {
     await activityService.markRead(activityId)
   } catch (error) {
-    console.error('Failed to mark activity as read:', error)
+    log.error('Failed to mark activity as read:', error)
   }
 }
 
@@ -142,7 +143,7 @@ async function handleMarkAllRead() {
   try {
     await activityService.markAllRead()
   } catch (error) {
-    console.error('Failed to mark all as read:', error)
+    log.error('Failed to mark all as read:', error)
   }
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, onMounted, watch } from 'vue';
 import { 
     Users, 
@@ -82,7 +83,7 @@ async function fetchTeams() {
         teams.value = data.teams;
         totalTeams.value = data.total;
     } catch (e) {
-        console.error('Failed to fetch teams', e);
+        log.error('Failed to fetch teams', e);
     } finally {
         loading.value = false;
     }
@@ -104,7 +105,7 @@ async function fetchChannels() {
         });
         teamChannels.value = data.channels;
     } catch (e) {
-        console.error('Failed to fetch channels', e);
+        log.error('Failed to fetch channels', e);
     } finally {
         channelsLoading.value = false;
     }
@@ -117,7 +118,7 @@ async function fetchMembers() {
         const { data } = await adminApi.listTeamMembers(selectedTeam.value.id);
         teamMembers.value = data;
     } catch (e) {
-        console.error('Failed to fetch members', e);
+        log.error('Failed to fetch members', e);
     } finally {
         membersLoading.value = false;
     }
@@ -165,7 +166,7 @@ async function createTeam() {
         showCreateTeamModal.value = false;
         await fetchTeams();
     } catch (e: unknown) {
-        console.error('Failed to create team', e);
+        log.error('Failed to create team', e);
         alert(getApiErrorMessage(e) || 'Failed to create team');
     }
 }
@@ -187,7 +188,7 @@ async function updateTeam() {
             selectedTeam.value = data;
         }
     } catch (e: unknown) {
-        console.error('Failed to update team', e);
+        log.error('Failed to update team', e);
         alert(getApiErrorMessage(e) || 'Failed to update team');
     }
 }
@@ -201,7 +202,7 @@ async function deleteTeam(team: AdminTeam) {
         await adminApi.deleteTeam(team.id);
         await fetchTeams();
     } catch (e) {
-        console.error('Failed to delete team', e);
+        log.error('Failed to delete team', e);
         alert('Failed to delete team');
     }
 }
@@ -225,7 +226,7 @@ async function createChannel() {
         showCreateChannelModal.value = false;
         await fetchChannels();
     } catch (e) {
-        console.error('Failed to create channel', e);
+        log.error('Failed to create channel', e);
         alert('Failed to create channel');
     }
 }
@@ -251,7 +252,7 @@ async function updateChannel() {
         showEditChannelModal.value = false;
         await fetchChannels();
     } catch (e) {
-        console.error('Failed to update channel', e);
+        log.error('Failed to update channel', e);
         alert('Failed to update channel');
     }
 }
@@ -265,7 +266,7 @@ async function deleteChannel(channel: AdminChannel) {
         await adminApi.deleteChannel(channel.id);
         await fetchChannels();
     } catch (e) {
-        console.error('Failed to delete channel', e);
+        log.error('Failed to delete channel', e);
         alert('Failed to delete channel');
     }
 }
@@ -283,7 +284,7 @@ async function searchUsers() {
         const currentIds = new Set(teamMembers.value.map(m => m.user_id));
         memberSearchResults.value = data.users.filter(u => !currentIds.has(u.id));
     } catch (e) {
-        console.error('Failed to search users', e);
+        log.error('Failed to search users', e);
     } finally {
         searchingMembers.value = false;
     }
@@ -296,7 +297,7 @@ async function addMember(user: AdminUser) {
         memberSearchResults.value = memberSearchResults.value.filter(u => u.id !== user.id);
         await fetchMembers();
     } catch (e) {
-        console.error('Failed to add member', e);
+        log.error('Failed to add member', e);
         alert('Failed to add member');
     }
 }
@@ -308,7 +309,7 @@ async function removeMember(member: any) {
         await adminApi.removeTeamMember(selectedTeam.value.id, member.user_id);
         await fetchMembers();
     } catch (e) {
-        console.error('Failed to remove member', e);
+        log.error('Failed to remove member', e);
         alert('Failed to remove member');
     }
 }
@@ -319,7 +320,7 @@ async function changeMemberRole(member: any, newRole: string) {
         await adminApi.updateTeamMemberRole(selectedTeam.value.id, member.user_id, newRole);
         await fetchMembers();
     } catch (e) {
-        console.error('Failed to change member role', e);
+        log.error('Failed to change member role', e);
         alert('Failed to change member role');
     }
 }

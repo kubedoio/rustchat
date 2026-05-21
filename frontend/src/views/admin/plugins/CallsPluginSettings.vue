@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, onMounted } from 'vue';
 import { adminApi, type CallsPluginConfig } from '../../../api/admin';
 import { Phone, Server, Globe, AlertCircle, CheckCircle, Save, TestTube } from 'lucide-vue-next';
@@ -35,7 +36,7 @@ onMounted(async () => {
             turn_server_credential: data.settings.turn_server_credential || ''
         };
     } catch (e: unknown) {
-        console.error("Failed to load Calls Plugin config", e);
+        log.error("Failed to load Calls Plugin config", e);
         saveError.value = 'Failed to load configuration';
     } finally {
         loading.value = false;
@@ -67,7 +68,7 @@ async function saveSettings() {
         setTimeout(() => saveSuccess.value = false, 3000);
     } catch (e: unknown) {
         saveError.value = getApiErrorMessage(e) || 'Failed to save configuration';
-        console.error(e);
+        log.error(e);
     } finally {
         saving.value = false;
     }

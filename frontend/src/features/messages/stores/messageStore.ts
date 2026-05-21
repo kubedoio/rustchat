@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed, type ComputedRef } from 'vue'
 import { postsApi, type Post } from '../../../api/posts'
@@ -298,7 +299,7 @@ export const useMessageStore = defineStore('messageStore', () => {
       // If we got fewer than 50, we probably reached the end
       hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
     } catch (e: unknown) {
-      console.error(`Failed to fetch messages for channel ${channelId}:`, e);
+      log.error(`Failed to fetch messages for channel ${channelId}:`, e);
       error.value = getApiErrorMessage(e) || getErrorMessage(e) || 'Failed to fetch messages'
     } finally {
       loading.value = false
@@ -332,7 +333,7 @@ export const useMessageStore = defineStore('messageStore', () => {
 
       hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
     } catch (e: unknown) {
-      console.error('Failed to fetch older messages:', e)
+      log.error('Failed to fetch older messages:', e)
     } finally {
       loading.value = false
       isLoadingOlder.value = false
@@ -351,7 +352,7 @@ export const useMessageStore = defineStore('messageStore', () => {
         .map(postToMessage)
       repliesByThread.value[rootId] = replies
     } catch (e: unknown) {
-      console.error(`Failed to fetch thread ${rootId}:`, e);
+      log.error(`Failed to fetch thread ${rootId}:`, e);
       error.value = getApiErrorMessage(e) || getErrorMessage(e) || 'Failed to fetch thread'
     } finally {
       loading.value = false

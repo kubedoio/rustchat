@@ -1,5 +1,6 @@
 // Preferences Service - Business logic for user preferences
 
+import { log } from '@/utils/log';
 import {
   preferencesRepository,
   type UserPreferences,
@@ -19,7 +20,7 @@ class PreferencesService {
       const status = await preferencesRepository.getMyStatus()
       this.store.setStatus(status)
     } catch (error) {
-      console.error('Failed to load status:', error)
+      log.error('Failed to load status:', error)
     }
   }
 
@@ -69,7 +70,7 @@ class PreferencesService {
       const prefs = await preferencesRepository.getMyPreferences()
       this.store.setPreferences(prefs)
     } catch (error) {
-      console.error('Failed to load preferences:', error)
+      log.error('Failed to load preferences:', error)
     }
   }
 
@@ -97,7 +98,7 @@ class PreferencesService {
       const presets = await preferencesRepository.listStatusPresets()
       this.store.setStatusPresets(presets)
     } catch (error) {
-      console.error('Failed to load status presets:', error)
+      log.error('Failed to load status presets:', error)
     }
   }
 

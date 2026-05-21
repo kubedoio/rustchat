@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, nextTick } from 'vue'
 import { format, formatDistanceToNow } from 'date-fns'
 import { Smile, MessageSquare, MoreHorizontal, Pencil, Trash2, Pin, X, Check, Bookmark, ArrowRight, Video, Phone, PhoneOff } from 'lucide-vue-next'
@@ -95,7 +96,7 @@ async function handleSave() {
     }
     showMenu.value = false
   } catch (e) {
-    console.error('Failed to toggle save', e)
+    log.error('Failed to toggle save', e)
   }
 }
 
@@ -108,7 +109,7 @@ async function handlePin() {
     }
     showMenu.value = false
   } catch (e) {
-    console.error('Failed to toggle pin', e)
+    log.error('Failed to toggle pin', e)
   }
 }
 
@@ -117,7 +118,7 @@ async function handleMarkAsUnread() {
     await unreadStore.markAsUnreadFromPost(props.message.id);
     showMenu.value = false;
   } catch (e) {
-    console.error('Failed to mark as unread', e)
+    log.error('Failed to mark as unread', e)
   }
 }
 
@@ -129,7 +130,7 @@ async function handleDelete() {
     await postsApi.delete(props.message.id)
     emit('delete', props.message.id)
   } catch (e) {
-    console.error('Failed to delete message', e)
+    log.error('Failed to delete message', e)
   } finally {
     deleting.value = false
     showMenu.value = false
@@ -171,7 +172,7 @@ async function saveEdit() {
     emit('update', props.message.id, editContent.value)
     isEditing.value = false
   } catch (e) {
-    console.error('Failed to update message', e)
+    log.error('Failed to update message', e)
   } finally {
     saving.value = false
   }
@@ -264,7 +265,7 @@ async function toggleReaction(emoji: string) {
       })
     }
   } catch (e) {
-    console.error('Failed to toggle reaction', e)
+    log.error('Failed to toggle reaction', e)
   }
 }
 </script>

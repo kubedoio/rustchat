@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, watch } from 'vue';
 import { X, Search, User, UserPlus } from 'lucide-vue-next';
 import { useTeamStore } from '@/features/teams/stores/teamStore';
@@ -43,7 +44,7 @@ watch(() => props.show, async (isShown) => {
                 const members = await channelRepository.getMembers(props.channelId)
                 currentMembers.value = new Set(members.map(m => m.userId))
             } catch (e) {
-                console.error('Failed to fetch channel members:', e)
+                log.error('Failed to fetch channel members:', e)
             }
         }
     }

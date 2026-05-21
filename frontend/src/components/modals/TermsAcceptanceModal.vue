@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, onMounted } from 'vue';
 import { FileText, CheckCircle, AlertTriangle } from 'lucide-vue-next';
 import { v4Api } from '../../api/client';
@@ -48,7 +49,7 @@ async function checkTermsStatus() {
             emit('accepted');
         }
     } catch (e: unknown) {
-        console.error('Failed to check terms status', e);
+        log.error('Failed to check terms status', e);
         // On error, allow the user through
         emit('accepted');
     }

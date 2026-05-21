@@ -1,5 +1,6 @@
 // Channel WebSocket Handlers - Feature-specific channel event handling
 
+import { log } from '@/utils/log';
 import { channelService } from '../services/channelService'
 import type { Channel, ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
@@ -55,7 +56,7 @@ function readEventUserId(data: Record<string, unknown>): UserId | undefined {
 
 // Event handlers
 function handleChannelCreated(event: WebSocketChannelEvent) {
-  console.log('Channel created:', event)
+  log.debug('Channel created:', event)
   const data = readEventData(event)
   
   if (!data.channel_id) return
@@ -65,7 +66,7 @@ function handleChannelCreated(event: WebSocketChannelEvent) {
 }
 
 function handleChannelUpdated(event: WebSocketChannelEvent) {
-  console.log('Channel updated:', event)
+  log.debug('Channel updated:', event)
   const data = readEventData(event)
   
   if (!data.channel_id) return
@@ -75,7 +76,7 @@ function handleChannelUpdated(event: WebSocketChannelEvent) {
 }
 
 function handleChannelDeleted(event: WebSocketChannelEvent) {
-  console.log('Channel deleted:', event)
+  log.debug('Channel deleted:', event)
   const data = readEventData(event)
   const channelId = readEventChannelId(data)
   

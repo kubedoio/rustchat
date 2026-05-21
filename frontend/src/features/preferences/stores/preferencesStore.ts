@@ -1,5 +1,6 @@
 // Preferences Store - Backwards-compatible state management for user preferences
 
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { preferencesApi, type StatusPreset } from '../../../api/preferences'
@@ -31,7 +32,7 @@ export const usePreferencesStore = defineStore('preferencesStore', () => {
             const response = await preferencesApi.getMyStatus()
             status.value = response.data
         } catch (e) {
-            console.error('Failed to fetch status:', e)
+            log.error('Failed to fetch status:', e)
         }
     }
 
@@ -61,7 +62,7 @@ export const usePreferencesStore = defineStore('preferencesStore', () => {
             const response = await preferencesApi.getMyPreferences()
             preferences.value = response.data
         } catch (e) {
-            console.error('Failed to fetch preferences:', e)
+            log.error('Failed to fetch preferences:', e)
         }
     }
 
@@ -81,7 +82,7 @@ export const usePreferencesStore = defineStore('preferencesStore', () => {
             const response = await preferencesApi.listStatusPresets()
             statusPresets.value = response.data
         } catch (e) {
-            console.error('Failed to fetch status presets:', e)
+            log.error('Failed to fetch status presets:', e)
         }
     }
 

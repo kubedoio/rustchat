@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useStorage } from '@vueuse/core'
@@ -250,7 +251,7 @@ export const useAuthStore = defineStore('authStore', () => {
         expiresAt: data.expires_at,
       })
     } catch (e) {
-      console.error('Failed to update status', e)
+      log.error('Failed to update status', e)
     }
   }
 
@@ -260,7 +261,7 @@ export const useAuthStore = defineStore('authStore', () => {
       authPolicy.value = data
       return data
     } catch (e) {
-      console.error('Failed to fetch auth policy', e)
+      log.error('Failed to fetch auth policy', e)
     }
   }
 

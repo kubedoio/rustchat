@@ -1,5 +1,6 @@
 // Unread Store - Backwards-compatible state management for unread counts
 
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '../../../api/client'
@@ -63,7 +64,7 @@ export const useUnreadStore = defineStore('unreadStore', () => {
                 teamUnreads.value[t.team_id] = t.unread_count
             })
         } catch (error) {
-            console.error('Failed to fetch unread overview:', error)
+            log.error('Failed to fetch unread overview:', error)
         } finally {
             loading.value = false
         }
@@ -85,7 +86,7 @@ export const useUnreadStore = defineStore('unreadStore', () => {
                 }
             }
         } catch (error) {
-            console.error('Failed to mark channel as read:', error)
+            log.error('Failed to mark channel as read:', error)
         }
     }
 
@@ -99,7 +100,7 @@ export const useUnreadStore = defineStore('unreadStore', () => {
             // Refresh overview to get accurate counts
             await fetchOverview()
         } catch (error) {
-            console.error('Failed to mark channel as unread:', error)
+            log.error('Failed to mark channel as unread:', error)
         }
     }
 
@@ -110,7 +111,7 @@ export const useUnreadStore = defineStore('unreadStore', () => {
             })
             applyPostUnread(data)
         } catch (error) {
-            console.error('Failed to mark post as unread:', error)
+            log.error('Failed to mark post as unread:', error)
             throw error
         }
     }
@@ -122,7 +123,7 @@ export const useUnreadStore = defineStore('unreadStore', () => {
             teamUnreads.value = {}
             channelMentions.value = {}
         } catch (error) {
-            console.error('Failed to mark all as read:', error)
+            log.error('Failed to mark all as read:', error)
         }
     }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, watch } from 'vue'
 import { Search, ExternalLink } from 'lucide-vue-next'
 import { format } from 'date-fns'
@@ -34,7 +35,7 @@ async function handleSearch() {
             searchQuery.value
         )
     } catch (e) {
-        console.error('Search failed', e)
+        log.error('Search failed', e)
     } finally {
         loading.value = false
     }

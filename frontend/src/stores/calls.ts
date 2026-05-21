@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import callsApi, { type CallState, type CallsConfig } from '../api/calls'
@@ -106,13 +107,13 @@ export const useCallsStore = defineStore('calls', () => {
 
     // WebSocket Event Listeners for Call Events
     onEvent('custom_com.mattermost.calls_call_start', (data) => {
-        console.log('Call started:', data)
+        log.debug('Call started:', data)
         // Reload calls to get updated state
         loadCalls()
     })
 
     onEvent('custom_com.mattermost.calls_call_end', (data) => {
-        console.log('Call ended:', data)
+        log.debug('Call ended:', data)
         const eventChannelId = readEventChannelId(data)
         if (eventChannelId && currentCall.value?.channelId === eventChannelId) {
             leaveCall()
@@ -123,7 +124,7 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_user_joined', (data) => {
-        console.log('User joined call:', data)
+        log.debug('User joined call:', data)
         const eventChannelId = readEventChannelId(data)
         if (eventChannelId) {
             loadCallForChannel(eventChannelId)
@@ -131,7 +132,7 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_user_left', (data) => {
-        console.log('User left call:', data)
+        log.debug('User left call:', data)
         const eventChannelId = readEventChannelId(data)
         if (eventChannelId) {
             loadCallForChannel(eventChannelId)
@@ -139,7 +140,7 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_user_muted', (data) => {
-        console.log('User muted:', data)
+        log.debug('User muted:', data)
         const eventChannelId = readEventChannelId(data)
         if (eventChannelId && currentCall.value?.channelId === eventChannelId) {
             const userId = readEventUserId(data)
@@ -159,7 +160,7 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_user_unmuted', (data) => {
-        console.log('User unmuted:', data)
+        log.debug('User unmuted:', data)
         const eventChannelId = readEventChannelId(data)
         if (!eventChannelId || currentCall.value?.channelId !== eventChannelId) {
             return
@@ -176,7 +177,7 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_raise_hand', (data) => {
-        console.log('Hand raised:', data)
+        log.debug('Hand raised:', data)
         const eventChannelId = readEventChannelId(data)
         if (!eventChannelId || currentCall.value?.channelId !== eventChannelId) {
             return
@@ -190,7 +191,7 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_lower_hand', (data) => {
-        console.log('Hand lowered:', data)
+        log.debug('Hand lowered:', data)
         const eventChannelId = readEventChannelId(data)
         if (eventChannelId && currentCall.value?.channelId === eventChannelId) {
             const userId = readEventUserId(data)
@@ -257,7 +258,7 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_screen_on', (data) => {
-        console.log('Screen share on:', data)
+        log.debug('Screen share on:', data)
         const eventChannelId = readEventChannelId(data)
         if (currentCall.value && currentCall.value.channelId === eventChannelId) {
             const userId = readEventUserId(data)
@@ -269,7 +270,7 @@ export const useCallsStore = defineStore('calls', () => {
     })
 
     onEvent('custom_com.mattermost.calls_screen_off', (data) => {
-        console.log('Screen share off:', data)
+        log.debug('Screen share off:', data)
         const eventChannelId = readEventChannelId(data)
         if (currentCall.value && currentCall.value.channelId === eventChannelId) {
             const userId = readEventUserId(data)
@@ -300,7 +301,7 @@ export const useCallsStore = defineStore('calls', () => {
                 })
             }
         } catch (error) {
-            console.error('Failed to handle signaling event', error)
+            log.error('Failed to handle signaling event', error)
         }
     })
 
@@ -322,14 +323,14 @@ export const useCallsStore = defineStore('calls', () => {
                         ...turnServers
                     ]
                 } catch (error) {
-                    console.error('Failed to fetch TURN credentials', error)
+                    log.error('Failed to fetch TURN credentials', error)
                 }
             }
 
             callsConfig.value = data
             return data
         } catch (error) {
-            console.error('Failed to load calls config', error)
+            log.error('Failed to load calls config', error)
             return null
         }
     }
@@ -346,7 +347,7 @@ export const useCallsStore = defineStore('calls', () => {
             }
             return data
         } catch (error) {
-            console.error('Failed to load calls', error)
+            log.error('Failed to load calls', error)
             return []
         }
     }
@@ -374,7 +375,7 @@ export const useCallsStore = defineStore('calls', () => {
         } catch (error: unknown) {
             // Silently handle 404s as they just mean there's no active call in the channel
             if (!isNotFoundError(error)) {
-                console.error('Failed to load call for channel', error)
+                log.error('Failed to load call for channel', error)
             }
             return null
         }
@@ -426,7 +427,7 @@ export const useCallsStore = defineStore('calls', () => {
         } catch (error: unknown) {
             cleanupWebRTC()
             currentCall.value = null
-            console.error('Failed to start call', error)
+            log.error('Failed to start call', error)
             toast.error('Failed to start call', getErrorMessage(error))
             throw error
         }
@@ -481,7 +482,7 @@ export const useCallsStore = defineStore('calls', () => {
         } catch (error: unknown) {
             cleanupWebRTC()
             currentCall.value = null
-            console.error('Failed to join call', error)
+            log.error('Failed to join call', error)
             toast.error('Failed to join call', getErrorMessage(error))
             throw error
         }
@@ -507,7 +508,7 @@ export const useCallsStore = defineStore('calls', () => {
             speakingParticipants.value.clear()
 
         } catch (error) {
-            console.error('Failed to leave call', error)
+            log.error('Failed to leave call', error)
         }
     }
 
@@ -531,7 +532,7 @@ export const useCallsStore = defineStore('calls', () => {
             speakingParticipants.value.clear()
 
         } catch (error) {
-            console.error('Failed to end call', error)
+            log.error('Failed to end call', error)
             toast.error('Failed to end call', 'Only the host can end the call')
         }
     }
@@ -627,7 +628,7 @@ export const useCallsStore = defineStore('calls', () => {
             try {
                 transceiver.setCodecPreferences(preferred)
             } catch (error) {
-                console.debug('Failed to set codec preferences on transceiver', error)
+                log.debug('Failed to set codec preferences on transceiver', error)
             }
         }
     }
@@ -647,7 +648,7 @@ export const useCallsStore = defineStore('calls', () => {
         } catch (error) {
             // Brave can reject aggressively munged SDP. Fall back to the
             // browser-generated offer so call setup still succeeds.
-            console.warn('Prepared SDP rejected by browser, retrying with original SDP', error)
+            log.warn('Prepared SDP rejected by browser, retrying with original SDP', error)
             selectedSdp = rawSdp
             await pc.setLocalDescription({
                 type: 'offer',
@@ -685,7 +686,7 @@ export const useCallsStore = defineStore('calls', () => {
 
             // Handle incoming tracks
             pc.ontrack = (event) => {
-                console.log('Received remote track:', event.track.kind, event.streams)
+                log.debug('Received remote track:', event.track.kind, event.streams)
                 const active = currentCall.value
                 if (!active) {
                     return
@@ -759,7 +760,7 @@ export const useCallsStore = defineStore('calls', () => {
             }
 
         } catch (error) {
-            console.error('WebRTC initialization failed', error)
+            log.error('WebRTC initialization failed', error)
             throw error
         }
     }
@@ -802,7 +803,7 @@ export const useCallsStore = defineStore('calls', () => {
             }
             isMuted.value = !isMuted.value
         } catch (error) {
-            console.error('Failed to toggle mute', error)
+            log.error('Failed to toggle mute', error)
         }
     }
 
@@ -818,7 +819,7 @@ export const useCallsStore = defineStore('calls', () => {
             }
             isHandRaised.value = !isHandRaised.value
         } catch (error) {
-            console.error('Failed to toggle hand', error)
+            log.error('Failed to toggle hand', error)
         }
     }
 
@@ -881,7 +882,7 @@ export const useCallsStore = defineStore('calls', () => {
                 isScreenSharing.value = true
             }
         } catch (error) {
-            console.error('Failed to toggle screen share', error)
+            log.error('Failed to toggle screen share', error)
             await stopLocalScreenShare()
             isScreenSharing.value = false
         }
@@ -901,7 +902,7 @@ export const useCallsStore = defineStore('calls', () => {
         try {
             await callsApi.sendReaction(currentCall.value.channelId, emoji)
         } catch (error) {
-            console.error('Failed to send reaction', error)
+            log.error('Failed to send reaction', error)
         }
     }
 
@@ -910,7 +911,7 @@ export const useCallsStore = defineStore('calls', () => {
             await callsApi.ringUsers(channelId)
             toast.success('Ringing participants', 'Other channel members have been notified')
         } catch (error) {
-            console.error('Failed to ring users', error)
+            log.error('Failed to ring users', error)
         }
     }
 
@@ -919,7 +920,7 @@ export const useCallsStore = defineStore('calls', () => {
         try {
             await callsApi.hostMute(currentCall.value.channelId, sessionId)
         } catch (error) {
-            console.error('Failed to host mute', error)
+            log.error('Failed to host mute', error)
         }
     }
 
@@ -929,7 +930,7 @@ export const useCallsStore = defineStore('calls', () => {
             await callsApi.hostMuteOthers(currentCall.value.channelId)
             toast.success('Muted all', 'All other participants have been muted')
         } catch (error) {
-            console.error('Failed to host mute others', error)
+            log.error('Failed to host mute others', error)
         }
     }
 
@@ -938,7 +939,7 @@ export const useCallsStore = defineStore('calls', () => {
         try {
             await callsApi.hostRemove(currentCall.value.channelId, sessionId)
         } catch (error) {
-            console.error('Failed to host remove', error)
+            log.error('Failed to host remove', error)
         }
     }
 

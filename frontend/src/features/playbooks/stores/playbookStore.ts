@@ -1,5 +1,6 @@
 // Playbook Store - Backwards-compatible state management for playbooks
 
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { playbooksApi, type Playbook, type PlaybookFull, type PlaybookRun, type RunWithTasks } from '../../../api/playbooks'
@@ -21,7 +22,7 @@ export const usePlaybookStore = defineStore('playbookStore', () => {
             const response = await playbooksApi.list(teamStore.currentTeamId)
             playbooks.value = response.data
         } catch (e) {
-            console.error('Failed to fetch playbooks:', e)
+            log.error('Failed to fetch playbooks:', e)
         } finally {
             loading.value = false
         }
@@ -71,7 +72,7 @@ export const usePlaybookStore = defineStore('playbookStore', () => {
             const response = await playbooksApi.listRuns(teamStore.currentTeamId)
             runs.value = response.data
         } catch (e) {
-            console.error('Failed to fetch runs:', e)
+            log.error('Failed to fetch runs:', e)
         }
     }
 
