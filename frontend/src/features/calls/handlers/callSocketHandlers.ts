@@ -1,7 +1,7 @@
 // Call WebSocket Handlers - Feature-specific call event handling
 // Replaces the centralized call event handling from useWebSocket.ts
 
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { callService } from '../services/callService'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
@@ -82,11 +82,11 @@ function readEventData(event: WebSocketCallEvent): Record<string, unknown> {
 }
 
 function readEventChannelId(data: Record<string, unknown>): ChannelId | undefined {
-  return ((data.channel_id_raw || data.channel_id) as string | undefined) as ChannelId | undefined
+  return (data.channel_id_raw || data.channel_id) as string | undefined as ChannelId | undefined
 }
 
 function readEventUserId(data: Record<string, unknown>): UserId | undefined {
-  return ((data.user_id_raw || data.user_id) as string | undefined) as UserId | undefined
+  return (data.user_id_raw || data.user_id) as string | undefined as UserId | undefined
 }
 
 function readEventSessionId(data: Record<string, unknown>): SessionId | undefined {
@@ -212,7 +212,9 @@ function handleHostChanged(event: WebSocketCallEvent) {
 function handleRinging(event: WebSocketCallEvent) {
   const data = readEventData(event)
   const channelId = readEventChannelId(data)
-  const callerId = (data.sender_id || data.sender_id_raw) as string | undefined as UserId | undefined
+  const callerId = (data.sender_id || data.sender_id_raw) as string | undefined as
+    | UserId
+    | undefined
   if (channelId && callerId) {
     callService.handleIncomingCall(channelId, callerId)
   }

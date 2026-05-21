@@ -25,8 +25,7 @@ pub async fn update_user_roles(
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::InsufficientPermissions);
     }
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     let role = if input.roles.contains("system_admin") {
         "system_admin"
     } else {
@@ -51,8 +50,7 @@ pub async fn update_user_active(
     axum::extract::Path(user_id): axum::extract::Path<String>,
     Json(input): Json<UserActiveRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     if !auth.can_access_owned(user_id, &permissions::USER_MANAGE) {
         return Err(AppError::InsufficientPermissions);
     }
@@ -70,8 +68,7 @@ pub async fn demote_user(
     if !auth.has_permission(&permissions::USER_MANAGE) {
         return Err(AppError::InsufficientPermissions);
     }
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     UserRepository::new(&state.db)
         .update_role(user_id, "member")
         .await?;
@@ -87,8 +84,7 @@ pub async fn promote_user(
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::InsufficientPermissions);
     }
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     UserRepository::new(&state.db)
         .update_role(user_id, "system_admin")
         .await?;
@@ -103,8 +99,7 @@ pub async fn convert_user_to_bot(
     if !auth.has_permission(&permissions::USER_MANAGE) {
         return Err(AppError::InsufficientPermissions);
     }
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     UserRepository::new(&state.db)
         .update_is_bot(user_id)
         .await?;

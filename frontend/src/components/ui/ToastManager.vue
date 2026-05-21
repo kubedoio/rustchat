@@ -35,43 +35,47 @@ function remove(id: number) {
 defineExpose({ add, remove })
 </script>
 
-
-
 <template>
-  <div class="fixed top-0 right-0 p-6 z-[100] flex flex-col space-y-4 w-full max-w-sm pointer-events-none">
-    <transition-group 
-        enter-active-class="transform ease-out duration-300 transition" 
-        enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2" 
-        enter-to-class="translate-y-0 opacity-100 sm:translate-x-0" 
-        leave-active-class="transition ease-in duration-100" 
-        leave-from-class="opacity-100" 
-        leave-to-class="opacity-0"
+  <div
+    class="fixed top-0 right-0 p-6 z-[100] flex flex-col space-y-4 w-full max-w-sm pointer-events-none"
+  >
+    <transition-group
+      enter-active-class="transform ease-out duration-300 transition"
+      enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+      enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
     >
-        <div 
-            v-for="toast in toasts" 
-            :key="toast.id" 
-            class="pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-bg-surface-1 shadow-lg ring-1 ring-text-1/5"
-        >
-            <div class="p-4">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0">
-                        <CheckCircle v-if="toast.type === 'success'" class="h-6 w-6 text-success" />
-                        <AlertCircle v-else-if="toast.type === 'error'" class="h-6 w-6 text-danger" />
-                        <Info v-else class="h-6 w-6 text-brand" />
-                    </div>
-                    <div class="ml-3 w-0 flex-1 pt-0.5">
-                        <p class="text-sm font-medium text-text-1">{{ toast.title }}</p>
-                        <p v-if="toast.message" class="mt-1 text-sm text-text-3">{{ toast.message }}</p>
-                    </div>
-                    <div class="ml-4 flex flex-shrink-0">
-                        <button @click="remove(toast.id)" type="button" class="inline-flex rounded-md bg-bg-surface-1 text-text-4 hover:text-text-3 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2">
-                            <span class="sr-only">Close</span>
-                            <X class="h-5 w-5" />
-                        </button>
-                    </div>
-                </div>
+      <div
+        v-for="toast in toasts"
+        :key="toast.id"
+        class="pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-bg-surface-1 shadow-lg ring-1 ring-text-1/5"
+      >
+        <div class="p-4">
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <CheckCircle v-if="toast.type === 'success'" class="h-6 w-6 text-success" />
+              <AlertCircle v-else-if="toast.type === 'error'" class="h-6 w-6 text-danger" />
+              <Info v-else class="h-6 w-6 text-brand" />
             </div>
+            <div class="ml-3 w-0 flex-1 pt-0.5">
+              <p class="text-sm font-medium text-text-1">{{ toast.title }}</p>
+              <p v-if="toast.message" class="mt-1 text-sm text-text-3">{{ toast.message }}</p>
+            </div>
+            <div class="ml-4 flex flex-shrink-0">
+              <button
+                @click="remove(toast.id)"
+                type="button"
+                class="inline-flex rounded-md bg-bg-surface-1 text-text-4 hover:text-text-3 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2"
+              >
+                <span class="sr-only">Close</span>
+                <X class="h-5 w-5" />
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
     </transition-group>
   </div>
 </template>

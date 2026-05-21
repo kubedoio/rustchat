@@ -11,7 +11,9 @@ export interface SendPayload {
 
 interface UseComposerSendOptions {
   content: Ref<string>
-  attachedFiles: Ref<{ file: File; uploading: boolean; progress: number; uploaded?: { id: string } }[]>
+  attachedFiles: Ref<
+    { file: File; uploading: boolean; progress: number; uploaded?: { id: string } }[]
+  >
   canSend: ComputedRef<boolean>
   onClearDraft: () => void
   onResetComposer: () => void
@@ -108,8 +110,8 @@ export function useComposerSend(options: UseComposerSendOptions) {
     }
 
     const fileIds = options.attachedFiles.value
-      .filter((attachment) => !attachment.uploading && attachment.uploaded)
-      .map((attachment) => attachment.uploaded!.id)
+      .filter(attachment => !attachment.uploading && attachment.uploaded)
+      .map(attachment => attachment.uploaded!.id)
 
     options.emitSend({
       content: options.content.value,

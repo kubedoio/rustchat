@@ -1,33 +1,33 @@
 <script setup lang="ts">
-import { X } from 'lucide-vue-next';
+import { X } from 'lucide-vue-next'
 
 interface Props {
-  modelValue: boolean;
-  title?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  hideClose?: boolean;
+  modelValue: boolean
+  title?: string
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+  hideClose?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   hideClose: false,
-});
+})
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void;
-  (e: 'close'): void;
-}>();
+  (e: 'update:modelValue', value: boolean): void
+  (e: 'close'): void
+}>()
 
 const sizeClasses: Record<string, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-lg',
   xl: 'max-w-2xl',
-};
+}
 
 function close() {
-  emit('update:modelValue', false);
-  emit('close');
+  emit('update:modelValue', false)
+  emit('close')
 }
 </script>
 

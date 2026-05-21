@@ -5,198 +5,206 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callsStore = reactive({
-    currentChannelCall: vi.fn<(_: string) => any>(),
-    startCall: vi.fn<(_: string) => Promise<void>>(),
-    joinCall: vi.fn<(_: string) => Promise<void>>(),
-    isInCall: false,
-    currentCall: null as { channelId: string } | null,
-    isExpanded: false,
+  currentChannelCall: vi.fn<(_: string) => any>(),
+  startCall: vi.fn<(_: string) => Promise<void>>(),
+  joinCall: vi.fn<(_: string) => Promise<void>>(),
+  isInCall: false,
+  currentCall: null as { channelId: string } | null,
+  isExpanded: false,
 })
 
 const channelStore = reactive({
-    leaveChannel: vi.fn<(_: string, __: string) => Promise<void>>(),
-    channels: [] as Array<{ id: string }>,
-    selectChannel: vi.fn(),
-    clearChannels: vi.fn(),
+  leaveChannel: vi.fn<(_: string, __: string) => Promise<void>>(),
+  channels: [] as Array<{ id: string }>,
+  selectChannel: vi.fn(),
+  clearChannels: vi.fn(),
 })
 
 const authStore = reactive({
-    user: {
-        id: 'user-1',
-        username: 'testuser',
-    } as Record<string, any> | null,
+  user: {
+    id: 'user-1',
+    username: 'testuser',
+  } as Record<string, any> | null,
 })
 
 const uiStore = reactive({
-    rhsView: null as string | null,
-    toggleRhs: vi.fn(),
-    toggleLhs: vi.fn(),
+  rhsView: null as string | null,
+  toggleRhs: vi.fn(),
+  toggleLhs: vi.fn(),
 })
 
 vi.mock('@/stores/calls', () => ({
-    useCallsStore: () => callsStore,
+  useCallsStore: () => callsStore,
 }))
 
 vi.mock('@/features/channels/stores/channelStore', () => ({
-    useChannelStore: () => channelStore,
+  useChannelStore: () => channelStore,
 }))
 
 vi.mock('../../features/auth/stores/authStore', () => ({
-    useAuthStore: () => authStore,
+  useAuthStore: () => authStore,
 }))
 
 vi.mock('../../features/ui/stores/uiStore', () => ({
-    useUIStore: () => uiStore,
+  useUIStore: () => uiStore,
 }))
 
 vi.mock('../../composables/useBreakpoints', () => ({
-    useBreakpoints: () => ({ isMobile: ref(false) }),
+  useBreakpoints: () => ({ isMobile: ref(false) }),
 }))
 
 describe('ChannelHeader', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        callsStore.currentChannelCall.mockReturnValue(undefined)
-        callsStore.isInCall = false
-        callsStore.currentCall = null
-        callsStore.isExpanded = false
-        channelStore.channels = []
-        uiStore.rhsView = null
+  beforeEach(() => {
+    vi.clearAllMocks()
+    callsStore.currentChannelCall.mockReturnValue(undefined)
+    callsStore.isInCall = false
+    callsStore.currentCall = null
+    callsStore.isExpanded = false
+    channelStore.channels = []
+    uiStore.rhsView = null
+  })
+
+  it('renders channel name and public indicator', async () => {
+    const ChannelHeader = (await import('./ChannelHeader.vue')).default
+
+    const wrapper = mount(ChannelHeader, {
+      props: {
+        name: 'general',
+        topic: 'General discussion',
+        channelType: 'public',
+        channelId: 'ch-1',
+      },
     })
 
-    it('renders channel name and public indicator', async () => {
-        const ChannelHeader = (await import('./ChannelHeader.vue')).default
+    expect(wrapper.text()).toContain('general')
+    expect(wrapper.text()).toContain('Channel')
+    expect(wrapper.text()).toContain('General discussion')
+  })
 
-        const wrapper = mount(ChannelHeader, {
-            props: {
-                name: 'general',
-                topic: 'General discussion',
-                channelType: 'public',
-                channelId: 'ch-1',
-            },
-        })
+  it('renders private channel indicator', async () => {
+    const ChannelHeader = (await import('./ChannelHeader.vue')).default
 
-        expect(wrapper.text()).toContain('general')
-        expect(wrapper.text()).toContain('Channel')
-        expect(wrapper.text()).toContain('General discussion')
+    const wrapper = mount(ChannelHeader, {
+      props: {
+        name: 'secret',
+        topic: '',
+        channelType: 'private',
+        channelId: 'ch-2',
+      },
     })
 
-    it('renders private channel indicator', async () => {
-        const ChannelHeader = (await import('./ChannelHeader.vue')).default
+    expect(wrapper.text()).toContain('secret')
+    expect(wrapper.text()).toContain('Private channel')
+    expect(wrapper.text()).toContain('No topic set yet')
+  })
 
-        const wrapper = mount(ChannelHeader, {
-            props: {
-                name: 'secret',
-                topic: '',
-                channelType: 'private',
-                channelId: 'ch-2',
-            },
-        })
+  it('toggles members RHS when members button is clicked', async () => {
+    const ChannelHeader = (await import('./ChannelHeader.vue')).default
 
-        expect(wrapper.text()).toContain('secret')
-        expect(wrapper.text()).toContain('Private channel')
-        expect(wrapper.text()).toContain('No topic set yet')
+    const wrapper = mount(ChannelHeader, {
+      props: {
+        name: 'general',
+        channelId: 'ch-1',
+      },
     })
 
-    it('toggles members RHS when members button is clicked', async () => {
-        const ChannelHeader = (await import('./ChannelHeader.vue')).default
+    const membersButton = wrapper
+      .findAll('button')
+      .find(b => b.attributes('aria-label') === 'Members')
+    expect(membersButton).toBeDefined()
 
-        const wrapper = mount(ChannelHeader, {
-            props: {
-                name: 'general',
-                channelId: 'ch-1',
-            },
-        })
+    await membersButton!.trigger('click')
+    await flushPromises()
 
-        const membersButton = wrapper.findAll('button').find((b) => b.attributes('aria-label') === 'Members')
-        expect(membersButton).toBeDefined()
+    expect(uiStore.toggleRhs).toHaveBeenCalledWith('members')
+  })
 
-        await membersButton!.trigger('click')
-        await flushPromises()
+  it('toggles search RHS when search button is clicked', async () => {
+    const ChannelHeader = (await import('./ChannelHeader.vue')).default
 
-        expect(uiStore.toggleRhs).toHaveBeenCalledWith('members')
+    const wrapper = mount(ChannelHeader, {
+      props: {
+        name: 'general',
+        channelId: 'ch-1',
+      },
     })
 
-    it('toggles search RHS when search button is clicked', async () => {
-        const ChannelHeader = (await import('./ChannelHeader.vue')).default
+    const searchButton = wrapper
+      .findAll('button')
+      .find(b => b.attributes('aria-label') === 'Search')
+    expect(searchButton).toBeDefined()
 
-        const wrapper = mount(ChannelHeader, {
-            props: {
-                name: 'general',
-                channelId: 'ch-1',
-            },
-        })
+    await searchButton!.trigger('click')
+    await flushPromises()
 
-        const searchButton = wrapper.findAll('button').find((b) => b.attributes('aria-label') === 'Search')
-        expect(searchButton).toBeDefined()
+    expect(uiStore.toggleRhs).toHaveBeenCalledWith('search')
+  })
 
-        await searchButton!.trigger('click')
-        await flushPromises()
+  it('starts a call when no active call exists', async () => {
+    callsStore.currentChannelCall.mockReturnValue(undefined)
+    callsStore.isInCall = false
 
-        expect(uiStore.toggleRhs).toHaveBeenCalledWith('search')
+    const ChannelHeader = (await import('./ChannelHeader.vue')).default
+
+    const wrapper = mount(ChannelHeader, {
+      props: {
+        name: 'general',
+        channelId: 'ch-1',
+      },
     })
 
-    it('starts a call when no active call exists', async () => {
-        callsStore.currentChannelCall.mockReturnValue(undefined)
-        callsStore.isInCall = false
+    const callButton = wrapper
+      .findAll('button')
+      .find(b => b.attributes('aria-label') === 'Start audio call')
+    expect(callButton).toBeDefined()
 
-        const ChannelHeader = (await import('./ChannelHeader.vue')).default
+    await callButton!.trigger('click')
+    await flushPromises()
 
-        const wrapper = mount(ChannelHeader, {
-            props: {
-                name: 'general',
-                channelId: 'ch-1',
-            },
-        })
+    expect(callsStore.startCall).toHaveBeenCalledWith('ch-1')
+  })
 
-        const callButton = wrapper.findAll('button').find((b) => b.attributes('aria-label') === 'Start audio call')
-        expect(callButton).toBeDefined()
+  it('joins an existing call when active call exists and user is not in it', async () => {
+    callsStore.currentChannelCall.mockReturnValue({ id: 'call-1' })
+    callsStore.isInCall = false
 
-        await callButton!.trigger('click')
-        await flushPromises()
+    const ChannelHeader = (await import('./ChannelHeader.vue')).default
 
-        expect(callsStore.startCall).toHaveBeenCalledWith('ch-1')
+    const wrapper = mount(ChannelHeader, {
+      props: {
+        name: 'general',
+        channelId: 'ch-1',
+      },
     })
 
-    it('joins an existing call when active call exists and user is not in it', async () => {
-        callsStore.currentChannelCall.mockReturnValue({ id: 'call-1' })
-        callsStore.isInCall = false
+    const callButton = wrapper
+      .findAll('button')
+      .find(b => b.attributes('aria-label') === 'Join active call')
+    expect(callButton).toBeDefined()
 
-        const ChannelHeader = (await import('./ChannelHeader.vue')).default
+    await callButton!.trigger('click')
+    await flushPromises()
 
-        const wrapper = mount(ChannelHeader, {
-            props: {
-                name: 'general',
-                channelId: 'ch-1',
-            },
-        })
+    expect(callsStore.joinCall).toHaveBeenCalledWith('ch-1')
+  })
 
-        const callButton = wrapper.findAll('button').find((b) => b.attributes('aria-label') === 'Join active call')
-        expect(callButton).toBeDefined()
+  it('opens more options menu and shows channel details button', async () => {
+    const ChannelHeader = (await import('./ChannelHeader.vue')).default
 
-        await callButton!.trigger('click')
-        await flushPromises()
-
-        expect(callsStore.joinCall).toHaveBeenCalledWith('ch-1')
+    const wrapper = mount(ChannelHeader, {
+      props: {
+        name: 'general',
+        channelId: 'ch-1',
+      },
     })
 
-    it('opens more options menu and shows channel details button', async () => {
-        const ChannelHeader = (await import('./ChannelHeader.vue')).default
+    const menuButton = wrapper.find('[data-testid="channel-header-menu"]')
+    expect(menuButton.exists()).toBe(true)
 
-        const wrapper = mount(ChannelHeader, {
-            props: {
-                name: 'general',
-                channelId: 'ch-1',
-            },
-        })
+    await menuButton.trigger('click')
+    await flushPromises()
 
-        const menuButton = wrapper.find('[data-testid="channel-header-menu"]')
-        expect(menuButton.exists()).toBe(true)
-
-        await menuButton.trigger('click')
-        await flushPromises()
-
-        const detailsButton = wrapper.find('[data-testid="channel-details-button"]')
-        expect(detailsButton.exists()).toBe(true)
-    })
+    const detailsButton = wrapper.find('[data-testid="channel-details-button"]')
+    expect(detailsButton.exists()).toBe(true)
+  })
 })

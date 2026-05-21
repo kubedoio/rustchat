@@ -1,4 +1,4 @@
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { ref, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import { replaceEmojiNames } from '../utils/emoji'
@@ -10,10 +10,32 @@ let isLoading = false
 const isReady = ref(false)
 const markdownSanitizeConfig = {
   ALLOWED_TAGS: [
-    'p', 'br', 'strong', 'em', 'code', 'pre', 'span', 'ul', 'ol', 'li',
-    'blockquote', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+    'p',
+    'br',
+    'strong',
+    'em',
+    'code',
+    'pre',
+    'span',
+    'ul',
+    'ol',
+    'li',
+    'blockquote',
+    'a',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'th',
+    'td',
   ],
-  ALLOWED_ATTR: ['href', 'target', 'class', 'rel', 'data-username']
+  ALLOWED_ATTR: ['href', 'target', 'class', 'rel', 'data-username'],
 }
 
 /**
@@ -26,7 +48,7 @@ async function loadMarkdownLibs(): Promise<void> {
   try {
     const [{ marked }, hljsModule] = await Promise.all([
       import('marked'),
-      import('highlight.js/lib/common')
+      import('highlight.js/lib/common'),
     ])
 
     markedInstance = marked
@@ -44,7 +66,7 @@ async function loadMarkdownLibs(): Promise<void> {
     marked.use({
       renderer,
       breaks: true,
-      gfm: true
+      gfm: true,
     })
 
     isReady.value = true
@@ -87,16 +109,13 @@ function renderMarkdownSync(markdown: string, highlightMentions?: string): strin
   // We use a strict \w+ regex and wrap in a safe span.
   // We also ensure external links have noopener noreferrer.
   const processedHtml = sanitizedHtml
-    .replace(
-      /@(\w+)/g,
-      (_match, username) => {
-        const isMe = highlightMentions && username === highlightMentions
-        const highlightClass = isMe
-          ? 'bg-warning/20 text-warning font-bold px-0.5 rounded border border-warning/30'
-          : 'text-brand font-semibold hover:underline cursor-pointer'
-        return `<span class="mention ${highlightClass}" data-username="${username}">@${username}</span>`
-      }
-    )
+    .replace(/@(\w+)/g, (_match, username) => {
+      const isMe = highlightMentions && username === highlightMentions
+      const highlightClass = isMe
+        ? 'bg-warning/20 text-warning font-bold px-0.5 rounded border border-warning/30'
+        : 'text-brand font-semibold hover:underline cursor-pointer'
+      return `<span class="mention ${highlightClass}" data-username="${username}">@${username}</span>`
+    })
     .replace(
       /<a href="([^"]+)" target="_blank">/g,
       '<a href="$1" target="_blank" rel="noopener noreferrer">'
@@ -128,7 +147,7 @@ export function useMarkdownRenderer() {
     /**
      * Force reload markdown libraries (rarely needed)
      */
-    reload: loadMarkdownLibs
+    reload: loadMarkdownLibs,
   }
 }
 

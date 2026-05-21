@@ -11,7 +11,12 @@ export interface PresencePresentation {
 
 export function normalizePresenceStatus(value?: string | null): PresenceStatus {
   const normalized = value?.toLowerCase()
-  if (normalized === 'online' || normalized === 'away' || normalized === 'dnd' || normalized === 'offline') {
+  if (
+    normalized === 'online' ||
+    normalized === 'away' ||
+    normalized === 'dnd' ||
+    normalized === 'offline'
+  ) {
     return normalized
   }
   return 'offline'

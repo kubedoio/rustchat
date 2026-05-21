@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Check } from 'lucide-vue-next'
-import { THEME_OPTIONS, getThemeColors, type Theme } from '../../../features/theme/stores/themeStore'
+import {
+  THEME_OPTIONS,
+  getThemeColors,
+  type Theme,
+} from '../../../features/theme/stores/themeStore'
 
 const props = defineProps<{
   modelValue: Theme
@@ -17,14 +21,14 @@ const selectedTheme = ref<Theme>(props.modelValue)
 
 watch(
   () => props.modelValue,
-  (nextTheme) => {
+  nextTheme => {
     selectedTheme.value = nextTheme
   },
   { immediate: true }
 )
 
 const themeCards = computed(() =>
-  THEME_OPTIONS.map((theme) => ({
+  THEME_OPTIONS.map(theme => ({
     ...theme,
     preview: getThemeColors(theme.id),
   }))
@@ -130,7 +134,8 @@ function handleCancel() {
     <div class="rounded-r-2 border border-border-1 bg-bg-surface-2 p-4">
       <p class="text-sm font-medium text-text-1">Note</p>
       <p class="mt-1 text-sm text-text-2">
-        Custom color editing is hidden for now because the app only persists the supported preset themes.
+        Custom color editing is hidden for now because the app only persists the supported preset
+        themes.
       </p>
     </div>
 

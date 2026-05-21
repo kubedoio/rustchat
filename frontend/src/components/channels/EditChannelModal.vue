@@ -24,23 +24,27 @@ const emit = defineEmits<{
 const formData = ref<FormData>({
   name: '',
   displayName: '',
-  purpose: ''
+  purpose: '',
 })
 
 const isLoading = ref(false)
 const errors = ref<Record<string, string>>({})
 
 // Reset form when channel changes or modal opens
-watch(() => props.channel, (channel) => {
-  if (channel) {
-    formData.value = {
-      name: channel.name || '',
-      displayName: channel.displayName || '',
-      purpose: channel.purpose || ''
+watch(
+  () => props.channel,
+  channel => {
+    if (channel) {
+      formData.value = {
+        name: channel.name || '',
+        displayName: channel.displayName || '',
+        purpose: channel.purpose || '',
+      }
     }
-  }
-  errors.value = {}
-}, { immediate: true })
+    errors.value = {}
+  },
+  { immediate: true }
+)
 
 // Validate name format (lowercase, no spaces, alphanumeric + hyphen + underscore)
 const nameError = computed(() => {
@@ -49,7 +53,8 @@ const nameError = computed(() => {
   if (name.length < 2) return 'Channel name must be at least 2 characters'
   if (name.length > 64) return 'Channel name must be at most 64 characters'
   if (name.includes(' ')) return 'Channel name cannot contain spaces'
-  if (!/^[a-z0-9_-]+$/.test(name)) return 'Channel name can only contain lowercase letters, numbers, hyphens, and underscores'
+  if (!/^[a-z0-9_-]+$/.test(name))
+    return 'Channel name can only contain lowercase letters, numbers, hyphens, and underscores'
   return null
 })
 
@@ -80,9 +85,9 @@ async function handleSubmit() {
     const updatedChannel = await channelService.updateChannel(props.channel.id, {
       name: formData.value.name.toLowerCase().trim(),
       displayName: formData.value.displayName.trim(),
-      purpose: formData.value.purpose.trim() || undefined
+      purpose: formData.value.purpose.trim() || undefined,
     })
-    
+
     emit('updated', updatedChannel)
     emit('close')
   } catch (error: unknown) {
@@ -161,7 +166,9 @@ function handleBackdropClick(event: MouseEvent) {
                 :class="{ 'border-danger': displayNameError && formData.displayName }"
                 :disabled="isLoading"
               />
-              <p v-if="displayNameError && formData.displayName" class="text-xs text-danger">{{ displayNameError }}</p>
+              <p v-if="displayNameError && formData.displayName" class="text-xs text-danger">
+                {{ displayNameError }}
+              </p>
             </div>
 
             <!-- Purpose Field -->

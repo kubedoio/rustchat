@@ -1936,10 +1936,7 @@ impl PostRepository {
     }
 
     /// Get user_id and root_post_id for a post
-    pub async fn get_parent_info(
-        &self,
-        post_id: Uuid,
-    ) -> ApiResult<Option<(Uuid, Option<Uuid>)>> {
+    pub async fn get_parent_info(&self, post_id: Uuid) -> ApiResult<Option<(Uuid, Option<Uuid>)>> {
         let info = sqlx::query_as::<_, (Uuid, Option<Uuid>)>(
             "SELECT user_id, root_post_id FROM posts WHERE id = $1",
         )
@@ -1950,11 +1947,7 @@ impl PostRepository {
     }
 
     /// Update post props
-    pub async fn update_props(
-        &self,
-        post_id: Uuid,
-        props: serde_json::Value,
-    ) -> ApiResult<()> {
+    pub async fn update_props(&self, post_id: Uuid, props: serde_json::Value) -> ApiResult<()> {
         sqlx::query("UPDATE posts SET props = $1 WHERE id = $2")
             .bind(props)
             .bind(post_id)

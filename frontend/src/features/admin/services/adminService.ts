@@ -1,6 +1,6 @@
 // Admin Service - Business logic for admin functions
 
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { adminRepository, type AuditLogQuery } from '../repositories/adminRepository'
 import type { AdminUser } from '../../../api/admin'
 import { useAdminStore } from '../stores/adminStore'
@@ -20,9 +20,7 @@ class AdminService {
       const config = await adminRepository.getConfig()
       this.store.setConfig(config)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to load config'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to load config')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -37,9 +35,7 @@ class AdminService {
       await adminRepository.updateConfig(category, data)
       await this.loadConfig()
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to update config'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to update config')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -56,9 +52,7 @@ class AdminService {
       this.store.setUsers(result.users)
       this.store.setUsersTotal(result.total)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to load users'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to load users')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -80,9 +74,7 @@ class AdminService {
       this.store.addUser(user)
       return user
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to create user'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to create user')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -98,9 +90,7 @@ class AdminService {
       this.store.updateUserInStore(user)
       return user
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to update user'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to update user')
       throw error
     }
   }
@@ -110,9 +100,7 @@ class AdminService {
       await adminRepository.deactivateUser(id)
       this.store.updateUserStatus(id, false)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to deactivate user'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to deactivate user')
       throw error
     }
   }
@@ -122,9 +110,7 @@ class AdminService {
       await adminRepository.reactivateUser(id)
       this.store.updateUserStatus(id, true)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to reactivate user'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to reactivate user')
       throw error
     }
   }
@@ -136,9 +122,7 @@ class AdminService {
       const logs = await adminRepository.listAuditLogs(params)
       this.store.setAuditLogs(logs)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to load audit logs'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to load audit logs')
     } finally {
       this.store.setLoading(false)
     }

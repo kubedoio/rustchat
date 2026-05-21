@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { computed, onMounted, ref } from 'vue'
 import { Pencil } from 'lucide-vue-next'
 import SettingItemMax from '../SettingItemMax.vue'
@@ -20,17 +20,17 @@ const selectedAudioOutput = ref('')
 const selectedVideoDevice = ref('')
 
 const audioInputLabel = computed(() => {
-  const device = audioInputDevices.value.find((d) => d.deviceId === selectedAudioInput.value)
+  const device = audioInputDevices.value.find(d => d.deviceId === selectedAudioInput.value)
   return device?.label || 'Default microphone'
 })
 
 const audioOutputLabel = computed(() => {
-  const device = audioOutputDevices.value.find((d) => d.deviceId === selectedAudioOutput.value)
+  const device = audioOutputDevices.value.find(d => d.deviceId === selectedAudioOutput.value)
   return device?.label || 'Default speaker'
 })
 
 const videoDeviceLabel = computed(() => {
-  const device = videoDevices.value.find((d) => d.deviceId === selectedVideoDevice.value)
+  const device = videoDevices.value.find(d => d.deviceId === selectedVideoDevice.value)
   return device?.label || 'Default camera'
 })
 
@@ -40,20 +40,23 @@ onMounted(async () => {
 })
 
 function syncLocalState() {
-  selectedAudioInput.value = callsStore.preferredAudioInput || audioInputDevices.value[0]?.deviceId || ''
-  selectedAudioOutput.value = callsStore.preferredAudioOutput || audioOutputDevices.value[0]?.deviceId || ''
-  selectedVideoDevice.value = callsStore.preferredVideoDevice || videoDevices.value[0]?.deviceId || ''
+  selectedAudioInput.value =
+    callsStore.preferredAudioInput || audioInputDevices.value[0]?.deviceId || ''
+  selectedAudioOutput.value =
+    callsStore.preferredAudioOutput || audioOutputDevices.value[0]?.deviceId || ''
+  selectedVideoDevice.value =
+    callsStore.preferredVideoDevice || videoDevices.value[0]?.deviceId || ''
 }
 
 async function enumerateDevices() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-    stream.getTracks().forEach((track) => track.stop())
+    stream.getTracks().forEach(track => track.stop())
 
     const devices = await navigator.mediaDevices.enumerateDevices()
-    audioInputDevices.value = devices.filter((d) => d.kind === 'audioinput')
-    audioOutputDevices.value = devices.filter((d) => d.kind === 'audiooutput')
-    videoDevices.value = devices.filter((d) => d.kind === 'videoinput')
+    audioInputDevices.value = devices.filter(d => d.kind === 'audioinput')
+    audioOutputDevices.value = devices.filter(d => d.kind === 'audiooutput')
+    videoDevices.value = devices.filter(d => d.kind === 'videoinput')
 
     permissionError.value = null
   } catch (error: unknown) {
@@ -99,7 +102,9 @@ async function saveVideoDevices() {
 
 <template>
   <div class="space-y-1">
-    <h3 class="mb-1 px-2 text-3xl sm:text-[2rem] font-semibold tracking-tight text-text-1">Calls Settings</h3>
+    <h3 class="mb-1 px-2 text-3xl sm:text-[2rem] font-semibold tracking-tight text-text-1">
+      Calls Settings
+    </h3>
 
     <div class="rounded-lg border border-border-1 bg-bg-surface-1">
       <div v-if="expandedRow !== 'audio_devices'">
@@ -109,8 +114,12 @@ async function saveVideoDevices() {
           @click="expandRow('audio_devices')"
         >
           <div>
-            <div class="text-xl sm:text-2xl font-medium leading-tight text-text-1">Audio devices</div>
-            <div class="mt-1 text-sm text-text-3">Set up audio devices to be used for Mattermost calls</div>
+            <div class="text-xl sm:text-2xl font-medium leading-tight text-text-1">
+              Audio devices
+            </div>
+            <div class="mt-1 text-sm text-text-3">
+              Set up audio devices to be used for Mattermost calls
+            </div>
           </div>
           <span class="mt-0.5 inline-flex items-center gap-1 text-sm font-medium text-primary">
             <Pencil class="h-4 w-4" />
@@ -128,7 +137,10 @@ async function saveVideoDevices() {
         @cancel="cancelEdit"
       >
         <div class="space-y-4">
-          <div v-if="permissionError" class="rounded-md border border-warning bg-warning/10 p-3 text-sm text-warning">
+          <div
+            v-if="permissionError"
+            class="rounded-md border border-warning bg-warning/10 p-3 text-sm text-warning"
+          >
             Permission required for device listing: {{ permissionError }}
           </div>
 
@@ -141,7 +153,12 @@ async function saveVideoDevices() {
                 :key="device.deviceId"
                 class="flex items-start gap-3 rounded-md border border-border-1 p-3 text-sm hover:bg-bg-surface-2"
               >
-                <input v-model="selectedAudioInput" type="radio" :value="device.deviceId" class="mt-0.5 h-4 w-4" />
+                <input
+                  v-model="selectedAudioInput"
+                  type="radio"
+                  :value="device.deviceId"
+                  class="mt-0.5 h-4 w-4"
+                />
                 <span>{{ device.label || 'Default microphone' }}</span>
               </label>
             </div>
@@ -156,7 +173,12 @@ async function saveVideoDevices() {
                 :key="device.deviceId"
                 class="flex items-start gap-3 rounded-md border border-border-1 p-3 text-sm hover:bg-bg-surface-2"
               >
-                <input v-model="selectedAudioOutput" type="radio" :value="device.deviceId" class="mt-0.5 h-4 w-4" />
+                <input
+                  v-model="selectedAudioOutput"
+                  type="radio"
+                  :value="device.deviceId"
+                  class="mt-0.5 h-4 w-4"
+                />
                 <span>{{ device.label || 'Default speaker' }}</span>
               </label>
             </div>
@@ -174,8 +196,12 @@ async function saveVideoDevices() {
           @click="expandRow('video_devices')"
         >
           <div>
-            <div class="text-xl sm:text-2xl font-medium leading-tight text-text-1">Video devices</div>
-            <div class="mt-1 text-sm text-text-3">Set up video devices to be used for Mattermost calls</div>
+            <div class="text-xl sm:text-2xl font-medium leading-tight text-text-1">
+              Video devices
+            </div>
+            <div class="mt-1 text-sm text-text-3">
+              Set up video devices to be used for Mattermost calls
+            </div>
           </div>
           <span class="mt-0.5 inline-flex items-center gap-1 text-sm font-medium text-primary">
             <Pencil class="h-4 w-4" />
@@ -201,11 +227,19 @@ async function saveVideoDevices() {
               :key="device.deviceId"
               class="flex items-start gap-3 rounded-md border border-border-1 p-3 text-sm hover:bg-bg-surface-2"
             >
-              <input v-model="selectedVideoDevice" type="radio" :value="device.deviceId" class="mt-0.5 h-4 w-4" />
+              <input
+                v-model="selectedVideoDevice"
+                type="radio"
+                :value="device.deviceId"
+                class="mt-0.5 h-4 w-4"
+              />
               <span>{{ device.label || 'Default camera' }}</span>
             </label>
           </div>
-          <div v-if="videoDevices.length === 0" class="rounded-md border border-border-1 p-3 text-sm text-text-3">
+          <div
+            v-if="videoDevices.length === 0"
+            class="rounded-md border border-border-1 p-3 text-sm text-text-3"
+          >
             No camera devices found.
           </div>
         </div>

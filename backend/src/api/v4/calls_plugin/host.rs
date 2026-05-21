@@ -37,8 +37,8 @@ pub(crate) async fn host_screen_off(
     Json(payload): Json<HostControlRequest>,
 ) -> ApiResult<Json<StatusResponse>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    let target_session_id = parse_mm_or_uuid(&payload.session_id)
-        .ok_or_else(|| AppError::InvalidSessionId)?;
+    let target_session_id =
+        parse_mm_or_uuid(&payload.session_id).ok_or_else(|| AppError::InvalidSessionId)?;
 
     let call_manager = state.call_state_manager.as_ref();
     let mut call = call_manager
@@ -93,8 +93,8 @@ pub(crate) async fn host_mute(
     Json(payload): Json<HostControlRequest>,
 ) -> ApiResult<Json<StatusResponse>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    let target_session_id = parse_mm_or_uuid(&payload.session_id)
-        .ok_or_else(|| AppError::InvalidSessionId)?;
+    let target_session_id =
+        parse_mm_or_uuid(&payload.session_id).ok_or_else(|| AppError::InvalidSessionId)?;
 
     let call_manager = state.call_state_manager.as_ref();
     let mut call = call_manager
@@ -228,8 +228,8 @@ pub(crate) async fn host_remove_user(
     Json(payload): Json<HostControlRequest>,
 ) -> ApiResult<Json<StatusResponse>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    let target_session_id = parse_mm_or_uuid(&payload.session_id)
-        .ok_or_else(|| AppError::InvalidSessionId)?;
+    let target_session_id =
+        parse_mm_or_uuid(&payload.session_id).ok_or_else(|| AppError::InvalidSessionId)?;
 
     let call_manager = state.call_state_manager.as_ref();
     let mut call = call_manager
@@ -313,8 +313,8 @@ pub(crate) async fn host_lower_hand(
     Json(payload): Json<HostControlRequest>,
 ) -> ApiResult<Json<StatusResponse>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    let target_session_id = parse_mm_or_uuid(&payload.session_id)
-        .ok_or_else(|| AppError::InvalidSessionId)?;
+    let target_session_id =
+        parse_mm_or_uuid(&payload.session_id).ok_or_else(|| AppError::InvalidSessionId)?;
 
     let call_manager = state.call_state_manager.as_ref();
     let mut call = call_manager

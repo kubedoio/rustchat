@@ -7,11 +7,7 @@ use uuid::Uuid;
 
 use crate::api::v4::users::hydrate_dm_display_names_batch;
 use crate::api::AppState;
-use crate::mattermost_compat::{
-    id::encode_mm_id,
-    mappers::map_channel_role,
-    models as mm,
-};
+use crate::mattermost_compat::{id::encode_mm_id, mappers::map_channel_role, models as mm};
 use crate::models::channel::Channel;
 use crate::realtime::websocket_actor::WebSocketActor;
 use crate::repositories::ChannelRepository;

@@ -12,7 +12,11 @@
       <p class="text-sm font-medium truncate">{{ item.name }}</p>
       <p v-if="item.subtitle" class="text-xs text-gray-400 truncate">{{ item.subtitle }}</p>
     </div>
-    <kbd v-if="selected" class="flex-shrink-0 text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded font-mono">↵</kbd>
+    <kbd
+      v-if="selected"
+      class="flex-shrink-0 text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded font-mono"
+      >↵</kbd
+    >
   </div>
 </template>
 

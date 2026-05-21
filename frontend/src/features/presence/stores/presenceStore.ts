@@ -44,7 +44,7 @@ export const usePresenceStore = defineStore('presenceStore', () => {
         userId: data.userId,
         username: data.username || '',
         presence: data.presence || 'online',
-        lastActiveAt: data.lastActiveAt || new Date()
+        lastActiveAt: data.lastActiveAt || new Date(),
       }
     } else {
       if (data.presence !== undefined) self.value.presence = data.presence
@@ -58,7 +58,7 @@ export const usePresenceStore = defineStore('presenceStore', () => {
       userId,
       username,
       presence,
-      lastActiveAt: new Date()
+      lastActiveAt: new Date(),
     })
   }
 
@@ -76,7 +76,7 @@ export const usePresenceStore = defineStore('presenceStore', () => {
           userId,
           username: '',
           presence,
-          lastActiveAt: new Date()
+          lastActiveAt: new Date(),
         })
       }
     }
@@ -94,15 +94,11 @@ export const usePresenceStore = defineStore('presenceStore', () => {
       username,
       channelId,
       timestamp: Date.now(),
-      threadRootId
+      threadRootId,
     })
   }
 
-  function removeTypingUser(
-    userId: UserId,
-    channelId: ChannelId,
-    threadRootId?: MessageId
-  ) {
+  function removeTypingUser(userId: UserId, channelId: ChannelId, threadRootId?: MessageId) {
     const key = `${channelId}:${threadRootId || 'root'}:${userId}`
     typingUsers.value.delete(key)
   }
@@ -170,6 +166,6 @@ export const usePresenceStore = defineStore('presenceStore', () => {
     hasTypingUsers,
     getUserPresence,
     getTypingUsersMap,
-    clear
+    clear,
   }
 })

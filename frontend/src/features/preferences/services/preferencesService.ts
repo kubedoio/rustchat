@@ -1,10 +1,10 @@
 // Preferences Service - Business logic for user preferences
 
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import {
   preferencesRepository,
   type UserPreferences,
-  type StatusPreset
+  type StatusPreset,
 } from '../repositories/preferencesRepository'
 import { usePreferencesStore } from '../stores/preferencesStore'
 import { AppError } from '../../../core/errors/AppError'
@@ -35,11 +35,7 @@ class PreferencesService {
       const status = await preferencesRepository.updateMyStatus(data)
       this.store.setStatus(status)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to update status'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to update status')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -53,11 +49,7 @@ class PreferencesService {
       const status = await preferencesRepository.clearMyStatus()
       this.store.setStatus(status)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to clear status'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to clear status')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -82,9 +74,7 @@ class PreferencesService {
       this.store.setPreferences(prefs)
     } catch (error) {
       this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to update preferences'
+        error instanceof AppError ? error.message : 'Failed to update preferences'
       )
       throw error
     } finally {
@@ -107,7 +97,7 @@ class PreferencesService {
     await this.updateStatus({
       text: preset.text,
       emoji: preset.emoji,
-      durationMinutes: preset.durationMinutes
+      durationMinutes: preset.durationMinutes,
     })
   }
 
@@ -125,7 +115,7 @@ class PreferencesService {
 
     void this.updatePreferences({
       ...prefs,
-      collapsedCategories: Array.from(collapsed)
+      collapsedCategories: Array.from(collapsed),
     })
   }
 }

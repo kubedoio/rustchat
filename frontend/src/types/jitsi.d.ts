@@ -1,7 +1,7 @@
-export { };
+export {}
 
 declare global {
-    interface Window {
-        JitsiMeetExternalAPI: any;
-    }
+  interface Window {
+    JitsiMeetExternalAPI: any
+  }
 }

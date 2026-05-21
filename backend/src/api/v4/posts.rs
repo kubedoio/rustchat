@@ -161,14 +161,11 @@ async fn create_post_handler(
     body: Bytes,
 ) -> ApiResult<Json<mm::Post>> {
     let input: CreatePostRequest = parse_body(&headers, &body, "Invalid post body")?;
-    let channel_id = parse_mm_or_uuid(&input.channel_id)
-        .ok_or_else(|| AppError::ValidationInvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::ValidationInvalidChannelId)?;
 
     let root_post_id = if !input.root_id.is_empty() {
-        Some(
-            parse_mm_or_uuid(&input.root_id)
-                .ok_or_else(|| AppError::ValidationInvalidRootId)?,
-        )
+        Some(parse_mm_or_uuid(&input.root_id).ok_or_else(|| AppError::ValidationInvalidRootId)?)
     } else {
         None
     };
@@ -235,8 +232,7 @@ async fn get_post(
     auth: MmAuthUser,
     Path(post_id): Path<String>,
 ) -> ApiResult<Json<mm::Post>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let repo = PostRepository::new(state.db.clone());
     let mut post: crate::models::post::PostResponse = repo
         .find_by_id(post_id)
@@ -276,8 +272,7 @@ async fn get_posts_by_ids(
 
     let mut post_ids = Vec::new();
     for id in &input {
-        let parsed = parse_mm_or_uuid(id)
-            .ok_or_else(|| AppError::InvalidPostId)?;
+        let parsed = parse_mm_or_uuid(id).ok_or_else(|| AppError::InvalidPostId)?;
         post_ids.push(parsed);
     }
 
@@ -319,8 +314,7 @@ async fn get_reactions_by_post_ids(
 
     let mut post_ids = Vec::new();
     for id in &input {
-        let parsed = parse_mm_or_uuid(id)
-            .ok_or_else(|| AppError::InvalidPostId)?;
+        let parsed = parse_mm_or_uuid(id).ok_or_else(|| AppError::InvalidPostId)?;
         post_ids.push(parsed);
     }
 
@@ -341,8 +335,7 @@ async fn get_post_files_info(
     auth: MmAuthUser,
     Path(post_id): Path<String>,
 ) -> ApiResult<Json<Vec<mm::FileInfo>>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
     let post = repo
@@ -367,8 +360,7 @@ async fn pin_post(
     auth: MmAuthUser,
     Path(post_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
@@ -384,8 +376,7 @@ async fn unpin_post(
     auth: MmAuthUser,
     Path(post_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
@@ -424,15 +415,13 @@ async fn get_post_thread(
     Path(post_id): Path<String>,
     axum::extract::Query(query): axum::extract::Query<ThreadQuery>,
 ) -> ApiResult<Json<ThreadResponseMm>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     // Parse cursor if provided
     let cursor = match query.cursor {
-        Some(cursor_str) => Some(
-            parse_mm_or_uuid(&cursor_str)
-                .ok_or_else(|| AppError::InvalidCursor)?,
-        ),
+        Some(cursor_str) => {
+            Some(parse_mm_or_uuid(&cursor_str).ok_or_else(|| AppError::InvalidCursor)?)
+        }
         None => None,
     };
 
@@ -506,8 +495,7 @@ async fn handle_post_action(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let _value: serde_json::Value = parse_body(&headers, &body, "Invalid action body")?;
 
     let repo = PostRepository::new(state.db.clone());
@@ -531,8 +519,7 @@ async fn move_post(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let _input: MovePostRequest = parse_body(&headers, &body, "Invalid move body")?;
 
     let repo = PostRepository::new(state.db.clone());
@@ -548,8 +535,7 @@ async fn restore_post(
     auth: MmAuthUser,
     Path((post_id, _restore_version_id)): Path<(String, String)>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
     repo.require_channel_membership(channel_id, auth.user_id)
@@ -562,8 +548,7 @@ async fn reveal_post(
     auth: MmAuthUser,
     Path(post_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
     repo.require_channel_membership(channel_id, auth.user_id)
@@ -576,8 +561,7 @@ async fn burn_post(
     auth: MmAuthUser,
     Path(post_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
     repo.require_channel_membership(channel_id, auth.user_id)
@@ -620,8 +604,7 @@ async fn set_post_unread(
 ) -> ApiResult<Json<mm::ChannelUnreadAt>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)
         .map_err(|_| AppError::CannotAccessOthersPosts)?;
-    let post_id = parse_mm_or_uuid(&path.post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&path.post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let request: SetPostUnreadRequest = if body.is_empty() {
         SetPostUnreadRequest::default()
     } else {
@@ -796,8 +779,7 @@ async fn get_flagged_posts(
     let user_id = if user_id == "me" {
         auth.user_id
     } else {
-        let parsed = parse_mm_or_uuid(&user_id)
-            .ok_or_else(|| AppError::InvalidUserId)?;
+        let parsed = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
         if !auth.can_access_owned(parsed, &permissions::USER_MANAGE) {
             return Err(AppError::CannotAccessOthersPosts);
         }
@@ -829,8 +811,7 @@ async fn delete_post(
     auth: MmAuthUser,
     Path(post_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let repo = PostRepository::new(state.db.clone());
     let (post_user_id, post_channel_id, _, _) = repo
         .get_post_basic(post_id)
@@ -885,10 +866,8 @@ async fn update_post(
     Path(post_id): Path<String>,
     Json(input): Json<UpdatePostRequest>,
 ) -> ApiResult<Json<mm::Post>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
-    let body_post_id = parse_mm_or_uuid(&input.id)
-        .ok_or_else(|| AppError::InvalidId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
+    let body_post_id = parse_mm_or_uuid(&input.id).ok_or_else(|| AppError::InvalidId)?;
 
     if post_id != body_post_id {
         return Err(AppError::InvalidId);
@@ -903,8 +882,7 @@ async fn patch_post(
     Path(post_id): Path<String>,
     Json(input): Json<PatchPostRequest>,
 ) -> ApiResult<Json<mm::Post>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     update_post_message(&state, auth.user_id, post_id, input.message).await
 }
 
@@ -971,8 +949,7 @@ async fn ack_post(
     Path(post_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
     // Parse and validate the post ID
-    let _post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let _post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     // Acknowledgments are typically used for:
     // 1. Confirming push notification receipt
@@ -1000,8 +977,8 @@ async fn list_scheduled_posts(
     auth: MmAuthUser,
     Path(team_id_str): Path<String>,
 ) -> ApiResult<Json<Vec<mm::ScheduledPost>>> {
-    let team_id = parse_mm_or_uuid(&team_id_str)
-        .ok_or_else(|| AppError::ValidationInvalidTeamId)?;
+    let team_id =
+        parse_mm_or_uuid(&team_id_str).ok_or_else(|| AppError::ValidationInvalidTeamId)?;
 
     let repo = PostRepository::new(state.db.clone());
     let rows = repo.list_scheduled_posts(auth.user_id, team_id).await?;
@@ -1030,14 +1007,11 @@ async fn create_scheduled_post(
     auth: MmAuthUser,
     Json(input): Json<CreateScheduledPostRequest>,
 ) -> ApiResult<Json<mm::ScheduledPost>> {
-    let channel_id = parse_mm_or_uuid(&input.channel_id)
-        .ok_or_else(|| AppError::ValidationInvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::ValidationInvalidChannelId)?;
 
     let root_id = if !input.root_id.is_empty() {
-        Some(
-            parse_mm_or_uuid(&input.root_id)
-                .ok_or_else(|| AppError::ValidationInvalidRootId)?,
-        )
+        Some(parse_mm_or_uuid(&input.root_id).ok_or_else(|| AppError::ValidationInvalidRootId)?)
     } else {
         None
     };
@@ -1106,20 +1080,17 @@ async fn update_scheduled_post(
 
     let scheduled_id = parse_mm_or_uuid(&scheduled_post_id)
         .ok_or_else(|| AppError::ValidationInvalidScheduledPostId)?;
-    let channel_id = parse_mm_or_uuid(&input.channel_id)
-        .ok_or_else(|| AppError::ValidationInvalidChannelId)?;
-    let user_id = parse_mm_or_uuid(&input.user_id)
-        .ok_or_else(|| AppError::ValidationInvalidUserId)?;
+    let channel_id =
+        parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::ValidationInvalidChannelId)?;
+    let user_id =
+        parse_mm_or_uuid(&input.user_id).ok_or_else(|| AppError::ValidationInvalidUserId)?;
 
     if user_id != auth.user_id {
         return Err(AppError::CannotUpdateOthersScheduledPost);
     }
 
     let root_id = if !input.root_id.is_empty() {
-        Some(
-            parse_mm_or_uuid(&input.root_id)
-                .ok_or_else(|| AppError::ValidationInvalidRootId)?,
-        )
+        Some(parse_mm_or_uuid(&input.root_id).ok_or_else(|| AppError::ValidationInvalidRootId)?)
     } else {
         None
     };
@@ -1200,8 +1171,8 @@ async fn create_ephemeral_post(
     auth: MmAuthUser,
     Json(input): Json<EphemeralPostRequest>,
 ) -> ApiResult<Json<mm::Post>> {
-    let target_user_id = parse_mm_or_uuid(&input.user_id)
-        .ok_or_else(|| AppError::ValidationInvalidUserId)?;
+    let target_user_id =
+        parse_mm_or_uuid(&input.user_id).ok_or_else(|| AppError::ValidationInvalidUserId)?;
 
     if target_user_id != auth.user_id && input.user_id != "me" {
         return Err(AppError::Forbidden(
@@ -1261,8 +1232,8 @@ async fn set_post_reminder(
     Path((user_id_str, post_id_str)): Path<(String, String)>,
     Json(input): Json<PostReminderRequest>,
 ) -> ApiResult<impl axum::response::IntoResponse> {
-    let target_user_id = parse_mm_or_uuid(&user_id_str)
-        .ok_or_else(|| AppError::ValidationInvalidUserId)?;
+    let target_user_id =
+        parse_mm_or_uuid(&user_id_str).ok_or_else(|| AppError::ValidationInvalidUserId)?;
 
     if target_user_id != auth.user_id && user_id_str != "me" {
         return Err(AppError::Forbidden(
@@ -1270,8 +1241,8 @@ async fn set_post_reminder(
         ));
     }
 
-    let post_id = parse_mm_or_uuid(&post_id_str)
-        .ok_or_else(|| AppError::ValidationInvalidPostId)?;
+    let post_id =
+        parse_mm_or_uuid(&post_id_str).ok_or_else(|| AppError::ValidationInvalidPostId)?;
 
     let target_at = chrono::DateTime::from_timestamp_millis(input.target_at)
         .ok_or_else(|| AppError::ValidationInvalidTargetAt)?;

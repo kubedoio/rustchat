@@ -48,16 +48,16 @@ pub(super) async fn add_reaction(
     body: Bytes,
 ) -> ApiResult<(StatusCode, Json<mm::Reaction>)> {
     let input: ReactionRequest = parse_body(&headers, &body, "Invalid reaction body")?;
-    let input_user_id = parse_mm_or_uuid(&input.user_id)
-        .ok_or_else(|| AppError::ValidationInvalidUserId)?;
+    let input_user_id =
+        parse_mm_or_uuid(&input.user_id).ok_or_else(|| AppError::ValidationInvalidUserId)?;
     if input_user_id != auth.user_id {
         return Err(AppError::Forbidden(
             "Cannot react for other user".to_string(),
         ));
     }
 
-    let post_id = parse_mm_or_uuid(&input.post_id)
-        .ok_or_else(|| AppError::ValidationInvalidPostId)?;
+    let post_id =
+        parse_mm_or_uuid(&input.post_id).ok_or_else(|| AppError::ValidationInvalidPostId)?;
 
     // Verify the caller is a member of the channel containing this post
     check_channel_membership(&state, post_id, auth.user_id).await?;
@@ -168,8 +168,7 @@ pub(super) async fn remove_reaction(
     auth: MmAuthUser,
     Path((post_id, emoji_name)): Path<(String, String)>,
 ) -> ApiResult<impl IntoResponse> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     // Verify the caller is a member of the channel containing this post
     check_channel_membership(&state, post_id, auth.user_id).await?;
@@ -187,8 +186,7 @@ pub(super) async fn remove_reaction_for_user(
     let resolved_user_id = if user_id == "me" {
         auth.user_id
     } else {
-        parse_mm_or_uuid(&user_id)
-            .ok_or_else(|| AppError::InvalidUserId)?
+        parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?
     };
 
     if resolved_user_id != auth.user_id {
@@ -197,8 +195,7 @@ pub(super) async fn remove_reaction_for_user(
         ));
     }
 
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     // Verify the caller is a member of the channel containing this post
     check_channel_membership(&state, post_id, auth.user_id).await?;
@@ -258,8 +255,7 @@ pub(super) async fn get_reactions(
     auth: MmAuthUser,
     Path(post_id): Path<String>,
 ) -> ApiResult<Json<Vec<mm::Reaction>>> {
-    let post_id = parse_mm_or_uuid(&post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     // Verify the caller is a member of the channel that owns this post.
     check_channel_membership(&state, post_id, auth.user_id).await?;

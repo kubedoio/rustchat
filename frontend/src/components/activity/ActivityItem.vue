@@ -3,16 +3,13 @@
     class="flex items-start gap-3 p-4 cursor-pointer transition-colors"
     :class="{
       'bg-blue-50 hover:bg-blue-100': !activity.read,
-      'hover:bg-gray-50': activity.read
+      'hover:bg-gray-50': activity.read,
     }"
     @click="$emit('click')"
   >
     <!-- Unread indicator -->
     <div class="w-1.5 self-stretch flex items-start pt-1.5">
-      <div
-        v-if="!activity.read"
-        class="w-1.5 h-1.5 bg-blue-500 rounded-full"
-      />
+      <div v-if="!activity.read" class="w-1.5 h-1.5 bg-blue-500 rounded-full" />
     </div>
 
     <!-- Icon -->
@@ -63,12 +60,18 @@ defineEmits<{
 
 const actionText = computed(() => {
   switch (props.activity.type) {
-    case ActivityType.MENTION: return 'mentioned you'
-    case ActivityType.REPLY: return 'replied to your message'
-    case ActivityType.REACTION: return `reacted to your message`
-    case ActivityType.DM: return 'sent you a message'
-    case ActivityType.THREAD_REPLY: return 'replied in a thread you follow'
-    default: return 'interacted with you'
+    case ActivityType.MENTION:
+      return 'mentioned you'
+    case ActivityType.REPLY:
+      return 'replied to your message'
+    case ActivityType.REACTION:
+      return `reacted to your message`
+    case ActivityType.DM:
+      return 'sent you a message'
+    case ActivityType.THREAD_REPLY:
+      return 'replied in a thread you follow'
+    default:
+      return 'interacted with you'
   }
 })
 

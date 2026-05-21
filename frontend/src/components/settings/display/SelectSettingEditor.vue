@@ -22,9 +22,7 @@ const selectClass =
     <select
       :value="modelValue"
       :class="selectClass"
-      @change="
-        emit('update:modelValue', ($event.target as HTMLSelectElement).value)
-      "
+      @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
       <option v-for="opt in options" :key="opt.value" :value="opt.value">
         {{ opt.label }}

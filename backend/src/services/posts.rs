@@ -7,10 +7,8 @@ use crate::error::{ApiResult, AppError};
 use crate::models::{
     normalize_avatar_url, ChannelMember, CreatePost, FileUploadResponse, Post, PostResponse,
 };
-use crate::repositories::{
-    ChannelRepository, PlaybookRepository, PostRepository, UserRepository,
-};
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
+use crate::repositories::{ChannelRepository, PlaybookRepository, PostRepository, UserRepository};
 use crate::services::activity;
 use regex::Regex;
 
@@ -32,10 +30,9 @@ async fn validate_create_post(
     ensure_permission(state, user_id, "post.create").await?;
 
     // Check membership
-    let _: ChannelMember =
-        PostRepository::new(state.db.clone())
-            .require_channel_membership(channel_id, user_id)
-            .await?;
+    let _: ChannelMember = PostRepository::new(state.db.clone())
+        .require_channel_membership(channel_id, user_id)
+        .await?;
 
     // Validate message
     if input.message.trim().is_empty() && input.file_ids.is_empty() {
@@ -241,7 +238,9 @@ async fn run_post_automation(
     // Check for outgoing webhook triggers
     if root_post_id.is_none() {
         // Get team_id for the channel
-        if let Ok(Some(team_id)) = ChannelRepository::new(&state.db).get_team_id(channel_id).await
+        if let Ok(Some(team_id)) = ChannelRepository::new(&state.db)
+            .get_team_id(channel_id)
+            .await
         {
             let channel_name = ChannelRepository::new(&state.db)
                 .get_name(channel_id)
@@ -707,9 +706,7 @@ async fn check_playbook_triggers(
             .await?;
 
         // 3. Find bot user (optional)
-        let bot_user = UserRepository::new(&state.db)
-            .get_bot_user_id()
-            .await?;
+        let bot_user = UserRepository::new(&state.db).get_bot_user_id().await?;
 
         let lower_message = message.to_lowercase();
 
@@ -773,8 +770,7 @@ pub async fn get_posts(
             .get_created_at(before_id)
             .await?;
 
-        let before_time =
-            before_time.ok_or_else(|| AppError::BeforePostNotFound)?;
+        let before_time = before_time.ok_or_else(|| AppError::BeforePostNotFound)?;
 
         PostRepository::new(state.db.clone())
             .list_before(channel_id, before_time, per_page)
@@ -787,8 +783,7 @@ pub async fn get_posts(
             .get_created_at(after_id)
             .await?;
 
-        let after_time =
-            after_time.ok_or_else(|| AppError::AfterPostNotFound)?;
+        let after_time = after_time.ok_or_else(|| AppError::AfterPostNotFound)?;
 
         PostRepository::new(state.db.clone())
             .list_after(channel_id, after_time, per_page)

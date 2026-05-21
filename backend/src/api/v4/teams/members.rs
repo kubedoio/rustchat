@@ -20,8 +20,7 @@ pub async fn get_team_members(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<Vec<mm::TeamMember>>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
     // Join with users table to get user information including presence
@@ -62,12 +61,10 @@ pub async fn add_team_member(
     use super::utils::parse_body;
     use crate::services::team_membership::apply_default_channel_membership_for_team_join;
 
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
     let input: AddTeamMemberRequest = parse_body(&headers, &body, "Invalid member body")?;
-    let user_id = parse_mm_or_uuid(&input.user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let user_id = parse_mm_or_uuid(&input.user_id).ok_or_else(|| AppError::InvalidUserId)?;
     TeamRepository::new(&state.db)
         .upsert_team_member(team_id, user_id, "member")
         .await?;
@@ -95,10 +92,8 @@ pub async fn get_team_member(
     auth: MmAuthUser,
     Path((team_id, user_id)): Path<(String, String)>,
 ) -> ApiResult<Json<mm::TeamMember>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
     let member = TeamRepository::new(&state.db)
         .get_team_member(team_id, user_id)
@@ -115,11 +110,9 @@ pub async fn remove_team_member(
 ) -> ApiResult<Json<serde_json::Value>> {
     use super::utils::status_ok;
 
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     TeamRepository::new(&state.db)
         .remove_team_member(team_id, user_id)
         .await?;
@@ -131,8 +124,7 @@ pub async fn get_team_member_ids(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<Vec<String>>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
     let ids = TeamRepository::new(&state.db)
         .list_team_member_ids(team_id)
@@ -145,8 +137,7 @@ pub async fn get_team_member_me(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<mm::TeamMember>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     let member = TeamRepository::new(&state.db)
         .get_team_member(team_id, auth.user_id)
         .await?
@@ -168,11 +159,9 @@ pub async fn update_team_member_roles(
 ) -> ApiResult<Json<serde_json::Value>> {
     use super::utils::status_ok;
 
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     let role = if input.roles.contains("team_admin") {
         "admin"
     } else {
@@ -198,10 +187,8 @@ pub async fn update_team_member_scheme_roles(
     Path((team_id, user_id)): Path<(String, String)>,
     Json(input): Json<TeamMemberSchemeRolesRequest>,
 ) -> ApiResult<Json<mm::TeamMember>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::InvalidUserId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
 
     // Verify target user exists

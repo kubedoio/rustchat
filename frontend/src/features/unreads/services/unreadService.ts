@@ -1,6 +1,6 @@
 // Unread Service - Business logic for unread counts
 
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { unreadRepository, type ReadState } from '../repositories/unreadRepository'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { TeamId } from '../../../core/entities/Team'
@@ -16,7 +16,7 @@ class UnreadService {
     this.store.setLoading(true)
     try {
       const overview = await unreadRepository.getOverview()
-      
+
       // Reset and populate
       this.store.clearAll()
 
@@ -46,7 +46,7 @@ class UnreadService {
         this.store.setChannelMentions(channelId, 0)
         this.store.setReadState(channelId, {
           last_read_message_id: null,
-          first_unread_message_id: null
+          first_unread_message_id: null,
         })
       }
       // If targetSeq is provided, it's "mark as unread from here"

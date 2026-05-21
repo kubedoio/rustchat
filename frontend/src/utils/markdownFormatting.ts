@@ -11,7 +11,7 @@ export function detectCodeLanguage(text: string): string | null {
   if (text.includes('function') || text.includes('const') || text.includes('let')) {
     return 'javascript'
   }
-  if (text.includes('def ') || text.includes('import ') && text.includes(':')) {
+  if (text.includes('def ') || (text.includes('import ') && text.includes(':'))) {
     return 'python'
   }
   if (text.includes('{') && text.includes('}') && text.includes(';')) {

@@ -33,8 +33,10 @@ const inputId = computed(() => props.id || `input-${Math.random().toString(36).s
         :disabled="disabled"
         class="block w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm transition-colors"
         :class="[
-          error ? 'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500' : '',
-          disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+          error
+            ? 'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500'
+            : '',
+          disabled ? 'bg-gray-100 cursor-not-allowed' : '',
         ]"
       />
     </div>

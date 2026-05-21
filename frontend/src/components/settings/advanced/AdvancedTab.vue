@@ -37,9 +37,11 @@ const unreadScrollLabel = computed(() => {
   const labels: Record<string, string> = {
     start: 'Start of channel',
     last: 'Last viewed post',
-    end: 'End of channel'
+    end: 'End of channel',
   }
-  return labels[preferencesStore.preferences?.unread_scroll_position || 'last'] || 'Last viewed post'
+  return (
+    labels[preferencesStore.preferences?.unread_scroll_position || 'last'] || 'Last viewed post'
+  )
 })
 
 const syncDraftsLabel = computed(() => {
@@ -100,7 +102,7 @@ function cancelEdit() {
         @click="expandRow('send_on_ctrl_enter')"
       />
     </div>
-    
+
     <SettingItemMax
       v-else
       label="Send messages on Ctrl+Enter"
@@ -110,10 +112,14 @@ function cancelEdit() {
       @cancel="cancelEdit"
     >
       <div class="space-y-3">
-        <label class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2">
+        <label
+          class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
+        >
           <div>
             <div class="text-sm font-medium text-text-1">Send messages on Ctrl+Enter</div>
-            <div class="text-xs text-text-3">When enabled, press Ctrl+Enter to send. Press Enter alone for a new line.</div>
+            <div class="text-xs text-text-3">
+              When enabled, press Ctrl+Enter to send. Press Enter alone for a new line.
+            </div>
           </div>
           <input
             type="checkbox"
@@ -133,7 +139,7 @@ function cancelEdit() {
         @click="expandRow('enable_formatting')"
       />
     </div>
-    
+
     <SettingItemMax
       v-else
       label="Enable post formatting"
@@ -143,7 +149,9 @@ function cancelEdit() {
       @cancel="cancelEdit"
     >
       <div class="space-y-3">
-        <label class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2">
+        <label
+          class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
+        >
           <div>
             <div class="text-sm font-medium text-text-1">Enable post formatting</div>
             <div class="text-xs text-text-3">Show the formatting toolbar in the message input</div>
@@ -166,7 +174,7 @@ function cancelEdit() {
         @click="expandRow('join_leave')"
       />
     </div>
-    
+
     <SettingItemMax
       v-else
       label="Enable join/leave messages"
@@ -176,10 +184,14 @@ function cancelEdit() {
       @cancel="cancelEdit"
     >
       <div class="space-y-3">
-        <label class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2">
+        <label
+          class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
+        >
           <div>
             <div class="text-sm font-medium text-text-1">Enable join/leave messages</div>
-            <div class="text-xs text-text-3">Display system messages when users join or leave channels</div>
+            <div class="text-xs text-text-3">
+              Display system messages when users join or leave channels
+            </div>
           </div>
           <input
             type="checkbox"
@@ -199,7 +211,7 @@ function cancelEdit() {
         @click="expandRow('performance_debug')"
       />
     </div>
-    
+
     <SettingItemMax
       v-else
       label="Enable performance debugging"
@@ -209,10 +221,14 @@ function cancelEdit() {
       @cancel="cancelEdit"
     >
       <div class="space-y-3">
-        <label class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2">
+        <label
+          class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
+        >
           <div>
             <div class="text-sm font-medium text-text-1">Enable performance debugging</div>
-            <div class="text-xs text-text-3">Show performance metrics and debugging information</div>
+            <div class="text-xs text-text-3">
+              Show performance metrics and debugging information
+            </div>
           </div>
           <input
             type="checkbox"
@@ -232,7 +248,7 @@ function cancelEdit() {
         @click="expandRow('unread_scroll')"
       />
     </div>
-    
+
     <SettingItemMax
       v-else
       label="Unread scroll position"
@@ -242,7 +258,9 @@ function cancelEdit() {
       @cancel="cancelEdit"
     >
       <div class="space-y-3">
-        <label class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2">
+        <label
+          class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
+        >
           <input
             type="radio"
             v-model="localUnreadScrollPosition"
@@ -254,7 +272,9 @@ function cancelEdit() {
             <div class="text-xs text-text-3">Always scroll to the beginning of the channel</div>
           </div>
         </label>
-        <label class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2">
+        <label
+          class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
+        >
           <input
             type="radio"
             v-model="localUnreadScrollPosition"
@@ -266,7 +286,9 @@ function cancelEdit() {
             <div class="text-xs text-text-3">Scroll to the last message you read</div>
           </div>
         </label>
-        <label class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2">
+        <label
+          class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
+        >
           <input
             type="radio"
             v-model="localUnreadScrollPosition"
@@ -290,7 +312,7 @@ function cancelEdit() {
         @click="expandRow('sync_drafts')"
       />
     </div>
-    
+
     <SettingItemMax
       v-else
       label="Sync draft messages"
@@ -300,16 +322,16 @@ function cancelEdit() {
       @cancel="cancelEdit"
     >
       <div class="space-y-3">
-        <label class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2">
+        <label
+          class="flex items-center justify-between p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
+        >
           <div>
             <div class="text-sm font-medium text-text-1">Sync draft messages</div>
-            <div class="text-xs text-text-3">Synchronize message drafts across all your devices</div>
+            <div class="text-xs text-text-3">
+              Synchronize message drafts across all your devices
+            </div>
           </div>
-          <input
-            type="checkbox"
-            v-model="localSyncDrafts"
-            class="w-5 h-5 text-primary rounded"
-          />
+          <input type="checkbox" v-model="localSyncDrafts" class="w-5 h-5 text-primary rounded" />
         </label>
       </div>
     </SettingItemMax>

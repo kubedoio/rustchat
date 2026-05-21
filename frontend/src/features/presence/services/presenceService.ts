@@ -44,19 +44,15 @@ class PresenceService {
 
   // Typing indicators
   addTypingUser(
-    userId: UserId, 
-    username: string, 
-    channelId: ChannelId, 
+    userId: UserId,
+    username: string,
+    channelId: ChannelId,
     threadRootId?: MessageId
   ): void {
     this.store.addTypingUser(userId, username, channelId, threadRootId)
   }
 
-  removeTypingUser(
-    userId: UserId, 
-    channelId: ChannelId, 
-    threadRootId?: MessageId
-  ): void {
+  removeTypingUser(userId: UserId, channelId: ChannelId, threadRootId?: MessageId): void {
     this.store.removeTypingUser(userId, channelId, threadRootId)
   }
 
@@ -107,7 +103,7 @@ class PresenceService {
 
     // Access the raw map through the store's internal state
     const typingUsers = this.store.getTypingUsersMap()
-    
+
     for (const [key, user] of typingUsers.entries()) {
       if (now - user.timestamp > TYPING_TIMEOUT) {
         staleKeys.push(key)

@@ -39,7 +39,9 @@ const slots = useSlots()
         {{ value }}
       </span>
       <slot name="extra" />
-      <ChevronRight class="h-4 w-4 shrink-0 text-text-3 transition-standard group-hover:text-text-2" />
+      <ChevronRight
+        class="h-4 w-4 shrink-0 text-text-3 transition-standard group-hover:text-text-2"
+      />
     </div>
   </button>
 </template>

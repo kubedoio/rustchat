@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Hash, User } from 'lucide-vue-next'
@@ -21,9 +21,7 @@ const items = [
 
 const filteredItems = computed(() => {
   if (!searchQuery.value) return items.slice(0, 5) // Recent
-  return items.filter(item => 
-    item.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  )
+  return items.filter(item => item.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
 })
 
 function open() {
@@ -50,7 +48,8 @@ function onKeydown(e: KeyboardEvent) {
       selectedIndex.value = (selectedIndex.value + 1) % filteredItems.value.length
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      selectedIndex.value = (selectedIndex.value - 1 + filteredItems.value.length) % filteredItems.value.length
+      selectedIndex.value =
+        (selectedIndex.value - 1 + filteredItems.value.length) % filteredItems.value.length
     } else if (e.key === 'Enter') {
       e.preventDefault()
       selectItem(filteredItems.value[selectedIndex.value])
@@ -61,7 +60,7 @@ function onKeydown(e: KeyboardEvent) {
 function selectItem(item: any) {
   log.debug('Selected:', item)
   if (item.type === 'channel') {
-      router.push(`/channels/${item.id}`)
+    router.push(`/channels/${item.id}`)
   }
   // Navigate
   close()
@@ -72,14 +71,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 md:p-20" role="dialog" @click="close">
+  <div
+    v-if="isOpen"
+    class="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 md:p-20"
+    role="dialog"
+    @click="close"
+  >
     <!-- Backdrop -->
     <div class="fixed inset-0 bg-black/25 transition-opacity backdrop-blur-sm"></div>
 
     <!-- Modal -->
-    <div 
-        class="mx-auto max-w-xl transform divide-y divide-border-1 overflow-hidden rounded-xl bg-bg-surface-1 shadow-2xl ring-1 ring-text-1/5 transition-all"
-        @click.stop
+    <div
+      class="mx-auto max-w-xl transform divide-y divide-border-1 overflow-hidden rounded-xl bg-bg-surface-1 shadow-2xl ring-1 ring-text-1/5 transition-all"
+      @click.stop
     >
       <div class="relative">
         <Search class="pointer-events-none absolute top-3.5 left-4 h-5 w-5 text-text-4" />
@@ -93,37 +97,40 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       </div>
 
       <div v-if="filteredItems.length > 0" class="max-h-96 scroll-py-3 overflow-y-auto p-3">
-         <div v-for="(item, index) in filteredItems" :key="item.id">
-             <!-- Group Header (Optional logic needed) -->
-             
-             <div
-                @click="selectItem(item)"
-                @mouseenter="selectedIndex = index"
-                class="group flex cursor-default select-none rounded-xl p-3"
-                :class="selectedIndex === index ? 'bg-bg-surface-2' : ''"
-             >
-                <div 
-                    class="flex h-10 w-10 flex-none items-center justify-center rounded-lg"
-                    :class="selectedIndex === index ? 'bg-bg-surface-1' : 'bg-bg-surface-2'"
-                >
-                    <Hash v-if="item.type === 'channel'" class="h-6 w-6 text-text-3" />
-                    <User v-else class="h-6 w-6 text-text-3" />
-                </div>
-                <div class="ml-4 flex-auto">
-                    <p class="text-sm font-medium text-text-2" :class="selectedIndex === index ? 'text-text-1' : ''">
-                        {{ item.name }}
-                    </p>
-                    <p class="text-sm text-text-3">
-                        {{ item.group }}
-                    </p>
-                </div>
-             </div>
-         </div>
+        <div v-for="(item, index) in filteredItems" :key="item.id">
+          <!-- Group Header (Optional logic needed) -->
+
+          <div
+            @click="selectItem(item)"
+            @mouseenter="selectedIndex = index"
+            class="group flex cursor-default select-none rounded-xl p-3"
+            :class="selectedIndex === index ? 'bg-bg-surface-2' : ''"
+          >
+            <div
+              class="flex h-10 w-10 flex-none items-center justify-center rounded-lg"
+              :class="selectedIndex === index ? 'bg-bg-surface-1' : 'bg-bg-surface-2'"
+            >
+              <Hash v-if="item.type === 'channel'" class="h-6 w-6 text-text-3" />
+              <User v-else class="h-6 w-6 text-text-3" />
+            </div>
+            <div class="ml-4 flex-auto">
+              <p
+                class="text-sm font-medium text-text-2"
+                :class="selectedIndex === index ? 'text-text-1' : ''"
+              >
+                {{ item.name }}
+              </p>
+              <p class="text-sm text-text-3">
+                {{ item.group }}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-      
+
       <div v-else class="py-14 px-6 text-center text-sm sm:px-14">
-          <p class="mt-4 font-semibold text-text-1">No results found</p>
-          <p class="mt-2 text-text-3">No components found for this search term. Please try again.</p>
+        <p class="mt-4 font-semibold text-text-1">No results found</p>
+        <p class="mt-2 text-text-3">No components found for this search term. Please try again.</p>
       </div>
     </div>
   </div>

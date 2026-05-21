@@ -23,8 +23,7 @@ pub async fn get_team_scheme(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
@@ -53,8 +52,7 @@ pub async fn update_team_scheme(
     Path(team_id): Path<String>,
     Json(input): Json<UpdateTeamSchemeRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden("System admin required".to_string()));
@@ -63,10 +61,7 @@ pub async fn update_team_scheme(
     let new_scheme_id: Option<Uuid> = if input.scheme_id.is_empty() {
         None
     } else {
-        Some(
-            parse_mm_or_uuid(&input.scheme_id)
-                .ok_or_else(|| AppError::InvalidSchemeId)?,
-        )
+        Some(parse_mm_or_uuid(&input.scheme_id).ok_or_else(|| AppError::InvalidSchemeId)?)
     };
 
     let rows_affected = sqlx::query(

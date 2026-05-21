@@ -38,18 +38,21 @@ function scrollToBottom(smooth = true) {
     if (listRef.value) {
       listRef.value.scrollTo({
         top: listRef.value.scrollHeight,
-        behavior: smooth ? 'smooth' : 'auto'
+        behavior: smooth ? 'smooth' : 'auto',
       })
     }
   })
 }
 
 // Scroll to bottom when new replies are added (if already at bottom)
-watch(() => props.replies.length, (newLength, oldLength) => {
-  if (newLength > oldLength && isScrolledToBottom.value) {
-    scrollToBottom()
+watch(
+  () => props.replies.length,
+  (newLength, oldLength) => {
+    if (newLength > oldLength && isScrolledToBottom.value) {
+      scrollToBottom()
+    }
   }
-})
+)
 
 onMounted(() => {
   // Scroll to bottom on initial mount
@@ -58,7 +61,7 @@ onMounted(() => {
 
 // Expose scrollToBottom for parent component
 defineExpose({
-  scrollToBottom
+  scrollToBottom,
 })
 </script>
 
@@ -81,13 +84,19 @@ defineExpose({
     </div>
 
     <!-- Loading State -->
-    <div v-if="isLoading && replies.length === 0" class="flex flex-col items-center justify-center py-12">
+    <div
+      v-if="isLoading && replies.length === 0"
+      class="flex flex-col items-center justify-center py-12"
+    >
       <Loader2 class="w-8 h-8 text-text-3 animate-spin mb-3" />
       <p class="text-sm text-text-3">Loading replies...</p>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="replies.length === 0" class="flex flex-col items-center justify-center py-12 text-center">
+    <div
+      v-else-if="replies.length === 0"
+      class="flex flex-col items-center justify-center py-12 text-center"
+    >
       <div class="w-16 h-16 bg-bg-surface-2 rounded-full flex items-center justify-center mb-4">
         <MessageSquare class="w-8 h-8 text-text-3" />
       </div>
@@ -97,11 +106,7 @@ defineExpose({
 
     <!-- Replies List -->
     <template v-else>
-      <ThreadReplyItem
-        v-for="reply in replies"
-        :key="reply.id"
-        :reply="reply"
-      />
+      <ThreadReplyItem v-for="reply in replies" :key="reply.id" :reply="reply" />
     </template>
   </div>
 </template>

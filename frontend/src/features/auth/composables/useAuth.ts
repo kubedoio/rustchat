@@ -47,7 +47,7 @@ export function useAuth() {
     login,
     logout,
     updateStatus,
-    refreshProfile
+    refreshProfile,
   }
 }
 
@@ -67,6 +67,6 @@ export function useAuthGuard() {
 
     requireAdmin: () => {
       return store.isAdmin
-    }
+    },
   }
 }

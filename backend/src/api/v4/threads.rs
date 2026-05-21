@@ -128,8 +128,7 @@ pub async fn get_threads_internal(
 ) -> ApiResult<Json<mm::ThreadResponse>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
 
-    let team_id = parse_mm_or_uuid(&path.team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&path.team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     let per_page = query.per_page.min(100);
     let offset = query.page * per_page;
@@ -237,10 +236,8 @@ pub async fn get_thread_internal(
     Path(path): Path<ThreadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
-    let team_id = parse_mm_or_uuid(&path.team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
-    let thread_id = parse_mm_or_uuid(&path.thread_id)
-        .ok_or_else(|| AppError::InvalidThreadId)?;
+    let team_id = parse_mm_or_uuid(&path.team_id).ok_or_else(|| AppError::InvalidTeamId)?;
+    let thread_id = parse_mm_or_uuid(&path.thread_id).ok_or_else(|| AppError::InvalidThreadId)?;
 
     let repo = PostRepository::new(state.db.clone());
     let thread = repo
@@ -280,10 +277,8 @@ pub async fn mark_thread_read_internal(
     Path(path): Path<ThreadReadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
-    let _team_id = parse_mm_or_uuid(&path.team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
-    let thread_id = parse_mm_or_uuid(&path.thread_id)
-        .ok_or_else(|| AppError::InvalidThreadId)?;
+    let _team_id = parse_mm_or_uuid(&path.team_id).ok_or_else(|| AppError::InvalidTeamId)?;
+    let thread_id = parse_mm_or_uuid(&path.thread_id).ok_or_else(|| AppError::InvalidThreadId)?;
 
     let read_at = DateTime::from_timestamp_millis(path.timestamp).unwrap_or_else(Utc::now);
 
@@ -309,8 +304,7 @@ pub async fn mark_all_read_internal(
     Path(path): Path<ThreadsPath>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
-    let team_id = parse_mm_or_uuid(&path.team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&path.team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     let repo = PostRepository::new(state.db.clone());
     repo.mark_all_threads_read(user_id, team_id).await?;
@@ -332,8 +326,7 @@ pub async fn get_thread_mention_counts(
     Path(path): Path<ThreadsPath>,
 ) -> ApiResult<Json<std::collections::HashMap<String, i64>>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
-    let team_id = parse_mm_or_uuid(&path.team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&path.team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     let repo = PostRepository::new(state.db.clone());
     let rows = repo
@@ -355,8 +348,7 @@ pub async fn follow_thread_internal(
     Path(path): Path<ThreadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
-    let thread_id = parse_mm_or_uuid(&path.thread_id)
-        .ok_or_else(|| AppError::InvalidThreadId)?;
+    let thread_id = parse_mm_or_uuid(&path.thread_id).ok_or_else(|| AppError::InvalidThreadId)?;
 
     let repo = PostRepository::new(state.db.clone());
     repo.follow_thread(user_id, thread_id).await?;
@@ -371,8 +363,7 @@ pub async fn unfollow_thread_internal(
     Path(path): Path<ThreadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
-    let thread_id = parse_mm_or_uuid(&path.thread_id)
-        .ok_or_else(|| AppError::InvalidThreadId)?;
+    let thread_id = parse_mm_or_uuid(&path.thread_id).ok_or_else(|| AppError::InvalidThreadId)?;
 
     let repo = PostRepository::new(state.db.clone());
     repo.unfollow_thread(user_id, thread_id).await?;
@@ -386,12 +377,9 @@ pub async fn set_thread_unread(
     Path(path): Path<ThreadSetUnreadPath>,
 ) -> ApiResult<Json<mm::Thread>> {
     let user_id = super::users::resolve_user_id(&path.user_id, &auth)?;
-    let _team_id = parse_mm_or_uuid(&path.team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
-    let thread_id = parse_mm_or_uuid(&path.thread_id)
-        .ok_or_else(|| AppError::InvalidThreadId)?;
-    let post_id = parse_mm_or_uuid(&path.post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let _team_id = parse_mm_or_uuid(&path.team_id).ok_or_else(|| AppError::InvalidTeamId)?;
+    let thread_id = parse_mm_or_uuid(&path.thread_id).ok_or_else(|| AppError::InvalidThreadId)?;
+    let post_id = parse_mm_or_uuid(&path.post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
     let post_created_at = repo

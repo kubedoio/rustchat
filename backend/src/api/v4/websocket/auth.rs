@@ -1,10 +1,10 @@
 use std::time::Duration;
 
+use crate::api::websocket_core;
+use crate::api::AppState;
 use axum::extract::ws::{Message, WebSocket};
 use serde_json::json;
 use tokio::time::timeout;
-use crate::api::websocket_core;
-use crate::api::AppState;
 
 /// Authenticate via WebSocket message exchange
 pub(crate) async fn authenticate_via_websocket(

@@ -1267,11 +1267,7 @@ impl<'a> UserRepository<'a> {
     }
 
     /// Check if a role has a specific permission
-    pub async fn has_permission(
-        &self,
-        role: &str,
-        permission: &str,
-    ) -> Result<bool, sqlx::Error> {
+    pub async fn has_permission(&self, role: &str, permission: &str) -> Result<bool, sqlx::Error> {
         sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM role_permissions WHERE role = $1 AND permission_id = $2)",
         )

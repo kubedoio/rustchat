@@ -11,15 +11,15 @@ export interface User {
   username: string
   email: string
   firstName?: string
-  first_name?: string  // API compatibility
+  first_name?: string // API compatibility
   lastName?: string
-  last_name?: string  // API compatibility
+  last_name?: string // API compatibility
   displayName?: string
-  display_name?: string  // API compatibility
+  display_name?: string // API compatibility
   nickname?: string
   position?: string
   avatarUrl?: string
-  avatar_url?: string  // API compatibility
+  avatar_url?: string // API compatibility
   role: 'system_admin' | 'org_admin' | 'user' | 'guest'
   presence: PresenceStatus
   isActive: boolean
@@ -49,6 +49,6 @@ export function toUserRef(user: User): UserRef {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
-    avatarUrl: user.avatarUrl
+    avatarUrl: user.avatarUrl,
   }
 }

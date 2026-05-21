@@ -5,5 +5,5 @@ export { preferencesRepository } from './repositories/preferencesRepository'
 export type {
   UserStatus,
   UserPreferences,
-  StatusPreset
+  StatusPreset,
 } from './repositories/preferencesRepository'

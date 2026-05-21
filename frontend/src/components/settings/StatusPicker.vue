@@ -74,7 +74,7 @@ async function handleClear() {
     <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <!-- Backdrop -->
       <div class="fixed inset-0 bg-black/50" @click="$emit('close')"></div>
-      
+
       <!-- Modal -->
       <div class="relative bg-bg-surface-1 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
         <!-- Header -->
@@ -84,12 +84,12 @@ async function handleClear() {
             <X class="w-5 h-5 text-text-3" />
           </button>
         </div>
-        
+
         <!-- Content -->
         <div class="p-6 space-y-5">
           <!-- Status Input -->
           <div class="flex items-center space-x-3">
-            <button 
+            <button
               ref="emojiButtonRef"
               @click="showEmojiPicker = !showEmojiPicker"
               class="w-10 h-10 rounded-lg bg-bg-surface-2 flex items-center justify-center text-xl hover:bg-bg-surface-1 transition-colors"
@@ -103,7 +103,7 @@ async function handleClear() {
               class="flex-1 px-4 py-2 border border-border-2 rounded-lg bg-bg-surface-2 text-text-1 focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
-          
+
           <!-- Emoji Picker -->
           <div v-if="showEmojiPicker" class="relative">
             <EmojiPicker
@@ -113,12 +113,10 @@ async function handleClear() {
               @close="showEmojiPicker = false"
             />
           </div>
-          
+
           <!-- Quick Presets -->
           <div>
-            <label class="block text-sm font-medium text-text-2 mb-2">
-              Quick select
-            </label>
+            <label class="block text-sm font-medium text-text-2 mb-2"> Quick select </label>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="preset in presets"
@@ -131,7 +129,7 @@ async function handleClear() {
               </button>
             </div>
           </div>
-          
+
           <!-- Duration -->
           <div>
             <label class="block text-sm font-medium text-text-2 mb-2">
@@ -148,7 +146,7 @@ async function handleClear() {
             </select>
           </div>
         </div>
-        
+
         <!-- Footer -->
         <div class="px-6 py-4 border-t border-border-1 flex justify-between">
           <BaseButton v-if="preferencesStore.hasStatus" variant="secondary" @click="handleClear">

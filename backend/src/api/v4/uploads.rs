@@ -101,8 +101,8 @@ async fn create_upload(
     auth: MmAuthUser,
     Json(input): Json<CreateUploadRequest>,
 ) -> ApiResult<(StatusCode, Json<mm::UploadSession>)> {
-    let channel_id = parse_mm_or_uuid(&input.channel_id)
-        .ok_or_else(|| AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
 
     // Verify user has access to channel
     let _ = ChannelRepository::new(&state.db)
@@ -146,8 +146,7 @@ async fn get_upload(
     auth: MmAuthUser,
     Path(upload_id): Path<String>,
 ) -> ApiResult<Json<mm::UploadSession>> {
-    let upload_id = parse_mm_or_uuid(&upload_id)
-        .ok_or_else(|| AppError::InvalidUploadId)?;
+    let upload_id = parse_mm_or_uuid(&upload_id).ok_or_else(|| AppError::InvalidUploadId)?;
 
     let session = UploadRepository::new(&state.db)
         .get_session(upload_id)
@@ -177,8 +176,7 @@ async fn upload_data(
     Path(upload_id): Path<String>,
     body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
-    let upload_id = parse_mm_or_uuid(&upload_id)
-        .ok_or_else(|| AppError::InvalidUploadId)?;
+    let upload_id = parse_mm_or_uuid(&upload_id).ok_or_else(|| AppError::InvalidUploadId)?;
 
     let session = UploadRepository::new(&state.db)
         .get_session(upload_id)

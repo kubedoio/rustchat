@@ -81,8 +81,7 @@ pub(super) async fn get_channel_bookmarks(
     Path(channel_id): Path<String>,
     Query(query): Query<BookmarksQuery>,
 ) -> ApiResult<Json<Vec<ChannelBookmarkResponse>>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| AppError::InvalidChannelId)?;
+    let channel_id = parse_mm_or_uuid(&channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -119,8 +118,7 @@ pub(super) async fn create_channel_bookmark(
     _headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<ChannelBookmarkResponse>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| AppError::InvalidChannelId)?;
+    let channel_id = parse_mm_or_uuid(&channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -199,10 +197,8 @@ pub(super) async fn patch_channel_bookmark(
     _headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<UpdateBookmarkResponse>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| AppError::InvalidChannelId)?;
-    let bookmark_id = parse_mm_or_uuid(&bookmark_id)
-        .ok_or_else(|| AppError::InvalidBookmarkId)?;
+    let channel_id = parse_mm_or_uuid(&channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
+    let bookmark_id = parse_mm_or_uuid(&bookmark_id).ok_or_else(|| AppError::InvalidBookmarkId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -247,10 +243,8 @@ pub(super) async fn update_channel_bookmark_sort_order(
     _headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<Vec<ChannelBookmarkResponse>>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| AppError::InvalidChannelId)?;
-    let bookmark_id = parse_mm_or_uuid(&bookmark_id)
-        .ok_or_else(|| AppError::InvalidBookmarkId)?;
+    let channel_id = parse_mm_or_uuid(&channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
+    let bookmark_id = parse_mm_or_uuid(&bookmark_id).ok_or_else(|| AppError::InvalidBookmarkId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -280,10 +274,8 @@ pub(super) async fn delete_channel_bookmark(
     auth: MmAuthUser,
     Path((channel_id, bookmark_id)): Path<(String, String)>,
 ) -> ApiResult<Json<ChannelBookmarkResponse>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| AppError::InvalidChannelId)?;
-    let bookmark_id = parse_mm_or_uuid(&bookmark_id)
-        .ok_or_else(|| AppError::InvalidBookmarkId)?;
+    let channel_id = parse_mm_or_uuid(&channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
+    let bookmark_id = parse_mm_or_uuid(&bookmark_id).ok_or_else(|| AppError::InvalidBookmarkId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -376,8 +368,7 @@ pub(super) async fn get_channel_groups(
     Path(channel_id): Path<String>,
     Query(query): Query<GroupAssociationQuery>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| AppError::InvalidChannelId)?;
+    let channel_id = parse_mm_or_uuid(&channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
 
     enforce_channel_group_read_permission(&state, &auth, channel_id).await?;
 

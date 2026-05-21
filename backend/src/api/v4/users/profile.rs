@@ -40,8 +40,7 @@ pub async fn get_user_by_id(
     let user_uuid = if user_id == "me" {
         return Err(AppError::BadRequest("Use /users/me endpoint".to_string()));
     } else {
-        parse_mm_or_uuid(&user_id)
-            .ok_or_else(|| AppError::InvalidUserId)?
+        parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?
     };
 
     let mut user: User = UserRepository::new(&state.db)

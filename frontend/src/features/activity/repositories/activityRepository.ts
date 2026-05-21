@@ -22,7 +22,7 @@ function transformActivity(apiActivity: Record<string, unknown>): Activity {
     message: apiActivity.message_text as string | undefined,
     reaction: apiActivity.reaction as string | undefined,
     read: apiActivity.read as boolean,
-    createdAt: new Date(apiActivity.created_at as string)
+    createdAt: new Date(apiActivity.created_at as string),
   }
 }
 
@@ -47,13 +47,13 @@ export const activityRepository = {
       order: response.data.order || [],
       activities,
       unreadCount: response.data.unread_count || 0,
-      nextCursor: response.data.next_cursor
+      nextCursor: response.data.next_cursor,
     }
   },
 
   async markRead(userId: string, activityIds: string[]): Promise<number> {
     const response = await v4Api.post(`/users/${userId}/activity/read`, {
-      activity_ids: activityIds
+      activity_ids: activityIds,
     })
     return response.data.updated
   },
@@ -61,5 +61,5 @@ export const activityRepository = {
   async markAllRead(userId: string): Promise<number> {
     const response = await v4Api.post(`/users/${userId}/activity/read-all`)
     return response.data.updated
-  }
+  },
 }

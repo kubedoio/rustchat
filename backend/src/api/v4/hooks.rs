@@ -115,8 +115,8 @@ pub async fn create_incoming_hook(
     auth: MmAuthUser,
     Json(input): Json<CreateIncomingRequest>,
 ) -> ApiResult<Json<mm::IncomingWebhook>> {
-    let channel_id = parse_mm_or_uuid(&input.channel_id)
-        .ok_or_else(|| AppError::ValidationInvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::ValidationInvalidChannelId)?;
 
     // Get team_id for the channel and verify the caller is a member
     let team_id: Uuid = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
@@ -191,8 +191,8 @@ pub async fn create_outgoing_hook(
         }
     }
 
-    let team_id = parse_mm_or_uuid(&input.team_id)
-        .ok_or_else(|| AppError::ValidationInvalidTeamId)?;
+    let team_id =
+        parse_mm_or_uuid(&input.team_id).ok_or_else(|| AppError::ValidationInvalidTeamId)?;
 
     let channel_id = input.channel_id.and_then(|id| parse_mm_or_uuid(&id));
 
@@ -276,8 +276,7 @@ async fn get_incoming_hook(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<mm::IncomingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::ValidationInvalidHookId)?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_incoming_hook(&state, id, &auth).await? {
@@ -308,8 +307,7 @@ async fn update_incoming_hook(
     Path(hook_id): Path<String>,
     Json(input): Json<UpdateIncomingRequest>,
 ) -> ApiResult<Json<mm::IncomingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::ValidationInvalidHookId)?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_incoming_hook(&state, id, &auth).await? {
@@ -335,8 +333,7 @@ async fn delete_incoming_hook(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::ValidationInvalidHookId)?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_incoming_hook(&state, id, &auth).await? {
@@ -357,8 +354,7 @@ async fn get_outgoing_hook(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<mm::OutgoingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::ValidationInvalidHookId)?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_outgoing_hook(&state, id, &auth).await? {
@@ -389,8 +385,7 @@ async fn update_outgoing_hook(
     Path(hook_id): Path<String>,
     Json(input): Json<UpdateOutgoingRequest>,
 ) -> ApiResult<Json<mm::OutgoingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::ValidationInvalidHookId)?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_outgoing_hook(&state, id, &auth).await? {
@@ -430,8 +425,7 @@ async fn delete_outgoing_hook(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::ValidationInvalidHookId)?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_outgoing_hook(&state, id, &auth).await? {
@@ -452,8 +446,7 @@ async fn regen_outgoing_hook_token(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<mm::OutgoingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::ValidationInvalidHookId)?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_outgoing_hook(&state, id, &auth).await? {

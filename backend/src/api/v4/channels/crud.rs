@@ -102,8 +102,8 @@ pub async fn get_channel(
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -151,8 +151,8 @@ pub async fn create_channel(
     let input: CreateChannelRequest =
         super::utils::parse_body(&headers, &body, "Invalid channel body")?;
 
-    let team_id = parse_mm_or_uuid(&input.team_id)
-        .ok_or_else(|| crate::error::AppError::InvalidTeamId)?;
+    let team_id =
+        parse_mm_or_uuid(&input.team_id).ok_or_else(|| crate::error::AppError::InvalidTeamId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -207,8 +207,8 @@ pub async fn update_channel(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
@@ -246,8 +246,8 @@ pub async fn delete_channel(
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     // Only channel admins or system admins may delete a channel
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
@@ -303,8 +303,8 @@ pub async fn patch_channel(
     Path(channel_id): Path<String>,
     Json(input): Json<PatchChannelRequest>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
@@ -345,8 +345,8 @@ pub async fn update_channel_privacy(
     Path(channel_id): Path<String>,
     Json(input): Json<UpdatePrivacyRequest>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     // Only channel admins or system admins may change channel privacy
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
@@ -373,8 +373,8 @@ pub async fn restore_channel(
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     // Only channel admins or system admins may restore a deleted channel
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
@@ -399,10 +399,10 @@ pub async fn move_channel(
     Path(channel_id): Path<String>,
     Json(input): Json<MoveChannelRequest>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
-    let new_team_id = parse_mm_or_uuid(&input.team_id)
-        .ok_or_else(|| crate::error::AppError::InvalidTeamId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let new_team_id =
+        parse_mm_or_uuid(&input.team_id).ok_or_else(|| crate::error::AppError::InvalidTeamId)?;
 
     // Only system admins may move a channel between teams
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {

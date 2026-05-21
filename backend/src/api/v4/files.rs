@@ -341,8 +341,7 @@ async fn get_file(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::InvalidFileId)?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
@@ -387,8 +386,7 @@ async fn get_file_info(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<Json<mm::FileInfo>> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::InvalidFileId)?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
@@ -425,8 +423,7 @@ async fn get_thumbnail(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::InvalidFileId)?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
@@ -475,8 +472,7 @@ async fn get_preview(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::InvalidFileId)?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
@@ -554,8 +550,7 @@ async fn get_link(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::InvalidFileId)?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
@@ -594,8 +589,7 @@ async fn search_files_for_team(
     Path(team_id): Path<String>,
     Json(params): Json<FileSearchParams>,
 ) -> ApiResult<Json<FileSearchResult>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     search_files_impl(&state, auth.user_id, Some(team_id), &params.terms).await
 }
 

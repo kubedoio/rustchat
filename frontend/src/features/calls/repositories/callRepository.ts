@@ -1,21 +1,15 @@
 // Call Repository - Data access for calls
 // Maps API responses to domain entities
 
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import callsApi from '../../../api/calls'
-import type { 
-  CallState, 
-  CallConfig, 
-  CallParticipant, 
-  SessionId
-} from '../../../core/entities/Call'
+import type { CallState, CallConfig, CallParticipant, SessionId } from '../../../core/entities/Call'
 import { createCallId, createSessionId } from '../../../core/entities/Call'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
 import { withRetry } from '../../../core/services/retry'
 import { AppError } from '../../../core/errors/AppError'
 import { isNotFoundError } from '../../../core/errors/errorUtils'
-
 
 export interface CallChannelState {
   channelId: ChannelId
@@ -29,7 +23,7 @@ export const callRepository = {
     return withRetry(async () => {
       const response = await callsApi.getConfig()
       const data = response.data
-      
+
       // If TURN is needed, fetch credentials
       let iceServers = data.ICEServersConfigs
       if (data.NeedsTURNCredentials) {
@@ -40,7 +34,7 @@ export const callRepository = {
               const urls = Array.isArray(s.urls) ? s.urls : [s.urls]
               return !urls.some(url => url.toString().startsWith('turn:'))
             }),
-            ...turnResponse.data
+            ...turnResponse.data,
           ]
         } catch (error) {
           log.error('Failed to fetch TURN credentials', error)
@@ -60,7 +54,7 @@ export const callRepository = {
         hostControlsAllowed: data.HostControlsAllowed,
         enableRecordings: data.EnableRecordings,
         maxRecordingDuration: data.MaxRecordingDuration,
-        groupCallsAllowed: data.GroupCallsAllowed
+        groupCallsAllowed: data.GroupCallsAllowed,
       }
     })
   },
@@ -72,7 +66,7 @@ export const callRepository = {
       return response.data.map(channelState => ({
         channelId: channelState.channel_id as ChannelId,
         enabled: channelState.enabled,
-        call: channelState.call ? normalizeCallState(channelState.call) : undefined
+        call: channelState.call ? normalizeCallState(channelState.call) : undefined,
       }))
     })
   },
@@ -82,11 +76,11 @@ export const callRepository = {
       try {
         const response = await callsApi.getCallForChannel(channelId)
         if (!response.data) return null
-        
+
         return {
           channelId: response.data.channel_id as ChannelId,
           enabled: response.data.enabled,
-          call: response.data.call ? normalizeCallState(response.data.call) : undefined
+          call: response.data.call ? normalizeCallState(response.data.call) : undefined,
         }
       } catch (error: unknown) {
         if (isNotFoundError(error)) {
@@ -99,17 +93,20 @@ export const callRepository = {
 
   // Call lifecycle
   async startCall(channelId: ChannelId): Promise<CallState> {
-    return withRetry(async () => {
-      await callsApi.startCall(channelId)
-      
-      // Fetch the full call state after starting
-      const channelState = await this.getCallForChannel(channelId)
-      if (!channelState?.call) {
-        throw new AppError('Call started but state could not be loaded')
-      }
-      
-      return channelState.call
-    }, { maxAttempts: 2 })
+    return withRetry(
+      async () => {
+        await callsApi.startCall(channelId)
+
+        // Fetch the full call state after starting
+        const channelState = await this.getCallForChannel(channelId)
+        if (!channelState?.call) {
+          throw new AppError('Call started but state could not be loaded')
+        }
+
+        return channelState.call
+      },
+      { maxAttempts: 2 }
+    )
   },
 
   async joinCall(channelId: ChannelId): Promise<void> {
@@ -154,14 +151,14 @@ export const callRepository = {
     const response = await withRetry(() => callsApi.sendOffer(channelId, sdp))
     return {
       sdp: response.data.sdp,
-      type: response.data.type_
+      type: response.data.type_,
     }
   },
 
   async sendIceCandidate(
-    channelId: ChannelId, 
-    candidate: string, 
-    sdpMid?: string, 
+    channelId: ChannelId,
+    candidate: string,
+    sdpMid?: string,
     sdpMLineIndex?: number
   ): Promise<void> {
     await withRetry(() => callsApi.sendIceCandidate(channelId, candidate, sdpMid, sdpMLineIndex))
@@ -187,14 +184,14 @@ export const callRepository = {
   // Ringing
   async ringUsers(channelId: ChannelId): Promise<void> {
     await withRetry(() => callsApi.ringUsers(channelId))
-  }
+  },
 }
 
 // Normalize API CallState to domain entity
 function normalizeCallState(raw: unknown): CallState {
   const r = raw as Record<string, unknown>
   const participants = new Map<SessionId, CallParticipant>()
-  
+
   const sessions = r.sessions
   if (sessions && typeof sessions === 'object') {
     for (const [key, session] of Object.entries(sessions)) {
@@ -209,26 +206,28 @@ function normalizeCallState(raw: unknown): CallState {
         isSpeaking: false, // Will be updated by WebSocket events
         isScreenSharing: false, // Will be updated by WebSocket events
         raisedHandAt: Number(s.raised_hand || 0),
-        joinedAt: new Date((r.start_at || Date.now()) as string | number)
+        joinedAt: new Date((r.start_at || Date.now()) as string | number),
       })
     }
   }
 
   return {
     id: createCallId((r.id || r.id_raw || '') as string),
-    channelId: ((r.channel_id_raw || r.channel_id) as string) as ChannelId,
+    channelId: (r.channel_id_raw || r.channel_id) as string as ChannelId,
     startedAt: new Date((r.start_at || Date.now()) as string | number),
-    startedBy: ((r.owner_id_raw || r.owner_id) as string) as UserId,
-    hostId: ((r.host_id_raw || r.host_id) as string) as UserId,
+    startedBy: (r.owner_id_raw || r.owner_id) as string as UserId,
+    hostId: (r.host_id_raw || r.host_id) as string as UserId,
     participants,
-    screenSharingSessionId: r.screen_sharing_session_id 
+    screenSharingSessionId: r.screen_sharing_session_id
       ? createSessionId(r.screen_sharing_session_id as string)
       : undefined,
     threadId: r.thread_id as string | undefined,
-    recording: r.recording ? {
-      isRecording: true,
-      startedAt: new Date((r.recording as Record<string, unknown>).start_at as string | number),
-      startedBy: r.owner_id as UserId
-    } : undefined
+    recording: r.recording
+      ? {
+          isRecording: true,
+          startedAt: new Date((r.recording as Record<string, unknown>).start_at as string | number),
+          startedBy: r.owner_id as UserId,
+        }
+      : undefined,
   }
 }

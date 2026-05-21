@@ -50,8 +50,8 @@ async fn handle_call_command(
     auth: MmAuthUser,
     Json(payload): Json<SlashCommandRequest>,
 ) -> ApiResult<Json<SlashCommandResponse>> {
-    let channel_uuid = Uuid::parse_str(&payload.channel_id)
-        .map_err(|_| AppError::InvalidChannelId)?;
+    let channel_uuid =
+        Uuid::parse_str(&payload.channel_id).map_err(|_| AppError::InvalidChannelId)?;
 
     // Parse command text
     let args: Vec<&str> = payload.text.split_whitespace().collect();

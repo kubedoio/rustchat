@@ -27,9 +27,7 @@ const checkboxClass = 'h-5 w-5 cursor-pointer rounded accent-brand'
         type="checkbox"
         :checked="modelValue"
         :class="checkboxClass"
-        @change="
-          emit('update:modelValue', ($event.target as HTMLInputElement).checked)
-        "
+        @change="emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
       />
     </label>
   </div>

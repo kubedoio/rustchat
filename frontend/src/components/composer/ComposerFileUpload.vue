@@ -24,7 +24,7 @@ const emit = defineEmits<{
 const fileUploaderRef = ref<InstanceType<typeof FileUploader> | null>(null)
 
 const uploadInProgressCount = computed(
-  () => props.modelValue.filter((attachment) => attachment.uploading).length
+  () => props.modelValue.filter(attachment => attachment.uploading).length
 )
 
 function openFilePicker() {
@@ -57,7 +57,7 @@ async function handleFiles(files: File[]) {
     const attachmentIndex = newValue.length - 1
 
     try {
-      const response = await filesApi.upload(file, props.channelId, (progressEvent) => {
+      const response = await filesApi.upload(file, props.channelId, progressEvent => {
         if (progressEvent.total) {
           const updated = [...newValue]
           const current = updated[attachmentIndex]
@@ -84,7 +84,10 @@ async function handleFiles(files: File[]) {
       emit('upload-success', file.name)
     } catch (error: unknown) {
       emit('upload-error', getErrorMessage(error, 'Unknown error'))
-      emit('update:modelValue', newValue.filter((_, i) => i !== attachmentIndex))
+      emit(
+        'update:modelValue',
+        newValue.filter((_, i) => i !== attachmentIndex)
+      )
     }
   }
 }

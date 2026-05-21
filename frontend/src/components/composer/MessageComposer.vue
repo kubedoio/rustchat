@@ -32,12 +32,14 @@ const showFormatting = ref(true)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const isMac = ref(false)
 
-const attachedFiles = ref<{
-  file: File
-  uploading: boolean
-  progress: number
-  uploaded?: import('../../api/files').FileUploadResponse
-}[]>([])
+const attachedFiles = ref<
+  {
+    file: File
+    uploading: boolean
+    progress: number
+    uploaded?: import('../../api/files').FileUploadResponse
+  }[]
+>([])
 
 const { loadDraft, saveDraft, clearDraft } = useComposerDraft()
 const { formatInlineCode, formatCodeBlock } = useCodeFormatting(textareaRef)
@@ -55,21 +57,23 @@ const placeholderText = computed(() => {
 })
 
 const sendOnCtrlEnter = computed(() => preferencesStore.preferences?.send_on_ctrl_enter ?? false)
-const formattingAllowed = computed(() => preferencesStore.preferences?.enable_post_formatting !== false)
+const formattingAllowed = computed(
+  () => preferencesStore.preferences?.enable_post_formatting !== false
+)
 const showToolbar = computed(() => formattingAllowed.value && showFormatting.value)
 
 const canSend = computed(() => {
   if (!isConnected.value) return false
   const hasContent = content.value.trim().length > 0
-  const hasUploadedFiles = attachedFiles.value.some((file) => file.uploaded)
-  const hasUploadInProgress = attachedFiles.value.some((file) => file.uploading)
+  const hasUploadedFiles = attachedFiles.value.some(file => file.uploaded)
+  const hasUploadInProgress = attachedFiles.value.some(file => file.uploading)
   return (hasContent || hasUploadedFiles) && !hasUploadInProgress
 })
 
 const sendDisabledReason = computed(() => {
   if (!isConnected.value) return 'Reconnecting...'
-  if (attachedFiles.value.some((f) => f.uploading)) return 'Uploading...'
-  if (!content.value.trim() && !attachedFiles.value.some((f) => f.uploaded)) return 'Type a message'
+  if (attachedFiles.value.some(f => f.uploading)) return 'Uploading...'
+  if (!content.value.trim() && !attachedFiles.value.some(f => f.uploaded)) return 'Type a message'
   return ''
 })
 
@@ -78,14 +82,30 @@ const sendShortcutLabel = computed(() => {
   return isMac.value ? 'Cmd+Enter' : 'Ctrl+Enter'
 })
 
-const autocompleteShowMentionMenu = computed(() => composerAutocompleteRef.value?.showMentionMenu ?? false)
-const autocompleteHasMentionSuggestions = computed(() => composerAutocompleteRef.value?.hasMentionSuggestions ?? false)
-const autocompleteShowEmojiAutocomplete = computed(() => composerAutocompleteRef.value?.showEmojiAutocomplete ?? false)
-const autocompleteHasEmojiSuggestions = computed(() => composerAutocompleteRef.value?.hasEmojiSuggestions ?? false)
-const autocompleteShowChannelAutocomplete = computed(() => composerAutocompleteRef.value?.showChannelAutocomplete ?? false)
-const autocompleteHasChannelSuggestions = computed(() => composerAutocompleteRef.value?.hasChannelSuggestions ?? false)
-const autocompleteShowCommandAutocomplete = computed(() => composerAutocompleteRef.value?.showCommandAutocomplete ?? false)
-const autocompleteHasCommandSuggestions = computed(() => composerAutocompleteRef.value?.hasCommandSuggestions ?? false)
+const autocompleteShowMentionMenu = computed(
+  () => composerAutocompleteRef.value?.showMentionMenu ?? false
+)
+const autocompleteHasMentionSuggestions = computed(
+  () => composerAutocompleteRef.value?.hasMentionSuggestions ?? false
+)
+const autocompleteShowEmojiAutocomplete = computed(
+  () => composerAutocompleteRef.value?.showEmojiAutocomplete ?? false
+)
+const autocompleteHasEmojiSuggestions = computed(
+  () => composerAutocompleteRef.value?.hasEmojiSuggestions ?? false
+)
+const autocompleteShowChannelAutocomplete = computed(
+  () => composerAutocompleteRef.value?.showChannelAutocomplete ?? false
+)
+const autocompleteHasChannelSuggestions = computed(
+  () => composerAutocompleteRef.value?.hasChannelSuggestions ?? false
+)
+const autocompleteShowCommandAutocomplete = computed(
+  () => composerAutocompleteRef.value?.showCommandAutocomplete ?? false
+)
+const autocompleteHasCommandSuggestions = computed(
+  () => composerAutocompleteRef.value?.hasCommandSuggestions ?? false
+)
 
 const { handleSend } = useComposerSend({
   content,
@@ -93,7 +113,7 @@ const { handleSend } = useComposerSend({
   canSend,
   onClearDraft: clearDraft,
   onResetComposer: resetComposer,
-  emitSend: (payload) => emit('send', payload),
+  emitSend: payload => emit('send', payload),
 })
 
 const { handleKeydown, handleGlobalKeydown } = useComposerKeyboard({
@@ -233,7 +253,7 @@ function resetForChannelChange(channelId?: string) {
 
 watch(
   () => channelStore.currentChannelId,
-  (channelId) => {
+  channelId => {
     resetForChannelChange(channelId || undefined)
   },
   { immediate: true }
@@ -241,7 +261,7 @@ watch(
 
 watch(
   () => formattingAllowed.value,
-  (allowed) => {
+  allowed => {
     if (!allowed) {
       showFormatting.value = false
       showPreview.value = false

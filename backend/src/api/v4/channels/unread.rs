@@ -14,8 +14,8 @@ pub async fn get_channel_unread(
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let channel_repo = ChannelRepository::new(&state.db);
     let post_repo = PostRepository::new(state.db.clone());
@@ -26,9 +26,7 @@ pub async fn get_channel_unread(
         .await
         .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
         .then_some(())
-        .ok_or_else(|| {
-            crate::error::AppError::NotAMember
-        })?;
+        .ok_or_else(|| crate::error::AppError::NotAMember)?;
 
     let team_id = channel_repo
         .get_team_id(channel_id)
@@ -74,14 +72,13 @@ pub async fn mark_channel_as_read(
     auth: MmAuthUser,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> ApiResult<impl IntoResponse> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let target_user_id = if user_id == "me" {
         auth.user_id
     } else {
-        parse_mm_or_uuid(&user_id)
-            .ok_or_else(|| crate::error::AppError::InvalidUserId)?
+        parse_mm_or_uuid(&user_id).ok_or_else(|| crate::error::AppError::InvalidUserId)?
     };
 
     // Users can only mark their own channels as read
@@ -99,9 +96,7 @@ pub async fn mark_channel_as_read(
         .await
         .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
         .then_some(())
-        .ok_or_else(|| {
-            crate::error::AppError::NotAMember
-        })?;
+        .ok_or_else(|| crate::error::AppError::NotAMember)?;
 
     channel_repo
         .mark_channel_read(auth.user_id, channel_id)
@@ -134,14 +129,13 @@ pub async fn mark_channel_as_unread(
     auth: MmAuthUser,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> ApiResult<impl IntoResponse> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let target_user_id = if user_id == "me" {
         auth.user_id
     } else {
-        parse_mm_or_uuid(&user_id)
-            .ok_or_else(|| crate::error::AppError::InvalidUserId)?
+        parse_mm_or_uuid(&user_id).ok_or_else(|| crate::error::AppError::InvalidUserId)?
     };
 
     // Users can only mark their own channels as unread
@@ -160,9 +154,7 @@ pub async fn mark_channel_as_unread(
         .await
         .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
         .then_some(())
-        .ok_or_else(|| {
-            crate::error::AppError::NotAMember
-        })?;
+        .ok_or_else(|| crate::error::AppError::NotAMember)?;
 
     // Get the oldest post in the channel to set as unread point
     let oldest_post_time = post_repo.get_oldest_post_time(channel_id).await?;

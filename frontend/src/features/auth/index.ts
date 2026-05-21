@@ -15,5 +15,5 @@ export type {
   LoginCredentials,
   LoginResponse,
   AuthPolicy,
-  UpdateStatusRequest
+  UpdateStatusRequest,
 } from './repositories/authRepository'

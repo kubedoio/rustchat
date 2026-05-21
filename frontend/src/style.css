@@ -1,9 +1,9 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @config "../tailwind.config.js";
 
 @theme {
   /* === DESIGN TOKENS === */
-  
+
   /* Color Tokens - mapped from CSS variables */
   --color-primary: var(--theme-primary);
   --color-secondary: var(--theme-secondary);
@@ -69,16 +69,19 @@
 @layer base {
   :root {
     /* === FONT STACKS === */
-    --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --font-figtree: "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-jetbrains-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
-    --font-quicksand: "Quicksand", "Avenir Next", "Segoe UI", sans-serif;
-    --font-montserrat: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-source-sans-3: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-nunito: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-manrope: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-work-sans: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-ibm-plex-sans: "IBM Plex Sans", "Aptos", "Segoe UI", sans-serif;
+    --font-inter:
+      'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+      sans-serif;
+    --font-figtree: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-jetbrains-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    --font-quicksand: 'Quicksand', 'Avenir Next', 'Segoe UI', sans-serif;
+    --font-montserrat: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-source-sans-3:
+      'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-nunito: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-manrope: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-work-sans: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-ibm-plex-sans: 'IBM Plex Sans', 'Aptos', 'Segoe UI', sans-serif;
 
     /* Default Typography */
     --chat-font-family: var(--font-ibm-plex-sans);
@@ -119,14 +122,14 @@
 
     /* === SPACING SCALE === */
     --sp-0: 0;
-    --sp-1: 0.25rem;    /* 4px */
-    --sp-2: 0.5rem;     /* 8px */
-    --sp-3: 0.75rem;    /* 12px */
-    --sp-4: 1rem;       /* 16px */
-    --sp-5: 1.25rem;    /* 20px */
-    --sp-6: 1.5rem;     /* 24px */
-    --sp-7: 2rem;       /* 32px */
-    --sp-8: 2.5rem;     /* 40px */
+    --sp-1: 0.25rem; /* 4px */
+    --sp-2: 0.5rem; /* 8px */
+    --sp-3: 0.75rem; /* 12px */
+    --sp-4: 1rem; /* 16px */
+    --sp-5: 1.25rem; /* 20px */
+    --sp-6: 1.5rem; /* 24px */
+    --sp-7: 2rem; /* 32px */
+    --sp-8: 2.5rem; /* 40px */
 
     /* === RADIUS SCALE === */
     --r-1: 6px;
@@ -141,7 +144,7 @@
     --team-rail-width: 56px;
     --rhs-width: 360px;
     --composer-min-height: 56px;
-    
+
     /* Message Layout */
     --msg-max-width: 1100px;
     --msg-gutter: 16px;
@@ -179,22 +182,22 @@
     --shadow-3: var(--theme-shadow-lg);
 
     /* Typography Scale - calculated from base size */
-    --fs-xs: calc(var(--chat-font-size) * 0.857);    /* ~12px at 14px base */
+    --fs-xs: calc(var(--chat-font-size) * 0.857); /* ~12px at 14px base */
     --lh-xs: calc(var(--chat-font-size) * 1.25);
-    
-    --fs-sm: var(--chat-font-size);                   /* 14px */
+
+    --fs-sm: var(--chat-font-size); /* 14px */
     --lh-sm: calc(var(--chat-font-size) * 1.428);
-    
-    --fs-base: calc(var(--chat-font-size) * 1.071);  /* ~15px */
+
+    --fs-base: calc(var(--chat-font-size) * 1.071); /* ~15px */
     --lh-base: calc(var(--chat-font-size) * 1.5);
-    
-    --fs-md: calc(var(--chat-font-size) * 1.143);    /* ~16px */
+
+    --fs-md: calc(var(--chat-font-size) * 1.143); /* ~16px */
     --lh-md: calc(var(--chat-font-size) * 1.5);
-    
-    --fs-lg: calc(var(--chat-font-size) * 1.286);    /* ~18px */
+
+    --fs-lg: calc(var(--chat-font-size) * 1.286); /* ~18px */
     --lh-lg: calc(var(--chat-font-size) * 1.555);
-    
-    --fs-xl: calc(var(--chat-font-size) * 1.5);      /* ~21px */
+
+    --fs-xl: calc(var(--chat-font-size) * 1.5); /* ~21px */
     --lh-xl: calc(var(--chat-font-size) * 1.4);
   }
 
@@ -473,7 +476,10 @@
 }
 
 .transition-colors {
-  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background-color 0.15s,
+    border-color 0.15s;
 }
 
 /* Focus ring utilities */
@@ -482,7 +488,9 @@
 }
 
 .focus-ring:focus {
-  box-shadow: 0 0 0 2px var(--bg-app), 0 0 0 4px var(--brand);
+  box-shadow:
+    0 0 0 2px var(--bg-app),
+    0 0 0 4px var(--brand);
 }
 
 .focus-ring-subtle {
@@ -495,7 +503,9 @@
 
 /* Hover lift effect */
 .hover-lift {
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .hover-lift:hover {
@@ -589,7 +599,8 @@
 }
 
 @keyframes pulse-soft {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -611,7 +622,8 @@
 /* Base code font stack */
 .message-content code,
 .message-content pre code {
-  font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family:
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 /* Inline code: smaller than body text for visual distinction */
@@ -654,21 +666,52 @@
   color: var(--text-1);
 }
 
-.message-content .hljs-keyword { color: #d73a49; }
-.message-content .hljs-string { color: #032f62; }
-.message-content .hljs-number { color: #005cc5; }
-.message-content .hljs-comment { color: #6a737d; font-style: italic; }
-.message-content .hljs-function { color: #6f42c1; }
-.message-content .hljs-class { color: #6f42c1; }
-.message-content .hljs-title { color: #6f42c1; }
-.message-content .hljs-params { color: var(--text-1); }
-.message-content .hljs-built_in { color: #005cc5; }
-.message-content .hljs-literal { color: #005cc5; }
-.message-content .hljs-operator { color: #d73a49; }
-.message-content .hljs-punctuation { color: var(--text-2); }
-.message-content .hljs-property { color: #005cc5; }
-.message-content .hljs-tag { color: #22863a; }
-.message-content .hljs-attr { color: #6f42c1; }
+.message-content .hljs-keyword {
+  color: #d73a49;
+}
+.message-content .hljs-string {
+  color: #032f62;
+}
+.message-content .hljs-number {
+  color: #005cc5;
+}
+.message-content .hljs-comment {
+  color: #6a737d;
+  font-style: italic;
+}
+.message-content .hljs-function {
+  color: #6f42c1;
+}
+.message-content .hljs-class {
+  color: #6f42c1;
+}
+.message-content .hljs-title {
+  color: #6f42c1;
+}
+.message-content .hljs-params {
+  color: var(--text-1);
+}
+.message-content .hljs-built_in {
+  color: #005cc5;
+}
+.message-content .hljs-literal {
+  color: #005cc5;
+}
+.message-content .hljs-operator {
+  color: #d73a49;
+}
+.message-content .hljs-punctuation {
+  color: var(--text-2);
+}
+.message-content .hljs-property {
+  color: #005cc5;
+}
+.message-content .hljs-tag {
+  color: #22863a;
+}
+.message-content .hljs-attr {
+  color: #6f42c1;
+}
 
 /* === RESPONSIVE HELPERS === */
 

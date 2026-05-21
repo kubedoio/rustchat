@@ -41,9 +41,7 @@ const isDeleted = computed(() => !props.parentPost)
     <div class="h-12 flex items-center justify-between px-4 border-b border-border-1">
       <div class="flex items-center gap-2">
         <MessageSquare class="w-5 h-5 text-text-2" />
-        <h3 class="font-bold text-[15px] text-text-1 uppercase tracking-wider">
-          Thread
-        </h3>
+        <h3 class="font-bold text-[15px] text-text-1 uppercase tracking-wider">Thread</h3>
         <span v-if="replyCount > 0" class="text-sm text-text-3">
           ({{ replyCount }} {{ replyCount === 1 ? 'reply' : 'replies' }})
         </span>
@@ -100,12 +98,11 @@ const isDeleted = computed(() => !props.parentPost)
           ></div>
 
           <!-- Files -->
-          <div v-if="parentPost.files && parentPost.files.length > 0" class="mt-4 flex flex-wrap gap-2">
-            <FilePreview
-              v-for="file in parentPost.files"
-              :key="file.id"
-              :file="file"
-            />
+          <div
+            v-if="parentPost.files && parentPost.files.length > 0"
+            class="mt-4 flex flex-wrap gap-2"
+          >
+            <FilePreview v-for="file in parentPost.files" :key="file.id" :file="file" />
           </div>
         </div>
       </div>

@@ -38,7 +38,7 @@ const commandEntries = ['call start', 'call join', 'call leave', 'call end']
 const hasMentionSuggestions = computed(() => {
   if (!showMentionMenu.value) return false
   const query = mentionQuery.value.toLowerCase()
-  return teamStore.members.some((member) => member.username.toLowerCase().includes(query))
+  return teamStore.members.some(member => member.username.toLowerCase().includes(query))
 })
 
 const hasEmojiSuggestions = computed(() => {
@@ -49,7 +49,7 @@ const hasEmojiSuggestions = computed(() => {
 const hasChannelSuggestions = computed(() => {
   if (!showChannelAutocomplete.value || !channelQuery.value) return false
   const query = channelQuery.value.toLowerCase()
-  return channelStore.channels.some((channel) => {
+  return channelStore.channels.some(channel => {
     const channelName = channel.name?.toLowerCase() ?? ''
     const displayName = channel.display_name?.toLowerCase() ?? ''
     return channelName.includes(query) || displayName.includes(query)
@@ -58,9 +58,12 @@ const hasChannelSuggestions = computed(() => {
 
 const hasCommandSuggestions = computed(() => {
   if (!showCommandAutocomplete.value) return false
-  const query = commandQuery.value.trim().toLowerCase().replace(/^\^k\s*/, '')
+  const query = commandQuery.value
+    .trim()
+    .toLowerCase()
+    .replace(/^\^k\s*/, '')
   if (!query) return commandEntries.length > 0
-  return commandEntries.some((command) => command.toLowerCase().startsWith(query))
+  return commandEntries.some(command => command.toLowerCase().startsWith(query))
 })
 
 const commandRef = ref<InstanceType<typeof CommandAutocomplete> | null>(null)

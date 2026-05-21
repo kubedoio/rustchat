@@ -99,7 +99,9 @@ function onInsertEmoji(emoji: string) {
       <!-- Keyboard Shortcuts Hint -->
       <div class="hidden xl:flex items-center gap-2 text-[11px] text-text-3">
         <span class="flex items-center gap-1">
-          <kbd class="px-1.5 py-0.5 bg-bg-surface-2 rounded text-[10px]">{{ sendShortcutLabel }}</kbd>
+          <kbd class="px-1.5 py-0.5 bg-bg-surface-2 rounded text-[10px]">{{
+            sendShortcutLabel
+          }}</kbd>
           <span>to send</span>
         </span>
         <span class="text-border-2">|</span>

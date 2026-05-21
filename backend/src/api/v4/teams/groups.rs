@@ -19,8 +19,7 @@ pub async fn get_team_groups(
     Path(team_id): Path<String>,
     Query(query): Query<GroupAssociationQuery>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {
         ensure_team_member(&state, team_id, auth.user_id).await?;
@@ -100,8 +99,7 @@ pub async fn get_team_groups_by_channels(
     Path(team_id): Path<String>,
     Query(query): Query<GroupAssociationQuery>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {
         ensure_team_member(&state, team_id, auth.user_id).await?;

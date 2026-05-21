@@ -478,7 +478,10 @@ async fn execute_call_command(
         let db_val_clone = db_value.clone();
         return Ok(build_command_response(
             "ephemeral",
-            format!("Calls are not enabled (db: {:?}, env: {})", db_val_clone, state.config.calls.enabled),
+            format!(
+                "Calls are not enabled (db: {:?}, env: {})",
+                db_val_clone, state.config.calls.enabled
+            ),
             None,
             None,
         ));
@@ -539,7 +542,12 @@ async fn execute_call_command(
             };
             state.ws_hub.broadcast(event).await;
 
-            return Ok(build_command_response("ephemeral", "Call ended", None, None));
+            return Ok(build_command_response(
+                "ephemeral",
+                "Call ended",
+                None,
+                None,
+            ));
         }
 
         return Ok(build_command_response(
@@ -754,7 +762,12 @@ async fn execute_call_command(
     )
     .await?;
 
-    Ok(build_command_response("ephemeral", "Call started", None, None))
+    Ok(build_command_response(
+        "ephemeral",
+        "Call started",
+        None,
+        None,
+    ))
 }
 
 async fn execute_join_command(
@@ -924,7 +937,12 @@ async fn try_execute_builtin_command(
         "join" => Some(execute_join_command(state, auth, payload, args).await),
         "leave" => Some(execute_leave_command(state, auth, payload).await),
         "me" => Some(execute_me_command(state, auth, payload, args).await),
-        "help" => Some(Ok(build_command_response("ephemeral", HELP_TEXT, None, None))),
+        "help" => Some(Ok(build_command_response(
+            "ephemeral",
+            HELP_TEXT,
+            None,
+            None,
+        ))),
         _ => None,
     }
 }
@@ -999,17 +1017,17 @@ async fn execute_custom_slash_command(
         .await?;
 
         if res.status().is_success() {
-            let resp_body = res
-                .json::<CommandResponse>()
-                .await
-                .unwrap_or_else(|_| CommandResponse {
-                    response_type: "ephemeral".to_string(),
-                    text: "Command executed successfully (no response body)".to_string(),
-                    username: None,
-                    icon_url: None,
-                    goto_location: None,
-                    attachments: None,
-                });
+            let resp_body =
+                res.json::<CommandResponse>()
+                    .await
+                    .unwrap_or_else(|_| CommandResponse {
+                        response_type: "ephemeral".to_string(),
+                        text: "Command executed successfully (no response body)".to_string(),
+                        username: None,
+                        icon_url: None,
+                        goto_location: None,
+                        attachments: None,
+                    });
             Ok(resp_body)
         } else {
             Ok(build_command_response(
@@ -1035,7 +1053,8 @@ pub async fn execute_slash_command(
     payload: ExecuteCommand,
 ) -> ApiResult<CommandResponse> {
     let (trigger, args) = parse_command_input(&payload.command)?;
-    if let Some(result) = try_execute_builtin_command(state, &auth, &payload, trigger, &args).await {
+    if let Some(result) = try_execute_builtin_command(state, &auth, &payload, trigger, &args).await
+    {
         return result;
     }
     execute_custom_slash_command(state, &auth, &payload, trigger, &args).await

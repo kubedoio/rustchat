@@ -55,8 +55,7 @@ pub async fn get_emoji(
     _auth: MmAuthUser,
     Path(emoji_id_str): Path<String>,
 ) -> ApiResult<Json<mm::Emoji>> {
-    let emoji_id = parse_mm_or_uuid(&emoji_id_str)
-        .ok_or_else(|| AppError::InvalidEmojiId)?;
+    let emoji_id = parse_mm_or_uuid(&emoji_id_str).ok_or_else(|| AppError::InvalidEmojiId)?;
 
     let emoji = EmojiRepository::new(&state.db)
         .get_by_id(emoji_id)
@@ -139,8 +138,7 @@ pub async fn get_emoji_image(
         ));
     }
 
-    let emoji_id = parse_mm_or_uuid(&emoji_id_str)
-        .ok_or_else(|| AppError::EmojiNotFound)?;
+    let emoji_id = parse_mm_or_uuid(&emoji_id_str).ok_or_else(|| AppError::EmojiNotFound)?;
 
     // Get the emoji's image path from database
     let image_url = EmojiRepository::new(&state.db)
@@ -268,8 +266,7 @@ pub async fn delete_emoji(
     auth: MmAuthUser,
     Path(emoji_id_str): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let emoji_id = parse_mm_or_uuid(&emoji_id_str)
-        .ok_or_else(|| AppError::InvalidEmojiId)?;
+    let emoji_id = parse_mm_or_uuid(&emoji_id_str).ok_or_else(|| AppError::InvalidEmojiId)?;
 
     let emoji = EmojiRepository::new(&state.db)
         .get_by_id(emoji_id)

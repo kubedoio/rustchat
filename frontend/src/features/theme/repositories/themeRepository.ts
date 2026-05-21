@@ -17,30 +17,26 @@ export interface AppearancePreferences {
 
 export const themeRepository = {
   // Persist appearance to server
-  async saveToServer(
-    theme: Theme,
-    font: ChatFont,
-    fontSize: ChatFontSize
-  ): Promise<void> {
+  async saveToServer(theme: Theme, font: ChatFont, fontSize: ChatFontSize): Promise<void> {
     const payload: Preference[] = [
       {
         user_id: 'me',
         category: SERVER_PREFERENCE_CATEGORY,
         name: SERVER_PREFERENCE_THEME,
-        value: theme
+        value: theme,
       },
       {
         user_id: 'me',
         category: SERVER_PREFERENCE_CATEGORY,
         name: SERVER_PREFERENCE_FONT,
-        value: font
+        value: font,
       },
       {
         user_id: 'me',
         category: SERVER_PREFERENCE_CATEGORY,
         name: SERVER_PREFERENCE_FONT_SIZE,
-        value: String(fontSize)
-      }
+        value: String(fontSize),
+      },
     ]
 
     await withRetry(() => preferencesApi.updatePreferencesV4('me', payload))
@@ -61,8 +57,8 @@ export const themeRepository = {
       return {
         theme: rawTheme as Theme | undefined,
         font: rawFont as ChatFont | undefined,
-        fontSize: rawFontSize ? (Number(rawFontSize) as ChatFontSize) : undefined
+        fontSize: rawFontSize ? (Number(rawFontSize) as ChatFontSize) : undefined,
       }
     })
-  }
+  },
 }

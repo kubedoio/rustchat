@@ -2,22 +2,191 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps<{
-    show: boolean
-    anchorEl?: HTMLElement | null
+  show: boolean
+  anchorEl?: HTMLElement | null
 }>()
 
 const emit = defineEmits<{
-    (e: 'select', emoji: string): void
-    (e: 'close'): void
+  (e: 'select', emoji: string): void
+  (e: 'close'): void
 }>()
 
 const categories = [
-    { id: 'frequent', name: '👍', emojis: ['👍', '❤️', '😂', '🎉', '🤔', '👀', '🙌', '💯'] },
-    { id: 'smileys', name: '😀', emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷'] },
-    { id: 'gestures', name: '👋', emojis: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏'] },
-    { id: 'hearts', name: '❤️', emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝'] },
-    { id: 'objects', name: '💡', emojis: ['⭐', '🌟', '✨', '⚡', '🔥', '💫', '🎯', '🎪', '🎨', '🎬', '🎤', '🎧', '🎵', '🎶', '🎹', '🥁', '🎸', '🎺', '🎻', '🎲', '🎮', '🕹️', '🎰', '🧩'] },
-    { id: 'symbols', name: '✅', emojis: ['✅', '❌', '❓', '❗', '💯', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🟤', '🔶', '🔷', '🔸', '🔹', '▪️', '▫️', '◾', '◽', '◼️', '◻️', '⬛', '⬜'] },
+  { id: 'frequent', name: '👍', emojis: ['👍', '❤️', '😂', '🎉', '🤔', '👀', '🙌', '💯'] },
+  {
+    id: 'smileys',
+    name: '😀',
+    emojis: [
+      '😀',
+      '😃',
+      '😄',
+      '😁',
+      '😆',
+      '😅',
+      '🤣',
+      '😂',
+      '🙂',
+      '😊',
+      '😇',
+      '🥰',
+      '😍',
+      '🤩',
+      '😘',
+      '😗',
+      '😚',
+      '😋',
+      '😛',
+      '😜',
+      '🤪',
+      '😝',
+      '🤑',
+      '🤗',
+      '🤭',
+      '🤫',
+      '🤔',
+      '🤐',
+      '🤨',
+      '😐',
+      '😑',
+      '😶',
+      '😏',
+      '😒',
+      '🙄',
+      '😬',
+      '🤥',
+      '😌',
+      '😔',
+      '😪',
+      '🤤',
+      '😴',
+      '😷',
+    ],
+  },
+  {
+    id: 'gestures',
+    name: '👋',
+    emojis: [
+      '👋',
+      '🤚',
+      '🖐️',
+      '✋',
+      '🖖',
+      '👌',
+      '🤌',
+      '🤏',
+      '✌️',
+      '🤞',
+      '🤟',
+      '🤘',
+      '🤙',
+      '👈',
+      '👉',
+      '👆',
+      '🖕',
+      '👇',
+      '☝️',
+      '👍',
+      '👎',
+      '✊',
+      '👊',
+      '🤛',
+      '🤜',
+      '👏',
+      '🙌',
+      '👐',
+      '🤲',
+      '🤝',
+      '🙏',
+    ],
+  },
+  {
+    id: 'hearts',
+    name: '❤️',
+    emojis: [
+      '❤️',
+      '🧡',
+      '💛',
+      '💚',
+      '💙',
+      '💜',
+      '🖤',
+      '🤍',
+      '🤎',
+      '💔',
+      '❤️‍🔥',
+      '❤️‍🩹',
+      '❣️',
+      '💕',
+      '💞',
+      '💓',
+      '💗',
+      '💖',
+      '💘',
+      '💝',
+    ],
+  },
+  {
+    id: 'objects',
+    name: '💡',
+    emojis: [
+      '⭐',
+      '🌟',
+      '✨',
+      '⚡',
+      '🔥',
+      '💫',
+      '🎯',
+      '🎪',
+      '🎨',
+      '🎬',
+      '🎤',
+      '🎧',
+      '🎵',
+      '🎶',
+      '🎹',
+      '🥁',
+      '🎸',
+      '🎺',
+      '🎻',
+      '🎲',
+      '🎮',
+      '🕹️',
+      '🎰',
+      '🧩',
+    ],
+  },
+  {
+    id: 'symbols',
+    name: '✅',
+    emojis: [
+      '✅',
+      '❌',
+      '❓',
+      '❗',
+      '💯',
+      '🔴',
+      '🟠',
+      '🟡',
+      '🟢',
+      '🔵',
+      '🟣',
+      '⚫',
+      '⚪',
+      '🟤',
+      '🔶',
+      '🔷',
+      '🔸',
+      '🔹',
+      '▪️',
+      '▫️',
+      '◾',
+      '◽',
+      '◼️',
+      '◻️',
+      '⬛',
+      '⬜',
+    ],
+  },
 ]
 
 const activeCategory = ref('frequent')
@@ -26,87 +195,93 @@ const pickerRef = ref<HTMLElement | null>(null)
 const pickerStyle = ref<Record<string, string>>({})
 
 const filteredEmojis = computed(() => {
-    const cat = categories.find(c => c.id === activeCategory.value)
-    if (!cat) return []
-    
-    if (searchQuery.value) {
-        return cat.emojis.filter(e => e.includes(searchQuery.value))
-    }
-    return cat.emojis
+  const cat = categories.find(c => c.id === activeCategory.value)
+  if (!cat) return []
+
+  if (searchQuery.value) {
+    return cat.emojis.filter(e => e.includes(searchQuery.value))
+  }
+  return cat.emojis
 })
 
 function selectEmoji(emoji: string) {
-    emit('select', emoji)
-    emit('close')
+  emit('select', emoji)
+  emit('close')
 }
 
 function updatePosition() {
-    if (!props.show || !props.anchorEl || !pickerRef.value) return
+  if (!props.show || !props.anchorEl || !pickerRef.value) return
 
-    const anchorRect = props.anchorEl.getBoundingClientRect()
-    const panelRect = pickerRef.value.getBoundingClientRect()
-    const viewportPadding = 8
-    const gap = 10
+  const anchorRect = props.anchorEl.getBoundingClientRect()
+  const panelRect = pickerRef.value.getBoundingClientRect()
+  const viewportPadding = 8
+  const gap = 10
 
-    let left = anchorRect.right - panelRect.width
-    left = Math.max(viewportPadding, Math.min(left, window.innerWidth - panelRect.width - viewportPadding))
+  let left = anchorRect.right - panelRect.width
+  left = Math.max(
+    viewportPadding,
+    Math.min(left, window.innerWidth - panelRect.width - viewportPadding)
+  )
 
-    let top = anchorRect.top - panelRect.height - gap
-    if (top < viewportPadding) {
-        top = anchorRect.bottom + gap
-    }
-    top = Math.max(viewportPadding, Math.min(top, window.innerHeight - panelRect.height - viewportPadding))
+  let top = anchorRect.top - panelRect.height - gap
+  if (top < viewportPadding) {
+    top = anchorRect.bottom + gap
+  }
+  top = Math.max(
+    viewportPadding,
+    Math.min(top, window.innerHeight - panelRect.height - viewportPadding)
+  )
 
-    pickerStyle.value = {
-        left: `${Math.round(left)}px`,
-        top: `${Math.round(top)}px`,
-    }
+  pickerStyle.value = {
+    left: `${Math.round(left)}px`,
+    top: `${Math.round(top)}px`,
+  }
 }
 
 function handlePointerDown(event: MouseEvent) {
-    if (!props.show) return
-    const target = event.target as Node | null
-    if (!target) return
-    if (pickerRef.value?.contains(target)) return
-    if (props.anchorEl?.contains(target)) return
-    emit('close')
+  if (!props.show) return
+  const target = event.target as Node | null
+  if (!target) return
+  if (pickerRef.value?.contains(target)) return
+  if (props.anchorEl?.contains(target)) return
+  emit('close')
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-    if (props.show && event.key === 'Escape') {
-        emit('close')
-    }
+  if (props.show && event.key === 'Escape') {
+    emit('close')
+  }
 }
 
 watch(
-    () => props.show,
-    async (visible) => {
-        if (!visible) return
-        await nextTick()
-        updatePosition()
-    }
+  () => props.show,
+  async visible => {
+    if (!visible) return
+    await nextTick()
+    updatePosition()
+  }
 )
 
 watch(
-    () => props.anchorEl,
-    () => {
-        if (!props.show) return
-        void nextTick(updatePosition)
-    }
+  () => props.anchorEl,
+  () => {
+    if (!props.show) return
+    void nextTick(updatePosition)
+  }
 )
 
 onMounted(() => {
-    window.addEventListener('resize', updatePosition)
-    window.addEventListener('scroll', updatePosition, true)
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('resize', updatePosition)
+  window.addEventListener('scroll', updatePosition, true)
+  document.addEventListener('mousedown', handlePointerDown)
+  document.addEventListener('keydown', handleKeyDown)
 })
 
 onUnmounted(() => {
-    window.removeEventListener('resize', updatePosition)
-    window.removeEventListener('scroll', updatePosition, true)
-    document.removeEventListener('mousedown', handlePointerDown)
-    document.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('resize', updatePosition)
+  window.removeEventListener('scroll', updatePosition, true)
+  document.removeEventListener('mousedown', handlePointerDown)
+  document.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 

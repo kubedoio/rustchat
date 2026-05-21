@@ -10,8 +10,8 @@ pub async fn get_channel_stats(
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
 ) -> ApiResult<Json<mm::ChannelStats>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
     let is_member: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2)",
     )

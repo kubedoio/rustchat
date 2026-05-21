@@ -1,6 +1,10 @@
 // Playbook Service - Business logic for playbooks
 
-import { playbookRepository, type CreatePlaybookRequest, type StartRunRequest } from '../repositories/playbookRepository'
+import {
+  playbookRepository,
+  type CreatePlaybookRequest,
+  type StartRunRequest,
+} from '../repositories/playbookRepository'
 import type { Playbook, PlaybookRun } from '../../../api/playbooks'
 import type { TeamId } from '../../../core/entities/Team'
 import { usePlaybookStore } from '../stores/playbookStore'
@@ -18,9 +22,7 @@ class PlaybookService {
       const playbooks = await playbookRepository.listByTeam(teamId)
       this.store.setPlaybooks(playbooks)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to load playbooks'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to load playbooks')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -33,9 +35,7 @@ class PlaybookService {
       const playbook = await playbookRepository.getById(id)
       this.store.setCurrentPlaybook(playbook)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to load playbook'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to load playbook')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -48,9 +48,7 @@ class PlaybookService {
       this.store.addPlaybook(playbook)
       return playbook
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to create playbook'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to create playbook')
       throw error
     }
   }
@@ -61,9 +59,7 @@ class PlaybookService {
       this.store.updatePlaybookInList(playbook)
       return playbook
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to update playbook'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to update playbook')
       throw error
     }
   }
@@ -73,9 +69,7 @@ class PlaybookService {
       await playbookRepository.delete(id)
       this.store.removePlaybook(id)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to delete playbook'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to delete playbook')
       throw error
     }
   }
@@ -87,9 +81,7 @@ class PlaybookService {
       const runs = await playbookRepository.listRuns(teamId)
       this.store.setRuns(runs)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to load runs'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to load runs')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -102,9 +94,7 @@ class PlaybookService {
       const run = await playbookRepository.getRun(id)
       this.store.setCurrentRun(run)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to load run'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to load run')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -117,9 +107,7 @@ class PlaybookService {
       this.store.addRun(run)
       return run
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to start run'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to start run')
       throw error
     }
   }
@@ -129,9 +117,7 @@ class PlaybookService {
       await playbookRepository.updateRunTask(runId, taskId, status)
       // State will be updated via API response or refresh
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError ? error.message : 'Failed to update task'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to update task')
       throw error
     }
   }

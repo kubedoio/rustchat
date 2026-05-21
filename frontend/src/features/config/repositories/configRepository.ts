@@ -10,5 +10,5 @@ export const configRepository = {
       const response = await siteApi.getInfo()
       return response.data
     })
-  }
+  },
 }

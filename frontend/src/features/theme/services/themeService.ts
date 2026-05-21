@@ -1,6 +1,6 @@
 // Theme Service - Business logic for appearance/theming
 
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { themeRepository } from '../repositories/themeRepository'
 import type { Theme, ChatFont, ChatFontSize } from '../types'
 import { THEME_OPTIONS, FONT_OPTIONS, FONT_SIZE_OPTIONS, DARK_THEMES } from '../types'
@@ -52,9 +52,7 @@ class ThemeService {
 
   // Set theme
   setTheme(theme: Theme | 'system'): void {
-    const normalized = theme === 'system' 
-      ? this.getSystemTheme() 
-      : this.normalizeTheme(theme)
+    const normalized = theme === 'system' ? this.getSystemTheme() : this.normalizeTheme(theme)
 
     this.store.setTheme(normalized)
     localStorage.setItem(STORAGE_THEME, normalized)

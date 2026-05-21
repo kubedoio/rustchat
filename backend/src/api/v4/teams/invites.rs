@@ -149,8 +149,7 @@ pub async fn invite_users_to_team(
     Path(team_id): Path<String>,
     Json(input): Json<InviteUsersRequest>,
 ) -> ApiResult<Json<Vec<TeamInviteResponse>>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
@@ -224,8 +223,7 @@ pub async fn invite_guests_to_team(
     Path(team_id): Path<String>,
     Json(input): Json<InviteGuestsRequest>,
 ) -> ApiResult<Json<Vec<EmailInviteResponse>>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
 
@@ -284,8 +282,7 @@ pub async fn invite_users_to_team_by_email(
     auth: MmAuthUser,
     Json(input): Json<InviteByEmailRequest>,
 ) -> ApiResult<Json<Vec<EmailInviteResponse>>> {
-    let team_id = parse_mm_or_uuid(&input.team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&input.team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
@@ -347,8 +344,7 @@ pub async fn regenerate_team_invite_id(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
 
     let repo = TeamRepository::new(&state.db);

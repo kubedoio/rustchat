@@ -7,12 +7,12 @@ import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const props = defineProps<{
-    show: boolean
+  show: boolean
 }>()
 
 const emit = defineEmits<{
-    (e: 'close'): void
-    (e: 'navigate', channelId: string, postId: string): void
+  (e: 'close'): void
+  (e: 'navigate', channelId: string, postId: string): void
 }>()
 
 const channelStore = useChannelStore()
@@ -26,66 +26,66 @@ const recentSearches = ref<string[]>([])
 // Debounced search
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-watch(query, (newQuery) => {
-    if (searchTimeout) {
-        clearTimeout(searchTimeout)
-    }
-    
-    if (newQuery.trim().length < 2) {
-        results.value = null
-        return
-    }
-    
-    searchTimeout = setTimeout(() => {
-        performSearch()
-    }, 300)
+watch(query, newQuery => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+
+  if (newQuery.trim().length < 2) {
+    results.value = null
+    return
+  }
+
+  searchTimeout = setTimeout(() => {
+    performSearch()
+  }, 300)
 })
 
 async function performSearch() {
-    if (query.value.trim().length < 2) return
-    
-    loading.value = true
-    error.value = ''
-    
-    try {
-        const response = await searchApi.search({
-            q: query.value.trim(),
-            per_page: 20,
-        })
-        results.value = response.data
-        
-        // Save to recent searches
-        const search = query.value.trim()
-        if (!recentSearches.value.includes(search)) {
-            recentSearches.value = [search, ...recentSearches.value.slice(0, 4)]
-        }
-    } catch (e: unknown) {
-        error.value = getApiErrorMessage(e) || 'Search failed'
-    } finally {
-        loading.value = false
+  if (query.value.trim().length < 2) return
+
+  loading.value = true
+  error.value = ''
+
+  try {
+    const response = await searchApi.search({
+      q: query.value.trim(),
+      per_page: 20,
+    })
+    results.value = response.data
+
+    // Save to recent searches
+    const search = query.value.trim()
+    if (!recentSearches.value.includes(search)) {
+      recentSearches.value = [search, ...recentSearches.value.slice(0, 4)]
     }
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e) || 'Search failed'
+  } finally {
+    loading.value = false
+  }
 }
 
 function handleResultClick(channelId: string, postId: string) {
-    emit('navigate', channelId, postId)
-    emit('close')
+  emit('navigate', channelId, postId)
+  emit('close')
 }
 
 function handleRecentClick(search: string) {
-    query.value = search
-    performSearch()
+  query.value = search
+  performSearch()
 }
 
 function handleClose() {
-    query.value = ''
-    results.value = null
-    error.value = ''
-    emit('close')
+  query.value = ''
+  results.value = null
+  error.value = ''
+  emit('close')
 }
 
 function getChannelName(channelId: string): string {
-    const channel = channelStore.channels.find(c => c.id === channelId)
-    return channel?.display_name || channel?.name || 'Unknown'
+  const channel = channelStore.channels.find(c => c.id === channelId)
+  return channel?.display_name || channel?.name || 'Unknown'
 }
 </script>
 
@@ -94,7 +94,7 @@ function getChannelName(channelId: string): string {
     <div v-if="show" class="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]">
       <!-- Backdrop -->
       <div class="absolute inset-0 bg-black/50" @click="handleClose"></div>
-      
+
       <!-- Search Modal -->
       <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
         <!-- Search Input -->
@@ -108,7 +108,9 @@ function getChannelName(channelId: string): string {
             autofocus
           />
           <div class="flex items-center space-x-2">
-            <kbd class="hidden sm:block px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded">ESC</kbd>
+            <kbd class="hidden sm:block px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded"
+              >ESC</kbd
+            >
             <button @click="handleClose" class="p-1 hover:bg-gray-100 rounded">
               <X class="w-5 h-5 text-gray-400" />
             </button>
@@ -119,7 +121,9 @@ function getChannelName(channelId: string): string {
         <div class="max-h-[60vh] overflow-y-auto">
           <!-- Loading -->
           <div v-if="loading" class="p-8 text-center text-gray-500">
-            <div class="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+            <div
+              class="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto"
+            ></div>
             <p class="mt-2">Searching...</p>
           </div>
 
@@ -133,7 +137,7 @@ function getChannelName(channelId: string): string {
             <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
               {{ results.total }} Results
             </div>
-            <div 
+            <div
               v-for="post in results.posts"
               :key="post.id"
               @click="handleResultClick(post.channel_id, post.id)"
@@ -153,7 +157,10 @@ function getChannelName(channelId: string): string {
           </div>
 
           <!-- No Results -->
-          <div v-else-if="results && results.posts.length === 0" class="p-8 text-center text-gray-500">
+          <div
+            v-else-if="results && results.posts.length === 0"
+            class="p-8 text-center text-gray-500"
+          >
             <MessageSquare class="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>No results found for "{{ query }}"</p>
           </div>
@@ -182,7 +189,9 @@ function getChannelName(channelId: string): string {
         </div>
 
         <!-- Footer -->
-        <div class="px-4 py-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+        <div
+          class="px-4 py-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex items-center justify-between"
+        >
           <span>Search powered by PostgreSQL full-text search</span>
           <span>↵ to select</span>
         </div>

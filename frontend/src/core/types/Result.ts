@@ -1,8 +1,6 @@
 // Rust-like Result type for explicit error handling
 
-export type Result<T, E = Error> = 
-  | { ok: true; value: T }
-  | { ok: false; error: E }
+export type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E }
 
 export interface AsyncResult<T, E = Error> {
   data: T | null

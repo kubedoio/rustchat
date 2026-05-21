@@ -51,8 +51,8 @@ pub(super) async fn get_posts_around_unread(
     let user_id = crate::api::v4::users::resolve_user_id(&path.user_id, &auth)
         .map_err(|_| AppError::Forbidden("Cannot access another user's posts".to_string()))?;
 
-    let channel_id = parse_mm_or_uuid(&path.channel_id)
-        .ok_or_else(|| AppError::InvalidChannelId)?;
+    let channel_id =
+        parse_mm_or_uuid(&path.channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
 
     let _ = ChannelRepository::new(&state.db)
         .require_member(channel_id, user_id)
@@ -96,8 +96,7 @@ pub(super) async fn save_acknowledgement_for_post(
     let user_id = crate::api::v4::users::resolve_user_id(&path.user_id, &auth)
         .map_err(|_| AppError::Forbidden("Cannot acknowledge for another user".to_string()))?;
 
-    let post_id = parse_mm_or_uuid(&path.post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&path.post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     let channel_id = PostRepository::new(state.db.clone())
         .get_post_channel_id_optional(post_id)
@@ -131,8 +130,7 @@ pub(super) async fn delete_acknowledgement_for_post(
         AppError::Forbidden("Cannot delete acknowledgement for another user".to_string())
     })?;
 
-    let post_id = parse_mm_or_uuid(&path.post_id)
-        .ok_or_else(|| AppError::InvalidPostId)?;
+    let post_id = parse_mm_or_uuid(&path.post_id).ok_or_else(|| AppError::InvalidPostId)?;
 
     let ack_time = PostRepository::new(state.db.clone())
         .get_acknowledgement(user_id, post_id)

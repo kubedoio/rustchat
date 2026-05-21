@@ -1,6 +1,6 @@
 // Config Service - Business logic for site config
 
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { configRepository } from '../repositories/configRepository'
 import { useConfigStore } from '../stores/configStore'
 import { wsManager } from '../../../core/websocket/WebSocketManager'
@@ -21,7 +21,7 @@ class ConfigService {
 
   // Initialize WebSocket listener for live config updates
   initSync(): () => void {
-    return wsManager.on('config_updated', (event) => {
+    return wsManager.on('config_updated', event => {
       try {
         const data = JSON.parse(event.data)
         if (data.category === 'site') {
@@ -29,7 +29,7 @@ class ConfigService {
           this.store.setConfig({
             ...currentConfig,
             site_name: data.config.site_name,
-            logo_url: data.config.logo_url
+            logo_url: data.config.logo_url,
           })
         }
       } catch {

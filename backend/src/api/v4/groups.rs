@@ -817,8 +817,7 @@ async fn get_group(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let group = GroupRepository::new(&state.db)
         .get_group_list_by_id(group_id)
@@ -837,8 +836,7 @@ async fn patch_group(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let current = GroupRepository::new(&state.db)
         .get_group_row_by_id_unchecked(group_id)
@@ -883,8 +881,7 @@ async fn delete_group(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let deleted_group = GroupRepository::new(&state.db)
         .soft_delete_group(group_id)
@@ -904,8 +901,7 @@ async fn restore_group(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let group = GroupRepository::new(&state.db)
         .restore_group(group_id)
@@ -925,8 +921,7 @@ async fn link_group_syncable_by_kind(
     kind: SyncableKind,
     patch: GroupSyncablePatch,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
 
@@ -961,8 +956,7 @@ async fn unlink_group_syncable_by_kind(
     syncable_id: String,
     kind: SyncableKind,
 ) -> ApiResult<Json<Value>> {
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
     let group = fetch_group_for_syncable(&state, group_id).await?;
@@ -1006,8 +1000,7 @@ async fn get_group_syncable_by_kind(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
 
@@ -1027,8 +1020,7 @@ async fn get_group_syncables_by_kind(
 ) -> ApiResult<Json<Vec<Value>>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let rows = GroupRepository::new(&state.db)
         .list_group_syncables_by_type(group_id, kind.as_db_str())
@@ -1050,8 +1042,7 @@ async fn patch_group_syncable_by_kind(
     kind: SyncableKind,
     patch: GroupSyncablePatch,
 ) -> ApiResult<Json<Value>> {
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
     let group = fetch_group_for_syncable(&state, group_id).await?;
@@ -1193,8 +1184,7 @@ async fn get_group_stats(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let count = GroupRepository::new(&state.db)
         .count_group_members(group_id)
@@ -1214,8 +1204,7 @@ async fn get_group_members(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let rows = GroupRepository::new(&state.db)
         .list_group_members(group_id)
@@ -1241,8 +1230,7 @@ async fn add_group_members(
 ) -> ApiResult<(axum::http::StatusCode, Json<Vec<Value>>)> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let user_ids = parse_user_ids(&members.user_ids)?;
 
     fetch_group_for_syncable(&state, group_id).await?;
@@ -1274,8 +1262,7 @@ async fn delete_group_members(
 ) -> ApiResult<Json<Vec<Value>>> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::InvalidGroupId)?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let user_ids = parse_user_ids(&members.user_ids)?;
 
     fetch_group_for_syncable(&state, group_id).await?;

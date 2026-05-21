@@ -29,9 +29,9 @@ const passwordErrors = computed(() => {
   const errors: string[] = []
   const pwd = password.value
   const policy = authStore.authPolicy
-  
+
   if (!policy) return errors
-  
+
   const minLength = policy.password_min_length ?? policy.passwordMinLength ?? 8
   if (pwd.length < minLength) {
     errors.push(`At least ${minLength} characters`)
@@ -48,7 +48,7 @@ const passwordErrors = computed(() => {
   if (policy.password_require_symbol && !/[^a-zA-Z0-9]/.test(pwd)) {
     errors.push('One special character')
   }
-  
+
   return errors
 })
 
@@ -57,30 +57,32 @@ const passwordsMatch = computed(() => {
 })
 
 const canSubmit = computed(() => {
-  return tokenValid.value && 
-         password.value.length > 0 && 
-         passwordsMatch.value && 
-         passwordErrors.value.length === 0
+  return (
+    tokenValid.value &&
+    password.value.length > 0 &&
+    passwordsMatch.value &&
+    passwordErrors.value.length === 0
+  )
 })
 
 onMounted(async () => {
-  token.value = route.query.token as string || ''
-  
+  token.value = (route.query.token as string) || ''
+
   if (!token.value) {
     error.value = 'Invalid or missing reset token'
     validating.value = false
     return
   }
-  
+
   // Load auth policy for password validation
   await authStore.getAuthPolicy()
-  
+
   // Validate token
   try {
     const response = await client.post('/auth/password/validate', {
-      token: token.value
+      token: token.value,
     })
-    
+
     if (response.data.valid) {
       tokenValid.value = true
       userEmail.value = response.data.email || ''
@@ -96,14 +98,14 @@ onMounted(async () => {
 
 async function handleSubmit() {
   if (!canSubmit.value) return
-  
+
   loading.value = true
   error.value = ''
-  
+
   try {
     await client.post('/auth/password/reset', {
       token: token.value,
-      new_password: password.value
+      new_password: password.value,
     })
     success.value = true
   } catch (e: unknown) {
@@ -133,41 +135,51 @@ async function handleSubmit() {
     <div v-else-if="!tokenValid" class="text-center py-8">
       <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
         <svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          ></path>
         </svg>
       </div>
-      <h3 class="text-xl font-semibold text-gray-900 mb-2">
-        Link expired or invalid
-      </h3>
+      <h3 class="text-xl font-semibold text-gray-900 mb-2">Link expired or invalid</h3>
       <p class="text-gray-600 mb-6">
         {{ error }}
       </p>
-      <BaseButton @click="router.push('/forgot-password')" block>
-        Request New Link
-      </BaseButton>
+      <BaseButton @click="router.push('/forgot-password')" block> Request New Link </BaseButton>
     </div>
 
     <!-- Success State -->
     <div v-else-if="success" class="text-center py-8">
-      <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
+      <div
+        class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6"
+      >
         <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M5 13l4 4L19 7"
+          ></path>
         </svg>
       </div>
       <h3 class="text-xl font-semibold text-gray-900 mb-2">
         {{ isSetup ? 'Password set successfully!' : 'Password reset successfully!' }}
       </h3>
       <p class="text-gray-600 mb-6">
-        Your password has been {{ isSetup ? 'set' : 'reset' }}. You can now sign in with your new password.
+        Your password has been {{ isSetup ? 'set' : 'reset' }}. You can now sign in with your new
+        password.
       </p>
-      <BaseButton @click="router.push('/login')" block>
-        Sign In
-      </BaseButton>
+      <BaseButton @click="router.push('/login')" block> Sign In </BaseButton>
     </div>
 
     <!-- Reset Password Form -->
     <form v-else class="space-y-6" @submit.prevent="handleSubmit">
-      <div v-if="error" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
+      <div
+        v-if="error"
+        class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm"
+      >
         {{ error }}
       </div>
 
@@ -199,16 +211,39 @@ async function handleSubmit() {
       <div v-if="authStore.authPolicy" class="text-xs text-gray-500 space-y-1">
         <p>Password must contain:</p>
         <ul class="list-disc list-inside">
-          <li :class="{ 'text-green-600': password.length >= (authStore.authPolicy.password_min_length ?? authStore.authPolicy.passwordMinLength ?? 8) }">
-            At least {{ authStore.authPolicy.password_min_length ?? authStore.authPolicy.passwordMinLength ?? 8 }} characters
+          <li
+            :class="{
+              'text-green-600':
+                password.length >=
+                (authStore.authPolicy.password_min_length ??
+                  authStore.authPolicy.passwordMinLength ??
+                  8),
+            }"
+          >
+            At least
+            {{
+              authStore.authPolicy.password_min_length ??
+              authStore.authPolicy.passwordMinLength ??
+              8
+            }}
+            characters
           </li>
-          <li v-if="authStore.authPolicy.password_require_uppercase" :class="{ 'text-green-600': /[A-Z]/.test(password) }">
+          <li
+            v-if="authStore.authPolicy.password_require_uppercase"
+            :class="{ 'text-green-600': /[A-Z]/.test(password) }"
+          >
             An uppercase letter
           </li>
-          <li v-if="authStore.authPolicy.password_require_number" :class="{ 'text-green-600': /[0-9]/.test(password) }">
+          <li
+            v-if="authStore.authPolicy.password_require_number"
+            :class="{ 'text-green-600': /[0-9]/.test(password) }"
+          >
             A number
           </li>
-          <li v-if="authStore.authPolicy.password_require_symbol" :class="{ 'text-green-600': /[^a-zA-Z0-9]/.test(password) }">
+          <li
+            v-if="authStore.authPolicy.password_require_symbol"
+            :class="{ 'text-green-600': /[^a-zA-Z0-9]/.test(password) }"
+          >
             A symbol
           </li>
           <li :class="{ 'text-green-600': passwordsMatch && confirmPassword !== '' }">
@@ -218,12 +253,7 @@ async function handleSubmit() {
       </div>
 
       <div>
-        <BaseButton 
-          type="submit" 
-          block 
-          :loading="loading"
-          :disabled="!canSubmit"
-        >
+        <BaseButton type="submit" block :loading="loading" :disabled="!canSubmit">
           {{ isSetup ? 'Set Password' : 'Reset Password' }}
         </BaseButton>
       </div>

@@ -347,10 +347,9 @@ async fn get_thread(
 
     // Parse cursor if provided
     let cursor = match query.cursor {
-        Some(cursor_str) => Some(
-            parse_mm_or_uuid(&cursor_str)
-                .ok_or_else(|| AppError::InvalidCursor)?,
-        ),
+        Some(cursor_str) => {
+            Some(parse_mm_or_uuid(&cursor_str).ok_or_else(|| AppError::InvalidCursor)?)
+        }
         None => None,
     };
 

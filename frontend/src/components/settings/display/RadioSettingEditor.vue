@@ -24,11 +24,7 @@ const radioClass = 'h-4 w-4 cursor-pointer accent-brand'
 
 <template>
   <div class="space-y-3">
-    <label
-      v-for="opt in options"
-      :key="String(opt.value)"
-      :class="optionCardClass"
-    >
+    <label v-for="opt in options" :key="String(opt.value)" :class="optionCardClass">
       <input
         type="radio"
         :value="opt.value"
@@ -38,11 +34,7 @@ const radioClass = 'h-4 w-4 cursor-pointer accent-brand'
       />
       <div class="flex-1">
         <div :class="optionTitleClass">{{ opt.label }}</div>
-        <div
-          v-if="opt.description"
-          :class="optionDescriptionClass"
-          :style="opt.style"
-        >
+        <div v-if="opt.description" :class="optionDescriptionClass" :style="opt.style">
           {{ opt.description }}
         </div>
       </div>

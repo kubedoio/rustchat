@@ -44,8 +44,7 @@ pub(super) async fn search_team_posts(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<mm::PostListWithSearchMatches>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::InvalidTeamId)?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     let input: SearchPostsRequest = parse_body(&headers, &body, "Invalid search body")?;
 

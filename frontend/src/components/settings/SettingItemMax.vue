@@ -31,28 +31,18 @@ defineEmits<{
         <X class="w-4 h-4" />
       </button>
     </div>
-    
+
     <!-- Content slot -->
     <div class="p-4">
       <slot />
     </div>
-    
+
     <!-- Actions -->
     <div class="flex items-center justify-end gap-2 border-t border-border-1 px-4 py-3">
-      <BaseButton 
-        size="sm" 
-        variant="secondary" 
-        @click="$emit('cancel')"
-        :disabled="loading"
-      >
+      <BaseButton size="sm" variant="secondary" @click="$emit('cancel')" :disabled="loading">
         Cancel
       </BaseButton>
-      <BaseButton 
-        size="sm" 
-        @click="$emit('save')"
-        :loading="loading"
-        :disabled="saveDisabled"
-      >
+      <BaseButton size="sm" @click="$emit('save')" :loading="loading" :disabled="saveDisabled">
         Save
       </BaseButton>
     </div>

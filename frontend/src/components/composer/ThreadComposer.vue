@@ -8,11 +8,7 @@
     />
     <div class="composer-input-wrapper">
       <EditorContent :editor="editor" class="composer-editor" />
-      <button
-        class="send-btn"
-        :disabled="!canSend || isSending"
-        @click="send"
-      >
+      <button class="send-btn" :disabled="!canSend || isSending" @click="send">
         {{ isSending ? 'Sending...' : 'Send' }}
       </button>
     </div>
@@ -38,10 +34,7 @@ const emit = defineEmits<{
 
 const editor = useEditor({
   content: props.modelValue,
-  extensions: [
-    StarterKit,
-    Placeholder.configure({ placeholder: 'Reply in thread...' }),
-  ],
+  extensions: [StarterKit, Placeholder.configure({ placeholder: 'Reply in thread...' })],
   onUpdate: ({ editor }) => {
     emit('update:modelValue', editor.getHTML())
   },
