@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { 
     Bold, Italic, Strikethrough, Heading, Link, Code, Quote, 
@@ -439,7 +440,7 @@ async function uploadFile(file: File) {
             }
         }
     } catch (e) {
-        console.error('Upload failed:', e)
+        log.error('Upload failed:', e)
         // Remove failed upload
         const index = attachedFiles.value.indexOf(fileItem)
         if (index > -1) {

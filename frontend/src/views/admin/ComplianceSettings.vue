@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, onMounted, watch } from 'vue';
 import { useAdminStore } from '../../features/admin/stores/adminStore';
 import { Scale, Trash2, Save, AlertCircle, CheckCircle, Download } from 'lucide-vue-next';
@@ -55,7 +56,7 @@ const triggerExport = async () => {
         exportSuccess.value = true;
         setTimeout(() => exportSuccess.value = false, 5000);
     } catch (e) {
-        console.error(e);
+        log.error(e);
     } finally {
         exporting.value = false;
     }

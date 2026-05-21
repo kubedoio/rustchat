@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, watch } from 'vue'
 import { X, Bookmark, ExternalLink } from 'lucide-vue-next'
 import { format } from 'date-fns'
@@ -23,7 +24,7 @@ async function loadSavedMessages() {
     try {
         savedMessages.value = await messageStore.fetchSavedMessages()
     } catch (e) {
-        console.error('Failed to fetch saved messages', e)
+        log.error('Failed to fetch saved messages', e)
     } finally {
         loading.value = false
     }
@@ -40,7 +41,7 @@ async function handleUnsave(message: Message) {
         await messageStore.unsaveMessage(message.id, message.channelId)
         savedMessages.value = savedMessages.value.filter(m => m.id !== message.id)
     } catch (e) {
-        console.error('Failed to unsave message', e)
+        log.error('Failed to unsave message', e)
     }
 }
 

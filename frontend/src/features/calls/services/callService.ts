@@ -1,6 +1,7 @@
 // Call Service - Business logic for calls
 // Handles WebRTC, state management, and orchestration
 
+import { log } from '@/utils/log';
 import { callRepository } from '../repositories/callRepository'
 import type { 
   CallState, 
@@ -29,7 +30,7 @@ class CallService {
       this.store.setConfig(config)
       return config
     } catch (error) {
-      console.error('Failed to load calls config', error)
+      log.error('Failed to load calls config', error)
       return null
     }
   }
@@ -40,7 +41,7 @@ class CallService {
       const calls = await callRepository.getActiveCalls()
       this.store.setActiveCalls(calls)
     } catch (error) {
-      console.error('Failed to load active calls', error)
+      log.error('Failed to load active calls', error)
     }
   }
 
@@ -62,7 +63,7 @@ class CallService {
         return null
       }
     } catch (error) {
-      console.error('Failed to load call for channel', error)
+      log.error('Failed to load call for channel', error)
       return null
     }
   }
@@ -136,7 +137,7 @@ class CallService {
       this.cleanupWebRTC()
       await callRepository.leaveCall(channelId)
     } catch (error) {
-      console.error('Failed to leave call', error)
+      log.error('Failed to leave call', error)
     } finally {
       this.store.clearCurrentCall()
     }
@@ -181,7 +182,7 @@ class CallService {
       }
       this.store.setIsMuted(!this.store.isMuted)
     } catch (error) {
-      console.error('Failed to toggle mute', error)
+      log.error('Failed to toggle mute', error)
     }
   }
 
@@ -199,7 +200,7 @@ class CallService {
       }
       this.store.setIsHandRaised(!this.store.isHandRaised)
     } catch (error) {
-      console.error('Failed to toggle hand', error)
+      log.error('Failed to toggle hand', error)
     }
   }
 
@@ -248,7 +249,7 @@ class CallService {
         this.store.setIsScreenSharing(true)
       }
     } catch (error) {
-      console.error('Failed to toggle screen share', error)
+      log.error('Failed to toggle screen share', error)
       await this.stopLocalScreenShare()
       this.store.setIsScreenSharing(false)
     }
@@ -261,7 +262,7 @@ class CallService {
     try {
       await callRepository.sendReaction(currentCall.channelId, emoji)
     } catch (error) {
-      console.error('Failed to send reaction', error)
+      log.error('Failed to send reaction', error)
     }
   }
 
@@ -273,7 +274,7 @@ class CallService {
     try {
       await callRepository.hostMute(currentCall.channelId, sessionId)
     } catch (error) {
-      console.error('Failed to host mute', error)
+      log.error('Failed to host mute', error)
     }
   }
 
@@ -285,7 +286,7 @@ class CallService {
       await callRepository.hostMuteOthers(currentCall.channelId)
       this.toast.success('Muted all', 'All other participants have been muted')
     } catch (error) {
-      console.error('Failed to host mute others', error)
+      log.error('Failed to host mute others', error)
     }
   }
 
@@ -296,7 +297,7 @@ class CallService {
     try {
       await callRepository.hostRemove(currentCall.channelId, sessionId)
     } catch (error) {
-      console.error('Failed to host remove', error)
+      log.error('Failed to host remove', error)
     }
   }
 
@@ -308,7 +309,7 @@ class CallService {
       await callRepository.ringUsers(currentCall.channelId)
       this.toast.success('Ringing participants', 'Other channel members have been notified')
     } catch (error) {
-      console.error('Failed to ring users', error)
+      log.error('Failed to ring users', error)
     }
   }
 
@@ -439,7 +440,7 @@ class CallService {
         sdpMid: (signal.sdp_mid ?? null) as string | null,
         sdpMLineIndex: (signal.sdp_mline_index ?? null) as number | null
       }).catch(error => {
-        console.error('Failed to handle signaling event', error)
+        log.error('Failed to handle signaling event', error)
       })
     }
   }
@@ -502,7 +503,7 @@ class CallService {
       // Create and send offer
       await this.createAndSendOffer(channelId, pc)
     } catch (error) {
-      console.error('WebRTC initialization failed', error)
+      log.error('WebRTC initialization failed', error)
       throw error
     }
   }
@@ -523,7 +524,7 @@ class CallService {
     } catch (error) {
       // Brave can reject aggressively munged SDP. Fall back to the
       // browser-generated offer so call setup still succeeds.
-      console.warn('Prepared SDP rejected by browser, retrying with original SDP', error)
+      log.warn('Prepared SDP rejected by browser, retrying with original SDP', error)
       selectedSdp = rawSdp
       await pc.setLocalDescription({
         type: 'offer',
@@ -540,7 +541,7 @@ class CallService {
   }
 
   private handleRemoteTrack(event: RTCTrackEvent): void {
-    console.log('Received remote track:', event.track.kind, event.streams)
+    log.debug('Received remote track:', event.track.kind, event.streams)
     
     if (event.streams && event.streams[0]) {
       const remoteStream = event.streams[0]
@@ -726,7 +727,7 @@ class CallService {
       try {
         transceiver.setCodecPreferences(preferred)
       } catch (error) {
-        console.debug('Failed to set codec preferences on transceiver', error)
+        log.debug('Failed to set codec preferences on transceiver', error)
       }
     }
   }

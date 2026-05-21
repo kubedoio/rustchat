@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { 
     Check, 
@@ -156,7 +157,7 @@ async function fetchCategories() {
             teamStore.currentTeamId
         )
     } catch (e) {
-        console.error('Failed to fetch categories:', e)
+        log.error('Failed to fetch categories:', e)
     }
 }
 
@@ -214,7 +215,7 @@ async function handleLeave() {
         await channelRepository.leave(props.channelId)
         emit('action', 'leave')
     } catch (e) {
-        console.error('Failed to leave channel:', e)
+        log.error('Failed to leave channel:', e)
     }
     emit('close')
 }
@@ -243,7 +244,7 @@ async function handleDelete() {
         await channelService.deleteChannel(props.channelId)
         emit('action', 'delete')
     } catch (e) {
-        console.error('Failed to delete channel:', e)
+        log.error('Failed to delete channel:', e)
         alert('Failed to delete channel. Please try again.')
     }
     emit('close')

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, onMounted } from 'vue'
 import { useToast } from '../../composables/useToast'
 import { adminApi, type SsoConfig, type CreateSsoConfigRequest, type AuthConfig } from '../../api/admin'
@@ -90,7 +91,7 @@ async function loadAuthConfig() {
     const response = await adminApi.getConfig()
     authConfig.value = response.data.authentication
   } catch (error) {
-    console.error('Failed to load auth config', error)
+    log.error('Failed to load auth config', error)
   }
 }
 

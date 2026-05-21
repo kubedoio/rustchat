@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, watch } from 'vue'
 import { 
   Hash, 
@@ -132,7 +133,7 @@ async function loadStats() {
     const muted = JSON.parse(localStorage.getItem('muted_channels') || '[]')
     isMuted.value = muted.includes(props.channelId)
   } catch (e) {
-    console.error('Failed to load channel stats:', e)
+    log.error('Failed to load channel stats:', e)
   } finally {
     loading.value = false
   }
@@ -169,7 +170,7 @@ async function toggleMute() {
     localStorage.setItem('muted_channels', JSON.stringify(muted))
     isMuted.value = newMuteState
   } catch (e) {
-    console.error('Failed to toggle mute:', e)
+    log.error('Failed to toggle mute:', e)
   }
 }
 
@@ -191,7 +192,7 @@ async function handleLeave() {
       channelStore.clearChannels()
     }
   } catch (e) {
-    console.error('Failed to leave channel:', e)
+    log.error('Failed to leave channel:', e)
   }
 }
 

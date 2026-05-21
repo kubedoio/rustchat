@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, watch } from 'vue';
 import { X, Users, ArrowRight, Check } from 'lucide-vue-next';
 import { useTeamStore } from '@/features/teams/stores/teamStore';
@@ -41,7 +42,7 @@ async function joinTeam(teamId: string) {
         emit('close');
         toast.success('Joined team', 'You have successfully joined the team');
     } catch (e) {
-        console.error('Failed to join team:', e);
+        log.error('Failed to join team:', e);
         toast.error('Failed to join', 'Could not join the team');
     } finally {
         joining.value = null;

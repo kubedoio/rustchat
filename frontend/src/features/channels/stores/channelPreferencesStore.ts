@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { preferencesApi, type Preference } from '../../../api/preferences'
@@ -51,7 +52,7 @@ export const useChannelPreferencesStore = defineStore('channelPreferences', () =
                 }
             })
         } catch (error) {
-            console.error('Failed to fetch channel preferences:', error)
+            log.error('Failed to fetch channel preferences:', error)
         } finally {
             loading.value = false
         }
@@ -72,7 +73,7 @@ export const useChannelPreferencesStore = defineStore('channelPreferences', () =
             await preferencesApi.updatePreferences(authStore.user.id, [pref])
             favoriteChannels.value.add(channelId)
         } catch (error) {
-            console.error('Failed to favorite channel:', error)
+            log.error('Failed to favorite channel:', error)
             throw error
         }
     }
@@ -92,7 +93,7 @@ export const useChannelPreferencesStore = defineStore('channelPreferences', () =
             await preferencesApi.deletePreferences(authStore.user.id, [pref])
             favoriteChannels.value.delete(channelId)
         } catch (error) {
-            console.error('Failed to unfavorite channel:', error)
+            log.error('Failed to unfavorite channel:', error)
             throw error
         }
     }
@@ -122,7 +123,7 @@ export const useChannelPreferencesStore = defineStore('channelPreferences', () =
             mutedChannels.value.add(channelId)
             channelNotifyProps.value[channelId] = props
         } catch (error) {
-            console.error('Failed to mute channel:', error)
+            log.error('Failed to mute channel:', error)
             throw error
         }
     }
@@ -143,7 +144,7 @@ export const useChannelPreferencesStore = defineStore('channelPreferences', () =
             mutedChannels.value.delete(channelId)
             channelNotifyProps.value[channelId] = props
         } catch (error) {
-            console.error('Failed to unmute channel:', error)
+            log.error('Failed to unmute channel:', error)
             throw error
         }
     }
@@ -174,7 +175,7 @@ export const useChannelPreferencesStore = defineStore('channelPreferences', () =
                 }
             }
         } catch (error) {
-            console.error('Failed to fetch channel notify props:', error)
+            log.error('Failed to fetch channel notify props:', error)
         }
     }
 

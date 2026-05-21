@@ -1,6 +1,7 @@
 // Auth Service - Business logic for authentication
 // Handles login flow, session management, and status updates
 
+import { log } from '@/utils/log';
 import { authRepository, type LoginCredentials, type UpdateStatusRequest } from '../repositories/authRepository'
 import type { User } from '../../../core/entities/User'
 import { useAuthStore } from '../stores/authStore'
@@ -138,7 +139,7 @@ class AuthService {
         this.store.setUser(updatedUser)
       }
     } catch (error) {
-      console.error('Failed to update status', error)
+      log.error('Failed to update status', error)
       throw error
     }
   }
@@ -149,7 +150,7 @@ class AuthService {
       const policy = await authRepository.getAuthPolicy()
       this.store.setAuthPolicy(policy)
     } catch (error) {
-      console.error('Failed to load auth policy', error)
+      log.error('Failed to load auth policy', error)
     }
   }
 

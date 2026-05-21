@@ -1,5 +1,6 @@
 // Admin Store - Backwards-compatible state management for admin
 
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import adminApi, {
@@ -161,7 +162,7 @@ export const useAdminStore = defineStore('adminStore', () => {
             stats.value = response.data
         } catch (e: unknown) {
             // Stats endpoint might not exist yet
-            console.warn('Stats not available:', getErrorMessage(e))
+            log.warn('Stats not available:', getErrorMessage(e))
         }
     }
 
@@ -170,7 +171,7 @@ export const useAdminStore = defineStore('adminStore', () => {
             const response = await adminApi.getHealth()
             health.value = response.data
         } catch (e: unknown) {
-            console.warn('Health endpoint not available:', getErrorMessage(e))
+            log.warn('Health endpoint not available:', getErrorMessage(e))
         }
     }
 

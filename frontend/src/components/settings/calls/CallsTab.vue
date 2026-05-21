@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { computed, onMounted, ref } from 'vue'
 import { Pencil } from 'lucide-vue-next'
 import SettingItemMax from '../SettingItemMax.vue'
@@ -56,7 +57,7 @@ async function enumerateDevices() {
 
     permissionError.value = null
   } catch (error: unknown) {
-    console.error('Failed to enumerate devices', error)
+    log.error('Failed to enumerate devices', error)
     permissionError.value = getErrorMessage(error, 'Permission denied')
   }
 }

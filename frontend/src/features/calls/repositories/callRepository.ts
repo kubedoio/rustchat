@@ -1,6 +1,7 @@
 // Call Repository - Data access for calls
 // Maps API responses to domain entities
 
+import { log } from '@/utils/log';
 import callsApi from '../../../api/calls'
 import type { 
   CallState, 
@@ -42,7 +43,7 @@ export const callRepository = {
             ...turnResponse.data
           ]
         } catch (error) {
-          console.error('Failed to fetch TURN credentials', error)
+          log.error('Failed to fetch TURN credentials', error)
         }
       }
 

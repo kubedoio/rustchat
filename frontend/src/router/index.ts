@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../features/auth/stores/authStore'
 import client from '../api/client'
@@ -211,7 +212,7 @@ router.beforeEach(async (to, _from, next) => {
 
             clearOAuthRedirectParams()
         } catch (error) {
-            console.error('OAuth redirect handling failed', error)
+            log.error('OAuth redirect handling failed', error)
             auth.token = ''
             auth.user = null
             clearOAuthRedirectParams()

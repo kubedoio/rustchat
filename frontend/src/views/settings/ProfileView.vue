@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed } from 'vue';
 import { useAuthStore } from '../../features/auth/stores/authStore';
 import { Camera, Save, Trash2, ArrowLeft } from 'lucide-vue-next';
@@ -114,7 +115,7 @@ async function removeAvatar() {
         await api.put(`/users/${user.value.id}`, { avatar_url: '' });
         await authStore.fetchMe();
     } catch (e) {
-        console.error('Failed to remove avatar', e);
+        log.error('Failed to remove avatar', e);
     }
 }
 </script>

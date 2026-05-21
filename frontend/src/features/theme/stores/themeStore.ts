@@ -1,5 +1,6 @@
 // Theme Store - Backwards-compatible state management for appearance
 
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { preferencesApi, type Preference } from '../../../api/preferences'
@@ -360,7 +361,7 @@ export const useThemeStore = defineStore('themeStore', () => {
         try {
             await preferencesApi.updatePreferencesV4('me', payload)
         } catch (error) {
-            console.debug('Failed to persist appearance preferences to server', error)
+            log.debug('Failed to persist appearance preferences to server', error)
         }
     }
 
@@ -398,7 +399,7 @@ export const useThemeStore = defineStore('themeStore', () => {
             applyAppearance()
             syncedServerToken.value = token
         } catch (error) {
-            console.debug('Failed to sync appearance preferences from server', error)
+            log.debug('Failed to sync appearance preferences from server', error)
         }
     }
 

@@ -1,5 +1,6 @@
 // Config Service - Business logic for site config
 
+import { log } from '@/utils/log';
 import { configRepository } from '../repositories/configRepository'
 import { useConfigStore } from '../stores/configStore'
 import { wsManager } from '../../../core/websocket/WebSocketManager'
@@ -14,7 +15,7 @@ class ConfigService {
       const config = await configRepository.getPublicConfig()
       this.store.setConfig(config)
     } catch (error) {
-      console.error('Failed to load site config', error)
+      log.error('Failed to load site config', error)
     }
   }
 

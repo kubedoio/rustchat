@@ -2,6 +2,7 @@
  * Activity Socket Handlers - WebSocket event handlers for activity feed
  */
 
+import { log } from '@/utils/log';
 import { activityService } from '../services/activityService'
 import type { Activity } from '../types'
 import { ActivityType } from '../types'
@@ -16,7 +17,7 @@ function parseActivityType(raw: string): ActivityType {
   }
   const type = map[raw]
   if (type === undefined) {
-    console.warn(`[ActivitySocket] Unknown activity type: ${raw}, defaulting to MENTION`)
+    log.warn(`[ActivitySocket] Unknown activity type: ${raw}, defaulting to MENTION`)
     return ActivityType.MENTION
   }
   return type

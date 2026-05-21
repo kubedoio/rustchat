@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, onMounted } from 'vue';
 import { FileText, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Users, Eye, X, Save, AlertTriangle } from 'lucide-vue-next';
 import { v4Api } from '../../api/client';
@@ -85,7 +86,7 @@ async function fetchTermsStats() {
             currentTerms.value = data.current_terms;
         }
     } catch (e: unknown) {
-        console.error('Failed to load stats', e);
+        log.error('Failed to load stats', e);
     }
 }
 

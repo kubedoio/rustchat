@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, onMounted, watch, computed } from 'vue';
 import { useAdminStore } from '../../features/admin/stores/adminStore';
 import { useAuthStore } from '../../features/auth/stores/authStore';
@@ -124,7 +125,7 @@ async function handleDeactivate(user: AdminUser) {
         await adminStore.deactivateUser(user.id);
         activeMenuUserId.value = null;
     } catch (e) {
-        console.error('Failed to deactivate user', e);
+        log.error('Failed to deactivate user', e);
     }
 }
 
@@ -133,7 +134,7 @@ async function handleReactivate(user: AdminUser) {
         await adminStore.reactivateUser(user.id);
         activeMenuUserId.value = null;
     } catch (e) {
-        console.error('Failed to reactivate user', e);
+        log.error('Failed to reactivate user', e);
     }
 }
 

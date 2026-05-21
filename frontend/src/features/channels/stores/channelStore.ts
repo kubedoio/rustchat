@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useStorage } from '@vueuse/core'
@@ -208,7 +209,7 @@ export const useChannelStore = defineStore('channelStore', () => {
       const response = await channelsApi.listJoinable(teamId)
       joinableChannels.value = response.data
     } catch (e: unknown) {
-      console.error('Failed to fetch joinable channels', e)
+      log.error('Failed to fetch joinable channels', e)
     } finally {
       loading.value = false
     }

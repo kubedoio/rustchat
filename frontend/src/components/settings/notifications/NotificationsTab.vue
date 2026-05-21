@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { computed, onMounted, ref } from 'vue'
 import { AlertTriangle, ExternalLink, Lightbulb, Pencil } from 'lucide-vue-next'
 import api from '../../../api/client'
@@ -208,7 +209,7 @@ async function requestNotificationPermission() {
 
     toast.error('Permission required', 'Please enable notifications in your browser settings')
   } catch (error) {
-    console.error('Failed to request notification permission', error)
+    log.error('Failed to request notification permission', error)
     toast.error('Permission request failed', 'Could not request notification permission')
   }
 }
@@ -231,7 +232,7 @@ function testNotificationSound() {
 
     toast.success('Sound test', 'Played notification sound')
   } catch (error) {
-    console.error('Failed to play notification sound', error)
+    log.error('Failed to play notification sound', error)
     toast.error('Sound test failed', 'Could not play notification sound')
   }
 }
@@ -247,7 +248,7 @@ async function sendTestNotification() {
 
     toast.error('Failed to send test notification', 'Unexpected response from server')
   } catch (error) {
-    console.error('Failed to send test notification', error)
+    log.error('Failed to send test notification', error)
     toast.error('Failed to send test notification', 'Please check your notification configuration and try again')
   } finally {
     sendingTestNotification.value = false

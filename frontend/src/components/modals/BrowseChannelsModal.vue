@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, watch } from 'vue';
 import { X, Hash, ArrowRight } from 'lucide-vue-next';
 import { useChannelStore } from '@/features/channels/stores/channelStore';
@@ -58,7 +59,7 @@ async function joinChannel(channelId: string) {
         emit('close');
         toast.success('Joined channel', 'You have successfully joined the channel');
     } catch (e) {
-        console.error('Failed to join channel:', e);
+        log.error('Failed to join channel:', e);
         toast.error('Failed to join', 'Could not join the channel');
     } finally {
         joining.value = null;

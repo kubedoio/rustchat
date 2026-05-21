@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, computed, onMounted, watch } from 'vue';
 import { Search, UserPlus, Shield, User } from 'lucide-vue-next';
 import RcAvatar from '../ui/RcAvatar.vue';
@@ -23,7 +24,7 @@ async function fetchMembers() {
         const response = await api.get(`/channels/${props.channelId}/members`);
         members.value = response.data;
     } catch (e) {
-        console.error('Failed to fetch channel members:', e);
+        log.error('Failed to fetch channel members:', e);
     } finally {
         loading.value = false;
     }

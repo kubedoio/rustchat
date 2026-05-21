@@ -1,3 +1,4 @@
+import { log } from '@/utils/log';
 import { ref } from 'vue'
 import { useAuthStore } from '../features/auth/stores/authStore'
 import { useMessageStore } from '@/features/messages/stores/messageStore'
@@ -408,7 +409,7 @@ export function useWebSocket() {
 
     function connect() {
         if (!authStore.token) {
-            console.log('No auth token, skipping WebSocket connection')
+            log.debug('No auth token, skipping WebSocket connection')
             return
         }
 
@@ -427,7 +428,7 @@ export function useWebSocket() {
 
             socket.onopen = () => {
                 const openedAfterReconnect = reconnectAttempts.value > 0
-                console.log('WebSocket connected')
+                log.debug('WebSocket connected')
                 connected.value = true
                 reconnectAttempts.value = 0
                 reconnectAttempt.value = 0
@@ -460,7 +461,7 @@ export function useWebSocket() {
             }
 
             socket.onclose = (event) => {
-                console.log('WebSocket disconnected', event.code, event.reason)
+                log.debug('WebSocket disconnected', event.code, event.reason)
                 connected.value = false
                 ws.value = null
                 disconnectedAt.value = new Date()
@@ -493,7 +494,7 @@ export function useWebSocket() {
                     const jitter = Math.random() * 1000
                     const delay = baseDelay + jitter
 
-                    console.log(`Reconnecting in ${Math.round(delay)}ms...`)
+                    log.debug(`Reconnecting in ${Math.round(delay)}ms...`)
                     clearReconnectTimer()
                     reconnectTimer = setTimeout(() => {
                         if (!connected.value) connect()
@@ -502,7 +503,7 @@ export function useWebSocket() {
             }
 
             socket.onerror = (error) => {
-                console.error('WebSocket connection failed:', error)
+                log.error('WebSocket connection failed:', error)
                 toast.error('Real-time connection error', 'The connection to the server was refused. Please check your network.')
             }
 
@@ -512,20 +513,20 @@ export function useWebSocket() {
                     const envelope = normalizeWsEnvelope(rawEnvelope)
                     handleMessage(envelope)
                 } catch (e) {
-                    console.error('Failed to parse WebSocket message:', e)
+                    log.error('Failed to parse WebSocket message:', e)
                 }
             }
         } catch (e) {
-            console.error('Failed to create WebSocket:', e)
+            log.error('Failed to create WebSocket:', e)
         }
     }
 
     function handleMessage(envelope: WsEnvelope) {
-        // console.log('WS Received:', envelope.event, envelope.data)
+        // log.debug('WS Received:', envelope.event, envelope.data)
 
         switch (envelope.event) {
             case 'hello':
-                console.log('WebSocket hello received', envelope.data)
+                log.debug('WebSocket hello received', envelope.data)
                 break
 
             case 'initial_load':
@@ -701,7 +702,7 @@ export function useWebSocket() {
             }
 
             case 'error':
-                console.error('WS Error:', envelope.data)
+                log.error('WS Error:', envelope.data)
                 break
         }
 
@@ -821,7 +822,7 @@ export function useWebSocket() {
             const finalMsg = postToMessage(post)
             messageStore.updateOptimisticMessage(clientMsgId, finalMsg)
         } catch (error) {
-            console.error('Failed to send message via REST:', error)
+            log.error('Failed to send message via REST:', error)
             // Ideally we'd have a store method to mark as failed
             const msg = (messageStore.messagesByChannel[channelId] || []).find(m => m.id === clientMsgId)
             if (msg) msg.status = 'failed'

@@ -1,6 +1,7 @@
 // Message WebSocket Handlers - Feature-specific WebSocket event handling
 // Replaces the centralized useWebSocket.ts message handling logic
 
+import { log } from '@/utils/log';
 import { messageService } from '../services/messageService'
 import type { FileAttachment, Message, MessageId } from '../../../core/entities/Message'
 import type { ChannelId } from '../../../core/entities/Channel'
@@ -47,7 +48,7 @@ function handlePost(event: WebSocketMessageEvent) {
     const normalizedPost = normalizePost(post)
     messageService.handleIncomingMessage(normalizedPost)
   } catch (err) {
-    console.error('Failed to handle post:', err)
+    log.error('Failed to handle post:', err)
   }
 }
 
@@ -59,7 +60,7 @@ function handlePostEdit(event: WebSocketMessageEvent) {
     const normalizedPost = normalizePost(post)
     messageService.handleMessageUpdate(normalizedPost.id, normalizedPost)
   } catch (err) {
-    console.error('Failed to handle post edit:', err)
+    log.error('Failed to handle post edit:', err)
   }
 }
 
@@ -71,7 +72,7 @@ function handlePostDelete(event: WebSocketMessageEvent) {
 
     messageService.handleMessageDelete(messageId, channelId)
   } catch (err) {
-    console.error('Failed to handle post delete:', err)
+    log.error('Failed to handle post delete:', err)
   }
 }
 
@@ -86,7 +87,7 @@ function handleReactionAdded(event: WebSocketMessageEvent) {
       reaction.user_id
     )
   } catch (err) {
-    console.error('Failed to handle reaction added:', err)
+    log.error('Failed to handle reaction added:', err)
   }
 }
 
@@ -101,7 +102,7 @@ function handleReactionRemoved(event: WebSocketMessageEvent) {
       reaction.user_id
     )
   } catch (err) {
-    console.error('Failed to handle reaction removed:', err)
+    log.error('Failed to handle reaction removed:', err)
   }
 }
 

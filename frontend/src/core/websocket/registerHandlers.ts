@@ -1,6 +1,7 @@
 // WebSocket Handler Registration
 // Central registration of all feature-specific WebSocket handlers
 
+import { log } from '@/utils/log';
 import { wsManager, type WebSocketEvent } from './WebSocketManager'
 import { handleMessageWebSocketEvent, registerThreadHandlers } from '../../features/messages'
 import { handleCallWebSocketEvent } from '../../features/calls'
@@ -80,7 +81,7 @@ export function registerWebSocketHandlers(): void {
     handleActivityRead(data)
   })
 
-  console.log('[WebSocket] All handlers registered')
+  log.debug('[WebSocket] All handlers registered')
 }
 
 /**
@@ -89,5 +90,5 @@ export function registerWebSocketHandlers(): void {
 export function unregisterWebSocketHandlers(): void {
   // Note: Current implementation doesn't support unregistering
   // Would need to store unsubscribe functions from wsManager.on()
-  console.log('[WebSocket] Handler unregistration not implemented')
+  log.debug('[WebSocket] Handler unregistration not implemented')
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { Users, Search, Hash, Lock, Phone, Bookmark, MoreVertical, LogOut, Info, Pin, PhoneCall, PanelLeft } from 'lucide-vue-next'
 import { ref, computed } from 'vue';
 import { useCallsStore } from '../../stores/calls';
@@ -80,7 +81,7 @@ const handleLeave = async () => {
         channelStore.clearChannels()
       }
     } catch (e) {
-      console.error('Failed to leave channel', e)
+      log.error('Failed to leave channel', e)
     }
   }
 }

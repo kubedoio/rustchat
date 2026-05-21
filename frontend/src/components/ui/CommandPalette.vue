@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Hash, User } from 'lucide-vue-next'
@@ -58,7 +59,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function selectItem(item: any) {
-  console.log('Selected:', item)
+  log.debug('Selected:', item)
   if (item.type === 'channel') {
       router.push(`/channels/${item.id}`)
   }

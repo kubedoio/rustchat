@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, CheckCircle2, Circle, Send } from 'lucide-vue-next'
@@ -56,7 +57,7 @@ async function fetchUpdates() {
         const response = await playbooksApi.listStatusUpdates(run.value.run.id)
         updates.value = response.data
     } catch(e) {
-        console.error('Failed to fetch updates', e)
+        log.error('Failed to fetch updates', e)
     }
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log';
 import { ref, watch } from 'vue'
 import { X, Pin, ExternalLink } from 'lucide-vue-next'
 import { format } from 'date-fns'
@@ -27,7 +28,7 @@ async function loadPinnedMessages() {
     try {
         pinnedMessages.value = await messageStore.fetchPinnedMessages(channelStore.currentChannelId)
     } catch (e) {
-        console.error('Failed to fetch pinned messages', e)
+        log.error('Failed to fetch pinned messages', e)
     } finally {
         loading.value = false
     }
@@ -51,7 +52,7 @@ async function handleUnpin(message: Message) {
         await messageStore.unpinMessage(message.id, message.channelId)
         pinnedMessages.value = pinnedMessages.value.filter(m => m.id !== message.id)
     } catch (e) {
-        console.error('Failed to unpin message', e)
+        log.error('Failed to unpin message', e)
     }
 }
 
