@@ -14,6 +14,7 @@ const channelStore = reactive({
     loading: false,
     joinableChannels: [] as Array<{
         id: string
+        team_id?: string
         name: string
         display_name: string
         purpose?: string
@@ -21,6 +22,9 @@ const channelStore = reactive({
     fetchJoinableChannels: vi.fn<(_: string) => Promise<void>>(),
     joinChannel: vi.fn<(_: string) => Promise<void>>(),
     fetchChannels: vi.fn<(_: string) => Promise<void>>(),
+    setJoinableChannels: vi.fn<(items: any[]) => void>((items) => {
+        channelStore.joinableChannels = items;
+    }),
 })
 
 const teamStore = reactive({
@@ -72,15 +76,6 @@ describe('BrowseChannelsModal', () => {
     })
 
     it('refreshes channel data after joining with the active team id', async () => {
-        channelStore.joinableChannels = [
-            {
-                id: 'channel-1',
-                name: 'town-square',
-                display_name: 'Town Square',
-                purpose: 'General chat',
-            },
-        ]
-
         const BrowseChannelsModal = (await import('./BrowseChannelsModal.vue')).default
 
         const wrapper = mount(BrowseChannelsModal, {
@@ -91,6 +86,17 @@ describe('BrowseChannelsModal', () => {
                 },
             },
         })
+
+        // Set joinable channels AFTER mounting, so that the immediate watcher doesn't wipe them
+        channelStore.joinableChannels = [
+            {
+                id: 'channel-1',
+                team_id: 'team-1',
+                name: 'town-square',
+                display_name: 'Town Square',
+                purpose: 'General chat',
+            },
+        ]
 
         await flushPromises()
 

@@ -274,6 +274,9 @@ function closeContextMenu() {
 function handleContextMenuAction(action: string) {
   console.log('Context menu action:', action);
   if (action === 'leave' || action === 'delete') {
+    if (contextMenuChannel.value) {
+      channelStore.removeChannel(contextMenuChannel.value.id);
+    }
     if (teamStore.currentTeamId) {
       channelStore.fetchChannels(teamStore.currentTeamId);
     }

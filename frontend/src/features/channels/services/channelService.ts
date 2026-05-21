@@ -6,6 +6,7 @@ import type { Channel, ChannelId } from '../../../core/entities/Channel'
 import type { TeamId } from '../../../core/entities/Team'
 import type { UserId } from '../../../core/entities/User'
 import { useChannelStore } from '../stores/channelStore'
+import { useAuthStore } from '../../auth/stores/authStore'
 import { AppError } from '../../../core/errors/AppError'
 
 // Local storage key for last selected channels
@@ -226,8 +227,11 @@ class ChannelService {
   }
 
   handleUserLeft(channelId: ChannelId, userId: UserId): void {
-    // Could trigger a notification or update member list
     console.log('User left channel:', channelId, userId)
+    const authStore = useAuthStore()
+    if (authStore.user?.id === userId) {
+      this.store.removeChannel(channelId)
+    }
   }
 
   handleNewMessage(channelId: ChannelId, hasMention: boolean): void {
