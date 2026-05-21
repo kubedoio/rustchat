@@ -22,7 +22,7 @@ pub async fn me(State(state): State<AppState>, auth: PolymorphicAuth) -> ApiResu
     let mut user: User = UserRepository::new(&state.db)
         .get_by_id(auth.user_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     let _ = status::clear_expired_custom_status_if_needed(&state, auth.user_id).await?;
     user.clear_custom_status_if_expired();
@@ -41,13 +41,13 @@ pub async fn get_user_by_id(
         return Err(AppError::BadRequest("Use /users/me endpoint".to_string()));
     } else {
         parse_mm_or_uuid(&user_id)
-            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?
+            .ok_or_else(|| AppError::InvalidUserId)?
     };
 
     let mut user: User = UserRepository::new(&state.db)
         .get_by_id_unchecked(user_uuid)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     let _ = status::clear_expired_custom_status_if_needed(&state, user_uuid).await?;
     user.clear_custom_status_if_expired();
@@ -64,7 +64,7 @@ pub async fn get_user_by_username(
     let user: User = UserRepository::new(&state.db)
         .get_by_username(&username)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     Ok(Json(user.into()))
 }
@@ -118,7 +118,7 @@ pub async fn patch_me(
     let user: User = UserRepository::new(&state.db)
         .get_by_id_unchecked(auth.user_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     Ok(Json(user.into()))
 }
@@ -159,6 +159,6 @@ pub async fn patch_user(
     let user: User = UserRepository::new(&state.db)
         .get_by_id_unchecked(user_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
     Ok(Json(user.into()))
 }

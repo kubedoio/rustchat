@@ -523,7 +523,7 @@ async fn me(State(state): State<AppState>, auth: AuthUser) -> ApiResult<Json<Use
     let user = UserRepository::new(&state.db)
         .get_by_id(auth.user_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     Ok(Json(UserResponse::from(user)))
 }

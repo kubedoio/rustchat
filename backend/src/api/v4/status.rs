@@ -713,7 +713,7 @@ pub async fn fetch_user_status_snapshot(
         .get_user_status_fields(user_id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     let (presence, manual, last_login_at, text, emoji, expires_at) = result;
 

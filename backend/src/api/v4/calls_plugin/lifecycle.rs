@@ -310,7 +310,7 @@ pub(crate) async fn join_call(
         None => call_manager
             .get_call(channel_uuid)
             .await
-            .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?,
+            .ok_or_else(|| AppError::NoActiveCall)?,
     };
 
     // Check if user already in call

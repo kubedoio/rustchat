@@ -92,7 +92,7 @@ async fn ensure_team_member(state: &AppState, team_id: Uuid, user_id: Uuid) -> A
         .is_team_member(team_id, user_id)
         .await?
     {
-        return Err(AppError::Forbidden("Not a member of this team".to_string()));
+        return Err(AppError::NotOnTeam);
     }
     Ok(())
 }
@@ -144,7 +144,7 @@ async fn get_incoming_webhook(
     let webhook = IntegrationRepository::new(&state.db)
         .get_incoming_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     if !auth.can_access_owned(webhook.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -163,7 +163,7 @@ async fn delete_incoming_webhook(
     let webhook = IntegrationRepository::new(&state.db)
         .get_incoming_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     if !auth.can_access_owned(webhook.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -259,7 +259,7 @@ async fn get_outgoing_webhook(
     let webhook = IntegrationRepository::new(&state.db)
         .get_outgoing_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     if !auth.can_access_owned(webhook.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -278,7 +278,7 @@ async fn delete_outgoing_webhook(
     let webhook = IntegrationRepository::new(&state.db)
         .get_outgoing_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     if !auth.can_access_owned(webhook.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -347,7 +347,7 @@ async fn get_slash_command(
     let command = IntegrationRepository::new(&state.db)
         .get_slash_command_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Command not found".to_string()))?;
+        .ok_or_else(|| AppError::CommandNotFound)?;
 
     if !auth.can_access_owned(command.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -366,7 +366,7 @@ async fn delete_slash_command(
     let command = IntegrationRepository::new(&state.db)
         .get_slash_command_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Command not found".to_string()))?;
+        .ok_or_else(|| AppError::CommandNotFound)?;
 
     if !auth.can_access_owned(command.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -445,7 +445,7 @@ async fn resolve_team_id(state: &AppState, payload: &ExecuteCommand) -> ApiResul
         ChannelRepository::new(&state.db)
             .get_team_id(payload.channel_id)
             .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))
+            .ok_or_else(|| AppError::ChannelNotFound)
     }
 }
 
@@ -487,7 +487,7 @@ async fn execute_call_command(
     let user = UserRepository::new(&state.db)
         .get_by_id_unchecked(auth.user_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     let call_manager = state.call_state_manager.as_ref();
 
@@ -777,7 +777,7 @@ async fn execute_join_command(
     let current_team_id = ChannelRepository::new(&state.db)
         .get_team_id(payload.channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+        .ok_or_else(|| AppError::ChannelNotFound)?;
 
     let target_channel = ChannelRepository::new(&state.db)
         .find_by_team_and_name(current_team_id, channel_name)
@@ -1099,10 +1099,10 @@ async fn get_bot(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
-        return Err(AppError::Forbidden("Cannot access this bot".to_string()));
+        return Err(AppError::CannotAccessBot);
     }
 
     Ok(Json(bot))
@@ -1116,7 +1116,7 @@ async fn delete_bot(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden("Cannot delete this bot".to_string()));
@@ -1135,10 +1135,10 @@ async fn list_bot_tokens(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
-        return Err(AppError::Forbidden("Cannot access this bot".to_string()));
+        return Err(AppError::CannotAccessBot);
     }
 
     let tokens = IntegrationRepository::new(&state.db)
@@ -1162,10 +1162,10 @@ async fn create_bot_token(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
-        return Err(AppError::Forbidden("Cannot access this bot".to_string()));
+        return Err(AppError::CannotAccessBot);
     }
 
     let token = generate_token();
@@ -1185,10 +1185,10 @@ async fn revoke_bot_token(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(bot_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
-        return Err(AppError::Forbidden("Cannot access this bot".to_string()));
+        return Err(AppError::CannotAccessBot);
     }
 
     IntegrationRepository::new(&state.db)

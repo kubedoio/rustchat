@@ -27,7 +27,7 @@ pub async fn search_channels(
     body: Bytes,
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
     let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
 
     let input: SearchChannelsRequest = parse_body(&headers, &body, "Invalid search request")?;
     let search_term = format!("%{}%", input.term.to_lowercase());

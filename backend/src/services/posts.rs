@@ -500,7 +500,7 @@ async fn ensure_permission(state: &AppState, user_id: Uuid, permission: &str) ->
         .await?;
 
     if !allowed {
-        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+        return Err(AppError::InsufficientPermissions);
     }
 
     Ok(())
@@ -774,7 +774,7 @@ pub async fn get_posts(
             .await?;
 
         let before_time =
-            before_time.ok_or_else(|| AppError::NotFound("Before post not found".to_string()))?;
+            before_time.ok_or_else(|| AppError::BeforePostNotFound)?;
 
         PostRepository::new(state.db.clone())
             .list_before(channel_id, before_time, per_page)
@@ -788,7 +788,7 @@ pub async fn get_posts(
             .await?;
 
         let after_time =
-            after_time.ok_or_else(|| AppError::NotFound("After post not found".to_string()))?;
+            after_time.ok_or_else(|| AppError::AfterPostNotFound)?;
 
         PostRepository::new(state.db.clone())
             .list_after(channel_id, after_time, per_page)
@@ -822,7 +822,7 @@ pub async fn get_post_by_id(state: &AppState, post_id: Uuid) -> ApiResult<PostRe
     let post = PostRepository::new(state.db.clone())
         .find_by_id_include_deleted(post_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     let mut post = post;
     post.avatar_url = normalize_avatar_url(post.user_id, post.avatar_url.as_deref());
@@ -852,7 +852,7 @@ pub async fn get_thread(
         .find_by_id_strict(post_id)
         .await?;
 
-    let mut parent = parent.ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let mut parent = parent.ok_or_else(|| AppError::PostNotFound)?;
     parent.avatar_url = normalize_avatar_url(parent.user_id, parent.avatar_url.as_deref());
 
     // Fetch replies

@@ -107,7 +107,7 @@ async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<Uuid>
     let id = repo
         .get_id_by_name(team_id_str)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     Ok(id)
 }
 
@@ -136,7 +136,7 @@ async fn get_category(
     let category = cat_repo
         .get(category_id, user_id, team_id)
         .await?
-        .ok_or_else(|| crate::error::AppError::NotFound("Category not found".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::CategoryNotFound)?;
 
     // Get channels for this category
     let channel_ids = cat_repo
@@ -272,7 +272,7 @@ async fn delete_category(
     let category = cat_repo
         .get(category_id, user_id, team_id)
         .await?
-        .ok_or_else(|| crate::error::AppError::NotFound("Category not found".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::CategoryNotFound)?;
 
     // Don't allow deleting default categories
     if matches!(

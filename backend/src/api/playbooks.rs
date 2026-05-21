@@ -380,7 +380,7 @@ async fn get_run(
     let run = repo
         .get_run(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Run not found".to_string()))?;
+        .ok_or_else(|| AppError::RunNotFound)?;
 
     repo.require_playbook_access(run.playbook_id, auth.user_id)
         .await?;
@@ -407,7 +407,7 @@ async fn update_run(
     let playbook_id = repo
         .get_run_playbook_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Run not found".to_string()))?;
+        .ok_or_else(|| AppError::RunNotFound)?;
     repo.require_playbook_access(playbook_id, auth.user_id)
         .await?;
 
@@ -429,7 +429,7 @@ async fn finish_run(
     let playbook_id = repo
         .get_run_playbook_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Run not found".to_string()))?;
+        .ok_or_else(|| AppError::RunNotFound)?;
     repo.require_playbook_access(playbook_id, auth.user_id)
         .await?;
 
@@ -486,7 +486,7 @@ async fn list_status_updates(
     let playbook_id = repo
         .get_run_playbook_id(run_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Run not found".to_string()))?;
+        .ok_or_else(|| AppError::RunNotFound)?;
     repo.require_playbook_access(playbook_id, auth.user_id)
         .await?;
 

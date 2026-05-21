@@ -201,7 +201,7 @@ pub async fn resync_user(state: &AppState, user_id: Uuid) -> ApiResult<KeycloakS
             .bind(user_id)
             .fetch_optional(&state.db)
             .await?
-            .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+            .ok_or_else(|| AppError::UserNotFound)?;
 
     if provider.as_deref() != Some(provider_key.as_str()) || external_id.is_none() {
         return Ok(KeycloakSyncReport {
@@ -1040,7 +1040,7 @@ async fn reconcile_group_syncable(
                         .bind(syncable_id)
                         .fetch_optional(&state.db)
                         .await?
-                        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+                        .ok_or_else(|| AppError::ChannelNotFound)?;
 
                 for user_id in &group_user_ids {
                     desired.insert(DesiredMembership {

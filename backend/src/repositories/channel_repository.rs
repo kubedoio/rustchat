@@ -283,7 +283,7 @@ impl<'a> ChannelRepository<'a> {
             .bind(user_id)
             .fetch_optional(self.pool)
             .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))
+            .ok_or_else(|| AppError::NotAMember)
     }
 
     /// Update a channel with optional fields (COALESCE pattern)

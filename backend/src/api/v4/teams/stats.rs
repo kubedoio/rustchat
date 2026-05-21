@@ -17,7 +17,7 @@ pub async fn get_team_stats(
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
     let total_count: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM team_members WHERE team_id = $1")
@@ -55,7 +55,7 @@ pub async fn get_team_members_minus_group_members(
     Query(query): Query<MembersMinusGroupQuery>,
 ) -> ApiResult<Json<Vec<serde_json::Value>>> {
     let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
@@ -69,7 +69,7 @@ pub async fn get_team_members_minus_group_members(
 
     let rows: Vec<MemberRow> = if let Some(ref group_id_str) = query.group_id {
         let group_id = parse_mm_or_uuid(group_id_str)
-            .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+            .ok_or_else(|| AppError::InvalidGroupId)?;
         sqlx::query_as(
             r#"
             SELECT u.id AS user_id, u.username, u.email, tm.role AS team_role
@@ -88,7 +88,7 @@ pub async fn get_team_members_minus_group_members(
         .await?
     } else if let Some(ref channel_id_str) = query.channel_id {
         let channel_id = parse_mm_or_uuid(channel_id_str)
-            .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
+            .ok_or_else(|| AppError::InvalidChannelId)?;
         sqlx::query_as(
             r#"
             SELECT u.id AS user_id, u.username, u.email, tm.role AS team_role

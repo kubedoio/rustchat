@@ -232,7 +232,7 @@ pub async fn resend_verification_email(
             error!("Failed to fetch user: {}", e);
             AppError::Internal("Failed to fetch user".to_string())
         })?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     if user.email_verified {
         return Err(AppError::BadRequest(

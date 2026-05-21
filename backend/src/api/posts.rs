@@ -221,7 +221,7 @@ async fn get_post(
     let post = repo
         .get_post_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     // Check membership
     let _: ChannelMember = repo
@@ -243,7 +243,7 @@ async fn update_post(
     let post = repo
         .get_post_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     // Only author can edit
     if !auth.can_access_owned(post.user_id, &permissions::ADMIN_FULL) {
@@ -307,7 +307,7 @@ async fn delete_post(
     let post = repo
         .get_post_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     // Only author or admin can delete
     if !auth.can_access_owned(post.user_id, &permissions::ADMIN_FULL) {
@@ -349,7 +349,7 @@ async fn get_thread(
     let cursor = match query.cursor {
         Some(cursor_str) => Some(
             parse_mm_or_uuid(&cursor_str)
-                .ok_or_else(|| AppError::BadRequest("Invalid cursor".to_string()))?,
+                .ok_or_else(|| AppError::InvalidCursor)?,
         ),
         None => None,
     };
@@ -363,7 +363,7 @@ async fn get_thread(
         .posts
         .values()
         .next()
-        .ok_or_else(|| AppError::NotFound("Thread not found".to_string()))?;
+        .ok_or_else(|| AppError::ThreadNotFound)?;
 
     let _: ChannelMember = PostRepository::new(state.db.clone())
         .require_channel_membership(first_post.channel_id, auth.user_id)
@@ -384,7 +384,7 @@ async fn add_reaction(
     let post = repo
         .get_post_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     // Check membership
     let _: ChannelMember = repo
@@ -458,7 +458,7 @@ async fn pin_post(
     let post = repo
         .get_post_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     // Check admin membership
     let member = repo
@@ -503,7 +503,7 @@ async fn unpin_post(
     let post = repo
         .get_post_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     // Check admin membership
     let member = repo
@@ -556,7 +556,7 @@ async fn save_post(
     let _post = repo
         .get_post_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     let channel_id = repo.get_post_channel_id(id).await?;
 

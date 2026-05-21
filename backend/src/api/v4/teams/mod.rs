@@ -65,7 +65,7 @@ pub async fn ensure_team_member(state: &AppState, team_id: Uuid, user_id: Uuid) 
     .fetch_one(&state.db)
     .await?;
     if !is_member {
-        return Err(AppError::Forbidden("Not a member of this team".to_string()));
+        return Err(AppError::NotOnTeam);
     }
     Ok(())
 }
@@ -124,7 +124,7 @@ pub async fn search_team_channels(
     use crate::mattermost_compat::id::parse_mm_or_uuid;
 
     let team_id = parse_mm_or_uuid(team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_member(state, team_id, user_id).await?;
     let search_term = format!("%{}%", term.to_lowercase());
     let channels: Vec<Channel> = sqlx::query_as(

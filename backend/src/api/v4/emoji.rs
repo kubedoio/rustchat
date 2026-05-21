@@ -56,12 +56,12 @@ pub async fn get_emoji(
     Path(emoji_id_str): Path<String>,
 ) -> ApiResult<Json<mm::Emoji>> {
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
-        .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidEmojiId)?;
 
     let emoji = EmojiRepository::new(&state.db)
         .get_by_id(emoji_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
+        .ok_or_else(|| AppError::EmojiNotFound)?;
 
     Ok(Json(map_emoji(emoji)))
 }
@@ -110,7 +110,7 @@ pub async fn get_emoji_by_name(
     let emoji = EmojiRepository::new(&state.db)
         .get_by_name(&name)
         .await?
-        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
+        .ok_or_else(|| AppError::EmojiNotFound)?;
 
     Ok(Json(map_emoji(emoji)))
 }
@@ -140,13 +140,13 @@ pub async fn get_emoji_image(
     }
 
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
-        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
+        .ok_or_else(|| AppError::EmojiNotFound)?;
 
     // Get the emoji's image path from database
     let image_url = EmojiRepository::new(&state.db)
         .get_image_url(emoji_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
+        .ok_or_else(|| AppError::EmojiNotFound)?;
 
     if !image_url.is_empty() {
         // Generate presigned URL for S3
@@ -269,12 +269,12 @@ pub async fn delete_emoji(
     Path(emoji_id_str): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let emoji_id = parse_mm_or_uuid(&emoji_id_str)
-        .ok_or_else(|| AppError::BadRequest("Invalid emoji_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidEmojiId)?;
 
     let emoji = EmojiRepository::new(&state.db)
         .get_by_id(emoji_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Emoji not found".to_string()))?;
+        .ok_or_else(|| AppError::EmojiNotFound)?;
 
     // Authorization
     if !auth.can_access_owned(emoji.creator_id, &permissions::ADMIN_FULL) {

@@ -84,12 +84,12 @@ async fn execute_command(
 ) -> ApiResult<Json<CommandResponse>> {
     let payload: ExecuteCommandRequest = parse_body(&headers, &body, "Invalid command body")?;
     let channel_id = parse_mm_or_uuid(&payload.channel_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidChannelId)?;
 
     let team_id = if let Some(team_id_str) = payload.team_id.as_deref() {
         Some(
             parse_mm_or_uuid(team_id_str)
-                .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?,
+                .ok_or_else(|| AppError::InvalidTeamId)?,
         )
     } else {
         None

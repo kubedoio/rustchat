@@ -36,7 +36,7 @@ async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<Uuid>
     let id = repo
         .get_id_by_name(team_id_str)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     Ok(id)
 }
 
@@ -136,7 +136,7 @@ pub(crate) async fn get_categories_internal(
     let team_repo = TeamRepository::new(&state.db);
     let exists = team_repo.get_team_by_id(team_id).await?.is_some();
     if !exists {
-        return Err(AppError::NotFound("Team not found".to_string()));
+        return Err(AppError::TeamNotFound);
     }
     let is_member = team_repo.is_team_member(team_id, user_id).await?;
     if !is_member {
@@ -336,7 +336,7 @@ pub(crate) async fn create_category_internal(
     let team_repo = TeamRepository::new(&state.db);
     let exists = team_repo.get_team_by_id(team_id).await?.is_some();
     if !exists {
-        return Err(AppError::NotFound("Team not found".to_string()));
+        return Err(AppError::TeamNotFound);
     }
     let is_member = team_repo.is_team_member(team_id, user_id).await?;
     if !is_member {
@@ -347,7 +347,7 @@ pub(crate) async fn create_category_internal(
 
     if let Some(input_user_id) = input.user_id.as_deref() {
         let parsed = parse_mm_or_uuid(input_user_id)
-            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+            .ok_or_else(|| AppError::InvalidUserId)?;
         if parsed != user_id {
             return Err(AppError::BadRequest(
                 "user_id does not match path".to_string(),
@@ -357,7 +357,7 @@ pub(crate) async fn create_category_internal(
 
     if let Some(input_team_id) = input.team_id.as_deref() {
         let parsed = parse_mm_or_uuid(input_team_id)
-            .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+            .ok_or_else(|| AppError::InvalidTeamId)?;
         if parsed != team_id {
             return Err(AppError::BadRequest(
                 "team_id does not match path".to_string(),
@@ -433,7 +433,7 @@ pub(crate) async fn update_categories_internal(
     let team_repo = TeamRepository::new(&state.db);
     let exists = team_repo.get_team_by_id(team_id).await?.is_some();
     if !exists {
-        return Err(AppError::NotFound("Team not found".to_string()));
+        return Err(AppError::TeamNotFound);
     }
     let is_member = team_repo.is_team_member(team_id, user_id).await?;
     if !is_member {
@@ -520,7 +520,7 @@ pub(crate) async fn update_category_order_internal(
     let team_repo = TeamRepository::new(&state.db);
     let exists = team_repo.get_team_by_id(team_id).await?.is_some();
     if !exists {
-        return Err(AppError::NotFound("Team not found".to_string()));
+        return Err(AppError::TeamNotFound);
     }
     let is_member = team_repo.is_team_member(team_id, user_id).await?;
     if !is_member {

@@ -45,7 +45,7 @@ pub(crate) async fn resolve_channel_id(state: &AppState, channel_id: &str) -> Ap
         }
     }
 
-    Err(AppError::BadRequest("Invalid channel_id".to_string()))
+    Err(AppError::InvalidChannelId)
 }
 pub(crate) async fn build_call_state_response(
     state: &AppState,

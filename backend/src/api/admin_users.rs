@@ -209,7 +209,7 @@ pub async fn delete_admin_user(
     let target = AdminRepository::new(&state.db)
         .get_user_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     if target.deleted_at.is_some() {
         return Err(AppError::Conflict("User is already deleted".to_string()));
@@ -285,7 +285,7 @@ pub async fn wipe_user(
     let target = AdminRepository::new(&state.db)
         .get_user_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     if target.deleted_at.is_none() {
         return Err(AppError::Conflict(

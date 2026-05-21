@@ -57,7 +57,7 @@ pub async fn add_team_member_by_invite(
         let team = repo
             .get_team_by_id(token_row.team_id)
             .await?
-            .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+            .ok_or_else(|| AppError::TeamNotFound)?;
 
         repo.upsert_team_member_in_tx(team.id, auth.user_id, "member", &mut tx)
             .await?;
@@ -76,7 +76,7 @@ pub async fn add_team_member_by_invite(
         let team = repo
             .get_team_by_invite_id(invite_value)
             .await?
-            .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+            .ok_or_else(|| AppError::TeamNotFound)?;
 
         if !team.allow_open_invite {
             return Err(AppError::Forbidden(
@@ -150,7 +150,7 @@ pub async fn invite_users_to_team(
     Json(input): Json<InviteUsersRequest>,
 ) -> ApiResult<Json<Vec<TeamInviteResponse>>> {
     let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
@@ -225,7 +225,7 @@ pub async fn invite_guests_to_team(
     Json(input): Json<InviteGuestsRequest>,
 ) -> ApiResult<Json<Vec<EmailInviteResponse>>> {
     let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
 
@@ -285,7 +285,7 @@ pub async fn invite_users_to_team_by_email(
     Json(input): Json<InviteByEmailRequest>,
 ) -> ApiResult<Json<Vec<EmailInviteResponse>>> {
     let team_id = parse_mm_or_uuid(&input.team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_member(&state, team_id, auth.user_id).await?;
 
@@ -338,7 +338,7 @@ pub async fn get_team_by_invite(
     let team = repo
         .get_team_by_invite_id(&invite_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     Ok(Json(team.into()))
 }
 
@@ -348,14 +348,14 @@ pub async fn regenerate_team_invite_id(
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
 
     let repo = TeamRepository::new(&state.db);
     let invite_id = repo
         .regenerate_team_invite_id(team_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
 
     Ok(Json(serde_json::json!({"invite_id": invite_id})))
 }

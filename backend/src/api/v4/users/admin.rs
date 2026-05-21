@@ -94,7 +94,7 @@ pub async fn get_user_groups(
         auth.user_id
     } else {
         parse_mm_or_uuid(&user_id)
-            .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?
+            .ok_or_else(|| AppError::InvalidUserId)?
     };
 
     if user_uuid != auth.user_id && !auth.has_permission(&permissions::SYSTEM_MANAGE) {

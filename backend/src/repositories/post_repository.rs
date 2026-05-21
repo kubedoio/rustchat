@@ -309,7 +309,7 @@ impl PostRepository {
                 .fetch_optional(&self.db)
                 .await?;
 
-        membership.ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))
+        membership.ok_or_else(|| AppError::NotAMember)
     }
 
     /// Get the channel_id for a post

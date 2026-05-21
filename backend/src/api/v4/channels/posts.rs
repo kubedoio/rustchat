@@ -28,7 +28,7 @@ pub async fn get_posts(
     Query(pagination): Query<Pagination>,
 ) -> ApiResult<Json<mm::PostList>> {
     let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let repo = PostRepository::new(state.db.clone());
 
@@ -58,7 +58,7 @@ pub async fn get_posts(
             })?;
 
             let before_time = repo.get_post_created_at(before_id).await?.ok_or_else(|| {
-                crate::error::AppError::NotFound("Before post not found".to_string())
+                crate::error::AppError::BeforePostNotFound
             })?;
 
             repo.list_before(channel_id, before_time, per_page)
@@ -73,7 +73,7 @@ pub async fn get_posts(
             })?;
 
             let after_time = repo.get_post_created_at(after_id).await?.ok_or_else(|| {
-                crate::error::AppError::NotFound("After post not found".to_string())
+                crate::error::AppError::AfterPostNotFound
             })?;
 
             repo.list_after(channel_id, after_time, per_page)
@@ -135,7 +135,7 @@ pub async fn get_pinned_posts(
     Query(query): Query<PinnedPostsQuery>,
 ) -> ApiResult<Json<mm::PostList>> {
     let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let repo = PostRepository::new(state.db.clone());
 
@@ -180,9 +180,9 @@ pub async fn pin_post(
     Path(path): Path<PinPath>,
 ) -> ApiResult<impl IntoResponse> {
     let channel_id = parse_mm_or_uuid(&path.channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
     let post_id = parse_mm_or_uuid(&path.post_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid post_id".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::InvalidPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
 
@@ -203,9 +203,9 @@ pub async fn unpin_post(
     Path(path): Path<PinPath>,
 ) -> ApiResult<impl IntoResponse> {
     let channel_id = parse_mm_or_uuid(&path.channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
     let post_id = parse_mm_or_uuid(&path.post_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid post_id".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::InvalidPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
 

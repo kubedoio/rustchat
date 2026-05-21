@@ -22,7 +22,7 @@ pub async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<U
     let id = TeamRepository::new(&state.db)
         .get_id_by_name(team_id_str)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
 
     Ok(id)
 }

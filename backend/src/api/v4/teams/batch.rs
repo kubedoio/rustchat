@@ -26,7 +26,7 @@ pub async fn add_team_members_batch(
     body: axum::body::Bytes,
 ) -> ApiResult<Json<Vec<mm::TeamMember>>> {
     let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+        .ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
     let input: AddTeamMembersBatchRequest = parse_body(&headers, &body, "Invalid batch body")?;
     let mut members = Vec::new();
