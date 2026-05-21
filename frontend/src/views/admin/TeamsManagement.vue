@@ -17,11 +17,11 @@ import {
     Edit2,
     UserPlus,
     UserMinus,
-    X,
     CheckCircle,
     Globe,
     MoreHorizontal
 } from 'lucide-vue-next';
+import BaseModal from '../../components/ui/BaseModal.vue';
 import adminApi, { type AdminTeam, type AdminChannel, type AdminUser } from '../../api/admin';
 import BaseInput from '../../components/atomic/BaseInput.vue';
 import { getApiErrorMessage } from '@/core/errors/errorUtils';
@@ -703,15 +703,8 @@ onMounted(fetchTeams);
         </div>
 
         <!-- Create Team Modal -->
-        <div v-if="showCreateTeamModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="fixed inset-0 bg-black/50" @click="showCreateTeamModal = false"></div>
-            <div class="relative bg-bg-surface-1 rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-bold text-text-1">Create Team</h3>
-                    <button @click="showCreateTeamModal = false" class="p-1 hover:bg-bg-surface-2 rounded-lg transition-colors">
-                        <X class="w-4 h-4 text-text-3" />
-                    </button>
-                </div>
+        <BaseModal v-model="showCreateTeamModal" title="Create Team">
+            <div class="p-5 space-y-4">
                 <BaseInput v-model="teamForm.name" label="Team URL Name" placeholder="e.g. engineering" required />
                 <BaseInput v-model="teamForm.display_name" label="Display Name" placeholder="e.g. Engineering Team" />
                 <BaseInput v-model="teamForm.description" label="Description" placeholder="Team description" />
@@ -725,7 +718,9 @@ onMounted(fetchTeams);
                         <span>Allow open invite (any member can invite)</span>
                     </label>
                 </div>
-                <div class="flex justify-end gap-2 pt-2">
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-2">
                     <button 
                         @click="showCreateTeamModal = false"
                         class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
@@ -740,19 +735,12 @@ onMounted(fetchTeams);
                         Create Team
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </BaseModal>
 
         <!-- Edit Team Modal -->
-        <div v-if="showEditTeamModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="fixed inset-0 bg-black/50" @click="showEditTeamModal = false"></div>
-            <div class="relative bg-bg-surface-1 rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-bold text-text-1">Edit Team</h3>
-                    <button @click="showEditTeamModal = false" class="p-1 hover:bg-bg-surface-2 rounded-lg transition-colors">
-                        <X class="w-4 h-4 text-text-3" />
-                    </button>
-                </div>
+        <BaseModal v-model="showEditTeamModal" title="Edit Team">
+            <div class="p-5 space-y-4">
                 <BaseInput v-model="teamForm.name" label="Team URL Name" disabled />
                 <BaseInput v-model="teamForm.display_name" label="Display Name" placeholder="e.g. Engineering Team" />
                 <BaseInput v-model="teamForm.description" label="Description" placeholder="Team description" />
@@ -766,7 +754,9 @@ onMounted(fetchTeams);
                         <span>Allow open invite (any member can invite)</span>
                     </label>
                 </div>
-                <div class="flex justify-end gap-2 pt-2">
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-2">
                     <button 
                         @click="showEditTeamModal = false"
                         class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
@@ -780,19 +770,12 @@ onMounted(fetchTeams);
                         Save Changes
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </BaseModal>
 
         <!-- Create Channel Modal -->
-        <div v-if="showCreateChannelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="fixed inset-0 bg-black/50" @click="showCreateChannelModal = false"></div>
-            <div class="relative bg-bg-surface-1 rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-bold text-text-1">Create Channel</h3>
-                    <button @click="showCreateChannelModal = false" class="p-1 hover:bg-bg-surface-2 rounded-lg transition-colors">
-                        <X class="w-4 h-4 text-text-3" />
-                    </button>
-                </div>
+        <BaseModal v-model="showCreateChannelModal" title="Create Channel">
+            <div class="p-5 space-y-4">
                 <BaseInput v-model="channelForm.name" label="Name" placeholder="e.g. general" required />
                 <BaseInput v-model="channelForm.display_name" label="Display Name" placeholder="e.g. General" />
                 <BaseInput v-model="channelForm.purpose" label="Purpose" placeholder="Channel purpose" />
@@ -803,7 +786,9 @@ onMounted(fetchTeams);
                         <option value="private">Private</option>
                     </select>
                 </div>
-                <div class="flex justify-end gap-2 pt-2">
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-2">
                     <button 
                         @click="showCreateChannelModal = false"
                         class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
@@ -818,23 +803,18 @@ onMounted(fetchTeams);
                         Create
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </BaseModal>
 
         <!-- Edit Channel Modal -->
-        <div v-if="showEditChannelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="fixed inset-0 bg-black/50" @click="showEditChannelModal = false"></div>
-            <div class="relative bg-bg-surface-1 rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-bold text-text-1">Edit Channel</h3>
-                    <button @click="showEditChannelModal = false" class="p-1 hover:bg-bg-surface-2 rounded-lg transition-colors">
-                        <X class="w-4 h-4 text-text-3" />
-                    </button>
-                </div>
+        <BaseModal v-model="showEditChannelModal" title="Edit Channel">
+            <div class="p-5 space-y-4">
                 <BaseInput v-model="channelForm.name" label="Name" disabled />
                 <BaseInput v-model="channelForm.display_name" label="Display Name" />
                 <BaseInput v-model="channelForm.purpose" label="Purpose" />
-                <div class="flex justify-end gap-2 pt-2">
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-2">
                     <button 
                         @click="showEditChannelModal = false"
                         class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
@@ -848,19 +828,12 @@ onMounted(fetchTeams);
                         Save
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </BaseModal>
 
         <!-- Add Member Modal -->
-        <div v-if="showAddMemberModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="fixed inset-0 bg-black/50" @click="showAddMemberModal = false"></div>
-            <div class="relative bg-bg-surface-1 rounded-xl shadow-xl w-full max-w-md p-5 space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-bold text-text-1">Add Team Member</h3>
-                    <button @click="showAddMemberModal = false" class="p-1 hover:bg-bg-surface-2 rounded-lg transition-colors">
-                        <X class="w-4 h-4 text-text-3" />
-                    </button>
-                </div>
+        <BaseModal v-model="showAddMemberModal" title="Add Team Member">
+            <div class="p-5 space-y-4">
                 <div class="relative">
                     <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-4" />
                     <input 
@@ -891,6 +864,6 @@ onMounted(fetchTeams);
                     </div>
                 </div>
             </div>
-        </div>
+        </BaseModal>
     </div>
 </template>

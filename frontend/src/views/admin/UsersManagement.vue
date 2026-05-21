@@ -7,6 +7,7 @@ import { Users, Plus, Search, MoreHorizontal, UserCheck, UserX, Edit2, Trash2, A
 import membershipPoliciesApi from '../../api/membershipPolicies';
 import CreateUserModal from '../../components/modals/CreateUserModal.vue';
 import EditUserModal from '../../components/modals/EditUserModal.vue';
+import BaseModal from '../../components/ui/BaseModal.vue';
 import type { AdminUser } from '../../api/admin';
 import adminApi from '../../api/admin';
 import { getApiErrorMessage } from '@/core/errors/errorUtils';
@@ -479,12 +480,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
         />
 
         <!-- Set Password Modal -->
-        <div
-            v-if="showPasswordModal && passwordUser"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            @click.self="showPasswordModal = false"
-        >
-            <div class="w-full max-w-md rounded-xl border border-border-1 bg-bg-surface-1 shadow-xl">
+        <BaseModal v-if="passwordUser" v-model="showPasswordModal" size="md">
+            <template #header>
                 <div class="flex items-center justify-between px-5 py-4 border-b border-border-1">
                     <div class="flex items-center gap-2.5">
                         <div class="rounded-lg bg-brand/10 p-1.5">
@@ -499,45 +496,47 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
                         <X class="w-4 h-4" />
                     </button>
                 </div>
+            </template>
 
-                <div class="p-5 space-y-4">
-                    <div v-if="passwordError" class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
-                        {{ passwordError }}
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-text-2 mb-1.5">New Password</label>
-                        <div class="relative">
-                            <input
-                                v-model="passwordForm.newPassword"
-                                :type="showPassword ? 'text' : 'password'"
-                                class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-                                placeholder="Enter new password"
-                            />
-                            <button 
-                                @click="showPassword = !showPassword"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-text-4 hover:text-text-2"
-                            >
-                                <Eye v-if="!showPassword" class="w-3.5 h-3.5" />
-                                <EyeOff v-else class="w-3.5 h-3.5" />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-text-2 mb-1.5">Confirm Password</label>
-                        <input
-                            v-model="passwordForm.confirmPassword"
-                            :type="showPassword ? 'text' : 'password'"
-                            class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-                            placeholder="Confirm new password"
-                        />
-                    </div>
-
-                    <p class="text-[10px] text-text-3">Password must be at least 8 characters long.</p>
+            <div class="p-5 space-y-4">
+                <div v-if="passwordError" class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
+                    {{ passwordError }}
                 </div>
 
-                <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-border-1">
+                <div>
+                    <label class="block text-xs font-medium text-text-2 mb-1.5">New Password</label>
+                    <div class="relative">
+                        <input
+                            v-model="passwordForm.newPassword"
+                            :type="showPassword ? 'text' : 'password'"
+                            class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                            placeholder="Enter new password"
+                        />
+                        <button 
+                            @click="showPassword = !showPassword"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-text-4 hover:text-text-2"
+                        >
+                            <Eye v-if="!showPassword" class="w-3.5 h-3.5" />
+                            <EyeOff v-else class="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-text-2 mb-1.5">Confirm Password</label>
+                    <input
+                        v-model="passwordForm.confirmPassword"
+                        :type="showPassword ? 'text' : 'password'"
+                        class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                        placeholder="Confirm new password"
+                    />
+                </div>
+
+                <p class="text-[10px] text-text-3">Password must be at least 8 characters long.</p>
+            </div>
+
+            <template #footer>
+                <div class="flex items-center justify-end gap-2">
                     <button
                         @click="showPasswordModal = false"
                         class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
@@ -552,16 +551,12 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
                         {{ passwordSubmitting ? 'Saving...' : 'Set Password' }}
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </BaseModal>
 
         <!-- Delete Modal -->
-        <div
-            v-if="showDeleteModal && deletingUser"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            @click.self="closeDeleteModal"
-        >
-            <div class="w-full max-w-lg rounded-xl border border-border-1 bg-bg-surface-1 shadow-xl">
+        <BaseModal v-if="deletingUser" v-model="showDeleteModal" size="lg" @close="closeDeleteModal">
+            <template #header>
                 <div class="flex items-start justify-between p-5 border-b border-border-1">
                     <div class="flex items-start gap-3">
                         <div class="rounded-lg bg-danger/10 p-2">
@@ -578,45 +573,47 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
                         <X class="w-4 h-4" />
                     </button>
                 </div>
+            </template>
 
-                <div class="p-5 space-y-4">
-                    <div class="rounded-lg border border-danger/20 bg-danger/10 p-3 text-xs text-danger">
-                        <p><strong>Consequences:</strong> login is blocked immediately, active sessions are revoked, and the account is marked deleted for audit/history. Messages remain for history.</p>
-                    </div>
+            <div class="p-5 space-y-4">
+                <div class="rounded-lg border border-danger/20 bg-danger/10 p-3 text-xs text-danger">
+                    <p><strong>Consequences:</strong> login is blocked immediately, active sessions are revoked, and the account is marked deleted for audit/history. Messages remain for history.</p>
+                </div>
 
-                    <div class="text-xs text-text-2">
-                        <div>Type the exact <span class="font-semibold">username</span> or <span class="font-semibold">email</span> to confirm deletion.</div>
-                        <div class="mt-2 rounded-md bg-bg-surface-2 px-3 py-2 font-mono text-[10px] break-all">
-                            {{ deletingUser.username }} or {{ deletingUser.email }}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-text-2 mb-1">Confirmation text</label>
-                        <input
-                            v-model="deleteConfirmInput"
-                            type="text"
-                            class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-                            :placeholder="deletingUser.username"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-text-2 mb-1">Reason (optional)</label>
-                        <textarea
-                            v-model="deleteReason"
-                            rows="2"
-                            class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none resize-none"
-                            placeholder="Why this account is being deleted"
-                        />
-                    </div>
-
-                    <div v-if="deleteError" class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
-                        {{ deleteError }}
+                <div class="text-xs text-text-2">
+                    <div>Type the exact <span class="font-semibold">username</span> or <span class="font-semibold">email</span> to confirm deletion.</div>
+                    <div class="mt-2 rounded-md bg-bg-surface-2 px-3 py-2 font-mono text-[10px] break-all">
+                        {{ deletingUser.username }} or {{ deletingUser.email }}
                     </div>
                 </div>
 
-                <div class="flex items-center justify-end gap-2 p-5 border-t border-border-1">
+                <div>
+                    <label class="block text-xs font-medium text-text-2 mb-1">Confirmation text</label>
+                    <input
+                        v-model="deleteConfirmInput"
+                        type="text"
+                        class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                        :placeholder="deletingUser.username"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-text-2 mb-1">Reason (optional)</label>
+                    <textarea
+                        v-model="deleteReason"
+                        rows="2"
+                        class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none resize-none"
+                        placeholder="Why this account is being deleted"
+                    />
+                </div>
+
+                <div v-if="deleteError" class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
+                    {{ deleteError }}
+                </div>
+            </div>
+
+            <template #footer>
+                <div class="flex items-center justify-end gap-2">
                     <button
                         @click="closeDeleteModal"
                         class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
@@ -631,16 +628,12 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
                         {{ deleteSubmitting ? 'Deleting...' : 'Delete User' }}
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </BaseModal>
 
         <!-- Wipe User Modal -->
-        <div
-            v-if="showWipeModal && wipingUser"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            @click.self="closeWipeModal"
-        >
-            <div class="w-full max-w-lg rounded-xl border border-border-1 bg-bg-surface-1 shadow-xl">
+        <BaseModal v-if="wipingUser" v-model="showWipeModal" size="lg" @close="closeWipeModal">
+            <template #header>
                 <div class="flex items-start justify-between p-5 border-b border-border-1">
                     <div class="flex items-start gap-3">
                         <div class="rounded-lg bg-warning/10 p-2">
@@ -657,26 +650,28 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
                         <X class="w-4 h-4" />
                     </button>
                 </div>
+            </template>
 
-                <div class="p-5 space-y-4">
-                    <div class="rounded-lg border border-warning/20 bg-warning/10 p-3 text-xs text-warning">
-                        <p><strong>Warning:</strong> This will permanently remove the user record from the database. Only users with no messages can be wiped.</p>
-                    </div>
-
-                    <div class="text-xs text-text-2">
-                        <p>You are about to wipe user:</p>
-                        <div class="mt-2 rounded-md bg-bg-surface-2 px-3 py-2 font-mono text-[10px] break-all">
-                            {{ wipingUser.username }} ({{ wipingUser.email }})
-                        </div>
-                        <p class="mt-2 text-[10px] text-text-3">Deleted at: {{ formatDate(wipingUser.deleted_at ?? null) }}</p>
-                    </div>
-
-                    <div v-if="wipeError" class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
-                        {{ wipeError }}
-                    </div>
+            <div class="p-5 space-y-4">
+                <div class="rounded-lg border border-warning/20 bg-warning/10 p-3 text-xs text-warning">
+                    <p><strong>Warning:</strong> This will permanently remove the user record from the database. Only users with no messages can be wiped.</p>
                 </div>
 
-                <div class="flex items-center justify-end gap-2 p-5 border-t border-border-1">
+                <div class="text-xs text-text-2">
+                    <p>You are about to wipe user:</p>
+                    <div class="mt-2 rounded-md bg-bg-surface-2 px-3 py-2 font-mono text-[10px] break-all">
+                        {{ wipingUser.username }} ({{ wipingUser.email }})
+                    </div>
+                    <p class="mt-2 text-[10px] text-text-3">Deleted at: {{ formatDate(wipingUser.deleted_at ?? null) }}</p>
+                </div>
+
+                <div v-if="wipeError" class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
+                    {{ wipeError }}
+                </div>
+            </div>
+
+            <template #footer>
+                <div class="flex items-center justify-end gap-2">
                     <button
                         @click="closeWipeModal"
                         class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
@@ -691,16 +686,12 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
                         {{ wipeSubmitting ? 'Wiping...' : 'Permanently Wipe User' }}
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </BaseModal>
 
         <!-- Re-sync Membership Modal -->
-        <div
-            v-if="showResyncModal && resyncingUser"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            @click.self="closeResyncModal"
-        >
-            <div class="w-full max-w-lg rounded-xl border border-border-1 bg-bg-surface-1 shadow-xl">
+        <BaseModal v-if="resyncingUser" v-model="showResyncModal" size="lg" @close="closeResyncModal">
+            <template #header>
                 <div class="flex items-start justify-between p-5 border-b border-border-1">
                     <div class="flex items-start gap-3">
                         <div class="rounded-lg bg-brand/10 p-2">
@@ -717,41 +708,43 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
                         <X class="w-4 h-4" />
                     </button>
                 </div>
+            </template>
 
-                <div class="p-5 space-y-4">
-                    <!-- User Info -->
-                    <div class="text-xs text-text-2">
-                        <p class="text-[10px] text-text-3 mb-1">User:</p>
-                        <div class="rounded-md bg-bg-surface-2 px-3 py-2 font-medium text-text-1">
-                            @{{ resyncingUser.username }} ({{ resyncingUser.email }})
-                        </div>
-                    </div>
-
-                    <!-- Result Display -->
-                    <div v-if="resyncResult" class="rounded-lg border border-success/20 bg-success/10 p-4">
-                        <h4 class="text-xs font-semibold text-success mb-3">Re-sync Complete</h4>
-                        <div class="grid grid-cols-3 gap-3 text-center">
-                            <div class="rounded-lg bg-bg-surface-1 p-2">
-                                <div class="text-xl font-bold text-success">{{ resyncResult.teams_processed }}</div>
-                                <div class="text-[10px] text-success/80">Teams Processed</div>
-                            </div>
-                            <div class="rounded-lg bg-bg-surface-1 p-2">
-                                <div class="text-xl font-bold text-success">{{ resyncResult.memberships_applied }}</div>
-                                <div class="text-[10px] text-success/80">Applied</div>
-                            </div>
-                            <div class="rounded-lg bg-bg-surface-1 p-2">
-                                <div class="text-xl font-bold" :class="resyncResult.memberships_failed > 0 ? 'text-danger' : 'text-success'">{{ resyncResult.memberships_failed }}</div>
-                                <div class="text-[10px]" :class="resyncResult.memberships_failed > 0 ? 'text-danger' : 'text-success'">Failed</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-if="resyncError" class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
-                        {{ resyncError }}
+            <div class="p-5 space-y-4">
+                <!-- User Info -->
+                <div class="text-xs text-text-2">
+                    <p class="text-[10px] text-text-3 mb-1">User:</p>
+                    <div class="rounded-md bg-bg-surface-2 px-3 py-2 font-medium text-text-1">
+                        @{{ resyncingUser.username }} ({{ resyncingUser.email }})
                     </div>
                 </div>
 
-                <div class="flex items-center justify-end gap-2 p-5 border-t border-border-1">
+                <!-- Result Display -->
+                <div v-if="resyncResult" class="rounded-lg border border-success/20 bg-success/10 p-4">
+                    <h4 class="text-xs font-semibold text-success mb-3">Re-sync Complete</h4>
+                    <div class="grid grid-cols-3 gap-3 text-center">
+                        <div class="rounded-lg bg-bg-surface-1 p-2">
+                            <div class="text-xl font-bold text-success">{{ resyncResult.teams_processed }}</div>
+                            <div class="text-[10px] text-success/80">Teams Processed</div>
+                        </div>
+                        <div class="rounded-lg bg-bg-surface-1 p-2">
+                            <div class="text-xl font-bold text-success">{{ resyncResult.memberships_applied }}</div>
+                            <div class="text-[10px] text-success/80">Applied</div>
+                        </div>
+                        <div class="rounded-lg bg-bg-surface-1 p-2">
+                            <div class="text-xl font-bold" :class="resyncResult.memberships_failed > 0 ? 'text-danger' : 'text-success'">{{ resyncResult.memberships_failed }}</div>
+                            <div class="text-[10px]" :class="resyncResult.memberships_failed > 0 ? 'text-danger' : 'text-success'">Failed</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="resyncError" class="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
+                    {{ resyncError }}
+                </div>
+            </div>
+
+            <template #footer>
+                <div class="flex items-center justify-end gap-2">
                     <button
                         v-if="!resyncResult"
                         @click="closeResyncModal"
@@ -776,7 +769,7 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at);
                         {{ resyncSubmitting ? 'Processing...' : 'Run Re-sync' }}
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </BaseModal>
     </div>
 </template>
