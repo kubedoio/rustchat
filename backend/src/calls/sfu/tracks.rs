@@ -1,7 +1,6 @@
 //! Track Management for SFU
 //!
 //! Manages audio/video tracks from participants and handles track forwarding.
-#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::sync::Arc;
