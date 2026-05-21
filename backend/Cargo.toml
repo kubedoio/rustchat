@@ -41,7 +41,6 @@ prometheus = { version = "0.14", features = ["process"] }
 # Auth
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
 argon2 = "0.5"
-bcrypt = "0.15"
 
 # Utils
 aes = "0.8"
