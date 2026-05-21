@@ -79,8 +79,8 @@ async function joinTeam(teamId: string) {
             </div>
           </div>
           <button
-            @click="emit('close')"
             class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2"
+            @click="emit('close')"
           >
             <X class="h-5 w-5 text-text-3" />
           </button>
@@ -119,9 +119,9 @@ async function joinTeam(teamId: string) {
                     </p>
                   </div>
                   <button
-                    @click="joinTeam(team.id)"
                     :disabled="joining === team.id"
                     class="ml-4 flex items-center rounded-r-2 bg-brand px-3 py-1.5 text-sm font-medium text-brand-foreground transition-standard hover:opacity-90 disabled:opacity-50"
+                    @click="joinTeam(team.id)"
                   >
                     <span>{{ joining === team.id ? 'Joining...' : 'Join' }}</span>
                     <ArrowRight class="w-4 h-4 ml-1" />

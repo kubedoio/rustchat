@@ -56,8 +56,8 @@ const cfg = computed(() => config.value)
       <span>{{ cfg.message }}</span>
       <button
         v-if="cfg.showRetry"
-        @click="emit('retry')"
         class="ml-2 rounded bg-white/20 px-2 py-0.5 text-xs font-semibold hover:bg-white/30 transition-colors"
+        @click="emit('retry')"
       >
         Retry now
       </button>

@@ -65,9 +65,9 @@ defineExpose({ add, remove })
             </div>
             <div class="ml-4 flex flex-shrink-0">
               <button
-                @click="remove(toast.id)"
                 type="button"
                 class="inline-flex rounded-md bg-bg-surface-1 text-text-4 hover:text-text-3 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2"
+                @click="remove(toast.id)"
               >
                 <span class="sr-only">Close</span>
                 <X class="h-5 w-5" />

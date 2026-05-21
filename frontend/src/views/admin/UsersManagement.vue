@@ -107,6 +107,11 @@ async function handleEdit(user: AdminUser) {
   activeMenuUserId.value = null
 }
 
+function closeEditModal() {
+  showEditModal.value = false
+  editingUser.value = null
+}
+
 async function handleSetPassword(user: AdminUser) {
   passwordUser.value = user
   passwordForm.value = { newPassword: '', confirmPassword: '' }
@@ -313,8 +318,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
         <p class="text-text-3 text-xs mt-0.5">Manage users, roles, and permissions</p>
       </div>
       <button
-        @click.stop="showCreateModal = true"
         class="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand/90 text-white rounded-lg text-xs font-medium transition-colors"
+        @click.stop="showCreateModal = true"
       >
         <Plus class="w-3.5 h-3.5" />
         Add User
@@ -444,16 +449,16 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </td>
             <td class="px-4 py-3 whitespace-nowrap text-right text-xs font-medium relative">
               <button
-                @click.stop="handleEdit(user)"
                 class="text-brand hover:text-brand/80 mr-2 p-1 hover:bg-brand/10 rounded transition-colors"
                 title="Edit User"
+                @click.stop="handleEdit(user)"
               >
                 <Edit2 class="w-3.5 h-3.5" />
               </button>
               <div class="relative inline-block text-left">
                 <button
-                  @click.stop="toggleMenu(user.id)"
                   class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded transition-colors"
+                  @click.stop="toggleMenu(user.id)"
                 >
                   <MoreHorizontal class="w-3.5 h-3.5" />
                 </button>
@@ -463,8 +468,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
                   class="absolute right-0 mt-1 w-44 bg-bg-surface-1 rounded-lg shadow-lg py-1 z-10 border border-border-1 ring-1 ring-text-1/5"
                 >
                   <button
-                    @click.stop="handleSetPassword(user)"
                     class="flex w-full items-center gap-2 px-3 py-2 text-xs text-text-2 hover:bg-bg-surface-2 transition-colors"
+                    @click.stop="handleSetPassword(user)"
                   >
                     <KeyRound class="w-3.5 h-3.5" />
                     Set Password
@@ -472,40 +477,40 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
                   <div class="h-px bg-border-1 my-1"></div>
                   <button
                     v-if="user.is_active && !isDeleted(user)"
-                    @click.stop="handleDeactivate(user)"
                     class="flex w-full items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-danger/10 transition-colors"
+                    @click.stop="handleDeactivate(user)"
                   >
                     <UserX class="w-3.5 h-3.5" />
                     Deactivate User
                   </button>
                   <button
                     v-else-if="!isDeleted(user)"
-                    @click.stop="handleReactivate(user)"
                     class="flex w-full items-center gap-2 px-3 py-2 text-xs text-success hover:bg-success/10 transition-colors"
+                    @click.stop="handleReactivate(user)"
                   >
                     <UserCheck class="w-3.5 h-3.5" />
                     Reactivate User
                   </button>
                   <button
                     v-if="isGlobalAdmin && !isDeleted(user)"
-                    @click.stop="openDeleteModal(user)"
                     class="flex w-full items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-danger/10 transition-colors"
+                    @click.stop="openDeleteModal(user)"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
                     Delete User
                   </button>
                   <button
                     v-if="isGlobalAdmin && isDeleted(user)"
-                    @click.stop="openWipeModal(user)"
                     class="flex w-full items-center gap-2 px-3 py-2 text-xs text-warning hover:bg-warning/10 transition-colors"
+                    @click.stop="openWipeModal(user)"
                   >
                     <Eraser class="w-3.5 h-3.5" />
                     Wipe User
                   </button>
                   <button
                     v-if="!isDeleted(user)"
-                    @click.stop="openResyncModal(user)"
                     class="flex w-full items-center gap-2 px-3 py-2 text-xs text-brand hover:bg-brand/10 transition-colors"
+                    @click.stop="openResyncModal(user)"
                   >
                     <RefreshCw class="w-3.5 h-3.5" />
                     Re-sync Memberships
@@ -533,10 +538,7 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
     <EditUserModal
       :open="showEditModal"
       :user="editingUser"
-      @close="
-        showEditModal = false
-        editingUser = null
-      "
+      @close="closeEditModal"
       @updated="fetchUsers"
     />
 
@@ -554,8 +556,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
-            @click="showPasswordModal = false"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="showPasswordModal = false"
           >
             <X class="w-4 h-4" />
           </button>
@@ -580,8 +582,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
               placeholder="Enter new password"
             />
             <button
-              @click="showPassword = !showPassword"
               class="absolute right-3 top-1/2 -translate-y-1/2 text-text-4 hover:text-text-2"
+              @click="showPassword = !showPassword"
             >
               <Eye v-if="!showPassword" class="w-3.5 h-3.5" />
               <EyeOff v-else class="w-3.5 h-3.5" />
@@ -605,15 +607,15 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
       <template #footer>
         <div class="flex items-center justify-end gap-2">
           <button
-            @click="showPasswordModal = false"
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="showPasswordModal = false"
           >
             Cancel
           </button>
           <button
-            @click="submitPasswordChange"
             :disabled="passwordSubmitting || !passwordForm.newPassword"
             class="px-3 py-2 rounded-lg bg-brand hover:bg-brand/90 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            @click="submitPasswordChange"
           >
             {{ passwordSubmitting ? 'Saving...' : 'Set Password' }}
           </button>
@@ -637,8 +639,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
-            @click="closeDeleteModal"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="closeDeleteModal"
           >
             <X class="w-4 h-4" />
           </button>
@@ -695,15 +697,15 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
       <template #footer>
         <div class="flex items-center justify-end gap-2">
           <button
-            @click="closeDeleteModal"
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="closeDeleteModal"
           >
             Cancel
           </button>
           <button
-            @click="confirmDeleteUser"
             :disabled="deleteSubmitting || !canDeleteSelectedUser"
             class="px-3 py-2 rounded-lg bg-danger hover:bg-danger/90 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            @click="confirmDeleteUser"
           >
             {{ deleteSubmitting ? 'Deleting...' : 'Delete User' }}
           </button>
@@ -727,8 +729,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
-            @click="closeWipeModal"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="closeWipeModal"
           >
             <X class="w-4 h-4" />
           </button>
@@ -764,15 +766,15 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
       <template #footer>
         <div class="flex items-center justify-end gap-2">
           <button
-            @click="closeWipeModal"
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="closeWipeModal"
           >
             Cancel
           </button>
           <button
-            @click="confirmWipeUser"
             :disabled="wipeSubmitting"
             class="px-3 py-2 rounded-lg bg-warning hover:bg-warning/90 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            @click="confirmWipeUser"
           >
             {{ wipeSubmitting ? 'Wiping...' : 'Permanently Wipe User' }}
           </button>
@@ -796,8 +798,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
-            @click="closeResyncModal"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="closeResyncModal"
           >
             <X class="w-4 h-4" />
           </button>
@@ -856,23 +858,23 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
         <div class="flex items-center justify-end gap-2">
           <button
             v-if="!resyncResult"
-            @click="closeResyncModal"
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="closeResyncModal"
           >
             Cancel
           </button>
           <button
             v-if="resyncResult"
-            @click="closeResyncModal"
             class="px-3 py-2 rounded-lg bg-text-3 hover:bg-text-2 text-white text-xs font-medium transition-colors"
+            @click="closeResyncModal"
           >
             Close
           </button>
           <button
             v-if="!resyncResult"
-            @click="confirmResyncUser"
             :disabled="resyncSubmitting"
             class="px-3 py-2 rounded-lg bg-brand hover:bg-brand/90 disabled:opacity-50 text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
+            @click="confirmResyncUser"
           >
             <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': resyncSubmitting }" />
             {{ resyncSubmitting ? 'Processing...' : 'Run Re-sync' }}

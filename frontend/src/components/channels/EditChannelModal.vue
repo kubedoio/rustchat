@@ -121,16 +121,16 @@ function handleBackdropClick(event: MouseEvent) {
           <div class="flex items-center justify-between px-6 py-4 border-b border-border-1">
             <h2 class="text-lg font-semibold text-text-1">Edit Channel</h2>
             <button
-              @click="handleClose"
               class="p-1.5 rounded-lg text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-colors"
               :disabled="isLoading"
+              @click="handleClose"
             >
               <X class="w-5 h-5" />
             </button>
           </div>
 
           <!-- Form -->
-          <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
+          <form class="p-6 space-y-4" @submit.prevent="handleSubmit">
             <!-- Name Field -->
             <div class="space-y-1.5">
               <label for="channel-name" class="block text-sm font-medium text-text-2">
@@ -198,9 +198,9 @@ function handleBackdropClick(event: MouseEvent) {
             <div class="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
-                @click="handleClose"
                 class="px-4 py-2 text-sm font-medium text-text-2 hover:text-text-1 bg-bg-surface-2 hover:bg-bg-surface-3 rounded-lg transition-colors"
                 :disabled="isLoading"
+                @click="handleClose"
               >
                 Cancel
               </button>

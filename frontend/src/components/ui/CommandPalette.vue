@@ -89,10 +89,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <Search class="pointer-events-none absolute top-3.5 left-4 h-5 w-5 text-text-4" />
         <input
           ref="inputRef"
+          v-model="searchQuery"
           type="text"
           class="h-12 w-full border-0 bg-transparent pl-11 pr-4 text-text-1 placeholder-text-4 focus:ring-0 sm:text-sm"
           placeholder="Search items..."
-          v-model="searchQuery"
         />
       </div>
 
@@ -101,10 +101,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           <!-- Group Header (Optional logic needed) -->
 
           <div
-            @click="selectItem(item)"
-            @mouseenter="selectedIndex = index"
             class="group flex cursor-default select-none rounded-xl p-3"
             :class="selectedIndex === index ? 'bg-bg-surface-2' : ''"
+            @click="selectItem(item)"
+            @mouseenter="selectedIndex = index"
           >
             <div
               class="flex h-10 w-10 flex-none items-center justify-center rounded-lg"

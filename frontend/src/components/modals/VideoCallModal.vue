@@ -22,8 +22,8 @@
       >
         <div class="absolute top-0 right-0 pt-4 pr-4 z-10">
           <button
-            @click="close"
             class="bg-gray-800/50 rounded-full p-1 text-white hover:text-gray-200 focus:outline-none"
+            @click="close"
           >
             <span class="sr-only">Close</span>
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

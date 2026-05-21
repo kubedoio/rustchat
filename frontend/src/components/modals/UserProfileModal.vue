@@ -72,8 +72,8 @@ function handleClose() {
         <!-- Header -->
         <div class="flex items-center justify-end border-b border-border-1 px-4 py-3">
           <button
-            @click="handleClose"
             class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2"
+            @click="handleClose"
           >
             <X class="h-5 w-5 text-text-3" />
           </button>
@@ -96,11 +96,11 @@ function handleClose() {
           <!-- Avatar & Name Section -->
           <div class="flex flex-col items-center px-6">
             <RcAvatar
-              :userId="user.id"
+              :user-id="user.id"
               :username="user.username"
               :src="user.avatarUrl"
               :size="96"
-              :showPresence="false"
+              :show-presence="false"
               class="shadow-lg ring-4 ring-bg-surface-1"
             />
 

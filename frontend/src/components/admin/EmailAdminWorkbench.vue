@@ -380,9 +380,9 @@ onMounted(() => {
           </p>
         </div>
         <button
-          @click="refreshAll"
           :disabled="loading"
           class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border-2 text-sm text-text-2"
+          @click="refreshAll"
         >
           <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
           {{ loading ? 'Refreshing...' : 'Refresh' }}
@@ -406,13 +406,13 @@ onMounted(() => {
         <button
           v-for="tab in tabs"
           :key="tab.key"
-          @click="activeTab = tab.key"
           class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors"
           :class="
             activeTab === tab.key
               ? 'bg-brand text-white border-brand'
               : 'border-border-2 text-text-2 hover:bg-bg-surface-2'
           "
+          @click="activeTab = tab.key"
         >
           <component :is="tab.icon" class="w-4 h-4" />
           {{ tab.label }}
@@ -471,20 +471,20 @@ onMounted(() => {
                 <td class="py-3 text-right">
                   <div class="inline-flex items-center gap-2">
                     <button
-                      @click="testProvider(provider.id)"
                       class="px-2 py-1 rounded border border-border-2 text-xs"
+                      @click="testProvider(provider.id)"
                     >
                       Test
                     </button>
                     <button
-                      @click="setDefaultProvider(provider.id)"
                       class="px-2 py-1 rounded border border-border-2 text-xs"
+                      @click="setDefaultProvider(provider.id)"
                     >
                       <Star class="w-3 h-3 inline mr-1" />Default
                     </button>
                     <button
-                      @click="deleteProvider(provider.id)"
                       class="px-2 py-1 rounded border border-danger/30 text-danger text-xs"
+                      @click="deleteProvider(provider.id)"
                     >
                       <Trash2 class="w-3 h-3 inline mr-1" />Delete
                     </button>
@@ -559,8 +559,8 @@ onMounted(() => {
               </td>
               <td class="py-3 text-right">
                 <button
-                  @click="saveWorkflow(wf)"
                   class="px-3 py-1 rounded bg-brand hover:bg-brand/80 text-white text-xs"
+                  @click="saveWorkflow(wf)"
                 >
                   Save
                 </button>
@@ -575,7 +575,7 @@ onMounted(() => {
       <div class="rounded-xl border border-border-1 bg-bg-surface-1 p-5">
         <div class="flex items-center justify-between">
           <h3 class="text-base font-semibold text-text-1">Template Families</h3>
-          <button @click="editingFamilyId = null" class="text-xs text-text-3">
+          <button class="text-xs text-text-3" @click="editingFamilyId = null">
             Clear edit state
           </button>
         </div>
@@ -596,8 +596,8 @@ onMounted(() => {
             class="px-3 py-2 rounded-lg border border-border-2 bg-bg-surface-1"
           />
           <button
-            @click="createOrUpdateFamily"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-brand hover:bg-brand/80 text-white"
+            @click="createOrUpdateFamily"
           >
             <Plus class="w-4 h-4" /> Create Family
           </button>
@@ -629,10 +629,10 @@ onMounted(() => {
               >
                 <td class="py-3 pr-4">
                   <input
+                    v-model="selectedFamilyId"
                     type="radio"
                     name="selectedFamily"
                     :value="family.id"
-                    v-model="selectedFamilyId"
                   />
                 </td>
                 <td class="py-3 pr-4 font-mono text-xs">{{ family.key }}</td>
@@ -668,29 +668,29 @@ onMounted(() => {
                   <div class="inline-flex gap-2">
                     <button
                       v-if="!family.is_system && editingFamilyId !== family.id"
-                      @click="editingFamilyId = family.id"
                       class="px-2 py-1 rounded border border-border-2 text-xs"
+                      @click="editingFamilyId = family.id"
                     >
                       Edit
                     </button>
                     <button
                       v-if="!family.is_system && editingFamilyId === family.id"
-                      @click="createOrUpdateFamily"
                       class="px-2 py-1 rounded bg-brand text-white text-xs"
+                      @click="createOrUpdateFamily"
                     >
                       Save
                     </button>
                     <button
                       v-if="!family.is_system && editingFamilyId === family.id"
-                      @click="editingFamilyId = null"
                       class="px-2 py-1 rounded border border-border-2 text-xs"
+                      @click="editingFamilyId = null"
                     >
                       Cancel
                     </button>
                     <button
                       v-if="!family.is_system"
-                      @click="removeFamily(family)"
                       class="px-2 py-1 rounded border border-danger/30 text-danger text-xs"
+                      @click="removeFamily(family)"
                     >
                       Delete
                     </button>
@@ -702,7 +702,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="rounded-xl border border-border-1 bg-bg-surface-1 p-5" v-if="selectedFamily">
+      <div v-if="selectedFamily" class="rounded-xl border border-border-1 bg-bg-surface-1 p-5">
         <h3 class="text-base font-semibold text-text-1">
           Template Versions: {{ selectedFamily.key }}
         </h3>
@@ -742,8 +742,8 @@ onMounted(() => {
         </div>
         <div class="mt-4">
           <button
-            @click="createTemplateVersion"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-brand hover:bg-brand/80 text-white"
+            @click="createTemplateVersion"
           >
             <Plus class="w-4 h-4" />
             Create Version
@@ -776,8 +776,8 @@ onMounted(() => {
                 <td class="py-3 text-right">
                   <button
                     v-if="version.status !== 'published'"
-                    @click="publishVersion(version.id)"
                     class="px-3 py-1 rounded bg-brand hover:bg-brand/80 text-white text-xs"
+                    @click="publishVersion(version.id)"
                   >
                     Publish
                   </button>
@@ -813,8 +813,8 @@ onMounted(() => {
             class="px-3 py-2 rounded-lg border border-border-2 bg-bg-surface-1"
           />
           <button
-            @click="refreshOutbox"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-brand hover:bg-brand/80 text-white"
+            @click="refreshOutbox"
           >
             <RefreshCw class="w-4 h-4" /> Refresh
           </button>
@@ -846,22 +846,22 @@ onMounted(() => {
                 <td class="py-3 text-right">
                   <div class="inline-flex gap-2">
                     <button
-                      @click="viewOutboxDetails(entry.id)"
                       class="px-2 py-1 rounded border border-border-2 text-xs"
+                      @click="viewOutboxDetails(entry.id)"
                     >
                       <Eye class="w-3 h-3 inline mr-1" />View
                     </button>
                     <button
                       v-if="entry.status === 'queued'"
-                      @click="cancelOutbox(entry.id)"
                       class="px-2 py-1 rounded border border-danger/30 text-danger text-xs"
+                      @click="cancelOutbox(entry.id)"
                     >
                       Cancel
                     </button>
                     <button
                       v-if="entry.status === 'failed'"
-                      @click="retryOutbox(entry.id)"
                       class="px-2 py-1 rounded border border-brand/30 text-brand text-xs"
+                      @click="retryOutbox(entry.id)"
                     >
                       Retry
                     </button>
@@ -877,7 +877,7 @@ onMounted(() => {
         <div v-if="selectedOutbox" class="mt-4 rounded-lg border border-border-1 p-4">
           <div class="flex items-center justify-between">
             <h4 class="font-semibold text-text-1">Outbox Entry Details</h4>
-            <button @click="selectedOutbox = null" class="text-xs text-text-3">Close</button>
+            <button class="text-xs text-text-3" @click="selectedOutbox = null">Close</button>
           </div>
           <pre class="mt-3 p-3 rounded-lg bg-bg-surface-2 text-text-1 text-xs overflow-auto">{{
             JSON.stringify(selectedOutbox, null, 2)
@@ -900,8 +900,8 @@ onMounted(() => {
             class="px-3 py-2 rounded-lg border border-border-2 bg-bg-surface-1"
           />
           <button
-            @click="refreshEvents"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-brand hover:bg-brand/80 text-white"
+            @click="refreshEvents"
           >
             <RefreshCw class="w-4 h-4" /> Refresh
           </button>

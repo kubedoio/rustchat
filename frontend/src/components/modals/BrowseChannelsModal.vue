@@ -97,8 +97,8 @@ async function joinChannel(channelId: string) {
             </div>
           </div>
           <button
-            @click="emit('close')"
             class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2"
+            @click="emit('close')"
           >
             <X class="h-5 w-5 text-text-3" />
           </button>
@@ -131,9 +131,9 @@ async function joinChannel(channelId: string) {
                 </p>
               </div>
               <button
-                @click="joinChannel(channel.id)"
                 :disabled="joining === channel.id"
                 class="ml-4 flex items-center rounded-r-2 bg-brand px-3 py-1.5 text-sm font-medium text-brand-foreground transition-standard hover:opacity-90 disabled:opacity-50"
+                @click="joinChannel(channel.id)"
               >
                 <span>{{ joining === channel.id ? 'Joining...' : 'Join' }}</span>
                 <ArrowRight class="w-4 h-4 ml-1" />

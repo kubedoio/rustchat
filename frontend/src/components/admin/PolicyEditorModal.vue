@@ -329,7 +329,7 @@ onMounted(() => {
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200">
         <h2 class="text-xl font-bold text-gray-900">{{ modalTitle }}</h2>
-        <button @click="cancel" class="p-2 text-gray-500 hover:text-gray-700 rounded-lg">
+        <button class="p-2 text-gray-500 hover:text-gray-700 rounded-lg" @click="cancel">
           <X class="w-5 h-5" />
         </button>
       </div>
@@ -458,9 +458,9 @@ onMounted(() => {
                   class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
                 >
                   <input
+                    v-model="sourceConfig.group_ids"
                     type="checkbox"
                     :value="group.id"
-                    v-model="sourceConfig.group_ids"
                     class="w-4 h-4 text-indigo-600 rounded"
                   />
                   <span class="ml-2 flex-1">{{ group.display_name }}</span>
@@ -499,9 +499,9 @@ onMounted(() => {
                   }"
                 >
                   <input
+                    v-model="sourceConfig.roles"
                     type="checkbox"
                     :value="role"
-                    v-model="sourceConfig.roles"
                     class="w-4 h-4 text-indigo-600 rounded"
                   />
                   <span class="ml-2 capitalize">{{ role.replace('_', ' ') }}</span>
@@ -562,8 +562,8 @@ onMounted(() => {
                     <option value="admin">Admin</option>
                   </select>
                   <button
-                    @click="removeTarget(index)"
                     class="p-1 text-red-500 hover:bg-red-50 rounded"
+                    @click="removeTarget(index)"
                   >
                     <Trash2 class="w-4 h-4" />
                   </button>
@@ -578,7 +578,6 @@ onMounted(() => {
                 <button
                   v-for="team in availableTargets.teams"
                   :key="team.id"
-                  @click="addTeamTarget(team)"
                   :disabled="targets.some(t => t.target_type === 'team' && t.target_id === team.id)"
                   class="px-3 py-1.5 text-sm border rounded-lg transition-colors"
                   :class="[
@@ -586,6 +585,7 @@ onMounted(() => {
                       ? 'border-gray-200 text-gray-400 cursor-not-allowed'
                       : 'border-gray-300 hover:border-indigo-500 hover:text-indigo-600',
                   ]"
+                  @click="addTeamTarget(team)"
                 >
                   <Building2 class="w-4 h-4 inline mr-1" />
                   {{ team.display_name || team.name }}
@@ -600,7 +600,6 @@ onMounted(() => {
                 <button
                   v-for="channel in availableTargets.channels"
                   :key="channel.id"
-                  @click="addChannelTarget(channel)"
                   :disabled="
                     targets.some(t => t.target_type === 'channel' && t.target_id === channel.id)
                   "
@@ -610,6 +609,7 @@ onMounted(() => {
                       ? 'border-gray-200 text-gray-400 cursor-not-allowed'
                       : 'border-gray-300 hover:border-indigo-500 hover:text-indigo-600',
                   ]"
+                  @click="addChannelTarget(channel)"
                 >
                   <Hash class="w-4 h-4 inline mr-1" />
                   {{ channel.display_name || channel.name }}
@@ -648,8 +648,8 @@ onMounted(() => {
       <!-- Footer -->
       <div class="flex items-center justify-between p-6 border-t border-gray-200">
         <button
-          @click="previewImpact"
           class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          @click="previewImpact"
         >
           <AlertCircle class="w-5 h-5 mr-2" />
           Preview Impact
@@ -657,15 +657,15 @@ onMounted(() => {
 
         <div class="flex space-x-3">
           <button
-            @click="cancel"
             class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            @click="cancel"
           >
             Cancel
           </button>
           <button
-            @click="savePolicy"
             :disabled="saving"
             class="flex items-center px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            @click="savePolicy"
           >
             <span v-if="saving" class="mr-2">Saving...</span>
             {{ isEditing ? 'Save Changes' : 'Create Policy' }}
@@ -708,17 +708,17 @@ onMounted(() => {
       </div>
       <div class="flex justify-end space-x-3">
         <button
-          @click="showPreview = false"
           class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+          @click="showPreview = false"
         >
           Close
         </button>
         <button
+          class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           @click="
             showPreview = false
             savePolicy()
           "
-          class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
         >
           Confirm & Save
         </button>

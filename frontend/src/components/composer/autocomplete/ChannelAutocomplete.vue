@@ -91,13 +91,13 @@ defineExpose({
     <button
       v-for="(channel, index) in filteredChannels"
       :key="channel.id"
-      @click="emit('select', channel.name)"
       class="w-full flex items-center px-3 py-2 text-left transition-standard"
       :class="
         index === selectedIndex
           ? 'bg-bg-surface-2 text-text-1'
           : 'text-text-2 hover:bg-bg-surface-2 hover:text-text-1'
       "
+      @click="emit('select', channel.name)"
     >
       <component
         :is="channel.channel_type === 'private' ? Lock : Hash"

@@ -177,6 +177,11 @@ const sendTestEmail = async () => {
     testing.value = false
   }
 }
+
+function addProvider() {
+  showAddModal.value = true
+  resetForm()
+}
 </script>
 
 <template>
@@ -191,11 +196,8 @@ const sendTestEmail = async () => {
           <CheckCircle class="w-4 h-4 mr-1" /> Saved
         </span>
         <button
-          @click="
-            showAddModal = true
-            resetForm()
-          "
           class="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+          @click="addProvider"
         >
           <Plus class="w-5 h-5 mr-2" />
           Add Provider
@@ -261,21 +263,21 @@ const sendTestEmail = async () => {
           <div class="flex items-center gap-2">
             <button
               v-if="!provider.is_default"
-              @click="setDefault(provider.id)"
               class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
               title="Set as default"
+              @click="setDefault(provider.id)"
             >
               <Star class="w-5 h-5" />
             </button>
             <button
-              @click="editProvider(provider)"
               class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+              @click="editProvider(provider)"
             >
               Edit
             </button>
             <button
-              @click="deleteProvider(provider.id)"
               class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+              @click="deleteProvider(provider.id)"
             >
               <Trash2 class="w-5 h-5" />
             </button>
@@ -304,9 +306,9 @@ const sendTestEmail = async () => {
           placeholder="test@example.com"
         />
         <button
-          @click="sendTestEmail"
           :disabled="testing || !testEmail"
           class="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+          @click="sendTestEmail"
         >
           <Send class="w-4 h-4 mr-2" />
           {{ testing ? 'Sending...' : 'Send Test' }}
@@ -412,24 +414,24 @@ const sendTestEmail = async () => {
           <div class="flex items-center gap-4">
             <label class="flex items-center">
               <input
-                type="checkbox"
                 v-model="form.enabled"
+                type="checkbox"
                 class="w-4 h-4 text-indigo-600 rounded mr-2"
               />
               <span class="text-gray-700 text-sm">Enabled</span>
             </label>
             <label class="flex items-center">
               <input
-                type="checkbox"
                 v-model="form.is_default"
+                type="checkbox"
                 class="w-4 h-4 text-indigo-600 rounded mr-2"
               />
               <span class="text-gray-700 text-sm">Set as default</span>
             </label>
             <label class="flex items-center">
               <input
-                type="checkbox"
                 v-model="form.skip_cert_verify"
+                type="checkbox"
                 class="w-4 h-4 text-indigo-600 rounded mr-2"
               />
               <span class="text-gray-700 text-sm">Skip cert verify (testing only)</span>
@@ -439,15 +441,15 @@ const sendTestEmail = async () => {
 
         <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
           <button
-            @click="showAddModal = false"
             class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+            @click="showAddModal = false"
           >
             Cancel
           </button>
           <button
-            @click="saveProvider"
             :disabled="saving || !form.host"
             class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium"
+            @click="saveProvider"
           >
             {{ saving ? 'Saving...' : editingProvider ? 'Update' : 'Create' }}
           </button>

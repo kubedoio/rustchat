@@ -340,6 +340,21 @@ function toggleMemberMenu(userId: string) {
   }
 }
 
+function handleSetAdmin(member: any) {
+  changeMemberRole(member, 'admin')
+  activeMenuMemberId.value = null
+}
+
+function handleSetMember(member: any) {
+  changeMemberRole(member, 'member')
+  activeMenuMemberId.value = null
+}
+
+function handleRemoveMember(member: any) {
+  removeMember(member)
+  activeMenuMemberId.value = null
+}
+
 // Watchers
 watch([search, page], () => {
   fetchTeams()
@@ -366,8 +381,8 @@ onMounted(fetchTeams)
       <div>
         <div v-if="selectedTeam" class="flex items-center gap-2 mb-1">
           <button
-            @click="closeDetails"
             class="text-text-3 hover:text-text-1 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="closeDetails"
           >
             <ArrowLeft class="w-3.5 h-3.5" />
           </button>
@@ -386,8 +401,8 @@ onMounted(fetchTeams)
       </div>
       <button
         v-if="!selectedTeam"
-        @click="openCreateTeam"
         class="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand/90 text-white rounded-lg text-xs font-medium transition-colors"
+        @click="openCreateTeam"
       >
         <Plus class="w-3.5 h-3.5" />
         Create Team
@@ -448,11 +463,13 @@ onMounted(fetchTeams)
               </tr>
             </thead>
             <tbody class="divide-y divide-border-1">
-              <tr v-if="loading" v-for="i in 3" :key="i" class="animate-pulse">
-                <td v-for="j in 6" :key="j" class="px-4 py-3">
-                  <div class="h-3 bg-bg-surface-2 rounded w-2/3"></div>
-                </td>
-              </tr>
+              <template v-if="loading">
+                <tr v-for="i in 3" :key="i" class="animate-pulse">
+                  <td v-for="j in 6" :key="j" class="px-4 py-3">
+                    <div class="h-3 bg-bg-surface-2 rounded w-2/3"></div>
+                  </td>
+                </tr>
+              </template>
               <tr v-else-if="teams.length === 0" class="text-center">
                 <td colspan="6" class="px-4 py-12">
                   <div class="flex flex-col items-center justify-center">
@@ -515,23 +532,23 @@ onMounted(fetchTeams)
                 <td class="px-4 py-3 text-right">
                   <div class="flex items-center justify-end gap-1">
                     <button
-                      @click="openEditTeam(team)"
                       class="p-1.5 text-text-4 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
                       title="Edit Team"
+                      @click="openEditTeam(team)"
                     >
                       <Edit2 class="w-3.5 h-3.5" />
                     </button>
                     <button
-                      @click="viewTeamDetails(team)"
                       class="p-1.5 text-text-4 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                       title="View Details"
+                      @click="viewTeamDetails(team)"
                     >
                       <Eye class="w-3.5 h-3.5" />
                     </button>
                     <button
-                      @click="deleteTeam(team)"
                       class="p-1.5 text-text-4 hover:text-danger hover:bg-danger/10 rounded-lg transition-colors"
                       title="Delete Team"
+                      @click="deleteTeam(team)"
                     >
                       <Trash2 class="w-3.5 h-3.5" />
                     </button>
@@ -552,16 +569,16 @@ onMounted(fetchTeams)
           </div>
           <div class="flex items-center gap-1.5">
             <button
-              @click="page--"
               :disabled="page === 1"
               class="p-1.5 border border-border-1 rounded-lg hover:bg-bg-surface-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              @click="page--"
             >
               <ChevronLeft class="w-3.5 h-3.5" />
             </button>
             <button
-              @click="page++"
               :disabled="page * perPage >= totalTeams"
               class="p-1.5 border border-border-1 rounded-lg hover:bg-bg-surface-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              @click="page++"
             >
               <ChevronRight class="w-3.5 h-3.5" />
             </button>
@@ -596,8 +613,8 @@ onMounted(fetchTeams)
                 </div>
               </div>
               <button
-                @click="openEditTeam(selectedTeam)"
                 class="flex items-center gap-1.5 px-3 py-2 bg-bg-surface-2 hover:bg-border-1 text-text-2 rounded-lg text-xs font-medium transition-colors"
+                @click="openEditTeam(selectedTeam)"
               >
                 <Edit2 class="w-3.5 h-3.5" />
                 Edit Team
@@ -606,24 +623,24 @@ onMounted(fetchTeams)
           </div>
           <div class="flex px-5 gap-6">
             <button
-              @click="activeTab = 'channels'"
               class="pb-3 text-xs font-medium border-b-2 transition-colors"
               :class="
                 activeTab === 'channels'
                   ? 'border-brand text-brand'
                   : 'border-transparent text-text-3 hover:text-text-2'
               "
+              @click="activeTab = 'channels'"
             >
               Channels
             </button>
             <button
-              @click="activeTab = 'members'"
               class="pb-3 text-xs font-medium border-b-2 transition-colors"
               :class="
                 activeTab === 'members'
                   ? 'border-brand text-brand'
                   : 'border-transparent text-text-3 hover:text-text-2'
               "
+              @click="activeTab = 'members'"
             >
               Members
             </button>
@@ -635,8 +652,8 @@ onMounted(fetchTeams)
           <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold text-text-1 text-sm">Team Channels</h3>
             <button
-              @click="openCreateChannel"
               class="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand/90 text-white rounded-lg text-xs font-medium transition-colors"
+              @click="openCreateChannel"
             >
               <Plus class="w-3.5 h-3.5" />
               Create Channel
@@ -678,16 +695,16 @@ onMounted(fetchTeams)
               </div>
               <div class="flex items-center gap-1">
                 <button
-                  @click="openEditChannel(channel)"
                   class="p-1.5 text-text-4 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
                   title="Edit Channel"
+                  @click="openEditChannel(channel)"
                 >
                   <Edit2 class="w-3.5 h-3.5" />
                 </button>
                 <button
-                  @click="deleteChannel(channel)"
                   class="p-1.5 text-text-4 hover:text-danger hover:bg-danger/10 rounded-lg transition-colors"
                   title="Delete Channel"
+                  @click="deleteChannel(channel)"
                 >
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
@@ -701,8 +718,8 @@ onMounted(fetchTeams)
           <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold text-text-1 text-sm">Team Members</h3>
             <button
-              @click="showAddMemberModal = true"
               class="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand/90 text-white rounded-lg text-xs font-medium transition-colors"
+              @click="showAddMemberModal = true"
             >
               <UserPlus class="w-3.5 h-3.5" />
               Add Member
@@ -741,8 +758,8 @@ onMounted(fetchTeams)
               <div class="flex items-center gap-1">
                 <div class="relative">
                   <button
-                    @click="toggleMemberMenu(member.user_id)"
                     class="p-1.5 text-text-4 hover:text-text-2 hover:bg-bg-surface-2 rounded-lg transition-colors"
+                    @click="toggleMemberMenu(member.user_id)"
                   >
                     <MoreHorizontal class="w-3.5 h-3.5" />
                   </button>
@@ -751,24 +768,18 @@ onMounted(fetchTeams)
                     class="absolute right-0 mt-1 w-36 bg-bg-surface-1 rounded-lg shadow-lg py-1 z-10 border border-border-1"
                   >
                     <button
-                      @click="
-                        changeMemberRole(member, 'admin')
-                        activeMenuMemberId = null
-                      "
                       class="flex w-full items-center gap-2 px-3 py-2 text-xs text-text-2 hover:bg-bg-surface-2 transition-colors"
                       :class="{ 'text-brand': member.role === 'admin' }"
+                      @click="handleSetAdmin(member)"
                     >
                       <CheckCircle v-if="member.role === 'admin'" class="w-3.5 h-3.5" />
                       <span v-else class="w-3.5 h-3.5"></span>
                       Admin
                     </button>
                     <button
-                      @click="
-                        changeMemberRole(member, 'member')
-                        activeMenuMemberId = null
-                      "
                       class="flex w-full items-center gap-2 px-3 py-2 text-xs text-text-2 hover:bg-bg-surface-2 transition-colors"
                       :class="{ 'text-brand': member.role === 'member' }"
+                      @click="handleSetMember(member)"
                     >
                       <CheckCircle v-if="member.role === 'member'" class="w-3.5 h-3.5" />
                       <span v-else class="w-3.5 h-3.5"></span>
@@ -776,11 +787,8 @@ onMounted(fetchTeams)
                     </button>
                     <div class="h-px bg-border-1 my-1"></div>
                     <button
-                      @click="
-                        removeMember(member)
-                        activeMenuMemberId = null
-                      "
                       class="flex w-full items-center gap-2 px-3 py-2 text-xs text-danger hover:bg-danger/10 transition-colors"
+                      @click="handleRemoveMember(member)"
                     >
                       <UserMinus class="w-3.5 h-3.5" />
                       Remove
@@ -835,15 +843,15 @@ onMounted(fetchTeams)
       <template #footer>
         <div class="flex justify-end gap-2">
           <button
-            @click="showCreateTeamModal = false"
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="showCreateTeamModal = false"
           >
             Cancel
           </button>
           <button
-            @click="createTeam"
             :disabled="!teamForm.name"
             class="px-3 py-2 rounded-lg bg-brand hover:bg-brand/90 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            @click="createTeam"
           >
             Create Team
           </button>
@@ -887,14 +895,14 @@ onMounted(fetchTeams)
       <template #footer>
         <div class="flex justify-end gap-2">
           <button
-            @click="showEditTeamModal = false"
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="showEditTeamModal = false"
           >
             Cancel
           </button>
           <button
-            @click="updateTeam"
             class="px-3 py-2 rounded-lg bg-brand hover:bg-brand/90 text-white text-xs font-medium transition-colors"
+            @click="updateTeam"
           >
             Save Changes
           </button>
@@ -926,15 +934,15 @@ onMounted(fetchTeams)
       <template #footer>
         <div class="flex justify-end gap-2">
           <button
-            @click="showCreateChannelModal = false"
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="showCreateChannelModal = false"
           >
             Cancel
           </button>
           <button
-            @click="createChannel"
             :disabled="!channelForm.name"
             class="px-3 py-2 rounded-lg bg-brand hover:bg-brand/90 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            @click="createChannel"
           >
             Create
           </button>
@@ -952,14 +960,14 @@ onMounted(fetchTeams)
       <template #footer>
         <div class="flex justify-end gap-2">
           <button
-            @click="showEditChannelModal = false"
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="showEditChannelModal = false"
           >
             Cancel
           </button>
           <button
-            @click="updateChannel"
             class="px-3 py-2 rounded-lg bg-brand hover:bg-brand/90 text-white text-xs font-medium transition-colors"
+            @click="updateChannel"
           >
             Save
           </button>
@@ -990,8 +998,8 @@ onMounted(fetchTeams)
             {{ memberSearch ? 'No users found' : 'Type to search users' }}
           </div>
           <div
-            v-else
             v-for="user in memberSearchResults"
+            v-else
             :key="user.id"
             class="flex items-center justify-between p-2 hover:bg-bg-surface-2 rounded-lg transition-colors"
           >
@@ -1009,8 +1017,8 @@ onMounted(fetchTeams)
               </div>
             </div>
             <button
-              @click="addMember(user)"
               class="p-1.5 bg-brand/10 text-brand rounded-lg hover:bg-brand/20 transition-colors"
+              @click="addMember(user)"
             >
               <Plus class="w-3.5 h-3.5" />
             </button>

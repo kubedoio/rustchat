@@ -34,8 +34,8 @@ async function handleStartRun(playbook: any) {
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     <!-- New Playbook Card -->
     <button
-      @click="router.push('/playbooks/new')"
       class="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl hover:border-indigo-500 hover:bg-gray-50 transition-all group"
+      @click="router.push('/playbooks/new')"
     >
       <div
         class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"

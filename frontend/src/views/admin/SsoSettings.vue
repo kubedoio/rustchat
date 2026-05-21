@@ -324,6 +324,11 @@ function getProviderBadgeClass(type: string) {
   }
   return classes[type] || 'bg-text-3 text-white'
 }
+
+function closeModal() {
+  showAddModal.value = false
+  showEditModal.value = false
+}
 </script>
 
 <template>
@@ -338,8 +343,8 @@ function getProviderBadgeClass(type: string) {
         <p class="text-text-3 mt-1">Configure OAuth2 and OIDC authentication providers</p>
       </div>
       <button
-        @click="openAddModal"
         class="inline-flex items-center px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand/90 transition-colors"
+        @click="openAddModal"
       >
         <Plus class="w-4 h-4 mr-2" />
         Add Provider
@@ -359,9 +364,9 @@ function getProviderBadgeClass(type: string) {
           </div>
           <input
             v-model="authConfig.enable_sso"
-            @change="updateAuthSettings"
             type="checkbox"
             class="w-5 h-5 text-brand rounded focus:ring-brand"
+            @change="updateAuthSettings"
           />
         </label>
 
@@ -374,9 +379,9 @@ function getProviderBadgeClass(type: string) {
           </div>
           <input
             v-model="authConfig.require_sso"
-            @change="updateAuthSettings"
             type="checkbox"
             class="w-5 h-5 text-brand rounded focus:ring-brand"
+            @change="updateAuthSettings"
           />
         </label>
       </div>
@@ -391,7 +396,7 @@ function getProviderBadgeClass(type: string) {
       <div v-if="ssoConfigs.length === 0" class="p-8 text-center text-text-3">
         <Shield class="w-12 h-12 mx-auto mb-4 opacity-50" />
         <p>No SSO providers configured yet.</p>
-        <button @click="openAddModal" class="mt-4 text-brand hover:text-brand/80 font-medium">
+        <button class="mt-4 text-brand hover:text-brand/80 font-medium" @click="openAddModal">
           Add your first provider
         </button>
       </div>
@@ -447,23 +452,23 @@ function getProviderBadgeClass(type: string) {
             </div>
             <div class="flex items-center gap-2">
               <button
-                @click="testConfig(config)"
                 class="p-2 text-text-2 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
                 title="Test Configuration"
+                @click="testConfig(config)"
               >
                 <TestTube class="w-5 h-5" />
               </button>
               <button
-                @click="openEditModal(config)"
                 class="p-2 text-text-2 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
                 title="Edit"
+                @click="openEditModal(config)"
               >
                 <Edit2 class="w-5 h-5" />
               </button>
               <button
-                @click="deleteConfig(config)"
                 class="p-2 text-text-2 hover:text-danger hover:bg-danger/10 rounded-lg transition-colors"
                 title="Delete"
+                @click="deleteConfig(config)"
               >
                 <Trash2 class="w-5 h-5" />
               </button>
@@ -485,8 +490,8 @@ function getProviderBadgeClass(type: string) {
           <label class="block text-sm font-medium text-text-2 mb-2"> Provider Type * </label>
           <select
             v-model="form.provider_type"
-            @change="onProviderTypeChange"
             class="w-full px-3 py-2 border border-border-2 rounded-lg bg-bg-surface-1 text-text-1"
+            @change="onProviderTypeChange"
           >
             <option value="github">GitHub (OAuth2)</option>
             <option value="google">Google (OIDC)</option>
@@ -577,7 +582,7 @@ function getProviderBadgeClass(type: string) {
               class="inline-flex items-center px-2 py-1 bg-brand/10 text-brand rounded text-sm"
             >
               {{ scope }}
-              <button @click="form.scopes.splice(index, 1)" class="ml-1 hover:text-brand/80">
+              <button class="ml-1 hover:text-brand/80" @click="form.scopes.splice(index, 1)">
                 ×
               </button>
             </span>
@@ -610,8 +615,8 @@ function getProviderBadgeClass(type: string) {
             >
               {{ domain }}
               <button
-                @click="(form.allow_domains || []).splice(index, 1)"
                 class="ml-1 hover:text-success/80"
+                @click="(form.allow_domains || []).splice(index, 1)"
               >
                 ×
               </button>
@@ -743,18 +748,15 @@ function getProviderBadgeClass(type: string) {
       <template #footer>
         <div class="flex justify-end gap-3">
           <button
-            @click="
-              showAddModal = false
-              showEditModal = false
-            "
             class="px-4 py-2 text-text-2 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="closeModal"
           >
             Cancel
           </button>
           <button
-            @click="saveConfig"
             :disabled="loading"
             class="px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand/90 disabled:opacity-50 transition-colors"
+            @click="saveConfig"
           >
             {{ loading ? 'Saving...' : editingConfig ? 'Update' : 'Create' }}
           </button>
@@ -796,8 +798,8 @@ function getProviderBadgeClass(type: string) {
       <template #footer>
         <div class="flex justify-end">
           <button
-            @click="showTestModal = false"
             class="px-4 py-2 bg-bg-surface-2 text-text-2 rounded-lg hover:bg-bg-surface-2/80 transition-colors"
+            @click="showTestModal = false"
           >
             Close
           </button>

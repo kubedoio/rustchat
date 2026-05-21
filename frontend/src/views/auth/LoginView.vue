@@ -117,8 +117,8 @@ function getProviderIconClass(providerType: string): string {
         <button
           v-for="provider in ssoProviders"
           :key="provider.id"
-          @click="loginWithSSO(provider)"
           class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 font-medium"
+          @click="loginWithSSO(provider)"
         >
           <span
             class="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[10px] font-semibold"
@@ -153,14 +153,14 @@ function getProviderIconClass(providerType: string): string {
 
       <BaseInput
         id="email"
+        v-model="email"
         type="email"
         label="Email address"
-        v-model="email"
         required
         placeholder="you@example.com"
       />
 
-      <BaseInput id="password" type="password" label="Password" v-model="password" required />
+      <BaseInput id="password" v-model="password" type="password" label="Password" required />
 
       <div class="flex items-center justify-between">
         <div class="flex items-center">

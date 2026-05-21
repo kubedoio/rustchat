@@ -76,8 +76,8 @@ function handlePreview() {
       <a
         :href="file.url"
         download
-        @click.stop
         class="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-indigo-600 transition-colors"
+        @click.stop
       >
         <Download class="w-4 h-4" />
       </a>

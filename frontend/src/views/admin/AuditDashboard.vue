@@ -136,16 +136,16 @@ onMounted(() => {
       </div>
       <div class="flex space-x-2">
         <button
-          @click="exportLogs"
           class="flex items-center px-4 py-2 border border-border-2 rounded-lg hover:bg-bg-surface-2 transition-colors"
+          @click="exportLogs"
         >
           <Download class="w-4 h-4 mr-2" />
           Export
         </button>
         <button
-          @click="refresh"
           class="flex items-center px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand/90 transition-colors"
           :disabled="loading"
+          @click="refresh"
         >
           <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': loading }" />
           Refresh
@@ -319,8 +319,8 @@ onMounted(() => {
           Audit Logs
         </h2>
         <button
-          @click="showFilters = !showFilters"
           class="flex items-center text-sm text-text-2 hover:text-text-1"
+          @click="showFilters = !showFilters"
         >
           <Filter class="w-4 h-4 mr-1" />
           Filters
@@ -336,8 +336,8 @@ onMounted(() => {
             <label class="block text-xs font-medium text-text-2 mb-1">Status</label>
             <select
               v-model="filters.status"
-              @change="fetchAuditLogs"
               class="w-full px-3 py-2 border border-border-2 rounded-lg bg-bg-surface-1 text-sm"
+              @change="fetchAuditLogs"
             >
               <option value="">All</option>
               <option value="success">Success</option>
@@ -349,8 +349,8 @@ onMounted(() => {
             <label class="block text-xs font-medium text-text-2 mb-1">Action</label>
             <select
               v-model="filters.action"
-              @change="fetchAuditLogs"
               class="w-full px-3 py-2 border border-border-2 rounded-lg bg-bg-surface-1 text-sm"
+              @change="fetchAuditLogs"
             >
               <option value="">All</option>
               <option value="add">Add</option>
@@ -363,8 +363,8 @@ onMounted(() => {
             <input
               v-model="filters.from_date"
               type="date"
-              @change="fetchAuditLogs"
               class="w-full px-3 py-2 border border-border-2 rounded-lg bg-bg-surface-1 text-sm"
+              @change="fetchAuditLogs"
             />
           </div>
           <div>
@@ -372,8 +372,8 @@ onMounted(() => {
             <input
               v-model="filters.to_date"
               type="date"
-              @change="fetchAuditLogs"
               class="w-full px-3 py-2 border border-border-2 rounded-lg bg-bg-surface-1 text-sm"
+              @change="fetchAuditLogs"
             />
           </div>
         </div>

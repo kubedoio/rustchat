@@ -79,7 +79,7 @@ function handleClose() {
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 class="text-xl font-bold text-gray-900">Create Team</h2>
-          <button @click="handleClose" class="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+          <button class="p-1 hover:bg-gray-100 rounded-lg transition-colors" @click="handleClose">
             <X class="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -95,7 +95,7 @@ function handleClose() {
         </div>
 
         <!-- Form -->
-        <form v-else @submit.prevent="handleSubmit" class="p-6 space-y-4">
+        <form v-else class="p-6 space-y-4" @submit.prevent="handleSubmit">
           <!-- Error -->
           <div
             v-if="error"
@@ -132,7 +132,7 @@ function handleClose() {
 
           <!-- Actions -->
           <div class="flex justify-end space-x-3 pt-4">
-            <BaseButton variant="secondary" @click="handleClose" :disabled="loading">
+            <BaseButton variant="secondary" :disabled="loading" @click="handleClose">
               Cancel
             </BaseButton>
             <BaseButton type="submit" :loading="loading"> Create Team </BaseButton>

@@ -100,9 +100,9 @@ const notifyOptions = [
         <div class="flex items-center justify-between">
           <span class="text-sm text-text-2">Notification sounds</span>
           <button
-            @click="notifySounds = !notifySounds"
             class="relative w-11 h-6 rounded-full transition-colors"
             :class="notifySounds ? 'bg-primary' : 'bg-bg-surface-3'"
+            @click="notifySounds = !notifySounds"
           >
             <span
               class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
@@ -124,9 +124,9 @@ const notifyOptions = [
         <div class="flex items-center justify-between">
           <span class="text-sm text-text-2">Enable scheduled DND</span>
           <button
-            @click="dndEnabled = !dndEnabled"
             class="relative w-11 h-6 rounded-full transition-colors"
             :class="dndEnabled ? 'bg-primary' : 'bg-bg-surface-3'"
+            @click="dndEnabled = !dndEnabled"
           >
             <span
               class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
@@ -169,24 +169,24 @@ const notifyOptions = [
           <label class="block text-sm font-medium text-text-2 mb-2"> Message display </label>
           <div class="flex space-x-3">
             <button
-              @click="messageDisplay = 'standard'"
               class="flex-1 p-3 border rounded-lg transition-colors text-sm"
               :class="
                 messageDisplay === 'standard'
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border-2 text-text-2'
               "
+              @click="messageDisplay = 'standard'"
             >
               Standard
             </button>
             <button
-              @click="messageDisplay = 'compact'"
               class="flex-1 p-3 border rounded-lg transition-colors text-sm"
               :class="
                 messageDisplay === 'compact'
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border-2 text-text-2'
               "
+              @click="messageDisplay = 'compact'"
             >
               Compact
             </button>
@@ -198,24 +198,24 @@ const notifyOptions = [
           <label class="block text-sm font-medium text-text-2 mb-2"> Time format </label>
           <div class="flex space-x-3">
             <button
-              @click="timeFormat = '12h'"
               class="flex-1 p-3 border rounded-lg transition-colors text-sm"
               :class="
                 timeFormat === '12h'
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border-2 text-text-2'
               "
+              @click="timeFormat = '12h'"
             >
               12-hour (3:00 PM)
             </button>
             <button
-              @click="timeFormat = '24h'"
               class="flex-1 p-3 border rounded-lg transition-colors text-sm"
               :class="
                 timeFormat === '24h'
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border-2 text-text-2'
               "
+              @click="timeFormat = '24h'"
             >
               24-hour (15:00)
             </button>
@@ -226,7 +226,7 @@ const notifyOptions = [
 
     <!-- Save Button -->
     <div class="pt-4">
-      <BaseButton @click="handleSave" :loading="preferencesStore.loading" class="w-full">
+      <BaseButton :loading="preferencesStore.loading" class="w-full" @click="handleSave">
         Save Preferences
       </BaseButton>
     </div>

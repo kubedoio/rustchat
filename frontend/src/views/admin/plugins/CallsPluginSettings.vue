@@ -128,7 +128,7 @@ function removeStunServer(index: number) {
         </div>
       </div>
 
-      <input type="checkbox" v-model="config.enabled" class="w-5 h-5 text-indigo-600 rounded" />
+      <input v-model="config.enabled" type="checkbox" class="w-5 h-5 text-indigo-600 rounded" />
     </div>
 
     <div v-if="loading" class="text-gray-500">Loading...</div>
@@ -142,8 +142,8 @@ function removeStunServer(index: number) {
           </h4>
           <label class="flex items-center space-x-2">
             <input
-              type="checkbox"
               v-model="config.turn_server_enabled"
+              type="checkbox"
               class="w-4 h-4 text-indigo-600 rounded"
             />
             <span class="text-sm text-gray-700">Enable TURN Server</span>
@@ -153,8 +153,8 @@ function removeStunServer(index: number) {
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1"> TURN Server URL </label>
             <input
-              type="text"
               v-model="config.turn_server_url"
+              type="text"
               placeholder="turn:turn.example.com:3478"
               class="w-full px-3 py-2 border rounded-lg"
             />
@@ -165,8 +165,8 @@ function removeStunServer(index: number) {
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1"> Username </label>
             <input
-              type="text"
               v-model="config.turn_server_username"
+              type="text"
               placeholder="TURN username"
               class="w-full px-3 py-2 border rounded-lg"
             />
@@ -176,8 +176,8 @@ function removeStunServer(index: number) {
               Credential (Password)
             </label>
             <input
-              type="password"
               v-model="config.turn_server_credential"
+              type="password"
               placeholder="TURN password"
               class="w-full px-3 py-2 border rounded-lg"
             />
@@ -185,8 +185,8 @@ function removeStunServer(index: number) {
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1"> ICE Host Override </label>
             <input
-              type="text"
               v-model="config.ice_host_override"
+              type="text"
               placeholder="Optional: public IP or hostname"
               class="w-full px-3 py-2 border rounded-lg"
             />
@@ -204,8 +204,8 @@ function removeStunServer(index: number) {
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1"> UDP Port </label>
             <input
-              type="number"
               v-model.number="config.udp_port"
+              type="number"
               min="1"
               max="65535"
               class="w-full px-3 py-2 border rounded-lg"
@@ -214,8 +214,8 @@ function removeStunServer(index: number) {
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1"> TCP Port </label>
             <input
-              type="number"
               v-model.number="config.tcp_port"
+              type="number"
               min="1"
               max="65535"
               class="w-full px-3 py-2 border rounded-lg"
@@ -237,29 +237,29 @@ function removeStunServer(index: number) {
             class="flex items-center gap-2"
           >
             <input
-              type="text"
               v-model="config.stun_servers[index]"
+              type="text"
               :placeholder="'STUN Server ' + (index + 1)"
               class="flex-1 px-3 py-2 border rounded-lg"
             />
             <button
-              @click="removeStunServer(index)"
               class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+              @click="removeStunServer(index)"
             >
               Remove
             </button>
           </div>
           <div class="flex items-center gap-2">
             <input
-              type="text"
               v-model="stunServerInput"
+              type="text"
               placeholder="stun:stun.example.com:19302"
               class="flex-1 px-3 py-2 border rounded-lg"
               @keyup.enter="addStunServer"
             />
             <button
-              @click="addStunServer"
               class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium"
+              @click="addStunServer"
             >
               Add Server
             </button>
@@ -271,9 +271,9 @@ function removeStunServer(index: number) {
       <div class="flex items-center justify-between pt-4 mt-4 border-t border-gray-200">
         <div class="flex items-center gap-4">
           <button
-            @click="testConfiguration"
             :disabled="testing"
             class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+            @click="testConfiguration"
           >
             <TestTube class="w-4 h-4 mr-2" />
             <span v-if="testing">Testing...</span>
@@ -286,9 +286,9 @@ function removeStunServer(index: number) {
         </div>
 
         <button
-          @click="saveSettings"
           :disabled="saving"
           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
+          @click="saveSettings"
         >
           <Save class="w-4 h-4 mr-2" />
           <span v-if="saving">Saving...</span>

@@ -196,7 +196,7 @@ async function save() {
       class="bg-bg-surface-1 border-b border-border-1 px-6 py-4 flex justify-between items-center"
     >
       <div class="flex items-center space-x-4">
-        <button @click="router.back()" class="p-2 hover:bg-bg-surface-2 rounded-lg">
+        <button class="p-2 hover:bg-bg-surface-2 rounded-lg" @click="router.back()">
           <ArrowLeft class="w-5 h-5 text-text-3" />
         </button>
         <div>
@@ -205,7 +205,7 @@ async function save() {
           </h1>
         </div>
       </div>
-      <BaseButton @click="save" :loading="saving">
+      <BaseButton :loading="saving" @click="save">
         <Save class="w-4 h-4 mr-2" />
         Save Playbook
       </BaseButton>
@@ -253,9 +253,9 @@ async function save() {
           <div class="space-y-4">
             <div class="flex items-center space-x-2">
               <input
+                id="is_public"
                 v-model="form.is_public"
                 type="checkbox"
-                id="is_public"
                 class="rounded border-border-2 text-primary focus:ring-brand"
               />
               <label for="is_public" class="text-sm font-medium text-text-2"
@@ -266,9 +266,9 @@ async function save() {
             <div class="border-t border-border-1 pt-4">
               <div class="flex items-center space-x-2 mb-2">
                 <input
+                  id="create_channel"
                   v-model="form.create_channel_on_run"
                   type="checkbox"
-                  id="create_channel"
                   class="rounded border-border-2 text-primary focus:ring-brand"
                 />
                 <label for="create_channel" class="text-sm font-medium text-text-2"
@@ -286,7 +286,7 @@ async function save() {
                   placeholder="incident-{{date}}"
                   class="w-full px-3 py-2 border border-border-2 rounded-lg bg-bg-surface-1 text-text-1"
                 />
-                <p class="text-xs text-text-3 mt-1" v-pre>
+                <p v-pre class="text-xs text-text-3 mt-1">
                   Available variables: {{ date }}, {{ playbook_name }}
                 </p>
               </div>
@@ -330,7 +330,7 @@ async function save() {
                 class="flex-1 bg-transparent font-medium text-text-1 focus:outline-none focus:ring-2 focus:ring-primary rounded px-2"
                 placeholder="Checklist Name"
               />
-              <button @click="removeChecklist(cIndex)" class="text-text-3 hover:text-danger">
+              <button class="text-text-3 hover:text-danger" @click="removeChecklist(cIndex)">
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
@@ -356,16 +356,16 @@ async function save() {
                   />
                 </div>
                 <button
-                  @click="removeTask(cIndex, tIndex)"
                   class="opacity-0 group-hover:opacity-100 text-text-3 hover:text-danger p-1"
+                  @click="removeTask(cIndex, tIndex)"
                 >
                   <X class="w-4 h-4" />
                 </button>
               </div>
 
               <button
-                @click="addTask(cIndex)"
                 class="flex items-center text-sm text-text-3 hover:text-primary mt-2 px-1"
+                @click="addTask(cIndex)"
               >
                 <Plus class="w-4 h-4 mr-1" />
                 Add Task

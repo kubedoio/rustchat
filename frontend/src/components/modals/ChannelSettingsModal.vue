@@ -201,7 +201,7 @@ async function handleDelete() {
             />
             <h2 class="text-lg font-semibold text-text-1">{{ channel.name }}</h2>
           </div>
-          <button @click="$emit('close')" class="p-1 hover:bg-bg-surface-2 rounded">
+          <button class="p-1 hover:bg-bg-surface-2 rounded" @click="$emit('close')">
             <X class="w-5 h-5 text-text-4" />
           </button>
         </div>
@@ -211,13 +211,13 @@ async function handleDelete() {
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            @click="activeTab = tab.id"
             class="flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors"
             :class="
               activeTab === tab.id
                 ? 'border-primary text-primary'
                 : 'border-transparent text-text-3 hover:text-text-2'
             "
+            @click="activeTab = tab.id"
           >
             <component :is="tab.icon" class="w-4 h-4 mr-2" />
             {{ tab.label }}
@@ -246,8 +246,8 @@ async function handleDelete() {
             </div>
 
             <BaseInput
-              label="Display Name"
               v-model="displayName"
+              label="Display Name"
               placeholder="Optional display name"
               :disabled="loading"
             />
@@ -278,9 +278,9 @@ async function handleDelete() {
             <div class="pt-6 border-t border-border-1">
               <h4 class="text-sm font-semibold text-danger mb-3">Danger Zone</h4>
               <button
-                @click="handleDelete"
                 :disabled="deleting"
                 class="flex items-center px-4 py-2 text-sm font-medium text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition-colors disabled:opacity-50"
+                @click="handleDelete"
               >
                 <Trash2 class="w-4 h-4 mr-2" />
                 {{ deleting ? 'Deleting...' : 'Delete Channel' }}
@@ -298,8 +298,8 @@ async function handleDelete() {
                   <Search class="h-4 w-4 text-text-4" />
                 </div>
                 <input
-                  type="text"
                   v-model="searchQuery"
+                  type="text"
                   placeholder="Search team members to add"
                   class="block w-full pl-10 pr-3 py-2 border border-border-2 rounded-lg leading-5 bg-bg-surface-1 placeholder-text-4 focus:outline-none focus:placeholder-text-4 focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition duration-150 ease-in-out"
                 />
@@ -329,9 +329,9 @@ async function handleDelete() {
                     </div>
                   </div>
                   <button
-                    @click="addMember(user.user_id)"
                     :disabled="addingMember === user.user_id"
                     class="p-1.5 bg-brand/10 text-brand rounded-lg hover:bg-brand/20 transition-colors disabled:opacity-50"
+                    @click="addMember(user.user_id)"
                   >
                     <Plus class="w-4 h-4" />
                   </button>
@@ -388,10 +388,10 @@ async function handleDelete() {
 
                     <div v-if="member.user_id !== authStore.user?.id" class="flex items-center">
                       <button
-                        @click="removeMember(member.user_id)"
                         :disabled="removingMember === member.user_id"
                         class="p-1.5 text-text-4 hover:text-danger hover:bg-danger/10 rounded-lg transition-colors disabled:opacity-50"
                         title="Remove member"
+                        @click="removeMember(member.user_id)"
                       >
                         <UserMinus class="w-4 h-4" />
                       </button>
@@ -413,7 +413,7 @@ async function handleDelete() {
         <!-- Footer -->
         <div class="px-6 py-4 border-t border-border-1 flex justify-end space-x-3 shrink-0">
           <BaseButton variant="secondary" @click="$emit('close')">Cancel</BaseButton>
-          <BaseButton v-if="canManageCurrentChannel" @click="handleSave" :loading="loading"
+          <BaseButton v-if="canManageCurrentChannel" :loading="loading" @click="handleSave"
             >Save Changes</BaseButton
           >
         </div>

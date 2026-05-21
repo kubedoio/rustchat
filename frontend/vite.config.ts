@@ -6,8 +6,8 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
   },
   plugins: [vue()],
   build: {
@@ -42,7 +42,6 @@ export default defineConfig({
 
             return 'vendor'
           }
-
         },
       },
     },

@@ -80,7 +80,7 @@ async function handleClear() {
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-border-1">
           <h2 class="text-lg font-semibold text-text-1">Set a status</h2>
-          <button @click="$emit('close')" class="p-1 hover:bg-bg-surface-2 rounded">
+          <button class="p-1 hover:bg-bg-surface-2 rounded" @click="$emit('close')">
             <X class="w-5 h-5 text-text-3" />
           </button>
         </div>
@@ -91,8 +91,8 @@ async function handleClear() {
           <div class="flex items-center space-x-3">
             <button
               ref="emojiButtonRef"
-              @click="showEmojiPicker = !showEmojiPicker"
               class="w-10 h-10 rounded-lg bg-bg-surface-2 flex items-center justify-center text-xl hover:bg-bg-surface-1 transition-colors"
+              @click="showEmojiPicker = !showEmojiPicker"
             >
               {{ statusEmoji || '😀' }}
             </button>
@@ -121,8 +121,8 @@ async function handleClear() {
               <button
                 v-for="preset in presets"
                 :key="preset.id"
-                @click="applyPreset(preset)"
                 class="px-3 py-1.5 text-sm rounded-full border border-border-2 hover:bg-bg-surface-2 transition-colors flex items-center space-x-1"
+                @click="applyPreset(preset)"
               >
                 <span>{{ preset.emoji }}</span>
                 <span class="text-text-2">{{ preset.text }}</span>
@@ -155,7 +155,7 @@ async function handleClear() {
           <div v-else></div>
           <div class="flex space-x-3">
             <BaseButton variant="secondary" @click="$emit('close')">Cancel</BaseButton>
-            <BaseButton @click="handleSave" :loading="preferencesStore.loading">
+            <BaseButton :loading="preferencesStore.loading" @click="handleSave">
               <Check class="w-4 h-4 mr-1" />
               Save
             </BaseButton>

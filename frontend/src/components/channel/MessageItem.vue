@@ -306,7 +306,7 @@ async function toggleReaction(emoji: string) {
   >
     <div class="shrink-0 select-none mr-3 mt-1">
       <RcAvatar
-        :userId="message.userId"
+        :user-id="message.userId"
         :src="message.avatarUrl"
         :username="message.username"
         size="md"
@@ -336,8 +336,8 @@ async function toggleReaction(emoji: string) {
         </div>
         <button
           v-if="message.props?.status !== 'ended'"
-          @click="joinCall"
           class="w-full bg-success text-white text-sm font-medium py-2 rounded-r-2 hover:opacity-90 transition-standard flex items-center justify-center gap-2"
+          @click="joinCall"
         >
           <Video class="w-4 h-4" />
           Join Call
@@ -358,8 +358,8 @@ async function toggleReaction(emoji: string) {
   >
     <div class="flex items-center text-[13px] text-text-3 w-full">
       <div class="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center mr-3 shrink-0">
-        <Phone class="w-4 h-4 text-brand" v-if="!message.props?.end_at" />
-        <PhoneOff class="w-4 h-4 text-text-3" v-else />
+        <Phone v-if="!message.props?.end_at" class="w-4 h-4 text-brand" />
+        <PhoneOff v-else class="w-4 h-4 text-text-3" />
       </div>
       <div class="flex-1">
         <span class="font-medium text-text-2">{{ message.username }}</span>
@@ -399,7 +399,7 @@ async function toggleReaction(emoji: string) {
       @click="openUserProfile"
     >
       <RcAvatar
-        :userId="message.userId"
+        :user-id="message.userId"
         :src="message.avatarUrl"
         :username="message.username"
         size="md"
@@ -455,23 +455,23 @@ async function toggleReaction(emoji: string) {
         <textarea
           ref="editInputRef"
           v-model="editContent"
-          @keydown="handleEditKeydown"
           rows="2"
           class="w-full px-3 py-2 border border-brand rounded-r-2 bg-bg-surface-1 text-text-1 resize-none focus:ring-2 focus:ring-brand/20 focus:outline-none text-sm"
+          @keydown="handleEditKeydown"
         ></textarea>
         <div class="flex items-center gap-2 mt-1.5">
           <button
-            @click="saveEdit"
             :disabled="saving"
             class="flex items-center gap-1 rounded-r-1 bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-standard hover:bg-brand-hover disabled:opacity-50"
+            @click="saveEdit"
           >
             <Check class="w-3 h-3" />
             <span>{{ saving ? 'Saving...' : 'Save' }}</span>
           </button>
           <button
-            @click="cancelEditing"
             :disabled="saving"
             class="px-3 py-1.5 bg-bg-surface-2 text-text-2 text-xs font-medium rounded-r-1 hover:bg-bg-surface-1 transition-standard flex items-center gap-1"
+            @click="cancelEditing"
           >
             <X class="w-3 h-3" />
             <span>Cancel</span>
@@ -502,8 +502,8 @@ async function toggleReaction(emoji: string) {
       <!-- Thread Reply Count -->
       <div v-if="message.threadCount && message.threadCount > 0" class="mt-1.5">
         <button
-          @click.stop="handleReply"
           class="inline-flex items-center gap-2 px-2 py-1 rounded-r-1 hover:bg-brand/5 transition-standard border border-transparent hover:border-brand/20"
+          @click.stop="handleReply"
         >
           <MessageSquare class="w-3.5 h-3.5 text-brand" />
           <span class="text-[13px] font-medium text-brand">
@@ -523,13 +523,13 @@ async function toggleReaction(emoji: string) {
         <button
           v-for="reaction in message.reactions"
           :key="reaction.emoji"
-          @click="toggleReaction(reaction.emoji)"
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-all hover:scale-105"
           :class="
             reaction.users.includes(authStore.user?.id || '')
               ? 'bg-brand/10 border-brand/30 text-brand'
               : 'bg-bg-surface-2 border-border-1 text-text-2 hover:border-border-2'
           "
+          @click="toggleReaction(reaction.emoji)"
         >
           <span>{{ getEmojiChar(reaction.emoji) }}</span>
           <span class="font-medium">{{ reaction.count }}</span>
@@ -547,18 +547,18 @@ async function toggleReaction(emoji: string) {
         <button
           v-for="emoji in quickEmojis"
           :key="emoji"
-          @click="toggleReaction(emoji)"
           class="p-1.5 hover:bg-bg-surface-2 rounded transition-colors text-base leading-none"
           :title="`React with ${emoji}`"
+          @click="toggleReaction(emoji)"
         >
           {{ emoji }}
         </button>
       </div>
 
       <button
-        @click="handleReply"
         class="p-1.5 hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-colors rounded"
         title="Reply in thread"
+        @click="handleReply"
       >
         <MessageSquare class="w-4 h-4" />
       </button>
@@ -566,13 +566,13 @@ async function toggleReaction(emoji: string) {
       <div class="relative">
         <button
           ref="emojiButtonRef"
+          class="p-1.5 hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-colors rounded"
+          :class="{ 'bg-bg-surface-2 text-brand': showEmojiPicker }"
+          title="Add reaction"
           @click.stop="
             showEmojiPicker = !showEmojiPicker
             showActions = true
           "
-          class="p-1.5 hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-colors rounded"
-          :class="{ 'bg-bg-surface-2 text-brand': showEmojiPicker }"
-          title="Add reaction"
         >
           <Smile class="w-4 h-4" />
         </button>
@@ -586,9 +586,9 @@ async function toggleReaction(emoji: string) {
 
       <div class="relative">
         <button
-          @click.stop="showMenu = !showMenu"
           class="p-1.5 hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-colors rounded"
           title="More actions"
+          @click.stop="showMenu = !showMenu"
         >
           <MoreHorizontal class="w-4 h-4" />
         </button>
@@ -608,38 +608,38 @@ async function toggleReaction(emoji: string) {
           >
             <button
               v-if="isOwnMessage && canEditMessage"
-              @click="startEditing"
               class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
+              @click="startEditing"
             >
               <Pencil class="w-4 h-4" />
               Edit message
             </button>
             <button
-              @click="handleSave"
               class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
+              @click="handleSave"
             >
               <Bookmark class="w-4 h-4" :class="{ 'fill-current': message.isSaved }" />
               {{ message.isSaved ? 'Unsave message' : 'Save message' }}
             </button>
             <button
-              @click="handlePin"
               class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
+              @click="handlePin"
             >
               <Pin class="w-4 h-4" :class="{ 'fill-current': message.isPinned }" />
               {{ message.isPinned ? 'Unpin from channel' : 'Pin to channel' }}
             </button>
             <button
-              @click="handleMarkAsUnread"
               class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center gap-2 transition-standard"
+              @click="handleMarkAsUnread"
             >
               <Check class="w-4 h-4" />
               Mark as unread
             </button>
             <button
               v-if="isOwnMessage"
-              @click="handleDelete"
               :disabled="deleting"
               class="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/5 flex items-center gap-2 transition-standard"
+              @click="handleDelete"
             >
               <Trash2 class="w-4 h-4" />
               {{ deleting ? 'Deleting...' : 'Delete message' }}
@@ -654,7 +654,7 @@ async function toggleReaction(emoji: string) {
       <ImageGallery
         v-if="showGallery"
         :images="galleryImages"
-        :initialIndex="galleryInitialIndex"
+        :initial-index="galleryInitialIndex"
         @close="showGallery = false"
       />
     </Teleport>

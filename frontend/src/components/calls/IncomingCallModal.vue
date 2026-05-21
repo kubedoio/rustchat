@@ -35,15 +35,15 @@ const decline = () => {
 
       <div class="flex space-x-3">
         <button
-          @click="decline"
           class="flex-1 flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-danger hover:bg-danger/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger"
+          @click="decline"
         >
           <PhoneOff class="w-4 h-4 mr-2" />
           Decline
         </button>
         <button
-          @click="accept"
           class="flex-1 flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-success hover:bg-success/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-success"
+          @click="accept"
         >
           <Phone class="w-4 h-4 mr-2" />
           Accept

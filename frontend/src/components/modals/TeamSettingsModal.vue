@@ -258,7 +258,7 @@ async function removeMember(userId: string) {
               <p class="text-sm text-text-3">Team Settings</p>
             </div>
           </div>
-          <button @click="$emit('close')" class="p-1 hover:bg-bg-surface-2 rounded">
+          <button class="p-1 hover:bg-bg-surface-2 rounded" @click="$emit('close')">
             <X class="w-5 h-5 text-text-4" />
           </button>
         </div>
@@ -268,13 +268,13 @@ async function removeMember(userId: string) {
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            @click="activeTab = tab.id"
             class="flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors"
             :class="
               activeTab === tab.id
                 ? 'border-primary text-primary'
                 : 'border-transparent text-text-3 hover:text-text-2'
             "
+            @click="activeTab = tab.id"
           >
             <component :is="tab.icon" class="w-4 h-4 mr-2" />
             {{ tab.label }}
@@ -314,8 +314,8 @@ async function removeMember(userId: string) {
             </div>
 
             <BaseInput
-              label="Display Name"
               v-model="displayName"
+              label="Display Name"
               placeholder="My Team"
               :disabled="loading"
             />
@@ -341,7 +341,7 @@ async function removeMember(userId: string) {
                   </p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" v-model="isPublic" class="sr-only peer" />
+                  <input v-model="isPublic" type="checkbox" class="sr-only peer" />
                   <div
                     class="w-11 h-6 bg-bg-surface-2 peer-focus:outline-none ring-offset-2 peer-focus:ring-2 peer-focus:ring-brand rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"
                   ></div>
@@ -359,7 +359,7 @@ async function removeMember(userId: string) {
                   </p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" v-model="allowOpenInvite" class="sr-only peer" />
+                  <input v-model="allowOpenInvite" type="checkbox" class="sr-only peer" />
                   <div
                     class="w-11 h-6 bg-bg-surface-2 peer-focus:outline-none ring-offset-2 peer-focus:ring-2 peer-focus:ring-brand rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border-2 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"
                   ></div>
@@ -378,8 +378,8 @@ async function removeMember(userId: string) {
                   class="flex-1 px-3 py-2 bg-bg-surface-1 border border-border-2 rounded-lg text-sm text-text-3"
                 />
                 <button
-                  @click="copyInviteLink"
                   class="flex items-center space-x-1 rounded-lg bg-primary px-3 py-2 text-brand-foreground transition-colors hover:bg-brand-hover"
+                  @click="copyInviteLink"
                 >
                   <component :is="copied ? Check : Copy" class="w-4 h-4" />
                   <span class="text-sm">{{ copied ? 'Copied' : 'Copy' }}</span>
@@ -393,9 +393,9 @@ async function removeMember(userId: string) {
               <h4 class="text-sm font-semibold text-danger mb-3">Danger Zone</h4>
               <div class="space-y-3">
                 <button
-                  @click="handleLeave"
                   :disabled="leaving || deleting"
                   class="flex items-center px-4 py-2 text-sm font-medium text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition-colors disabled:opacity-50"
+                  @click="handleLeave"
                 >
                   <LogOut class="w-4 h-4 mr-2" />
                   {{ leaving ? 'Leaving...' : 'Leave Team' }}
@@ -403,9 +403,9 @@ async function removeMember(userId: string) {
 
                 <button
                   v-if="canManageCurrentTeam"
-                  @click="handleDelete"
                   :disabled="deleting || leaving"
                   class="flex items-center px-4 py-2 text-sm font-medium text-danger border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                  @click="handleDelete"
                 >
                   <Trash2 class="w-4 h-4 mr-2" />
                   {{ deleting ? 'Deleting...' : 'Delete Team' }}
@@ -428,11 +428,11 @@ async function removeMember(userId: string) {
                   <Search class="h-4 w-4 text-text-4" />
                 </div>
                 <input
-                  type="text"
                   v-model="searchQuery"
-                  @input="onSearchInput"
+                  type="text"
                   placeholder="Search users by name or username"
                   class="block w-full pl-10 pr-3 py-2 border border-border-2 rounded-lg leading-5 bg-bg-surface-1 placeholder-text-4 focus:outline-none focus:placeholder-text-4 focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition duration-150 ease-in-out"
+                  @input="onSearchInput"
                 />
                 <div
                   v-if="searching"
@@ -468,9 +468,9 @@ async function removeMember(userId: string) {
                     </div>
                   </div>
                   <button
-                    @click="addMember(user)"
                     :disabled="addingMember === user.id"
                     class="p-1.5 bg-brand/10 text-brand rounded-lg hover:bg-brand/20 transition-colors disabled:opacity-50"
+                    @click="addMember(user)"
                   >
                     <Plus class="w-4 h-4" />
                   </button>
@@ -523,10 +523,10 @@ async function removeMember(userId: string) {
 
                   <div v-if="member.user_id !== authStore.user?.id" class="flex items-center">
                     <button
-                      @click="removeMember(member.user_id)"
                       :disabled="removingMember === member.user_id"
                       class="p-1.5 text-text-4 hover:text-danger hover:bg-danger/10 rounded-lg transition-colors disabled:opacity-50"
                       title="Remove member"
+                      @click="removeMember(member.user_id)"
                     >
                       <UserMinus class="w-4 h-4" />
                     </button>
@@ -554,7 +554,7 @@ async function removeMember(userId: string) {
         <!-- Footer -->
         <div class="px-6 py-4 border-t border-border-1 flex justify-end space-x-3 shrink-0">
           <BaseButton variant="secondary" @click="$emit('close')">Cancel</BaseButton>
-          <BaseButton v-if="canManageCurrentTeam" @click="handleSave" :loading="loading"
+          <BaseButton v-if="canManageCurrentTeam" :loading="loading" @click="handleSave"
             >Save Changes</BaseButton
           >
         </div>

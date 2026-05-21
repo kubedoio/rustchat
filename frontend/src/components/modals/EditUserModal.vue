@@ -93,13 +93,13 @@ function close() {
               <p v-if="user" class="text-[10px] text-text-3">@{{ user.username }}</p>
             </div>
           </div>
-          <button @click="close" class="p-1.5 hover:bg-bg-surface-2 rounded-lg transition-colors">
+          <button class="p-1.5 hover:bg-bg-surface-2 rounded-lg transition-colors" @click="close">
             <X class="w-4 h-4 text-text-4" />
           </button>
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="submit" class="p-5 space-y-4">
+        <form class="p-5 space-y-4" @submit.prevent="submit">
           <!-- Error -->
           <div
             v-if="error"
@@ -169,8 +169,8 @@ function close() {
           <div class="flex justify-end gap-2 pt-4">
             <button
               type="button"
-              @click="close"
               class="px-3 py-2 text-text-2 hover:bg-bg-surface-2 rounded-lg text-xs font-medium transition-colors"
+              @click="close"
             >
               Cancel
             </button>

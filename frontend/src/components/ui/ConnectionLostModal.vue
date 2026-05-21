@@ -10,7 +10,7 @@ const emit = defineEmits<{
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div class="fixed inset-0 z-[110]">
+      <div v-if="true" class="fixed inset-0 z-[110]">
         <!-- Backdrop with blur -->
         <div class="absolute inset-0 bg-black/40 backdrop-blur-md" aria-hidden="true" />
 
@@ -42,16 +42,16 @@ const emit = defineEmits<{
             <!-- Actions -->
             <div class="mt-6 flex flex-col gap-3">
               <button
-                @click="emit('reconnect')"
                 class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-brand-foreground transition-standard hover:bg-brand-hover"
+                @click="emit('reconnect')"
               >
                 <RotateCcw class="h-4 w-4" />
                 Reconnect
               </button>
 
               <button
-                @click="emit('refresh')"
                 class="inline-flex items-center justify-center gap-2 rounded-lg bg-bg-surface-2 px-4 py-2.5 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-3 hover:text-text-1"
+                @click="emit('refresh')"
               >
                 <RefreshCw class="h-4 w-4" />
                 Refresh page

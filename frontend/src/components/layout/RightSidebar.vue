@@ -43,10 +43,10 @@ function handleJump(messageId: string) {
         <span v-else-if="ui.rhsView === 'members'">Members</span>
       </h3>
       <button
-        @click="ui.closeRhs()"
         class="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500 transition-standard focus-ring"
         aria-label="Close sidebar"
         title="Close sidebar"
+        @click="ui.closeRhs()"
       >
         <X class="w-5 h-5" />
       </button>
@@ -69,20 +69,20 @@ function handleJump(messageId: string) {
       />
       <SearchPanel
         v-else-if="ui.rhsView === 'search' && channelStore.currentChannelId"
-        :channelId="channelStore.currentChannelId"
+        :channel-id="channelStore.currentChannelId"
         @close="ui.closeRhs()"
         @jump="handleJump"
       />
       <ChannelMembersPanel
         v-else-if="ui.rhsView === 'members' && channelStore.currentChannelId"
-        :channelId="channelStore.currentChannelId"
+        :channel-id="channelStore.currentChannelId"
         @close="ui.closeRhs()"
       />
       <ChannelInfoPanel
         v-else-if="ui.rhsView === 'info' && channelStore.currentChannelId"
-        :channelId="channelStore.currentChannelId"
+        :channel-id="channelStore.currentChannelId"
         @close="ui.closeRhs()"
-        @openSettings="handleOpenSettings"
+        @open-settings="handleOpenSettings"
       />
 
       <div

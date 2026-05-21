@@ -106,6 +106,11 @@ function resetChanges() {
   selected.value = new Set(originalSelected.value)
 }
 
+function selectRole(roleValue: string) {
+  activeRole.value = roleValue
+  loadRole(roleValue)
+}
+
 function selectAllInCategory(category: string) {
   const categoryPerms = grouped.value.find(([c]) => c === category)?.[1] || []
   const newSelected = new Set(selected.value)
@@ -137,22 +142,22 @@ onMounted(async () => {
       <div class="flex items-center gap-2">
         <button
           v-if="hasChanges"
-          @click="resetChanges"
           class="flex items-center gap-1.5 px-3 py-2 border border-border-1 rounded-lg text-xs font-medium text-text-2 hover:bg-bg-surface-2 transition-colors"
+          @click="resetChanges"
         >
           Reset
         </button>
         <button
-          @click="loadRole(activeRole)"
           class="flex items-center gap-1.5 px-3 py-2 border border-border-1 rounded-lg text-xs font-medium text-text-2 hover:bg-bg-surface-2 transition-colors"
+          @click="loadRole(activeRole)"
         >
           <RefreshCw class="w-3.5 h-3.5" />
           Refresh
         </button>
         <button
-          @click="saveRole"
           :disabled="saving || !hasChanges"
           class="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors"
+          @click="saveRole"
         >
           <Save class="w-3.5 h-3.5" />
           {{ saving ? 'Saving...' : 'Save Changes' }}
@@ -189,16 +194,13 @@ onMounted(async () => {
         <button
           v-for="role in roles"
           :key="role.value"
-          @click="
-            activeRole = role.value
-            loadRole(role.value)
-          "
           class="text-left p-3 rounded-lg border transition-all"
           :class="
             activeRole === role.value
               ? 'border-brand bg-brand/5'
               : 'border-border-1 hover:bg-bg-surface-2'
           "
+          @click="selectRole(role.value)"
         >
           <div
             class="text-xs font-medium"
@@ -247,15 +249,15 @@ onMounted(async () => {
             </h3>
             <div class="flex items-center gap-1.5">
               <button
-                @click="selectAllInCategory(category)"
                 class="px-2 py-1 text-[10px] text-brand hover:bg-brand/10 rounded transition-colors"
+                @click="selectAllInCategory(category)"
               >
                 Select All
               </button>
               <span class="text-text-4">|</span>
               <button
-                @click="deselectAllInCategory(category)"
                 class="px-2 py-1 text-[10px] text-danger hover:bg-danger/10 rounded transition-colors"
+                @click="deselectAllInCategory(category)"
               >
                 Deselect All
               </button>
@@ -275,8 +277,8 @@ onMounted(async () => {
               <input
                 type="checkbox"
                 :checked="selected.has(perm.id)"
-                @change="togglePermission(perm.id)"
                 class="w-4 h-4 text-brand rounded border-border-1 mt-0.5 shrink-0"
+                @change="togglePermission(perm.id)"
               />
               <div class="min-w-0">
                 <div class="text-xs font-medium text-text-1 truncate">{{ perm.id }}</div>
@@ -297,9 +299,9 @@ onMounted(async () => {
     >
       <span class="text-xs text-text-2">You have unsaved changes</span>
       <button
-        @click="saveRole"
         :disabled="saving"
         class="px-3 py-1.5 bg-brand hover:bg-brand/90 disabled:opacity-50 text-white rounded text-xs font-medium transition-colors"
+        @click="saveRole"
       >
         {{ saving ? 'Saving...' : 'Save Now' }}
       </button>

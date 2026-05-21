@@ -52,7 +52,6 @@ function getInitials(name: string): string {
 
         <!-- Team Button -->
         <button
-          @click="selectTeam(team.id)"
           class="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-r-2 text-sm font-bold transition-standard"
           :class="{
             'bg-brand text-brand-foreground shadow-1': teamStore.currentTeamId === team.id,
@@ -60,6 +59,7 @@ function getInitials(name: string): string {
               teamStore.currentTeamId !== team.id,
           }"
           :title="team.display_name || team.name"
+          @click="selectTeam(team.id)"
         >
           {{ getInitials(team.display_name || team.name) }}
         </button>
@@ -83,9 +83,9 @@ function getInitials(name: string): string {
     <!-- Add Team Button -->
     <div v-if="canCreateTeam" class="mt-auto w-full border-t border-border-1 px-2 pt-3">
       <button
-        @click="showCreateModal = true"
         class="mx-auto flex h-11 w-11 items-center justify-center rounded-r-2 border border-dashed border-border-2 bg-bg-surface-1 text-text-3 transition-standard hover:border-brand hover:bg-brand/10 hover:text-brand"
         title="Create Team"
+        @click="showCreateModal = true"
       >
         <Plus class="w-5 h-5" />
       </button>

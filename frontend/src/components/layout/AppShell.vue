@@ -124,7 +124,7 @@ watch(
           class="fixed lg:relative top-0 right-0 h-full z-40 lg:z-10 shadow-2xl lg:shadow-none bg-bg-surface-1 border-l border-border-1 shrink-0"
           :class="[isMobile ? 'w-[85%]' : isTablet ? 'w-[360px]' : 'w-[var(--rhs-width)]']"
           @jump="emit('rhsJump', $event)"
-          @openSettings="emit('openChannelSettings')"
+          @open-settings="emit('openChannelSettings')"
         />
       </Transition>
     </div>

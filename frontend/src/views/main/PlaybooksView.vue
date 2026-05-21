@@ -46,25 +46,25 @@ onMounted(() => {
       <div class="px-6 mt-4 border-b border-gray-200">
         <nav class="flex space-x-8">
           <button
-            @click="activeTab = 'playbooks'"
             class="pb-4 border-b-2 font-medium text-sm transition-colors flex items-center"
             :class="
               activeTab === 'playbooks'
                 ? 'border-indigo-500 text-indigo-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             "
+            @click="activeTab = 'playbooks'"
           >
             <Book class="w-4 h-4 mr-2" />
             Library
           </button>
           <button
-            @click="activeTab = 'runs'"
             class="pb-4 border-b-2 font-medium text-sm transition-colors flex items-center"
             :class="
               activeTab === 'runs'
                 ? 'border-indigo-500 text-indigo-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             "
+            @click="activeTab = 'runs'"
           >
             <Play class="w-4 h-4 mr-2" />
             Runs
@@ -99,8 +99,8 @@ onMounted(() => {
               <div
                 v-for="run in playbookStore.runs"
                 :key="run.id"
-                @click="router.push(`/runs/${run.id}`)"
                 class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center justify-between group"
+                @click="router.push(`/runs/${run.id}`)"
               >
                 <div class="flex items-center space-x-4">
                   <div class="p-2 bg-blue-50 rounded-lg text-blue-600">

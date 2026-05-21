@@ -66,9 +66,9 @@ const saveSettings = async () => {
           <CheckCircle class="w-4 h-4 mr-1" /> Saved
         </span>
         <button
-          @click="saveSettings"
           :disabled="saving"
           class="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+          @click="saveSettings"
         >
           <Save class="w-5 h-5 mr-2" />
           {{ saving ? 'Saving...' : 'Save Changes' }}
@@ -97,8 +97,8 @@ const saveSettings = async () => {
             </div>
           </div>
           <input
-            type="checkbox"
             v-model="form.enable_webhooks"
+            type="checkbox"
             class="w-5 h-5 text-indigo-600 rounded"
           />
         </div>
@@ -136,8 +136,8 @@ const saveSettings = async () => {
             </div>
           </div>
           <input
-            type="checkbox"
             v-model="form.enable_slash_commands"
+            type="checkbox"
             class="w-5 h-5 text-indigo-600 rounded"
           />
         </div>
@@ -154,8 +154,8 @@ const saveSettings = async () => {
             </div>
           </div>
           <input
-            type="checkbox"
             v-model="form.enable_bots"
+            type="checkbox"
             class="w-5 h-5 text-indigo-600 rounded"
           />
         </div>

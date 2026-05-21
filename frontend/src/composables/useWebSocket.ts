@@ -560,11 +560,11 @@ export function useWebSocket() {
         applyInitialLoadSnapshot(envelope.data)
         break
 
+      // Mattermost standard / custom types
       case 'posted':
       case 'message_created':
       case 'post_created': // Fallback
       case 'message_posted':
-      // Mattermost standard
       case 'thread_reply_created': {
         const post = normalizeWsPost(envelope.data, envelope.channel_id)
         if (!post) {

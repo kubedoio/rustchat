@@ -77,13 +77,13 @@ onUnmounted(() => {
       <button
         v-for="(member, index) in filteredMembers"
         :key="member.user_id"
-        @click="select(member.username)"
-        @mouseenter="selectedIndex = index"
         class="w-full px-3 py-2 flex items-center space-x-3 transition-colors text-left"
         :class="selectedIndex === index ? 'bg-blue-50' : 'hover:bg-gray-50'"
+        @click="select(member.username)"
+        @mouseenter="selectedIndex = index"
       >
         <RcAvatar
-          :userId="member.user_id"
+          :user-id="member.user_id"
           :username="member.username"
           :src="member.avatar_url"
           size="sm"

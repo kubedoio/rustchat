@@ -179,8 +179,8 @@ async function handleSaveStatus() {
             </div>
             <button
               type="button"
-              @click="fileInput?.click()"
               class="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-bg-surface-1 bg-brand text-brand-foreground shadow-1 transition-standard hover:bg-brand-hover sm:h-8 sm:w-8"
+              @click="fileInput?.click()"
             >
               <Camera class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </button>
@@ -197,8 +197,8 @@ async function handleSaveStatus() {
             <p :class="helperTextClass">
               <button
                 type="button"
-                @click="fileInput?.click()"
                 class="font-medium text-brand transition-standard hover:text-brand-hover"
+                @click="fileInput?.click()"
               >
                 Upload a new photo
               </button>
@@ -209,36 +209,36 @@ async function handleSaveStatus() {
         <!-- Form Fields -->
         <div class="grid grid-cols-1 gap-4">
           <BaseInput
-            label="Username"
             v-model="username"
+            label="Username"
             placeholder="your_username"
             :disabled="loading"
           />
           <BaseInput
-            label="Display Name"
             v-model="displayName"
+            label="Display Name"
             placeholder="Your Name"
             :disabled="loading"
           />
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <BaseInput
-              label="First Name"
               v-model="firstName"
+              label="First Name"
               placeholder="John"
               :disabled="loading"
             />
-            <BaseInput label="Last Name" v-model="lastName" placeholder="Doe" :disabled="loading" />
+            <BaseInput v-model="lastName" label="Last Name" placeholder="Doe" :disabled="loading" />
           </div>
-          <BaseInput label="Nickname" v-model="nickname" placeholder="Johnny" :disabled="loading" />
+          <BaseInput v-model="nickname" label="Nickname" placeholder="Johnny" :disabled="loading" />
           <BaseInput
-            label="Position"
             v-model="position"
+            label="Position"
             placeholder="Software Engineer"
             :disabled="loading"
           />
           <BaseInput
-            label="Avatar URL"
             v-model="avatarUrl"
+            label="Avatar URL"
             placeholder="https://example.com/avatar.jpg"
             :disabled="loading"
           />
@@ -251,7 +251,7 @@ async function handleSaveStatus() {
         </div>
 
         <div class="flex justify-end">
-          <BaseButton @click="handleSaveProfile" :loading="loading">Save Profile</BaseButton>
+          <BaseButton :loading="loading" @click="handleSaveProfile">Save Profile</BaseButton>
         </div>
       </div>
     </div>
@@ -290,7 +290,7 @@ async function handleSaveStatus() {
         </div>
 
         <div class="flex justify-end">
-          <BaseButton @click="handleSaveStatus" :loading="loading">Update Status</BaseButton>
+          <BaseButton :loading="loading" @click="handleSaveStatus">Update Status</BaseButton>
         </div>
       </div>
     </div>

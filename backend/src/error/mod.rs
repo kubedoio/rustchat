@@ -519,8 +519,12 @@ impl IntoResponse for AppError {
         let status = self.status_code();
         let message = self.to_string();
 
-        // Log the error for debugging
-        tracing::error!(error = %message, code = %self.code(), status = %status, "API error");
+        // Log the error for debugging: 5xx is error, 4xx is warn
+        if status.is_server_error() {
+            tracing::error!(error = %message, code = %self.code(), status = %status, "API error");
+        } else {
+            tracing::warn!(error = %message, code = %self.code(), status = %status, "API error");
+        }
 
         let body = ErrorResponse {
             error: ErrorBody {

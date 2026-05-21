@@ -115,7 +115,7 @@ function handleKeydown(e: KeyboardEvent) {
     <div class="p-5 border-b border-border-dim bg-surface-dim/30">
       <div class="flex items-start space-x-3">
         <RcAvatar
-          :userId="parentMessage.userId"
+          :user-id="parentMessage.userId"
           :username="parentMessage.username"
           :src="parentMessage.avatarUrl"
           size="md"
@@ -179,13 +179,13 @@ function handleKeydown(e: KeyboardEvent) {
       </div>
 
       <div
-        v-else
         v-for="reply in replies"
+        v-else
         :key="reply.id"
         class="flex items-start space-x-3 group relative transition-all"
       >
         <RcAvatar
-          :userId="reply.userId"
+          :user-id="reply.userId"
           :username="reply.username"
           :src="reply.avatarUrl"
           size="sm"
@@ -220,15 +220,15 @@ function handleKeydown(e: KeyboardEvent) {
       >
         <textarea
           v-model="replyContent"
-          @keydown="handleKeydown"
           rows="2"
           class="flex-1 px-3 py-2 bg-transparent text-gray-900 resize-none border-none focus:ring-0 text-[14px] scrollbar-none"
           placeholder="Reply to thread..."
+          @keydown="handleKeydown"
         ></textarea>
         <button
-          @click="sendReply"
           :disabled="!replyContent.trim()"
           class="mb-1 mr-1 rounded-lg bg-primary p-2.5 text-brand-foreground shadow-lg shadow-primary/20 transition-all hover:bg-brand-hover active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          @click="sendReply"
         >
           <Send class="w-4 h-4" />
         </button>
@@ -240,7 +240,7 @@ function handleKeydown(e: KeyboardEvent) {
       <ImageGallery
         v-if="showGallery"
         :images="galleryCurrentImages"
-        :initialIndex="galleryInitialIndex"
+        :initial-index="galleryInitialIndex"
         @close="showGallery = false"
       />
     </Teleport>

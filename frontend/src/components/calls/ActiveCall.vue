@@ -153,9 +153,9 @@ const formatDuration = (startAt: number | string | Date) => {
       </div>
       <div class="flex items-center space-x-1 shrink-0">
         <button
-          @click="toggleExpand"
           class="p-1.5 text-text-3 hover:text-text-1 rounded hover:bg-bg-surface-1 transition-colors"
           :title="isExpanded ? 'Minimize' : 'Maximize'"
+          @click="toggleExpand"
         >
           <Minimize2 v-if="isExpanded" class="w-4 h-4" />
           <Maximize2 v-else class="w-4 h-4" />
@@ -252,11 +252,11 @@ const formatDuration = (startAt: number | string | Date) => {
                 class="relative ml-1"
               >
                 <button
+                  class="p-1 text-text-3 hover:text-text-1 rounded hover:bg-bg-surface-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   @click="
                     participantMenuOpen =
                       participantMenuOpen === participant.session_id ? null : participant.session_id
                   "
-                  class="p-1 text-text-3 hover:text-text-1 rounded hover:bg-bg-surface-1 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <MoreVertical class="w-3.5 h-3.5" />
                 </button>
@@ -266,15 +266,15 @@ const formatDuration = (startAt: number | string | Date) => {
                   class="absolute right-0 top-full mt-1 w-32 bg-bg-surface-2 border border-border-1 rounded shadow-xl z-50 py-1"
                 >
                   <button
-                    @click="handleHostMute(participant.session_id)"
                     class="w-full px-3 py-1.5 text-left text-xs text-text-2 hover:bg-bg-surface-2 flex items-center"
+                    @click="handleHostMute(participant.session_id)"
                   >
                     <MicOff class="w-3 h-3 mr-2" />
                     Mute
                   </button>
                   <button
-                    @click="handleHostRemove(participant.session_id)"
                     class="w-full px-3 py-1.5 text-left text-xs text-danger hover:bg-bg-surface-2 flex items-center"
+                    @click="handleHostRemove(participant.session_id)"
                   >
                     <Trash2 class="w-3 h-3 mr-2" />
                     Remove
@@ -327,7 +327,6 @@ const formatDuration = (startAt: number | string | Date) => {
     >
       <!-- Mute/Unmute -->
       <button
-        @click="toggleMute"
         :class="[
           'w-12 h-12 rounded-full flex items-center justify-center transition-all',
           isMuted
@@ -335,6 +334,7 @@ const formatDuration = (startAt: number | string | Date) => {
             : 'bg-bg-surface-2 text-text-1 hover:bg-bg-surface-1',
         ]"
         :title="isMuted ? 'Unmute' : 'Mute'"
+        @click="toggleMute"
       >
         <MicOff v-if="isMuted" class="w-5 h-5" />
         <Mic v-else class="w-5 h-5" />
@@ -342,7 +342,6 @@ const formatDuration = (startAt: number | string | Date) => {
 
       <!-- Raise Hand -->
       <button
-        @click="toggleHand"
         :class="[
           'w-10 h-10 rounded-full flex items-center justify-center transition-all',
           isHandRaised
@@ -350,13 +349,13 @@ const formatDuration = (startAt: number | string | Date) => {
             : 'bg-bg-surface-2 text-text-3 hover:bg-bg-surface-1',
         ]"
         :title="isHandRaised ? 'Lower hand' : 'Raise hand'"
+        @click="toggleHand"
       >
         <Hand class="w-4 h-4" />
       </button>
 
       <!-- Screen Share -->
       <button
-        @click="toggleScreenShare"
         :class="[
           'w-10 h-10 rounded-full flex items-center justify-center transition-all',
           isScreenSharing
@@ -364,6 +363,7 @@ const formatDuration = (startAt: number | string | Date) => {
             : 'bg-bg-surface-2 text-text-3 hover:bg-bg-surface-1',
         ]"
         :title="isScreenSharing ? 'Stop sharing' : 'Share screen'"
+        @click="toggleScreenShare"
       >
         <Monitor class="w-4 h-4" />
       </button>
@@ -371,7 +371,6 @@ const formatDuration = (startAt: number | string | Date) => {
       <!-- Participants Toggle (Expanded mode only) -->
       <button
         v-if="isExpanded"
-        @click="showParticipants = !showParticipants"
         :class="[
           'w-10 h-10 rounded-full flex items-center justify-center transition-all',
           showParticipants
@@ -379,6 +378,7 @@ const formatDuration = (startAt: number | string | Date) => {
             : 'bg-bg-surface-2 text-text-3 hover:bg-bg-surface-1',
         ]"
         :title="showParticipants ? 'Hide participants' : 'Show participants'"
+        @click="showParticipants = !showParticipants"
       >
         <Users class="w-4 h-4" />
       </button>
@@ -386,9 +386,9 @@ const formatDuration = (startAt: number | string | Date) => {
       <!-- More Options -->
       <div class="relative">
         <button
-          @click="showMenu = !showMenu"
           class="w-10 h-10 rounded-full flex items-center justify-center bg-bg-surface-2 text-text-3 hover:bg-bg-surface-1 transition-all"
           title="More options"
+          @click="showMenu = !showMenu"
         >
           <MoreVertical class="w-4 h-4" />
         </button>
@@ -401,32 +401,32 @@ const formatDuration = (startAt: number | string | Date) => {
 
           <template v-if="isHost">
             <button
+              class="w-full px-4 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center"
               @click="
                 handleMuteAll()
                 showMenu = false
               "
-              class="w-full px-4 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center"
             >
               <MicOff class="w-4 h-4 mr-2" />
               Mute All
             </button>
             <button
+              class="w-full px-4 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center"
               @click="
                 handleRingAll()
                 showMenu = false
               "
-              class="w-full px-4 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center"
             >
               <Bell class="w-4 h-4 mr-2" />
               Ring Everyone
             </button>
             <div class="my-1 border-t border-border-1"></div>
             <button
+              class="w-full px-4 py-2 text-left text-sm text-danger hover:bg-bg-surface-2 flex items-center"
               @click="
                 handleEndCall()
                 showMenu = false
               "
-              class="w-full px-4 py-2 text-left text-sm text-danger hover:bg-bg-surface-2 flex items-center"
             >
               <PhoneOff class="w-4 h-4 mr-2" />
               End Call for Everyone
@@ -442,9 +442,9 @@ const formatDuration = (startAt: number | string | Date) => {
 
       <!-- Hangup -->
       <button
-        @click="handleHangup"
         class="w-12 h-12 rounded-full bg-danger hover:bg-danger/90 text-text-1 flex items-center justify-center transition-all"
         title="Leave call"
+        @click="handleHangup"
       >
         <PhoneOff class="w-5 h-5" />
       </button>

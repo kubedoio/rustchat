@@ -92,8 +92,8 @@ function cancelEdit() {
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
           <input
-            type="radio"
             v-model="localGroupUnread"
+            type="radio"
             value="never"
             class="w-4 h-4 text-primary"
           />
@@ -106,8 +106,8 @@ function cancelEdit() {
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
           <input
-            type="radio"
             v-model="localGroupUnread"
+            type="radio"
             value="only_for_favorites"
             class="w-4 h-4 text-primary"
           />
@@ -120,8 +120,8 @@ function cancelEdit() {
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
           <input
-            type="radio"
             v-model="localGroupUnread"
+            type="radio"
             value="always"
             class="w-4 h-4 text-primary"
           />
@@ -155,7 +155,7 @@ function cancelEdit() {
         <label
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
-          <input type="radio" v-model="localLimitDMs" value="all" class="w-4 h-4 text-primary" />
+          <input v-model="localLimitDMs" type="radio" value="all" class="w-4 h-4 text-primary" />
           <div class="flex-1">
             <div class="text-sm font-medium text-text-1">All direct messages</div>
             <div class="text-xs text-text-3">Show all your direct messages</div>
@@ -164,7 +164,7 @@ function cancelEdit() {
         <label
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
-          <input type="radio" v-model="localLimitDMs" value="40" class="w-4 h-4 text-primary" />
+          <input v-model="localLimitDMs" type="radio" value="40" class="w-4 h-4 text-primary" />
           <div class="flex-1">
             <div class="text-sm font-medium text-text-1">40 direct messages</div>
             <div class="text-xs text-text-3">Show the 40 most recent conversations</div>
@@ -173,7 +173,7 @@ function cancelEdit() {
         <label
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
-          <input type="radio" v-model="localLimitDMs" value="20" class="w-4 h-4 text-primary" />
+          <input v-model="localLimitDMs" type="radio" value="20" class="w-4 h-4 text-primary" />
           <div class="flex-1">
             <div class="text-sm font-medium text-text-1">20 direct messages</div>
             <div class="text-xs text-text-3">Show the 20 most recent conversations</div>
@@ -182,7 +182,7 @@ function cancelEdit() {
         <label
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
-          <input type="radio" v-model="localLimitDMs" value="10" class="w-4 h-4 text-primary" />
+          <input v-model="localLimitDMs" type="radio" value="10" class="w-4 h-4 text-primary" />
           <div class="flex-1">
             <div class="text-sm font-medium text-text-1">10 direct messages</div>
             <div class="text-xs text-text-3">Show the 10 most recent conversations</div>

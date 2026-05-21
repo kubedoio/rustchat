@@ -62,7 +62,7 @@ describe('useDraft', () => {
 
   it('clears draft when content is empty', () => {
     const channelId = 'channel-789'
-    const { saveDraft, clearDraft } = useDraft(channelId)
+    const { saveDraft } = useDraft(channelId)
 
     saveDraft('Test message')
     expect(localStorageMock.setItem).toHaveBeenCalled()

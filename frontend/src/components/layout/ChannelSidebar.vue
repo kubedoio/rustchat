@@ -465,11 +465,11 @@ async function handleLeaveTeam() {
       >
         <button
           v-if="authStore.user?.role === 'system_admin' || authStore.user?.role === 'org_admin'"
+          class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
           @click="
             $router.push('/admin')
             showTeamMenu = false
           "
-          class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
         >
           <Shield class="w-4 h-4 text-brand" />
           System Console
@@ -481,22 +481,22 @@ async function handleLeaveTeam() {
         />
 
         <button
+          class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
           @click="
             showBrowseTeams = true
             showTeamMenu = false
           "
-          class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
         >
           <Compass class="w-4 h-4" />
           Browse Teams
         </button>
         <button
           v-if="canManageCurrentTeam"
+          class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
           @click="
             showTeamSettings = true
             showTeamMenu = false
           "
-          class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
         >
           <Settings class="w-4 h-4" />
           Team Settings
@@ -505,8 +505,8 @@ async function handleLeaveTeam() {
         <div class="h-px bg-border-1 my-1" />
 
         <button
-          @click="handleLeaveTeam"
           class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger hover:bg-danger/5 transition-standard"
+          @click="handleLeaveTeam"
         >
           <LogOut class="w-4 h-4" />
           Leave Team
@@ -553,9 +553,9 @@ async function handleLeaveTeam() {
               </span>
               <button
                 v-if="cat.id === 'dms' || canCreateChannelsInCurrentTeam"
-                @click.stop="handleAddCategory(cat.id)"
                 class="rounded p-1 opacity-0 transition-standard hover:bg-bg-surface-1 group-hover:opacity-100"
                 :title="cat.id === 'dms' ? 'New direct message' : 'Create channel'"
+                @click.stop="handleAddCategory(cat.id)"
               >
                 <Plus class="h-3.5 w-3.5" />
               </button>
@@ -570,8 +570,6 @@ async function handleLeaveTeam() {
               :data-testid="channel.type === 'dm' ? 'dm-sidebar-row' : 'channel-sidebar-row'"
               :data-channel-id="channel.id"
               :data-user-id="channel.userId"
-              @click="selectChannel(channel.id)"
-              @contextmenu.prevent="openContextMenu(channel, $event)"
               class="group/item relative flex cursor-pointer items-center justify-between rounded-r-2 border px-2.5 py-2 transition-standard"
               :class="{
                 'border-brand/25 bg-bg-surface-1 shadow-1':
@@ -579,6 +577,8 @@ async function handleLeaveTeam() {
                 'border-transparent hover:border-border-1 hover:bg-bg-surface-1':
                   channelStore.currentChannelId !== channel.id,
               }"
+              @click="selectChannel(channel.id)"
+              @contextmenu.prevent="openContextMenu(channel, $event)"
             >
               <div
                 v-if="channelStore.currentChannelId === channel.id"
@@ -654,7 +654,6 @@ async function handleLeaveTeam() {
                 <!-- Mark as read button (on hover) -->
                 <button
                   v-if="channel.unread > 0"
-                  @click.stop="markChannelAsRead(channel.id)"
                   class="flex h-5 w-5 items-center justify-center rounded opacity-0 transition-opacity group-hover/item:opacity-100"
                   :class="
                     channelStore.currentChannelId === channel.id
@@ -662,6 +661,7 @@ async function handleLeaveTeam() {
                       : 'text-text-3 hover:bg-bg-surface-2 hover:text-text-1'
                   "
                   title="Mark as read"
+                  @click.stop="markChannelAsRead(channel.id)"
                 >
                   <Check class="w-3.5 h-3.5" />
                 </button>
@@ -703,7 +703,6 @@ async function handleLeaveTeam() {
 
                 <!-- Context Menu Trigger -->
                 <button
-                  @click.stop="openContextMenu(channel, $event)"
                   class="flex h-6 w-6 items-center justify-center rounded opacity-0 transition-opacity group-hover/item:opacity-100"
                   :class="
                     channelStore.currentChannelId === channel.id
@@ -711,12 +710,13 @@ async function handleLeaveTeam() {
                       : 'text-text-3 hover:bg-bg-surface-2 hover:text-text-1'
                   "
                   title="More actions"
+                  @click.stop="openContextMenu(channel, $event)"
                 >
                   <MoreVertical class="w-4 h-4" />
                 </button>
 
                 <!-- Context Menu -->
-                <Teleport to="body" v-if="contextMenuChannel?.id === channel.id">
+                <Teleport v-if="contextMenuChannel?.id === channel.id" to="body">
                   <ChannelContextMenu
                     :channel-id="contextMenuChannel!.id"
                     :channel-name="contextMenuChannel!.name"
@@ -753,23 +753,23 @@ async function handleLeaveTeam() {
       </div>
       <button
         v-if="hasAnyUnread"
-        @click="markAllAsRead()"
         class="flex w-full items-center gap-3 rounded-r-1 px-2 py-1.5 text-left text-xs text-text-3 transition-standard hover:bg-bg-surface-1 hover:text-text-1"
+        @click="markAllAsRead()"
       >
         <Check class="w-4 h-4" />
         <span>Mark all as read</span>
       </button>
       <button
-        @click="showBrowseChannels = true"
         class="flex w-full items-center gap-3 rounded-r-1 px-2 py-1.5 text-left text-xs text-text-3 transition-standard hover:bg-bg-surface-1 hover:text-text-1"
+        @click="showBrowseChannels = true"
       >
         <Compass class="w-4 h-4" />
         <span>Browse channels</span>
       </button>
       <button
         v-if="canCreateChannelsInCurrentTeam"
-        @click="showCreateModal = true"
         class="flex w-full items-center gap-3 rounded-r-1 px-2 py-1.5 text-left text-xs text-text-3 transition-standard hover:bg-bg-surface-1 hover:text-text-1"
+        @click="showCreateModal = true"
       >
         <Plus class="w-4 h-4" />
         <span>Create channel</span>
@@ -780,7 +780,7 @@ async function handleLeaveTeam() {
     <CreateChannelModal :show="showCreateModal" @close="showCreateModal = false" />
     <DirectMessageModal :show="showDirectMessageModal" @close="showDirectMessageModal = false" />
     <TeamSettingsModal
-      :isOpen="showTeamSettings"
+      :is-open="showTeamSettings"
       :team="teamStore.currentTeam"
       @close="showTeamSettings = false"
       @deleted="handleTeamDeleted"
@@ -809,7 +809,7 @@ async function handleLeaveTeam() {
     />
 
     <!-- Move to Category Modal -->
-    <Teleport to="body" v-if="showMoveToModal">
+    <Teleport v-if="showMoveToModal" to="body">
       <div class="fixed inset-0 z-50 flex items-center justify-center">
         <div
           class="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -826,8 +826,8 @@ async function handleLeaveTeam() {
           <button
             v-for="cat in moveToCategories"
             :key="cat.id"
-            @click="handleMoveToCategory(cat)"
             class="w-full px-4 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 hover:text-text-1 transition-standard"
+            @click="handleMoveToCategory(cat)"
           >
             {{ cat.display_name }}
           </button>

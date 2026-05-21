@@ -611,26 +611,26 @@ const canSend = computed(() => {
       <!-- Left group: Text formatting -->
       <div class="flex items-center gap-0.5">
         <button
-          @click="onBold"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Bold (Ctrl+B)"
           aria-label="Bold"
+          @click="onBold"
         >
           <Bold class="w-4 h-4" />
         </button>
         <button
-          @click="onItalic"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Italic (Ctrl+I)"
           aria-label="Italic"
+          @click="onItalic"
         >
           <Italic class="w-4 h-4" />
         </button>
         <button
-          @click="onStrikethrough"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Strikethrough (Ctrl+Shift+X)"
           aria-label="Strikethrough"
+          @click="onStrikethrough"
         >
           <Strikethrough class="w-4 h-4" />
         </button>
@@ -641,26 +641,26 @@ const canSend = computed(() => {
       <!-- Middle group: Structure -->
       <div class="flex items-center gap-0.5">
         <button
-          @click="onHeading"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Heading"
           aria-label="Heading"
+          @click="onHeading"
         >
           <Heading class="w-4 h-4" />
         </button>
         <button
-          @click="onLink"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Link"
           aria-label="Link"
+          @click="onLink"
         >
           <Link class="w-4 h-4" />
         </button>
         <button
-          @click="onInlineCode"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Inline Code"
           aria-label="Inline Code"
+          @click="onInlineCode"
         >
           <Code class="w-4 h-4" />
         </button>
@@ -671,26 +671,26 @@ const canSend = computed(() => {
       <!-- Right group: Lists and quotes -->
       <div class="flex items-center gap-0.5">
         <button
-          @click="onQuote"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Quote"
           aria-label="Quote"
+          @click="onQuote"
         >
           <Quote class="w-4 h-4" />
         </button>
         <button
-          @click="onBulletedList"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Bulleted List (Ctrl+Shift+8)"
           aria-label="Bulleted List"
+          @click="onBulletedList"
         >
           <List class="w-4 h-4" />
         </button>
         <button
-          @click="onNumberedList"
           class="p-1.5 rounded hover:bg-bg-surface-1 text-text-2 hover:text-text-1 transition-standard"
           title="Numbered List (Ctrl+Shift+7)"
           aria-label="Numbered List"
+          @click="onNumberedList"
         >
           <ListOrdered class="w-4 h-4" />
         </button>
@@ -770,9 +770,9 @@ const canSend = computed(() => {
           <span v-else class="text-xs text-success">✓</span>
 
           <button
-            @click="removeAttachment(index)"
             class="p-0.5 hover:bg-danger/10 hover:text-danger rounded transition-standard"
             aria-label="Remove attachment"
+            @click="removeAttachment(index)"
           >
             <X class="w-3.5 h-3.5" />
           </button>
@@ -788,12 +788,12 @@ const canSend = computed(() => {
         :class="fontSizeClass"
         class="w-full bg-transparent border-0 focus:ring-0 resize-none min-h-[60px] max-h-[400px] py-3 px-3 text-text-1 placeholder-text-3"
         rows="1"
+        aria-label="Message composer"
         @input="onInput"
         @keydown="onKeydown"
         @keyup="updateSelection"
         @click="updateSelection"
         @paste="onPaste"
-        aria-label="Message composer"
       ></textarea>
 
       <!-- Controls footer -->
@@ -802,10 +802,10 @@ const canSend = computed(() => {
         <div class="flex items-center gap-1">
           <!-- Attachment -->
           <button
-            @click="fileInputRef?.click()"
             class="p-1.5 rounded hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-standard"
             title="Attach file"
             aria-label="Attach file"
+            @click="fileInputRef?.click()"
           >
             <Paperclip class="w-4 h-4" />
           </button>
@@ -815,10 +815,10 @@ const canSend = computed(() => {
           <div class="relative">
             <button
               ref="emojiButtonRef"
-              @click="showEmojiPicker = !showEmojiPicker"
               class="p-1.5 rounded hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-standard"
               title="Emoji"
               aria-label="Insert emoji"
+              @click="showEmojiPicker = !showEmojiPicker"
             >
               <Smile class="w-4 h-4" />
             </button>
@@ -833,12 +833,12 @@ const canSend = computed(() => {
 
           <!-- Font size toggle -->
           <button
-            @click="
-              fontSize = fontSize === 'normal' ? 'large' : fontSize === 'large' ? 'small' : 'normal'
-            "
             class="p-1.5 rounded hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-standard"
             :title="`Font size: ${fontSize}`"
             aria-label="Toggle font size"
+            @click="
+              fontSize = fontSize === 'normal' ? 'large' : fontSize === 'large' ? 'small' : 'normal'
+            "
           >
             <Type class="w-4 h-4" />
           </button>
@@ -848,11 +848,11 @@ const canSend = computed(() => {
         <div class="flex items-center gap-1">
           <!-- Formatting toggle -->
           <button
-            @click="showFormatting = !showFormatting"
             class="p-1.5 rounded hover:bg-bg-surface-2 transition-standard"
             :class="showFormatting ? 'text-primary bg-primary/10' : 'text-text-3 hover:text-text-1'"
             title="Toggle formatting toolbar"
             aria-label="Toggle formatting toolbar"
+            @click="showFormatting = !showFormatting"
           >
             <Sparkles class="w-4 h-4" />
           </button>
@@ -860,18 +860,18 @@ const canSend = computed(() => {
           <!-- Send button -->
           <div class="relative flex items-center">
             <button
-              @click="onSend"
               :disabled="!canSend"
               class="flex items-center gap-1 rounded-r-1 bg-primary px-3 py-1.5 text-brand-foreground transition-standard hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Send message"
+              @click="onSend"
             >
               <Send class="w-4 h-4" />
               <span class="text-sm font-medium hidden sm:inline">Send</span>
             </button>
             <button
-              @click="showSendOptions = !showSendOptions"
               class="ml-0.5 rounded-r-1 bg-primary p-1.5 text-brand-foreground transition-standard hover:bg-brand-hover"
               aria-label="Send options"
+              @click="showSendOptions = !showSendOptions"
             >
               <ChevronDown class="w-3 h-3" />
             </button>
@@ -882,11 +882,11 @@ const canSend = computed(() => {
               class="absolute bottom-full right-0 mb-1 w-48 bg-bg-surface-1 border border-border-1 rounded-r-2 shadow-xl z-50"
             >
               <button
+                class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 hover:text-text-1 transition-standard"
                 @click="
                   onSend()
                   showSendOptions = false
                 "
-                class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 hover:text-text-1 transition-standard"
               >
                 Send now
               </button>

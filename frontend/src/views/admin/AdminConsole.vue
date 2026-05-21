@@ -100,8 +100,8 @@ const exitAdmin = () => {
       <!-- Footer -->
       <div class="p-3 border-t border-border-1">
         <button
-          @click="exitAdmin"
           class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-bg-surface-2 hover:bg-border-1 rounded-lg text-xs font-medium text-text-2 transition-colors"
+          @click="exitAdmin"
         >
           <ArrowLeft class="w-3.5 h-3.5" />
           Exit Admin Console

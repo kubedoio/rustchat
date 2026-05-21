@@ -123,9 +123,9 @@ const saveSettings = async () => {
         <p class="text-text-3 mt-1">Configure your RustChat instance</p>
       </div>
       <button
-        @click="saveSettings"
         :disabled="saving"
         class="flex items-center px-4 py-2 bg-brand hover:bg-brand/90 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+        @click="saveSettings"
       >
         <Save class="w-5 h-5 mr-2" />
         {{ saving ? 'Saving...' : 'Save Changes' }}
@@ -230,8 +230,8 @@ const saveSettings = async () => {
           </div>
           <button
             type="button"
-            @click="showAdvanced = !showAdvanced"
             class="px-3 py-1.5 text-sm font-medium rounded-md border border-border-2 text-text-2 hover:bg-bg-surface-2"
+            @click="showAdvanced = !showAdvanced"
           >
             {{ showAdvanced ? 'Hide' : 'Show' }} Advanced
           </button>
@@ -365,7 +365,7 @@ const saveSettings = async () => {
               <p class="font-medium text-text-1">Enable Files</p>
               <p class="text-sm text-text-3">Allow file uploads and downloads</p>
             </div>
-            <input type="checkbox" v-model="form.enable_file" class="w-5 h-5 text-brand rounded" />
+            <input v-model="form.enable_file" type="checkbox" class="w-5 h-5 text-brand rounded" />
           </label>
           <label class="flex items-center justify-between p-4 bg-bg-surface-2 rounded-lg">
             <div>
@@ -373,8 +373,8 @@ const saveSettings = async () => {
               <p class="text-sm text-text-3">Allow users to set custom statuses</p>
             </div>
             <input
-              type="checkbox"
               v-model="form.enable_user_statuses"
+              type="checkbox"
               class="w-5 h-5 text-brand rounded"
             />
           </label>
@@ -384,8 +384,8 @@ const saveSettings = async () => {
               <p class="text-sm text-text-3">Allow custom emoji uploads</p>
             </div>
             <input
-              type="checkbox"
               v-model="form.enable_custom_emoji"
+              type="checkbox"
               class="w-5 h-5 text-brand rounded"
             />
           </label>
@@ -395,8 +395,8 @@ const saveSettings = async () => {
               <p class="text-sm text-text-3">Show custom brand text in clients</p>
             </div>
             <input
-              type="checkbox"
               v-model="form.enable_custom_brand"
+              type="checkbox"
               class="w-5 h-5 text-brand rounded"
             />
           </label>
@@ -406,8 +406,8 @@ const saveSettings = async () => {
               <p class="text-sm text-text-3">Allow downloads on mobile clients</p>
             </div>
             <input
-              type="checkbox"
               v-model="form.enable_mobile_file_download"
+              type="checkbox"
               class="w-5 h-5 text-brand rounded"
             />
           </label>
@@ -417,8 +417,8 @@ const saveSettings = async () => {
               <p class="text-sm text-text-3">Allow uploads on mobile clients</p>
             </div>
             <input
-              type="checkbox"
               v-model="form.enable_mobile_file_upload"
+              type="checkbox"
               class="w-5 h-5 text-brand rounded"
             />
           </label>
@@ -428,8 +428,8 @@ const saveSettings = async () => {
               <p class="text-sm text-text-3">Allow clients to download logs</p>
             </div>
             <input
-              type="checkbox"
               v-model="form.allow_download_logs"
+              type="checkbox"
               class="w-5 h-5 text-brand rounded"
             />
           </label>
@@ -439,8 +439,8 @@ const saveSettings = async () => {
               <p class="text-sm text-text-3">Expose diagnostics and telemetry</p>
             </div>
             <input
-              type="checkbox"
               v-model="form.diagnostics_enabled"
+              type="checkbox"
               class="w-5 h-5 text-brand rounded"
             />
           </label>

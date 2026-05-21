@@ -27,7 +27,6 @@ const inputId = computed(() => props.id || `input-${Math.random().toString(36).s
         :id="inputId"
         :type="type || 'text'"
         :value="modelValue"
-        @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
         :placeholder="placeholder"
         :required="required"
         :disabled="disabled"
@@ -38,8 +37,9 @@ const inputId = computed(() => props.id || `input-${Math.random().toString(36).s
             : '',
           disabled ? 'bg-gray-100 cursor-not-allowed' : '',
         ]"
+        @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       />
     </div>
-    <p v-if="error" class="mt-2 text-sm text-red-600" :id="`${inputId}-error`">{{ error }}</p>
+    <p v-if="error" :id="`${inputId}-error`" class="mt-2 text-sm text-red-600">{{ error }}</p>
   </div>
 </template>

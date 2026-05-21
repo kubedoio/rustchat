@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'GitHub runner label to run the jobs on'
+        type: string
+        default: 'ubuntu-latest'
 
 permissions:
   contents: read
@@ -15,7 +21,7 @@ env:
 jobs:
   detect-changes:
     name: Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -54,7 +60,7 @@ jobs:
     name: Backend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 30
 
     services:
@@ -171,7 +177,7 @@ jobs:
     name: Frontend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 20
     defaults:
       run:
@@ -223,7 +229,7 @@ jobs:
     name: Push Proxy Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 25
     defaults:
       run:
@@ -275,7 +281,7 @@ jobs:
     name: Docker Validate
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 20
 
     steps:
@@ -308,7 +314,7 @@ jobs:
     name: Frontend E2E Tests
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 25
     defaults:
       run:
@@ -348,7 +354,7 @@ jobs:
     name: Build Release
     needs: backend-check
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 40
 
     env:
@@ -379,7 +385,7 @@ jobs:
 
   ci-complete:
     name: CI Complete
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     needs: [detect-changes, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
     if: always()
     timeout-minutes: 5

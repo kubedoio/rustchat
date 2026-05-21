@@ -379,7 +379,6 @@ onMounted(() => {
       <!-- Menu Item -->
       <button
         v-else
-        @click="item.action"
         :disabled="item.disabled"
         class="w-full flex items-center px-3 py-2 text-sm text-left transition-standard"
         :class="[
@@ -388,8 +387,9 @@ onMounted(() => {
             : 'text-text-2 hover:bg-bg-surface-2 hover:text-text-1',
           item.disabled && 'opacity-50 cursor-not-allowed',
         ]"
+        @click="item.action"
       >
-        <component v-if="item.icon" :is="item.icon" class="w-4 h-4 mr-3 opacity-70" />
+        <component :is="item.icon" v-if="item.icon" class="w-4 h-4 mr-3 opacity-70" />
         <span class="flex-1">{{ item.label }}</span>
       </button>
     </template>

@@ -64,9 +64,9 @@ onUnmounted(() => {
           <Download class="w-5 h-5" />
         </a>
         <button
-          @click="emit('close')"
           class="p-2 hover:bg-white/10 rounded-full transition-colors"
           title="Close"
+          @click="emit('close')"
         >
           <X class="w-6 h-6" />
         </button>
@@ -78,8 +78,8 @@ onUnmounted(() => {
       <!-- Navigation -->
       <button
         v-if="images.length > 1"
-        @click="prev"
         class="absolute left-4 z-20 p-3 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-all active:scale-95"
+        @click="prev"
       >
         <ChevronLeft class="w-8 h-8" />
       </button>
@@ -103,8 +103,8 @@ onUnmounted(() => {
 
       <button
         v-if="images.length > 1"
-        @click="next"
         class="absolute right-4 z-20 p-3 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-all active:scale-95"
+        @click="next"
       >
         <ChevronRight class="w-8 h-8" />
       </button>
@@ -118,13 +118,13 @@ onUnmounted(() => {
       <button
         v-for="(img, index) in images"
         :key="img.id"
-        @click="currentIndex = index"
         class="h-16 aspect-video rounded overflow-hidden border-2 transition-all flex-shrink-0"
         :class="
           currentIndex === index
             ? 'border-primary scale-105 shadow-lg'
             : 'border-transparent opacity-50 hover:opacity-100'
         "
+        @click="currentIndex = index"
       >
         <img :src="img.thumbnail_url || img.url" class="w-full h-full object-cover" />
       </button>

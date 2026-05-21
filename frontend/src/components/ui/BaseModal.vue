@@ -52,8 +52,8 @@ function close() {
           <h3 class="text-sm font-bold text-text-1">{{ title }}</h3>
           <button
             v-if="!hideClose"
-            @click="close"
             class="p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="close"
           >
             <X class="w-4 h-4 text-text-3" />
           </button>

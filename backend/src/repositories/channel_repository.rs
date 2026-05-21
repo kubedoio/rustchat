@@ -7,6 +7,13 @@ use uuid::Uuid;
 use crate::error::{ApiResult, AppError};
 use crate::models::{Channel, ChannelMember, ChannelType};
 
+fn escape_like_pattern(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+
 /// Row returned from channel list queries that join team data
 #[derive(Debug, sqlx::FromRow)]
 pub struct ChannelWithTeamDataRow {
@@ -806,7 +813,7 @@ impl<'a> ChannelRepository<'a> {
         .bind(channel_id)
         .bind(filter_allow_reference)
         .bind(search_term)
-        .bind(format!("%{}%", search_term))
+        .bind(format!("%{}%", escape_like_pattern(&search_term.to_lowercase())))
         .fetch_all(self.pool)
         .await?;
         Ok(rows)

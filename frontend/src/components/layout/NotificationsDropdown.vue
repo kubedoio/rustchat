@@ -55,8 +55,8 @@ function clearAll() {
       <h3 class="text-sm font-bold text-gray-900">Unread Activity</h3>
       <button
         v-if="unreadChannels.length > 0"
-        @click="clearAll"
         class="text-[11px] font-medium text-indigo-600 hover:underline"
+        @click="clearAll"
       >
         Mark all as read
       </button>
@@ -72,8 +72,8 @@ function clearAll() {
         <div
           v-for="channel in unreadChannels"
           :key="channel.id"
-          @click="goToChannel(channel)"
           class="px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group"
+          @click="goToChannel(channel)"
         >
           <div class="flex items-center justify-between">
             <div class="flex items-center min-w-0 mr-2">

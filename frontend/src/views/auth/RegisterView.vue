@@ -139,7 +139,7 @@ async function handleRegister() {
           >
           to resend.
         </p>
-        <BaseButton @click="router.push('/login')" variant="secondary" block>
+        <BaseButton variant="secondary" block @click="router.push('/login')">
           Go to Login
         </BaseButton>
       </div>
@@ -156,16 +156,16 @@ async function handleRegister() {
 
       <!-- Honeypot field - hidden from humans -->
       <div class="honeypot-field" aria-hidden="true">
-        <input type="text" name="website" v-model="website" tabindex="-1" autocomplete="off" />
+        <input v-model="website" type="text" name="website" tabindex="-1" autocomplete="off" />
       </div>
 
-      <BaseInput id="username" label="Username" v-model="username" required placeholder="jdoe" />
+      <BaseInput id="username" v-model="username" label="Username" required placeholder="jdoe" />
 
       <BaseInput
         id="email"
+        v-model="email"
         type="email"
         label="Email address"
-        v-model="email"
         required
         placeholder="you@example.com"
       />

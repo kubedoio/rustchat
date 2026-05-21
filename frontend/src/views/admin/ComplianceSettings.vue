@@ -78,9 +78,9 @@ const triggerExport = async () => {
           <CheckCircle class="w-4 h-4 mr-1" /> Saved
         </span>
         <button
-          @click="saveSettings"
           :disabled="saving"
           class="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+          @click="saveSettings"
         >
           <Save class="w-5 h-5 mr-2" />
           {{ saving ? 'Saving...' : 'Save Changes' }}
@@ -163,9 +163,9 @@ const triggerExport = async () => {
       </div>
 
       <button
-        @click="triggerExport"
         :disabled="exporting"
         class="px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-gray-700 font-medium transition-colors"
+        @click="triggerExport"
       >
         {{ exporting ? 'Starting Export...' : 'Start Compliance Export' }}
       </button>

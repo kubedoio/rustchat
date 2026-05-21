@@ -65,13 +65,13 @@ function handleCancel() {
         v-for="theme in themeCards"
         :key="theme.id"
         type="button"
-        @click="selectTheme(theme.id)"
         class="relative overflow-hidden rounded-r-2 border p-3 text-left transition-standard"
         :class="
           selectedTheme === theme.id
             ? 'border-brand bg-brand/8 ring-2 ring-brand/20'
             : 'border-border-1 bg-bg-surface-1 hover:border-border-2 hover:bg-bg-surface-2'
         "
+        @click="selectTheme(theme.id)"
       >
         <div class="overflow-hidden rounded-r-1 border border-border-1">
           <div class="flex h-16">
@@ -142,15 +142,15 @@ function handleCancel() {
     <div class="flex items-center justify-end gap-2 pt-2">
       <button
         type="button"
-        @click="handleCancel"
         class="rounded-r-1 px-4 py-2 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-2 hover:text-text-1"
+        @click="handleCancel"
       >
         Cancel
       </button>
       <button
         type="button"
-        @click="handleSave"
         class="rounded-r-1 bg-brand px-4 py-2 text-sm font-medium text-brand-foreground shadow-1 transition-standard hover:bg-brand-hover"
+        @click="handleSave"
       >
         Save
       </button>

@@ -298,7 +298,7 @@ function handleKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <AppShell @rhsJump="handleMessageJump" @openChannelSettings="showChannelSettings = true">
+  <AppShell @rhs-jump="handleMessageJump" @open-channel-settings="showChannelSettings = true">
     <div class="flex h-full relative overflow-hidden">
       <!-- Background - uses theme surface color -->
       <div
@@ -325,9 +325,9 @@ function handleKeydown(e: KeyboardEvent) {
           <ChannelHeader
             :name="currentChannel.display_name || currentChannel.name"
             :topic="currentChannel.purpose || currentChannel.header"
-            :channelType="currentChannel.channel_type"
-            :channelId="currentChannel.id"
-            @openSettings="showChannelSettings = true"
+            :channel-type="currentChannel.channel_type"
+            :channel-id="currentChannel.id"
+            @open-settings="showChannelSettings = true"
           />
 
           <!-- Breadcrumb navigation -->
@@ -338,21 +338,21 @@ function handleKeydown(e: KeyboardEvent) {
           <!-- Messages -->
           <MessageList
             ref="messageListRef"
-            :channelId="currentChannel.id"
+            :channel-id="currentChannel.id"
             @reply="handleMessageReply"
             @delete="handleMessageDelete"
-            @openProfile="handleOpenProfile"
+            @open-profile="handleOpenProfile"
           />
 
           <!-- Typing Indicator -->
-          <TypingIndicator :channelId="currentChannel.id" />
+          <TypingIndicator :channel-id="currentChannel.id" />
 
           <!-- Composer -->
           <MessageComposer
             @send="onSendMessage"
             @typing="onTyping"
-            @stopTyping="onStopTyping"
-            @startAudioCall="onStartAudioCall"
+            @stop-typing="onStopTyping"
+            @start-audio-call="onStartAudioCall"
           />
         </template>
       </div>
@@ -360,7 +360,7 @@ function handleKeydown(e: KeyboardEvent) {
 
     <!-- Channel Settings Modal -->
     <ChannelSettingsModal
-      :isOpen="showChannelSettings"
+      :is-open="showChannelSettings"
       :channel="currentChannel"
       @close="showChannelSettings = false"
       @deleted="handleChannelDeleted"
@@ -382,7 +382,7 @@ function handleKeydown(e: KeyboardEvent) {
     <!-- User Profile Modal -->
     <UserProfileModal
       :show="showUserProfile"
-      :userId="profileUserId || ''"
+      :user-id="profileUserId || ''"
       @close="showUserProfile = false"
     />
   </AppShell>

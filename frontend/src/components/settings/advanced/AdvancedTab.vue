@@ -122,8 +122,8 @@ function cancelEdit() {
             </div>
           </div>
           <input
-            type="checkbox"
             v-model="localSendOnCtrlEnter"
+            type="checkbox"
             class="w-5 h-5 text-primary rounded"
           />
         </label>
@@ -157,8 +157,8 @@ function cancelEdit() {
             <div class="text-xs text-text-3">Show the formatting toolbar in the message input</div>
           </div>
           <input
-            type="checkbox"
             v-model="localEnableFormatting"
+            type="checkbox"
             class="w-5 h-5 text-primary rounded"
           />
         </label>
@@ -194,8 +194,8 @@ function cancelEdit() {
             </div>
           </div>
           <input
-            type="checkbox"
             v-model="localEnableJoinLeave"
+            type="checkbox"
             class="w-5 h-5 text-primary rounded"
           />
         </label>
@@ -231,8 +231,8 @@ function cancelEdit() {
             </div>
           </div>
           <input
-            type="checkbox"
             v-model="localEnablePerformanceDebug"
+            type="checkbox"
             class="w-5 h-5 text-primary rounded"
           />
         </label>
@@ -262,8 +262,8 @@ function cancelEdit() {
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
           <input
-            type="radio"
             v-model="localUnreadScrollPosition"
+            type="radio"
             value="start"
             class="w-4 h-4 text-primary"
           />
@@ -276,8 +276,8 @@ function cancelEdit() {
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
           <input
-            type="radio"
             v-model="localUnreadScrollPosition"
+            type="radio"
             value="last"
             class="w-4 h-4 text-primary"
           />
@@ -290,8 +290,8 @@ function cancelEdit() {
           class="flex items-center gap-3 p-3 border border-border-1 rounded-lg cursor-pointer hover:bg-bg-surface-2"
         >
           <input
-            type="radio"
             v-model="localUnreadScrollPosition"
+            type="radio"
             value="end"
             class="w-4 h-4 text-primary"
           />
@@ -331,7 +331,7 @@ function cancelEdit() {
               Synchronize message drafts across all your devices
             </div>
           </div>
-          <input type="checkbox" v-model="localSyncDrafts" class="w-5 h-5 text-primary rounded" />
+          <input v-model="localSyncDrafts" type="checkbox" class="w-5 h-5 text-primary rounded" />
         </label>
       </div>
     </SettingItemMax>

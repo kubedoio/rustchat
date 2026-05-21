@@ -631,8 +631,8 @@ impl PostRepository {
         let row = sqlx::query_as(
             r#"
             DELETE FROM scheduled_posts
-            WHERE id = $1 AND user_id = $2 AND processed_at = 0
-            RETURNING channel_id, user_id, root_id::text, message, props, file_ids, scheduled_at, create_at, update_at
+            WHERE id = $1 AND user_id = $2 AND state = 'pending'
+            RETURNING channel_id, user_id, COALESCE(root_id::text, ''), message, props, file_ids, (extract(epoch from scheduled_at) * 1000)::bigint, created_at, updated_at
             "#,
         )
         .bind(scheduled_id)
@@ -2036,9 +2036,9 @@ impl PostRepository {
             Self::POST_COLUMNS
         );
         if cursor.is_some() {
-            query.push_str(" AND p.id > $2 ");
+            query.push_str(" AND (p.created_at, p.id) > (SELECT created_at, id FROM posts WHERE id = $2) ");
         }
-        query.push_str("ORDER BY p.created_at ASC LIMIT $3");
+        query.push_str("ORDER BY p.created_at ASC, p.id ASC LIMIT $3");
         let rows = if let Some(cursor_id) = cursor {
             sqlx::query_as(&query)
                 .bind(root_post_id)
@@ -2047,7 +2047,7 @@ impl PostRepository {
                 .fetch_all(&self.db)
                 .await?
         } else {
-            let query_no_cursor = query.replace("AND p.id > $2", "");
+            let query_no_cursor = query.replace("AND (p.created_at, p.id) > (SELECT created_at, id FROM posts WHERE id = $2)", "");
             sqlx::query_as(&query_no_cursor.replace("$3", "$2"))
                 .bind(root_post_id)
                 .bind(limit)

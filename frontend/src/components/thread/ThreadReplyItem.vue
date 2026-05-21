@@ -35,7 +35,7 @@ const hasReactions = computed(() => {
     <!-- User Avatar -->
     <div class="shrink-0 mt-0.5">
       <RcAvatar
-        :userId="reply.user_id"
+        :user-id="reply.user_id"
         :username="reply.username"
         :src="reply.avatar_url"
         size="sm"

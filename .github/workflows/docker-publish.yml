@@ -4,12 +4,24 @@ on:
   push:
     branches: ["main"]
     tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'GitHub runner label to run the job on'
+        type: string
+        default: 'ubuntu-latest'
+      platforms:
+        description: 'Platforms to build for (comma-separated list)'
+        type: string
+        default: 'linux/amd64,linux/arm64'
 
 jobs:
   build-and-push:
     uses: ./.github/workflows/docker-build-push.yml
     with:
       push: true
+      runner: ${{ github.event_name == 'workflow_dispatch' && inputs.runner || 'ubuntu-latest' }}
+      platforms: ${{ github.event_name == 'workflow_dispatch' && inputs.platforms || 'linux/amd64,linux/arm64' }}
       tags: |
         type=semver,pattern={{version}}
         type=semver,pattern={{major}}.{{minor}}

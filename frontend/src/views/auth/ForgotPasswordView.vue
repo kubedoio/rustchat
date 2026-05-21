@@ -114,7 +114,7 @@ async function handleSubmit() {
         >, you will receive a password reset link. Please check your inbox and spam folder.
       </p>
       <div class="space-y-4">
-        <BaseButton @click="router.push('/login')" variant="secondary" block>
+        <BaseButton variant="secondary" block @click="router.push('/login')">
           Back to Login
         </BaseButton>
       </div>
@@ -131,7 +131,7 @@ async function handleSubmit() {
 
       <!-- Honeypot field - hidden from humans -->
       <div class="honeypot-field" aria-hidden="true">
-        <input type="text" name="website" v-model="website" tabindex="-1" autocomplete="off" />
+        <input v-model="website" type="text" name="website" tabindex="-1" autocomplete="off" />
       </div>
 
       <p class="text-sm text-gray-600">
@@ -140,9 +140,9 @@ async function handleSubmit() {
 
       <BaseInput
         id="email"
+        v-model="email"
         type="email"
         label="Email address"
-        v-model="email"
         required
         placeholder="you@example.com"
       />

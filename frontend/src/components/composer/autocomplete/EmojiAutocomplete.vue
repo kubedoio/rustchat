@@ -102,13 +102,13 @@ defineExpose({
     <button
       v-for="(emoji, index) in filteredEmojis"
       :key="emoji.name"
-      @click="emit('select', emoji.name)"
       class="w-full flex items-center px-3 py-2 text-left transition-standard"
       :class="
         index === selectedIndex
           ? 'bg-bg-surface-2 text-text-1'
           : 'text-text-2 hover:bg-bg-surface-2 hover:text-text-1'
       "
+      @click="emit('select', emoji.name)"
     >
       <span class="text-xl mr-3">{{ emoji.char }}</span>
       <span class="text-sm">:{{ emoji.name }}:</span>

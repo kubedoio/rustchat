@@ -75,7 +75,7 @@ function jumpToMessage(message: Message) {
         <Pin class="w-5 h-5 text-gray-500 fill-current" />
         <span class="font-semibold text-gray-900">Pinned Items</span>
       </div>
-      <button @click="$emit('close')" class="p-1 hover:bg-gray-100 rounded transition-colors">
+      <button class="p-1 hover:bg-gray-100 rounded transition-colors" @click="$emit('close')">
         <X class="w-5 h-5 text-gray-400" />
       </button>
     </div>
@@ -115,16 +115,16 @@ function jumpToMessage(message: Message) {
               class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <button
-                @click="handleUnpin(message)"
                 class="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-red-500 transition-colors"
                 title="Unpin"
+                @click="handleUnpin(message)"
               >
                 <Pin class="w-3.5 h-3.5 rotate-45" />
               </button>
               <button
-                @click="jumpToMessage(message)"
                 class="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-blue-500 transition-colors"
                 title="Jump to message"
+                @click="jumpToMessage(message)"
               >
                 <ExternalLink class="w-3.5 h-3.5" />
               </button>

@@ -74,9 +74,9 @@ defineExpose({
     <!-- Load More Button -->
     <div v-if="showLoadMore" class="flex justify-center py-2">
       <button
-        @click="$emit('loadMore')"
         :disabled="isLoading"
         class="px-4 py-2 text-sm text-text-2 hover:text-text-1 bg-bg-surface-2 hover:bg-bg-surface-1 border border-border-1 rounded-lg transition-standard flex items-center gap-2"
+        @click="$emit('loadMore')"
       >
         <Loader2 v-if="isLoading" class="w-4 h-4 animate-spin" />
         <span>Load more replies</span>

@@ -149,15 +149,15 @@ async function removeAvatar() {
         >
           <div class="relative group">
             <RcAvatar
-              :userId="user?.id"
+              :user-id="user?.id"
               :username="user?.username"
               :src="user?.avatar_url"
               :size="120"
               class="shadow-2 ring-4 ring-bg-surface-1"
             />
             <button
-              @click="fileInput?.click()"
               class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100"
+              @click="fileInput?.click()"
             >
               <Camera class="w-8 h-8" />
             </button>
@@ -188,15 +188,15 @@ async function removeAvatar() {
 
           <div class="mt-4 flex items-center space-x-4">
             <button
-              @click="fileInput?.click()"
               class="text-sm font-medium text-brand transition-colors hover:text-brand-hover"
+              @click="fileInput?.click()"
             >
               Change Photo
             </button>
             <button
               v-if="user?.avatar_url"
-              @click="removeAvatar"
               class="flex items-center text-sm font-medium text-danger transition-colors hover:opacity-80"
+              @click="removeAvatar"
             >
               <Trash2 class="mr-1 h-4 w-4" />
               Remove
@@ -321,13 +321,13 @@ async function removeAvatar() {
                     v-for="theme in themes"
                     :key="theme.id"
                     type="button"
-                    @click="setTheme(theme.id)"
                     class="rounded-lg border p-2 text-left transition-all"
                     :class="
                       selectedTheme === theme.id
                         ? 'border-brand bg-brand/5 ring-2 ring-brand/20'
                         : 'border-border-1 bg-bg-surface-1 hover:border-border-2 hover:bg-bg-surface-2'
                     "
+                    @click="setTheme(theme.id)"
                   >
                     <div class="flex items-center gap-1.5">
                       <span
@@ -404,9 +404,9 @@ async function removeAvatar() {
 
           <div class="flex justify-end pt-6">
             <button
-              @click="handleUpdateProfile"
               :disabled="saving"
               class="flex items-center space-x-2 rounded-lg bg-brand px-8 py-2.5 font-bold text-brand-foreground shadow-lg shadow-brand/20 transition-all hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+              @click="handleUpdateProfile"
             >
               <Save v-if="!saving" class="h-5 w-5" />
               <div

@@ -550,14 +550,14 @@ const commonTimezones = [
     >
       <div class="space-y-4">
         <label :class="optionCardClass">
-          <input type="radio" v-model="localTimezoneMode" value="auto" :class="radioClass" />
+          <input v-model="localTimezoneMode" type="radio" value="auto" :class="radioClass" />
           <div class="flex-1">
             <div :class="optionTitleClass">Auto</div>
             <div :class="optionDescriptionClass">Use your browser's timezone</div>
           </div>
         </label>
         <label :class="optionCardClass">
-          <input type="radio" v-model="localTimezoneMode" value="manual" :class="radioClass" />
+          <input v-model="localTimezoneMode" type="radio" value="manual" :class="radioClass" />
           <div class="flex-1">
             <div :class="optionTitleClass">Manual</div>
             <div :class="optionDescriptionClass">Select a specific timezone</div>

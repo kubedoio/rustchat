@@ -111,7 +111,7 @@ function getChannelName(channelId: string): string {
             <kbd class="hidden sm:block px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded"
               >ESC</kbd
             >
-            <button @click="handleClose" class="p-1 hover:bg-gray-100 rounded">
+            <button class="p-1 hover:bg-gray-100 rounded" @click="handleClose">
               <X class="w-5 h-5 text-gray-400" />
             </button>
           </div>
@@ -140,8 +140,8 @@ function getChannelName(channelId: string): string {
             <div
               v-for="post in results.posts"
               :key="post.id"
-              @click="handleResultClick(post.channel_id, post.id)"
               class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+              @click="handleResultClick(post.channel_id, post.id)"
             >
               <div class="flex items-center space-x-2 text-xs text-gray-500 mb-1">
                 <Hash class="w-3 h-3" />
@@ -173,8 +173,8 @@ function getChannelName(channelId: string): string {
                 <button
                   v-for="search in recentSearches"
                   :key="search"
-                  @click="handleRecentClick(search)"
                   class="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                  @click="handleRecentClick(search)"
                 >
                   <Clock class="w-4 h-4 mr-2 text-gray-400" />
                   {{ search }}

@@ -190,8 +190,8 @@ onMounted(fetchPolicies)
         </p>
       </div>
       <button
-        @click="createPolicy"
         class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        @click="createPolicy"
       >
         <Plus class="w-5 h-5 mr-2" />
         New Policy
@@ -214,8 +214,8 @@ onMounted(fetchPolicies)
 
       <select
         v-model="filterScope"
-        @change="fetchPolicies"
         class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+        @change="fetchPolicies"
       >
         <option value="all">All Scopes</option>
         <option value="global">Global</option>
@@ -224,8 +224,8 @@ onMounted(fetchPolicies)
 
       <select
         v-model="filterEnabled"
-        @change="fetchPolicies"
         class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+        @change="fetchPolicies"
       >
         <option value="all">All Status</option>
         <option value="true">Enabled</option>
@@ -233,8 +233,8 @@ onMounted(fetchPolicies)
       </select>
 
       <button
-        @click="fetchPolicies"
         class="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        @click="fetchPolicies"
       >
         <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': loading }" />
         Refresh
@@ -302,21 +302,20 @@ onMounted(fetchPolicies)
 
             <div class="flex items-center space-x-2 ml-4">
               <button
-                @click="openPreview(policy)"
                 class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                 title="Preview impact"
+                @click="openPreview(policy)"
               >
                 <AlertCircle class="w-5 h-5" />
               </button>
               <button
-                @click="viewAudit(policy)"
                 class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 title="View audit log"
+                @click="viewAudit(policy)"
               >
                 <CheckCircle class="w-5 h-5" />
               </button>
               <button
-                @click="togglePolicy(policy)"
                 :class="[
                   'p-2 rounded-lg transition-colors',
                   policy.enabled
@@ -324,20 +323,21 @@ onMounted(fetchPolicies)
                     : 'text-gray-400 hover:text-green-600 hover:bg-green-50',
                 ]"
                 :title="policy.enabled ? 'Disable' : 'Enable'"
+                @click="togglePolicy(policy)"
               >
                 <CheckCircle class="w-5 h-5" :class="{ 'fill-current': policy.enabled }" />
               </button>
               <button
-                @click="editPolicy(policy)"
                 class="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                 title="Edit"
+                @click="editPolicy(policy)"
               >
                 <Edit3 class="w-5 h-5" />
               </button>
               <button
-                @click="deletePolicy(policy)"
                 class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 title="Delete"
+                @click="deletePolicy(policy)"
               >
                 <Trash2 class="w-5 h-5" />
               </button>
@@ -375,8 +375,8 @@ onMounted(fetchPolicies)
             <p class="text-sm text-gray-500 mt-1">Recent policy application events</p>
           </div>
           <button
-            @click="showAudit = false"
             class="p-2 text-gray-500 hover:text-gray-700 rounded-lg"
+            @click="showAudit = false"
           >
             <XCircle class="w-6 h-6" />
           </button>

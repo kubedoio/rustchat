@@ -91,8 +91,8 @@ function handleLogout() {
         >
           <h2 class="text-xl sm:text-2xl font-semibold text-text-1">Settings</h2>
           <button
-            @click="$emit('close')"
             class="flex h-11 w-11 items-center justify-center rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
+            @click="$emit('close')"
           >
             <X class="h-5 w-5" />
           </button>
@@ -117,13 +117,13 @@ function handleLogout() {
               <button
                 v-for="tab in tabs"
                 :key="tab.id"
-                @click="setTab(tab.id)"
                 class="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-r-2 whitespace-nowrap transition-standard"
                 :class="
                   activeTab === tab.id
                     ? 'bg-bg-surface-1 text-brand shadow-sm ring-1 ring-border-1'
                     : 'text-text-2 hover:bg-bg-surface-1 hover:text-text-1'
                 "
+                @click="setTab(tab.id)"
               >
                 <component :is="tab.icon" class="w-4 h-4 shrink-0" />
                 {{ tab.label }}
@@ -142,13 +142,13 @@ function handleLogout() {
               <button
                 v-for="tab in pluginTabs"
                 :key="tab.id"
-                @click="setTab(tab.id)"
                 class="flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-r-2 whitespace-nowrap transition-standard"
                 :class="
                   activeTab === tab.id
                     ? 'bg-bg-surface-1 text-brand shadow-sm ring-1 ring-border-1'
                     : 'text-text-2 hover:bg-bg-surface-1 hover:text-text-1'
                 "
+                @click="setTab(tab.id)"
               >
                 <component :is="tab.icon" class="w-4 h-4 shrink-0" />
                 {{ tab.label }}
@@ -160,20 +160,20 @@ function handleLogout() {
               class="grid grid-cols-2 gap-2 p-3 border-t border-border-1 sm:mt-auto sm:block sm:p-2"
             >
               <button
-                @click="setTab('profile')"
                 class="w-full flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-r-2 transition-standard sm:mb-1"
                 :class="
                   activeTab === 'profile'
                     ? 'bg-bg-surface-1 text-brand shadow-sm ring-1 ring-border-1'
                     : 'text-text-2 hover:bg-bg-surface-1 hover:text-text-1'
                 "
+                @click="setTab('profile')"
               >
                 <User class="w-4 h-4 shrink-0" />
                 Profile
               </button>
               <button
-                @click="handleLogout"
                 class="w-full flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-r-2 transition-standard"
+                @click="handleLogout"
               >
                 <LogOut class="w-4 h-4 shrink-0" />
                 Log out

@@ -199,11 +199,11 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
       <!-- Mobile Menu Button -->
       <button
         v-if="isMobile"
-        @click="ui.toggleLhs()"
         class="flex items-center justify-center w-11 h-11 rounded-r-2 hover:bg-bg-surface-2 text-text-2 transition-standard focus-ring"
         :class="{ 'bg-bg-surface-2 text-brand': ui.isLhsOpen }"
         aria-label="Toggle navigation menu"
         title="Menu"
+        @click="ui.toggleLhs()"
       >
         <Menu class="w-5 h-5" />
       </button>
@@ -236,8 +236,8 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
     <!-- Center: Search (hidden on mobile) -->
     <div class="hidden flex-1 px-4 md:block">
       <button
-        @click="showSearch = true"
         class="group mx-auto flex w-full max-w-md items-center gap-3 rounded-r-3 border border-border-1 bg-bg-surface-2/75 px-3.5 py-2.5 text-left transition-standard hover:border-border-2 hover:bg-bg-surface-1 focus-ring"
+        @click="showSearch = true"
       >
         <Search class="h-4 w-4 shrink-0 text-text-3 group-hover:text-text-2" />
         <span
@@ -258,9 +258,9 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
     >
       <!-- Mobile Search Button -->
       <button
-        @click="showSearch = true"
         class="md:hidden flex items-center justify-center w-11 h-11 rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
         aria-label="Search"
+        @click="showSearch = true"
       >
         <Search class="w-5 h-5" />
       </button>
@@ -276,10 +276,10 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
       <!-- Notifications -->
       <div class="relative">
         <button
-          @click="showNotifications = !showNotifications"
           class="relative flex items-center justify-center w-11 h-11 rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
           :class="{ 'bg-bg-surface-2 text-text-1': showNotifications }"
           aria-label="Notifications"
+          @click="showNotifications = !showNotifications"
         >
           <Bell class="w-5 h-5" />
           <span
@@ -326,12 +326,12 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
       <div class="relative ml-1">
         <button
           data-testid="user-menu-trigger"
-          @click="showUserMenu = !showUserMenu"
           class="relative flex min-h-11 items-center gap-2 rounded-r-2 py-1 pl-1.5 pr-2.5 transition-standard focus-ring hover:bg-bg-surface-1"
           :class="{ 'bg-bg-surface-1': showUserMenu }"
+          @click="showUserMenu = !showUserMenu"
         >
           <RcAvatar
-            :userId="auth.user?.id"
+            :user-id="auth.user?.id"
             :src="auth.user?.avatar_url"
             :username="auth.user?.username"
             size="sm"
@@ -357,8 +357,8 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
           >
             <!-- Custom Status -->
             <button
-              @click="openCustomStatus"
               class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="openCustomStatus"
             >
               <span v-if="auth.user?.status_emoji" class="text-base">{{
                 auth.user.status_emoji
@@ -371,8 +371,8 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
 
             <!-- Presence Options -->
             <button
-              @click="setPresence('online')"
               class="w-full flex items-center justify-between px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="setPresence('online')"
             >
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full bg-success" />
@@ -382,8 +382,8 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
             </button>
 
             <button
-              @click="setPresence('away')"
               class="w-full flex items-center justify-between px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="setPresence('away')"
             >
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full bg-warning" />
@@ -394,8 +394,8 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
 
             <!-- DND with Submenu -->
             <button
-              @click="showDndSubmenu = !showDndSubmenu"
               class="w-full flex items-center justify-between px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="showDndSubmenu = !showDndSubmenu"
             >
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full bg-danger" />
@@ -419,16 +419,16 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
               <button
                 v-for="duration in dndDurations"
                 :key="duration.value"
-                @click="setDndWithDuration(duration.value)"
                 class="w-full text-left pl-11 pr-4 py-1.5 text-sm text-text-3 hover:bg-bg-surface-2 hover:text-text-1 transition-colors"
+                @click="setDndWithDuration(duration.value)"
               >
                 {{ duration.label }}
               </button>
             </div>
 
             <button
-              @click="setPresence('offline')"
               class="w-full flex items-center justify-between px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="setPresence('offline')"
             >
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full border-2 border-text-3" />
@@ -441,8 +441,8 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
 
             <!-- Profile -->
             <button
-              @click="openProfile"
               class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="openProfile"
             >
               <User class="w-4 h-4 text-text-3" />
               <span>Profile</span>
@@ -455,11 +455,11 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
                   auth.user?.role || ''
                 )
               "
+              class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
               @click="
                 router.push('/admin')
                 showUserMenu = false
               "
-              class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
             >
               <Shield class="w-4 h-4 text-text-3" />
               <span>Admin Console</span>
@@ -469,11 +469,11 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
 
             <!-- Log out -->
             <button
+              class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger hover:bg-danger/5 transition-colors"
               @click="
                 auth.logout()
                 showUserMenu = false
               "
-              class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger hover:bg-danger/5 transition-colors"
             >
               <LogOut class="w-4 h-4" />
               <span>Log out</span>

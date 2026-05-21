@@ -17,6 +17,14 @@ on:
         description: 'Job timeout in minutes'
         type: number
         default: 90
+      runner:
+        description: 'GitHub runner label to run the job on'
+        type: string
+        default: 'ubuntu-latest'
+      platforms:
+        description: 'Platforms to build for (comma-separated list)'
+        type: string
+        default: 'linux/amd64,linux/arm64'
 
 env:
   REGISTRY: ghcr.io
@@ -24,7 +32,7 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       contents: read
@@ -52,6 +60,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up QEMU
+        if: ${{ !contains(inputs.runner, 'self-hosted') }}
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
 
       - name: Set up Docker Buildx
@@ -78,7 +87,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: ${{ inputs.push }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ inputs.platforms }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |

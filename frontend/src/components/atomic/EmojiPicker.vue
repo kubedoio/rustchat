@@ -308,9 +308,9 @@ onUnmounted(() => {
         <button
           v-for="cat in categories"
           :key="cat.id"
-          @click="activeCategory = cat.id"
           class="rounded-r-1 p-1.5 text-lg transition-standard hover:bg-bg-surface-2"
           :class="activeCategory === cat.id ? 'bg-bg-surface-2 text-brand' : 'text-text-2'"
+          @click="activeCategory = cat.id"
         >
           {{ cat.name }}
         </button>
@@ -321,8 +321,8 @@ onUnmounted(() => {
         <button
           v-for="emoji in filteredEmojis"
           :key="emoji"
-          @click="selectEmoji(emoji)"
           class="rounded-r-1 p-1.5 text-xl transition-standard hover:bg-bg-surface-2"
+          @click="selectEmoji(emoji)"
         >
           {{ emoji }}
         </button>

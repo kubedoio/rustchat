@@ -109,9 +109,9 @@ const handleLeave = async () => {
       <!-- Mobile Menu Toggle -->
       <button
         v-if="isMobile"
-        @click="toggleSidebar"
         class="flex items-center justify-center w-8 h-8 rounded-r-2 hover:bg-bg-surface-2 text-text-2 transition-standard focus-ring"
         aria-label="Open channels"
+        @click="toggleSidebar"
       >
         <PanelLeft class="w-4 h-4" />
       </button>
@@ -148,7 +148,6 @@ const handleLeave = async () => {
     >
       <!-- Members Button -->
       <button
-        @click="toggleView('members')"
         class="flex items-center justify-center w-11 h-11 rounded-r-2 transition-standard focus-ring"
         :class="{
           'bg-brand text-brand-foreground': uiStore.rhsView === 'members',
@@ -156,6 +155,7 @@ const handleLeave = async () => {
         }"
         title="Members"
         aria-label="Members"
+        @click="toggleView('members')"
       >
         <Users class="w-4 h-4" />
       </button>
@@ -165,37 +165,36 @@ const handleLeave = async () => {
       <!-- Call Buttons -->
       <button
         v-if="hasActiveCall && !isInCurrentCall"
-        @click="joinExistingCall"
         class="flex items-center justify-center w-11 h-11 rounded-r-2 bg-success/10 text-success hover:bg-success/20 transition-standard animate-pulse focus-ring"
         title="Join active call"
         aria-label="Join active call"
+        @click="joinExistingCall"
       >
         <PhoneCall class="w-4 h-4" />
       </button>
 
       <button
         v-else-if="isInCurrentCall"
-        @click="callsStore.isExpanded = true"
         class="flex items-center justify-center w-11 h-11 rounded-r-2 bg-success/10 text-success hover:bg-success/20 transition-standard focus-ring"
         title="Show call"
         aria-label="Show call"
+        @click="callsStore.isExpanded = true"
       >
         <Phone class="w-4 h-4" />
       </button>
 
       <button
         v-else
-        @click="startNativeCall"
         class="flex items-center justify-center w-11 h-11 rounded-r-2 hover:bg-success/10 text-success transition-standard focus-ring"
         title="Start audio call"
         aria-label="Start audio call"
+        @click="startNativeCall"
       >
         <Phone class="w-4 h-4" />
       </button>
 
       <!-- Search Button (hidden on smallest screens) -->
       <button
-        @click="toggleView('search')"
         class="hidden sm:flex items-center justify-center w-11 h-11 rounded-r-2 transition-standard focus-ring"
         :class="{
           'bg-brand text-brand-foreground': uiStore.rhsView === 'search',
@@ -203,13 +202,13 @@ const handleLeave = async () => {
         }"
         title="Search"
         aria-label="Search"
+        @click="toggleView('search')"
       >
         <Search class="w-4 h-4" />
       </button>
 
       <!-- Pinned Items -->
       <button
-        @click="toggleView('pinned')"
         class="flex items-center justify-center w-11 h-11 rounded-r-2 transition-standard focus-ring"
         :class="{
           'bg-brand text-brand-foreground': uiStore.rhsView === 'pinned',
@@ -217,13 +216,13 @@ const handleLeave = async () => {
         }"
         title="Pinned items"
         aria-label="Pinned items"
+        @click="toggleView('pinned')"
       >
         <Pin class="w-4 h-4" />
       </button>
 
       <!-- Saved Items -->
       <button
-        @click="toggleView('saved')"
         class="flex items-center justify-center w-11 h-11 rounded-r-2 transition-standard focus-ring"
         :class="{
           'bg-brand text-brand-foreground': uiStore.rhsView === 'saved',
@@ -231,6 +230,7 @@ const handleLeave = async () => {
         }"
         title="Saved items"
         aria-label="Saved items"
+        @click="toggleView('saved')"
       >
         <Bookmark class="w-4 h-4" />
       </button>
@@ -239,11 +239,11 @@ const handleLeave = async () => {
       <div class="relative">
         <button
           data-testid="channel-header-menu"
-          @click="showMenu = !showMenu"
           class="flex items-center justify-center w-11 h-11 rounded-r-2 hover:bg-bg-surface-2 text-text-2 transition-standard focus-ring"
           :class="{ 'bg-bg-surface-2': showMenu }"
           title="More options"
           aria-label="More options"
+          @click="showMenu = !showMenu"
         >
           <MoreVertical class="w-4 h-4" />
         </button>
@@ -263,11 +263,11 @@ const handleLeave = async () => {
           >
             <button
               data-testid="channel-details-button"
+              class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-text-2 hover:bg-bg-surface-2 transition-standard"
               @click="
                 uiStore.toggleRhs('info')
                 showMenu = false
               "
-              class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-text-2 hover:bg-bg-surface-2 transition-standard"
             >
               <Info class="w-4 h-4" />
               Channel Details
@@ -275,11 +275,11 @@ const handleLeave = async () => {
 
             <!-- Mobile-only search option -->
             <button
+              class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-text-2 hover:bg-bg-surface-2 transition-standard sm:hidden"
               @click="
                 toggleView('search')
                 showMenu = false
               "
-              class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-text-2 hover:bg-bg-surface-2 transition-standard sm:hidden"
             >
               <Search class="w-4 h-4" />
               Search
@@ -288,8 +288,8 @@ const handleLeave = async () => {
             <div class="h-px bg-border-1 my-1" />
 
             <button
-              @click="handleLeave"
               class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-danger hover:bg-danger/5 transition-standard"
+              @click="handleLeave"
             >
               <LogOut class="w-4 h-4" />
               Leave Channel

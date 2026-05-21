@@ -147,7 +147,7 @@ async function handleSubmit() {
       <p class="text-gray-600 mb-6">
         {{ error }}
       </p>
-      <BaseButton @click="router.push('/forgot-password')" block> Request New Link </BaseButton>
+      <BaseButton block @click="router.push('/forgot-password')"> Request New Link </BaseButton>
     </div>
 
     <!-- Success State -->
@@ -171,7 +171,7 @@ async function handleSubmit() {
         Your password has been {{ isSetup ? 'set' : 'reset' }}. You can now sign in with your new
         password.
       </p>
-      <BaseButton @click="router.push('/login')" block> Sign In </BaseButton>
+      <BaseButton block @click="router.push('/login')"> Sign In </BaseButton>
     </div>
 
     <!-- Reset Password Form -->
@@ -191,18 +191,18 @@ async function handleSubmit() {
 
       <BaseInput
         id="password"
+        v-model="password"
         type="password"
         label="New password"
-        v-model="password"
         required
         placeholder="Enter your new password"
       />
 
       <BaseInput
         id="confirm-password"
+        v-model="confirmPassword"
         type="password"
         label="Confirm password"
-        v-model="confirmPassword"
         required
         placeholder="Confirm your new password"
       />

@@ -221,7 +221,7 @@ watch(
       <div class="flex items-start space-x-3">
         <RcAvatar
           v-if="showDirectMessageProfile"
-          :userId="directContactId || undefined"
+          :user-id="directContactId || undefined"
           :username="directContact?.username || directContactMember?.username || directContactName"
           :src="directContact?.avatarUrl || directContactMember?.avatar_url"
           size="lg"
@@ -302,20 +302,20 @@ watch(
     <div class="p-4 border-b border-border-1">
       <div class="grid grid-cols-4 gap-2">
         <button
-          @click="toggleFavorite"
           class="flex flex-col items-center p-3 rounded-xl transition-all"
           :class="isFavorite ? 'bg-amber-100 text-amber-600' : 'hover:bg-surface-2 text-text-2'"
           :title="isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+          @click="toggleFavorite"
         >
           <Star class="w-5 h-5 mb-1" :class="isFavorite && 'fill-current'" />
           <span class="text-[10px] font-medium">{{ isFavorite ? 'Favorited' : 'Favorite' }}</span>
         </button>
 
         <button
-          @click="toggleMute"
           class="flex flex-col items-center p-3 rounded-xl transition-all"
           :class="isMuted ? 'bg-red-100 text-red-600' : 'hover:bg-surface-2 text-text-2'"
           :title="isMuted ? 'Unmute channel' : 'Mute channel'"
+          @click="toggleMute"
         >
           <Bell class="w-5 h-5 mb-1" :class="isMuted && 'fill-current'" />
           <span class="text-[10px] font-medium">{{ isMuted ? 'Muted' : 'Mute' }}</span>
@@ -323,18 +323,18 @@ watch(
 
         <button
           v-if="canManageCurrentChannel"
-          @click="emit('openSettings')"
           class="flex flex-col items-center p-3 rounded-xl hover:bg-surface-2 text-text-2 transition-all"
           title="Edit channel settings"
+          @click="emit('openSettings')"
         >
           <Edit3 class="w-5 h-5 mb-1" />
           <span class="text-[10px] font-medium">Edit</span>
         </button>
 
         <button
-          @click="handleLeave"
           class="flex flex-col items-center p-3 rounded-xl hover:bg-danger/10 text-text-2 hover:text-danger transition-all"
           title="Leave channel"
+          @click="handleLeave"
         >
           <LogOut class="w-5 h-5 mb-1" />
           <span class="text-[10px] font-medium">Leave</span>
@@ -399,9 +399,9 @@ watch(
             {{ channel?.name }}
           </code>
           <button
-            @click="copyChannelLink"
             class="p-2 hover:bg-surface-2 rounded-lg text-text-3 hover:text-text-1 transition-colors"
             title="Copy link"
+            @click="copyChannelLink"
           >
             <Copy class="w-4 h-4" />
           </button>
@@ -425,7 +425,7 @@ watch(
           >Created By</label
         >
         <div class="flex items-center space-x-2">
-          <RcAvatar :userId="channel.creator_id" size="sm" class="w-6 h-6 rounded-md" />
+          <RcAvatar :user-id="channel.creator_id" size="sm" class="w-6 h-6 rounded-md" />
           <span class="text-sm text-text-2">{{ isCreator ? 'You' : 'Unknown' }}</span>
         </div>
       </div>

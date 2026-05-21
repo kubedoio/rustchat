@@ -46,9 +46,9 @@ const saveSettings = async () => {
         <p class="text-gray-500 mt-1">Configure authentication and access policies</p>
       </div>
       <button
-        @click="saveSettings"
         :disabled="saving"
         class="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+        @click="saveSettings"
       >
         {{ saving ? 'Saving...' : 'Save Changes' }}
       </button>
@@ -68,8 +68,8 @@ const saveSettings = async () => {
             <p class="text-sm text-gray-500">Allow users to sign in with email and password</p>
           </div>
           <input
-            type="checkbox"
             v-model="authForm.enable_email_password"
+            type="checkbox"
             class="w-5 h-5 text-indigo-600 rounded"
           />
         </label>
@@ -80,8 +80,8 @@ const saveSettings = async () => {
             <p class="text-sm text-gray-500">Enable login via external identity provider</p>
           </div>
           <input
-            type="checkbox"
             v-model="authForm.enable_sso"
+            type="checkbox"
             class="w-5 h-5 text-indigo-600 rounded"
           />
         </label>
@@ -95,8 +95,8 @@ const saveSettings = async () => {
             <p class="text-sm text-yellow-600">Disable password login, require SSO only</p>
           </div>
           <input
-            type="checkbox"
             v-model="authForm.require_sso"
+            type="checkbox"
             class="w-5 h-5 text-yellow-600 rounded"
           />
         </label>
@@ -136,40 +136,40 @@ const saveSettings = async () => {
       <div class="mt-4 space-y-2">
         <label class="flex items-center">
           <input
-            type="checkbox"
             v-model="authForm.password_require_lowercase"
+            type="checkbox"
             class="w-4 h-4 text-indigo-600 rounded mr-3"
           />
           <span class="text-gray-700">Require lowercase letter</span>
         </label>
         <label class="flex items-center">
           <input
-            type="checkbox"
             v-model="authForm.password_require_uppercase"
+            type="checkbox"
             class="w-4 h-4 text-indigo-600 rounded mr-3"
           />
           <span class="text-gray-700">Require uppercase letter</span>
         </label>
         <label class="flex items-center">
           <input
-            type="checkbox"
             v-model="authForm.password_require_number"
+            type="checkbox"
             class="w-4 h-4 text-indigo-600 rounded mr-3"
           />
           <span class="text-gray-700">Require number</span>
         </label>
         <label class="flex items-center">
           <input
-            type="checkbox"
             v-model="authForm.password_require_symbol"
+            type="checkbox"
             class="w-4 h-4 text-indigo-600 rounded mr-3"
           />
           <span class="text-gray-700">Require symbol</span>
         </label>
         <label class="flex items-center">
           <input
-            type="checkbox"
             v-model="authForm.password_enable_forgot_link"
+            type="checkbox"
             class="w-4 h-4 text-indigo-600 rounded mr-3"
           />
           <span class="text-gray-700">Enable forgot password link</span>
@@ -190,8 +190,8 @@ const saveSettings = async () => {
           <p class="text-sm text-gray-500">Anyone can create an account</p>
         </div>
         <input
-          type="checkbox"
           v-model="authForm.allow_registration"
+          type="checkbox"
           class="w-5 h-5 text-indigo-600 rounded"
         />
       </label>

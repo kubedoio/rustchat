@@ -88,7 +88,7 @@ watch(
   />
 
   <CommandPalette v-if="isActiveTab" />
-  <SettingsModal v-if="isActiveTab" :isOpen="ui.isSettingsOpen" @close="ui.closeSettings()" />
+  <SettingsModal v-if="isActiveTab" :is-open="ui.isSettingsOpen" @close="ui.closeSettings()" />
   <ActiveCall v-if="isActiveTab" />
   <IncomingCallModal v-if="isActiveTab" />
   <TermsAcceptanceModal v-if="showTermsModal" />

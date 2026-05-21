@@ -104,8 +104,8 @@ function handleClose() {
             </p>
           </div>
           <button
-            @click="handleClose"
             class="rounded-r-2 p-1 transition-standard hover:bg-bg-surface-2"
+            @click="handleClose"
           >
             <X class="h-5 w-5 text-text-3" />
           </button>
@@ -151,13 +151,13 @@ function handleClose() {
             <button
               v-for="member in filteredMembers"
               :key="member.user_id"
-              @click="startDM(member)"
               :disabled="loading"
               class="group flex w-full items-center rounded-r-2 border border-transparent px-4 py-3 text-left transition-standard hover:border-border-1 hover:bg-bg-surface-2/70"
+              @click="startDM(member)"
             >
               <!-- Avatar -->
               <RcAvatar
-                :userId="member.user_id"
+                :user-id="member.user_id"
                 :username="member.username"
                 :src="member.avatar_url"
                 size="md"
@@ -193,7 +193,7 @@ function handleClose() {
 
         <!-- Footer -->
         <div class="flex justify-end border-t border-border-1 bg-bg-surface-2/45 px-6 py-4">
-          <BaseButton variant="secondary" @click="handleClose" :disabled="loading">
+          <BaseButton variant="secondary" :disabled="loading" @click="handleClose">
             Cancel
           </BaseButton>
         </div>

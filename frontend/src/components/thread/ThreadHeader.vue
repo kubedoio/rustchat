@@ -48,10 +48,10 @@ const isDeleted = computed(() => !props.parentPost)
       </div>
 
       <button
-        @click="$emit('close')"
         class="p-1.5 hover:bg-bg-surface-1 rounded-lg text-text-3 hover:text-text-1 transition-standard focus-ring"
         aria-label="Close thread"
         title="Close thread"
+        @click="$emit('close')"
       >
         <X class="w-5 h-5" />
       </button>
@@ -74,7 +74,7 @@ const isDeleted = computed(() => !props.parentPost)
       <div class="flex items-start space-x-3">
         <!-- User Avatar -->
         <RcAvatar
-          :userId="parentPost.user_id"
+          :user-id="parentPost.user_id"
           :username="parentPost.username"
           :src="parentPost.avatar_url"
           size="md"

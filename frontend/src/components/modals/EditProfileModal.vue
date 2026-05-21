@@ -109,13 +109,13 @@ function handleClose() {
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 class="text-xl font-bold text-gray-900">Edit Profile</h2>
-          <button @click="handleClose" class="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+          <button class="p-1 hover:bg-gray-100 rounded-lg transition-colors" @click="handleClose">
             <X class="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="handleSubmit" class="p-6 space-y-5">
+        <form class="p-6 space-y-5" @submit.prevent="handleSubmit">
           <!-- Avatar Preview -->
           <div class="flex justify-center">
             <div class="relative">
@@ -225,7 +225,7 @@ function handleClose() {
 
           <!-- Actions -->
           <div class="flex justify-end space-x-3 pt-4">
-            <BaseButton variant="secondary" @click="handleClose" :disabled="loading">
+            <BaseButton variant="secondary" :disabled="loading" @click="handleClose">
               Cancel
             </BaseButton>
             <BaseButton type="submit" :loading="loading"> Save Changes </BaseButton>

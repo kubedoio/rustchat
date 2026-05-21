@@ -198,6 +198,11 @@ async function deleteTerms(terms: TermsOfService) {
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString()
 }
+
+function closeModal() {
+  showCreateModal.value = false
+  showEditModal.value = false
+}
 </script>
 
 <template>
@@ -209,8 +214,8 @@ const formatDate = (date: string) => {
         <p class="text-text-3 text-xs mt-0.5">Manage terms versions and track user acceptances</p>
       </div>
       <button
-        @click="openCreateModal"
         class="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand/90 text-white rounded-lg text-xs font-medium transition-colors"
+        @click="openCreateModal"
       >
         <Plus class="w-3.5 h-3.5" />
         New Terms Version
@@ -250,8 +255,8 @@ const formatDate = (date: string) => {
         <div class="text-2xl font-semibold text-warning">{{ stats.pending_count }}</div>
         <button
           v-if="stats.pending_count > 0"
-          @click="showPendingModal = true"
           class="text-[10px] text-brand hover:underline mt-1"
+          @click="showPendingModal = true"
         >
           View users
         </button>
@@ -292,16 +297,16 @@ const formatDate = (date: string) => {
         </div>
         <div class="flex items-center gap-1">
           <button
-            @click="openPreviewModal(currentTerms)"
             class="p-1.5 text-text-4 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
             title="Preview"
+            @click="openPreviewModal(currentTerms)"
           >
             <Eye class="w-3.5 h-3.5" />
           </button>
           <button
-            @click="openEditModal(currentTerms)"
             class="p-1.5 text-text-4 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
             title="Edit"
+            @click="openEditModal(currentTerms)"
           >
             <Edit2 class="w-3.5 h-3.5" />
           </button>
@@ -353,29 +358,29 @@ const formatDate = (date: string) => {
           <div class="flex items-center gap-1">
             <button
               v-if="!terms.is_active"
-              @click="activateTerms(terms)"
               class="px-2 py-1 text-[10px] text-brand hover:bg-brand/10 rounded transition-colors"
+              @click="activateTerms(terms)"
             >
               Activate
             </button>
             <button
-              @click="openPreviewModal(terms)"
               class="p-1.5 text-text-4 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
               title="Preview"
+              @click="openPreviewModal(terms)"
             >
               <Eye class="w-3.5 h-3.5" />
             </button>
             <button
-              @click="openEditModal(terms)"
               class="p-1.5 text-text-4 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
               title="Edit"
+              @click="openEditModal(terms)"
             >
               <Edit2 class="w-3.5 h-3.5" />
             </button>
             <button
-              @click="deleteTerms(terms)"
               class="p-1.5 text-text-4 hover:text-danger hover:bg-danger/10 rounded-lg transition-colors"
               title="Delete"
+              @click="deleteTerms(terms)"
             >
               <Trash2 class="w-3.5 h-3.5" />
             </button>
@@ -389,13 +394,7 @@ const formatDate = (date: string) => {
       v-if="showCreateModal || showEditModal"
       class="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
-      <div
-        class="fixed inset-0 bg-black/50"
-        @click="
-          showCreateModal = false
-          showEditModal = false
-        "
-      ></div>
+      <div class="fixed inset-0 bg-black/50" @click="closeModal"></div>
       <div
         class="relative bg-bg-surface-1 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
       >
@@ -404,11 +403,8 @@ const formatDate = (date: string) => {
             {{ editingTerms ? 'Edit Terms' : 'Create Terms Version' }}
           </h3>
           <button
-            @click="
-              showCreateModal = false
-              showEditModal = false
-            "
             class="p-1.5 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="closeModal"
           >
             <X class="w-4 h-4 text-text-3" />
           </button>
@@ -471,18 +467,15 @@ const formatDate = (date: string) => {
 
         <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-border-1">
           <button
-            @click="
-              showCreateModal = false
-              showEditModal = false
-            "
             class="px-3 py-2 rounded-lg border border-border-1 text-text-2 text-xs font-medium hover:bg-bg-surface-2 transition-colors"
+            @click="closeModal"
           >
             Cancel
           </button>
           <button
-            @click="editingTerms ? updateTerms() : createTerms()"
             :disabled="!form.version || !form.title || !form.content"
             class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand hover:bg-brand/90 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            @click="editingTerms ? updateTerms() : createTerms()"
           >
             <Save class="w-3.5 h-3.5" />
             {{ editingTerms ? 'Save Changes' : 'Create Version' }}
@@ -506,8 +499,8 @@ const formatDate = (date: string) => {
             <p class="text-[10px] text-text-3">Version {{ editingTerms.version }}</p>
           </div>
           <button
-            @click="showPreviewModal = false"
             class="p-1.5 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="showPreviewModal = false"
           >
             <X class="w-4 h-4 text-text-3" />
           </button>
@@ -538,8 +531,8 @@ const formatDate = (date: string) => {
             </p>
           </div>
           <button
-            @click="showPendingModal = false"
             class="p-1.5 hover:bg-bg-surface-2 rounded-lg transition-colors"
+            @click="showPendingModal = false"
           >
             <X class="w-4 h-4 text-text-3" />
           </button>

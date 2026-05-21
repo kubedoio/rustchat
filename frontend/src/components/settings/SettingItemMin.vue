@@ -18,8 +18,8 @@ const slots = useSlots()
 <template>
   <button
     type="button"
-    @click="$emit('click')"
     class="group flex w-full items-center justify-between rounded-r-1 px-4 py-3 text-left transition-standard hover:bg-bg-surface-2"
+    @click="$emit('click')"
   >
     <div class="flex items-start flex-1 min-w-0">
       <div v-if="slots.icon" class="mr-3 mt-0.5">

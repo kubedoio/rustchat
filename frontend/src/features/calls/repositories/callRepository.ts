@@ -202,7 +202,7 @@ function normalizeCallState(raw: unknown): CallState {
         userId: (s.user_id_raw || s.user_id) as UserId,
         username: String(s.username || ''),
         displayName: s.display_name as string | undefined,
-        isMuted: !Boolean(s.unmuted),
+        isMuted: !s.unmuted,
         isSpeaking: false, // Will be updated by WebSocket events
         isScreenSharing: false, // Will be updated by WebSocket events
         raisedHandAt: Number(s.raised_hand || 0),

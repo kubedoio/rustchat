@@ -46,13 +46,9 @@ export const usePlaybookStore = defineStore('playbookStore', () => {
 
   async function createPlaybook(data: Record<string, unknown>) {
     if (!teamStore.currentTeamId) return
-    try {
-      const response = await playbooksApi.create(teamStore.currentTeamId, data as any)
-      playbooks.value.push(response.data)
-      return response.data
-    } catch (e) {
-      throw e
-    }
+    const response = await playbooksApi.create(teamStore.currentTeamId, data as any)
+    playbooks.value.push(response.data)
+    return response.data
   }
 
   async function updatePlaybook(id: string, data: Record<string, unknown>) {
@@ -65,8 +61,6 @@ export const usePlaybookStore = defineStore('playbookStore', () => {
         playbooks.value[index] = response.data
       }
       return response.data
-    } catch (e) {
-      throw e
     } finally {
       loading.value = false
     }
@@ -84,16 +78,12 @@ export const usePlaybookStore = defineStore('playbookStore', () => {
 
   async function startRun(playbookId: string, name: string) {
     if (!teamStore.currentTeamId) return
-    try {
-      const response = await playbooksApi.startRun(teamStore.currentTeamId, {
-        playbook_id: playbookId,
-        name,
-      })
-      runs.value.unshift(response.data.run)
-      return response.data
-    } catch (e) {
-      throw e
-    }
+    const response = await playbooksApi.startRun(teamStore.currentTeamId, {
+      playbook_id: playbookId,
+      name,
+    })
+    runs.value.unshift(response.data.run)
+    return response.data
   }
 
   // Feature-compatible setters

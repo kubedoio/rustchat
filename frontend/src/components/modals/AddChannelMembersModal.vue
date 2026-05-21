@@ -120,7 +120,7 @@ function handleClose() {
             <h2 class="text-xl font-bold text-gray-900">Add Members</h2>
             <p v-if="channelName" class="text-sm text-gray-500 mt-0.5">To #{{ channelName }}</p>
           </div>
-          <button @click="handleClose" class="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+          <button class="p-1 hover:bg-gray-100 rounded-lg transition-colors" @click="handleClose">
             <X class="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -173,9 +173,9 @@ function handleClose() {
             <button
               v-for="member in filteredMembers"
               :key="member.user_id"
-              @click="addMember(member)"
               :disabled="addingMembers.has(member.user_id)"
               class="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-indigo-50 transition-colors group text-left"
+              @click="addMember(member)"
             >
               <div class="flex items-center">
                 <!-- Avatar -->

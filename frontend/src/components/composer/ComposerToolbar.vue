@@ -70,10 +70,10 @@ onUnmounted(() => {
     <button
       v-for="action in formatActions"
       :key="action.type"
-      @click="$emit('format', action.type)"
       :title="action.title"
       :aria-label="action.label"
       class="flex h-8 w-8 shrink-0 items-center justify-center rounded-r-1 text-text-3 transition-standard hover:bg-bg-surface-1 hover:text-text-1 focus-ring"
+      @click="$emit('format', action.type)"
     >
       <component :is="action.icon" class="w-3.5 h-3.5" />
     </button>
@@ -83,7 +83,6 @@ onUnmounted(() => {
 
     <!-- Preview toggle -->
     <button
-      @click="$emit('togglePreview')"
       :title="showPreview ? 'Hide preview' : 'Show preview'"
       aria-label="Toggle markdown preview"
       class="flex h-8 w-8 shrink-0 items-center justify-center rounded-r-1 transition-standard focus-ring"
@@ -92,16 +91,17 @@ onUnmounted(() => {
           ? 'bg-brand/10 text-brand'
           : 'text-text-3 hover:bg-bg-surface-1 hover:text-text-1'
       "
+      @click="$emit('togglePreview')"
     >
       <component :is="showPreview ? EyeOff : Eye" class="w-3.5 h-3.5" />
     </button>
 
     <button
-      @click="showHelp = !showHelp"
       title="Formatting help"
       aria-label="Formatting help"
       class="flex h-8 w-8 shrink-0 items-center justify-center rounded-r-1 text-text-3 transition-standard hover:bg-bg-surface-1 hover:text-text-1 focus-ring"
       :class="showHelp ? 'bg-bg-surface-1 text-text-1' : ''"
+      @click="showHelp = !showHelp"
     >
       <HelpCircle class="w-3.5 h-3.5" />
     </button>

@@ -101,8 +101,7 @@ function initJitsi() {
     jwt: props.jwt,
   }
 
-  // @ts-ignore
-  api = new window.JitsiMeetExternalAPI(props.domain || 'meet.jit.si', options)
+  api = new (window as any).JitsiMeetExternalAPI(props.domain || 'meet.jit.si', options)
 
   api.addEventListeners({
     videoConferenceJoined: (e: any) => emit('videoConferenceJoined', e),

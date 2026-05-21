@@ -133,7 +133,7 @@ function formatDate(date: string) {
       <!-- Header -->
       <header class="bg-white border-b border-gray-200 px-6 py-4">
         <div class="flex items-center space-x-4 mb-4">
-          <button @click="router.push('/playbooks')" class="p-2 hover:bg-gray-100 rounded-lg">
+          <button class="p-2 hover:bg-gray-100 rounded-lg" @click="router.push('/playbooks')">
             <ArrowLeft class="w-5 h-5 text-gray-500" />
           </button>
           <div>
@@ -174,9 +174,9 @@ function formatDate(date: string) {
               :class="{ 'opacity-75': task.status === 'done' }"
             >
               <button
-                @click="toggleTask(task)"
                 class="mt-1 flex-shrink-0 text-gray-400 hover:text-primary transition-colors"
                 :class="{ 'text-green-500': task.status === 'done' }"
+                @click="toggleTask(task)"
               >
                 <CheckCircle2 v-if="task.status === 'done'" class="w-5 h-5" />
                 <Circle v-else class="w-5 h-5" />
@@ -221,7 +221,7 @@ function formatDate(date: string) {
           </div>
 
           <div class="p-4 border-t border-gray-200 bg-gray-50">
-            <form @submit.prevent="postUpdate" class="flex space-x-2">
+            <form class="flex space-x-2" @submit.prevent="postUpdate">
               <input
                 v-model="newUpdate"
                 placeholder="Post an update..."

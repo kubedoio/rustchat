@@ -106,7 +106,7 @@ watch(() => props.channelId, fetchMembers)
             class="group flex cursor-pointer items-center gap-3 rounded-r-2 border border-transparent p-2 transition-standard hover:border-border-1 hover:bg-bg-surface-2/70"
           >
             <RcAvatar
-              :userId="member.user_id"
+              :user-id="member.user_id"
               :username="member.username"
               :src="member.avatar_url"
               size="sm"

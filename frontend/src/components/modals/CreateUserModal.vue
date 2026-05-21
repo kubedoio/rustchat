@@ -113,13 +113,13 @@ function close() {
             </div>
             <h2 class="text-sm font-semibold text-text-1">Create User</h2>
           </div>
-          <button @click="close" class="p-1.5 hover:bg-bg-surface-2 rounded-lg transition-colors">
+          <button class="p-1.5 hover:bg-bg-surface-2 rounded-lg transition-colors" @click="close">
             <X class="w-4 h-4 text-text-4" />
           </button>
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="submit" class="p-5 space-y-4">
+        <form class="p-5 space-y-4" @submit.prevent="submit">
           <!-- Error -->
           <div
             v-if="error"
@@ -206,8 +206,8 @@ function close() {
               />
               <button
                 type="button"
-                @click="showPassword = !showPassword"
                 class="absolute right-3 top-1/2 -translate-y-1/2 text-text-4 hover:text-text-2 p-1"
+                @click="showPassword = !showPassword"
               >
                 <Eye v-if="!showPassword" class="w-3.5 h-3.5" />
                 <EyeOff v-else class="w-3.5 h-3.5" />
@@ -239,8 +239,8 @@ function close() {
           <div class="flex justify-end gap-2 pt-4">
             <button
               type="button"
-              @click="close"
               class="px-3 py-2 text-text-2 hover:bg-bg-surface-2 rounded-lg text-xs font-medium transition-colors"
+              @click="close"
             >
               Cancel
             </button>
