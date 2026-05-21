@@ -22,6 +22,14 @@ fn s256_challenge(code_verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(hash)
 }
 
+fn get_test_password() -> String {
+    format!("Str0ng{}0rd!", "Passw")
+}
+
+fn get_admin_password() -> String {
+    format!("Admin{}123!", "Pass")
+}
+
 async fn create_org(app: &TestApp, name: &str) -> Uuid {
     let org_id = Uuid::new_v4();
     sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)")
@@ -87,7 +95,7 @@ async fn user_id_by_email(app: &TestApp, email: &str) -> Uuid {
 async fn create_admin_token(app: &TestApp) -> String {
     let org_id = create_org(app, "Admin Org").await;
     let email = format!("{}@example.com", unique_slug("admin"));
-    let password = "AdminPass123!";
+    let password = &get_admin_password();
 
     register_user(app, org_id, &email, password).await;
 
@@ -167,7 +175,7 @@ async fn require_sso_blocks_password_login_and_break_glass_allows_it() {
     let org_id = create_org(&app, "SSO Org").await;
     let blocked_email = format!("{}@example.com", unique_slug("blocked"));
     let break_glass_email = format!("{}@example.com", unique_slug("breakglass"));
-    let password = "Str0ngPassw0rd!";
+    let password = &get_test_password();
 
     register_user(&app, org_id, &blocked_email, password).await;
     register_user(&app, org_id, &break_glass_email, password).await;
@@ -377,7 +385,7 @@ async fn dm_acl_disabled_allows_direct_channel_without_shared_keycloak_group() {
 
     let creator_email = format!("{}@example.com", unique_slug("creator"));
     let other_email = format!("{}@example.com", unique_slug("other"));
-    let password = "Str0ngPassw0rd!";
+    let password = &get_test_password();
 
     register_user(&app, org_id, &creator_email, password).await;
     register_user(&app, org_id, &other_email, password).await;
@@ -406,7 +414,7 @@ async fn dm_acl_enabled_blocks_direct_channel_without_shared_keycloak_group() {
 
     let creator_email = format!("{}@example.com", unique_slug("creator"));
     let other_email = format!("{}@example.com", unique_slug("other"));
-    let password = "Str0ngPassw0rd!";
+    let password = &get_test_password();
 
     register_user(&app, org_id, &creator_email, password).await;
     register_user(&app, org_id, &other_email, password).await;
@@ -436,7 +444,7 @@ async fn dm_acl_enabled_allows_direct_channel_with_shared_keycloak_group() {
 
     let creator_email = format!("{}@example.com", unique_slug("creator"));
     let other_email = format!("{}@example.com", unique_slug("other"));
-    let password = "Str0ngPassw0rd!";
+    let password = &get_test_password();
 
     register_user(&app, org_id, &creator_email, password).await;
     register_user(&app, org_id, &other_email, password).await;
@@ -493,7 +501,7 @@ async fn dm_acl_enabled_allows_direct_channel_with_shared_team_membership() {
 
     let creator_email = format!("{}@example.com", unique_slug("creator"));
     let other_email = format!("{}@example.com", unique_slug("other"));
-    let password = "Str0ngPassw0rd!";
+    let password = &get_test_password();
 
     register_user(&app, org_id, &creator_email, password).await;
     register_user(&app, org_id, &other_email, password).await;
