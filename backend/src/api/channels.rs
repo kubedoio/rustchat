@@ -9,13 +9,13 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
+use crate::api::v4::users::hydrate_dm_display_names_batch;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
     normalize_avatar_url, Channel, ChannelMember, ChannelType, CreateChannel, UpdateChannel,
 };
-use crate::api::v4::users::hydrate_dm_display_names_batch;
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
 use crate::repositories::{AdminRepository, ChannelRepository, UserRepository};
 
@@ -466,8 +466,17 @@ async fn add_member(
     Path(id): Path<Uuid>,
     Json(input): Json<AddMemberRequest>,
 ) -> ApiResult<Json<ChannelMember>> {
+    // Handle "me" as current user
+    let target_user_id = if input.user_id == "me" {
+        auth.user_id
+    } else {
+        input.user_id
+            .parse::<Uuid>()
+            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+    };
+
     // Check permissions
-    if auth.user_id == input.user_id {
+    if auth.user_id == target_user_id {
         // User joining themselves
         let channel: Channel = ChannelRepository::new(&state.db).get_by_id(id).await?;
 
@@ -497,7 +506,7 @@ async fn add_member(
     }
 
     let new_member: ChannelMember = ChannelRepository::new(&state.db)
-        .upsert_member(id, input.user_id, input.role.as_deref().unwrap_or("member"))
+        .upsert_member(id, target_user_id, input.role.as_deref().unwrap_or("member"))
         .await?;
 
     // Announce join in public channels
@@ -505,7 +514,7 @@ async fn add_member(
 
     if channel.channel_type == crate::models::ChannelType::Public {
         let username = UserRepository::new(&state.db)
-            .get_username(input.user_id)
+            .get_username(target_user_id)
             .await?
             .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
@@ -523,7 +532,7 @@ async fn add_member(
 
 #[derive(Debug, Deserialize)]
 pub struct AddMemberRequest {
-    pub user_id: Uuid,
+    pub user_id: String,
     pub role: Option<String>,
 }
 
@@ -531,10 +540,19 @@ pub struct AddMemberRequest {
 async fn remove_member(
     State(state): State<AppState>,
     auth: AuthUser,
-    Path((channel_id, user_id)): Path<(Uuid, Uuid)>,
+    Path((channel_id, user_id)): Path<(Uuid, String)>,
 ) -> ApiResult<Json<serde_json::Value>> {
+    // Handle "me" as current user
+    let target_user_id = if user_id == "me" {
+        auth.user_id
+    } else {
+        user_id
+            .parse::<Uuid>()
+            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+    };
+
     // Check admin membership (or user removing themselves)
-    if auth.user_id != user_id {
+    if auth.user_id != target_user_id {
         let member = ChannelRepository::new(&state.db)
             .require_member(channel_id, auth.user_id)
             .await?;
@@ -547,7 +565,7 @@ async fn remove_member(
     }
 
     ChannelRepository::new(&state.db)
-        .remove_member(channel_id, user_id)
+        .remove_member(channel_id, target_user_id)
         .await?;
 
     Ok(Json(serde_json::json!({"status": "removed"})))

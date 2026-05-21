@@ -6,8 +6,7 @@ use axum::{
 use serde::Deserialize;
 
 use super::{
-    encode_mm_id, mm, parse_mm_or_uuid, status_ok, ApiResult, AppError,
-    AppState, MmAuthUser,
+    encode_mm_id, mm, parse_mm_or_uuid, status_ok, ApiResult, AppError, AppState, MmAuthUser,
 };
 use crate::repositories::{ChannelRepository, PostRepository};
 

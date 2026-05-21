@@ -44,7 +44,10 @@ pub async fn hydrate_dm_display_names_batch(
 
     match repo.get_dm_display_names(&dm_ids, viewer_id).await {
         Ok(names) => {
-            for channel in channels.iter_mut().filter(|c| c.channel_type == ChannelType::Direct) {
+            for channel in channels
+                .iter_mut()
+                .filter(|c| c.channel_type == ChannelType::Direct)
+            {
                 channel.display_name = names.get(&channel.id).cloned();
             }
         }
@@ -141,9 +144,7 @@ pub async fn my_channels(
     };
 
     let repo = ChannelRepository::new(&state.db);
-    let mut channels: Vec<Channel> = repo
-        .list_user_channels(auth.user_id, since)
-        .await?;
+    let mut channels: Vec<Channel> = repo.list_user_channels(auth.user_id, since).await?;
 
     hydrate_dm_display_names_batch(&repo, &mut channels, auth.user_id).await;
 
@@ -158,9 +159,7 @@ pub async fn get_channels_for_user(
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
     let user_id = super::user_sidebar_categories::resolve_user_id(&user_id, &auth)?;
     let repo = ChannelRepository::new(&state.db);
-    let mut channels: Vec<Channel> = repo
-        .list_user_channels(user_id, None)
-        .await?;
+    let mut channels: Vec<Channel> = repo.list_user_channels(user_id, None).await?;
 
     hydrate_dm_display_names_batch(&repo, &mut channels, user_id).await;
 
@@ -183,7 +182,10 @@ pub async fn my_team_channels_not_members(
     let team_id = resolve_team_id(&state, &team_id).await?;
 
     let page = query.page.unwrap_or(0).max(0);
-    let per_page = query.per_page.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE);
+    let per_page = query
+        .per_page
+        .unwrap_or(DEFAULT_PAGE_SIZE)
+        .clamp(1, MAX_PAGE_SIZE);
     let offset = page * per_page;
 
     let channels: Vec<Channel> = ChannelRepository::new(&state.db)

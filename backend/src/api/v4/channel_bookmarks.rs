@@ -111,18 +111,20 @@ async fn create_bookmark(
     let sort_order = body.sort_order.unwrap_or(0);
 
     let bookmark_repo = BookmarkRepository::new(&state.db);
-    let bookmark = bookmark_repo.create(
-        channel_uuid,
-        auth.user_id,
-        &body.r#type,
-        body.display_name.as_deref(),
-        body.link_url.as_deref(),
-        file_uuid,
-        body.emoji.as_deref(),
-        sort_order,
-        body.image_url.as_deref(),
-        now,
-    ).await?;
+    let bookmark = bookmark_repo
+        .create(
+            channel_uuid,
+            auth.user_id,
+            &body.r#type,
+            body.display_name.as_deref(),
+            body.link_url.as_deref(),
+            file_uuid,
+            body.emoji.as_deref(),
+            sort_order,
+            body.image_url.as_deref(),
+            now,
+        )
+        .await?;
 
     // Broadcast event
     broadcast_bookmark_event(&state, "channel_bookmark_created", &bookmark).await;
@@ -144,7 +146,9 @@ async fn update_bookmark(
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark ID".to_string()))?;
 
     let bookmark_repo = BookmarkRepository::new(&state.db);
-    let owner_id = bookmark_repo.get_owner_id(bookmark_uuid, channel_uuid).await?
+    let owner_id = bookmark_repo
+        .get_owner_id(bookmark_uuid, channel_uuid)
+        .await?
         .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     if owner_id != auth.user_id && !auth.has_role("admin") {
@@ -155,16 +159,18 @@ async fn update_bookmark(
 
     let now = Utc::now().timestamp_millis();
 
-    let bookmark = bookmark_repo.update(
-        bookmark_uuid,
-        channel_uuid,
-        body.display_name.as_deref(),
-        body.link_url.as_deref(),
-        body.emoji.as_deref(),
-        body.sort_order,
-        body.image_url.as_deref(),
-        now,
-    ).await?;
+    let bookmark = bookmark_repo
+        .update(
+            bookmark_uuid,
+            channel_uuid,
+            body.display_name.as_deref(),
+            body.link_url.as_deref(),
+            body.emoji.as_deref(),
+            body.sort_order,
+            body.image_url.as_deref(),
+            now,
+        )
+        .await?;
 
     // Broadcast event
     broadcast_bookmark_event(&state, "channel_bookmark_updated", &bookmark).await;
@@ -185,7 +191,9 @@ async fn delete_bookmark(
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark ID".to_string()))?;
 
     let bookmark_repo = BookmarkRepository::new(&state.db);
-    let bookmark = bookmark_repo.get(bookmark_uuid, channel_uuid).await?
+    let bookmark = bookmark_repo
+        .get(bookmark_uuid, channel_uuid)
+        .await?
         .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     if bookmark.owner_id != auth.user_id && !auth.has_role("admin") {
@@ -196,7 +204,9 @@ async fn delete_bookmark(
 
     let now = Utc::now().timestamp_millis();
 
-    bookmark_repo.soft_delete(bookmark_uuid, channel_uuid, now).await?;
+    bookmark_repo
+        .soft_delete(bookmark_uuid, channel_uuid, now)
+        .await?;
 
     // Broadcast event
     broadcast_bookmark_event(&state, "channel_bookmark_deleted", &bookmark).await;
@@ -218,7 +228,9 @@ async fn reorder_bookmark(
         .ok_or_else(|| AppError::BadRequest("Invalid bookmark ID".to_string()))?;
 
     let bookmark_repo = BookmarkRepository::new(&state.db);
-    let bookmark = bookmark_repo.get(bookmark_uuid, channel_uuid).await?
+    let bookmark = bookmark_repo
+        .get(bookmark_uuid, channel_uuid)
+        .await?
         .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     if bookmark.owner_id != auth.user_id && !auth.has_role("admin") {
@@ -229,7 +241,9 @@ async fn reorder_bookmark(
 
     let now = Utc::now().timestamp_millis();
 
-    let bookmark = bookmark_repo.reorder(bookmark_uuid, channel_uuid, body.sort_order, now).await?;
+    let bookmark = bookmark_repo
+        .reorder(bookmark_uuid, channel_uuid, body.sort_order, now)
+        .await?;
 
     // Broadcast event
     broadcast_bookmark_event(&state, "channel_bookmark_sorted", &bookmark).await;

@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    Playbook, PlaybookChecklist, PlaybookFull, PlaybookRun, PlaybookTask, ChecklistWithTasks,
-    RunStatusUpdate, RunTask, RunProgress,
+    ChecklistWithTasks, Playbook, PlaybookChecklist, PlaybookFull, PlaybookRun, PlaybookTask,
+    RunProgress, RunStatusUpdate, RunTask,
 };
 
 /// Repository for playbook-related database operations
@@ -211,7 +211,11 @@ impl<'a> PlaybookRepository<'a> {
     }
 
     /// Get a full playbook with checklists and tasks
-    pub async fn get_playbook_full(&self, id: Uuid, user_id: Uuid) -> ApiResult<Option<PlaybookFull>> {
+    pub async fn get_playbook_full(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> ApiResult<Option<PlaybookFull>> {
         let playbook = match self.get_playbook(id, user_id).await? {
             Some(p) => p,
             None => return Ok(None),
@@ -292,7 +296,10 @@ impl<'a> PlaybookRepository<'a> {
     // ============ Tasks ============
 
     /// List tasks for a checklist
-    pub async fn list_tasks_by_checklist(&self, checklist_id: Uuid) -> ApiResult<Vec<PlaybookTask>> {
+    pub async fn list_tasks_by_checklist(
+        &self,
+        checklist_id: Uuid,
+    ) -> ApiResult<Vec<PlaybookTask>> {
         let tasks = sqlx::query_as::<_, PlaybookTask>(
             "SELECT * FROM playbook_tasks WHERE checklist_id = $1 ORDER BY sort_order",
         )

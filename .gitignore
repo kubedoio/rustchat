@@ -36,6 +36,9 @@ docs/.vitepress/cache/
 .agent.workflows/
 .agent.history/
 .agent.cache/
+.antigravitycli/
+.antigravity/
+antigravity/
 
 previous-analyses/*
 !previous-analyses/_TEMPLATE/

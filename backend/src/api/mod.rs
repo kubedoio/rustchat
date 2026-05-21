@@ -16,8 +16,8 @@ mod admin_users;
 mod auth;
 mod calls;
 mod channels;
-mod files;
 mod file_validation;
+mod files;
 mod health;
 mod integrations;
 mod oauth;
@@ -79,8 +79,8 @@ fn handle_panic(
         .unwrap()
 }
 
-use crate::calls::sfu::{SFUManager, VOICE_EVENT_CHANNEL_CAPACITY};
 use crate::api::v4::calls_plugin::start_voice_event_listener;
+use crate::calls::sfu::{SFUManager, VOICE_EVENT_CHANNEL_CAPACITY};
 use crate::calls::state::{CallStateBackend, CallStateManager};
 use crate::config::Config;
 use crate::middleware::reliability::ServiceCircuitBreakers;

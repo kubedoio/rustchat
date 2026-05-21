@@ -88,7 +88,9 @@ async fn list_users(
     };
 
     let repo = UserRepository::new(&state.db);
-    let users = repo.list_users(org_id, query.q.as_deref(), per_page as i64, offset).await?;
+    let users = repo
+        .list_users(org_id, query.q.as_deref(), per_page as i64, offset)
+        .await?;
 
     Ok(Json(users.into_iter().map(UserResponse::from).collect()))
 }
@@ -133,9 +135,7 @@ async fn get_users_by_ids(
         return Ok(Json(vec![]));
     }
 
-    let users: Vec<User> = UserRepository::new(&state.db)
-        .get_by_ids(&user_ids)
-        .await?;
+    let users: Vec<User> = UserRepository::new(&state.db).get_by_ids(&user_ids).await?;
 
     let can_view = |user: &User| {
         auth.user_id == user.id
@@ -180,7 +180,11 @@ async fn update_user(
 
     let repo = UserRepository::new(&state.db);
 
-    if input.username.is_none() && input.display_name.is_none() && input.avatar_url.is_none() && input.custom_status.is_none() {
+    if input.username.is_none()
+        && input.display_name.is_none()
+        && input.avatar_url.is_none()
+        && input.custom_status.is_none()
+    {
         return Err(AppError::BadRequest("No fields to update".to_string()));
     }
 
@@ -343,7 +347,8 @@ async fn update_my_status(
             )
         };
 
-        repo.update_status_fields(auth.user_id, text, emoji, expires_at, json_status).await?;
+        repo.update_status_fields(auth.user_id, text, emoji, expires_at, json_status)
+            .await?;
         should_broadcast = true;
     }
 

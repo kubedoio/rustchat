@@ -69,9 +69,13 @@ async fn websocket_disconnect_presence_offline() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "WS Disconnect Org").await;
-    let (token, _user_id) =
-        register_and_login(&app, org_id, "ws_disconnect_user", "ws_disconnect_user@example.com")
-            .await;
+    let (token, _user_id) = register_and_login(
+        &app,
+        org_id,
+        "ws_disconnect_user",
+        "ws_disconnect_user@example.com",
+    )
+    .await;
 
     let mut ws = app.connect_ws_v4(&token).await;
     app.wait_for_event(&mut ws, "hello", 5000).await;
@@ -84,14 +88,8 @@ async fn websocket_disconnect_presence_offline() {
         .expect("websocket close frame should be sent");
     drop(ws);
 
-    let offline_status = wait_for_status(
-        &app,
-        &token,
-        "offline",
-        false,
-        Duration::from_secs(8),
-    )
-    .await;
+    let offline_status =
+        wait_for_status(&app, &token, "offline", false, Duration::from_secs(8)).await;
     assert_eq!(offline_status["status"], "offline");
     assert_eq!(offline_status["manual"], false);
 }
@@ -169,11 +167,7 @@ async fn register_and_login(
     (token, user_id)
 }
 
-async fn create_channel_with_members(
-    app: &common::TestApp,
-    org_id: Uuid,
-    users: &[Uuid],
-) -> Uuid {
+async fn create_channel_with_members(app: &common::TestApp, org_id: Uuid, users: &[Uuid]) -> Uuid {
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let team_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();

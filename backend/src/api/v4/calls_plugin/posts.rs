@@ -1,6 +1,6 @@
 use chrono::Utc;
-use uuid::Uuid;
 use tracing::warn;
+use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::mattermost_compat::id::encode_mm_id;

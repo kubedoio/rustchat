@@ -1,8 +1,8 @@
-use axum::{extract::State, Json};
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::auth::policy::permissions;
 use crate::error::{ApiResult, AppError};
+use axum::{extract::State, Json};
 
 pub(crate) async fn plugin_management_enable_not_implemented(
     State(_state): State<AppState>,

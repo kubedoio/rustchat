@@ -345,13 +345,12 @@ async fn handle_mentions(
         if let Some(team_id) = team_id_opt {
             // Batch-resolve usernames to user IDs
             let usernames = mentions.iter().map(|m| m.as_str()).collect::<Vec<_>>();
-            let users: Vec<(Uuid, String)> = sqlx::query_as(
-                "SELECT id, username FROM users WHERE username = ANY($1)"
-            )
-            .bind(&usernames)
-            .fetch_all(&state.db)
-            .await
-            .unwrap_or_default();
+            let users: Vec<(Uuid, String)> =
+                sqlx::query_as("SELECT id, username FROM users WHERE username = ANY($1)")
+                    .bind(&usernames)
+                    .fetch_all(&state.db)
+                    .await
+                    .unwrap_or_default();
 
             let mentioned_user_ids: Vec<Uuid> = users
                 .into_iter()
@@ -523,10 +522,20 @@ pub async fn create_post(
     run_post_automation(state, channel_id, user_id, &response, root_post_id).await;
 
     let _ = ensure_dm_membership(state, channel_id).await;
-    let _ = crate::services::unreads::increment_unreads(state, channel_id, user_id, response.seq).await;
+    let _ =
+        crate::services::unreads::increment_unreads(state, channel_id, user_id, response.seq).await;
 
     let username_for_push = response.username.clone().unwrap_or_default();
-    send_push_notifications(state, channel_id, user_id, response.id, &response, &mentions, username_for_push).await;
+    send_push_notifications(
+        state,
+        channel_id,
+        user_id,
+        response.id,
+        &response,
+        &mentions,
+        username_for_push,
+    )
+    .await;
 
     Ok(response)
 }

@@ -84,6 +84,11 @@ pub async fn enforce_dm_acl_for_users(state: &AppState, user_ids: &[Uuid]) -> Ap
                   AND g.source = $3
                   AND gm1.user_id = $1
                   AND gm2.user_id = $2
+            ) OR EXISTS(
+                SELECT 1
+                FROM team_members tm1
+                JOIN team_members tm2 ON tm1.team_id = tm2.team_id
+                WHERE tm1.user_id = $1 AND tm2.user_id = $2
             )
             "#,
         )
@@ -105,6 +110,12 @@ pub async fn enforce_dm_acl_for_users(state: &AppState, user_ids: &[Uuid]) -> Ap
                   AND gm.user_id = ANY($2)
                 GROUP BY gm.group_id
                 HAVING COUNT(DISTINCT gm.user_id) = $3
+            ) OR EXISTS(
+                SELECT tm.team_id
+                FROM team_members tm
+                WHERE tm.user_id = ANY($2)
+                GROUP BY tm.team_id
+                HAVING COUNT(DISTINCT tm.user_id) = $3
             )
             "#,
         )

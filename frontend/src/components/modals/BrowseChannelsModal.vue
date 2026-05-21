@@ -4,6 +4,7 @@ import { X, Hash, ArrowRight } from 'lucide-vue-next';
 import { useChannelStore } from '@/features/channels/stores/channelStore';
 import { useTeamStore } from '@/features/teams/stores/teamStore';
 import { useToast } from '../../composables/useToast';
+import { normalizeEntityId } from '@/utils/idCompat';
 
 const props = defineProps<{
     open: boolean
@@ -20,12 +21,29 @@ const joining = ref<string | null>(null);
 const activeTeamId = computed(() => teamStore.currentTeamId || teamStore.currentTeam?.id || null);
 
 watch([() => props.open, activeTeamId], ([isOpen, teamId]) => {
-    if (isOpen && teamId) {
-        channelStore.fetchJoinableChannels(teamId);
+    if (isOpen) {
+        // Clear stale channels instantly to prevent flashing channels from other teams
+        channelStore.setJoinableChannels([]);
+        if (teamId) {
+            channelStore.fetchJoinableChannels(teamId);
+        }
     }
 }, { immediate: true });
 
-const availableChannels = computed(() => channelStore.joinableChannels);
+// Filter channels on the client side by the active team ID for bulletproof security
+const availableChannels = computed(() => {
+    const rawActiveId = activeTeamId.value;
+    if (!rawActiveId) return [];
+    
+    // Normalize active team ID to UUID format for robust comparison
+    const normActiveId = normalizeEntityId(rawActiveId);
+    
+    return channelStore.joinableChannels.filter(c => {
+        const rawChannelTeamId = c.teamId || c.team_id;
+        const normChannelTeamId = normalizeEntityId(rawChannelTeamId);
+        return normChannelTeamId === normActiveId;
+    });
+});
 
 async function joinChannel(channelId: string) {
     joining.value = channelId;
@@ -92,7 +110,7 @@ async function joinChannel(channelId: string) {
                             <div class="flex-1 min-w-0">
                                 <p class="flex items-center truncate font-medium text-text-1">
                                     <Hash class="mr-1 h-4 w-4 text-text-3" />
-                                    {{ channel.display_name || channel.name }}
+                                    {{ channel.displayName || channel.display_name || channel.name }}
                                 </p>
                                 <p v-if="channel.purpose" class="mt-0.5 ml-5 truncate text-sm text-text-3">
                                     {{ channel.purpose }}

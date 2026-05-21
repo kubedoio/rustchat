@@ -92,6 +92,10 @@ pub async fn register_ip_rate_limit(
     request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
+    if !state.config.security.rate_limit_enabled {
+        return Ok(next.run(request).await);
+    }
+
     const WINDOW_SECS: u64 = 15 * 60;
     const MAX_REQUESTS: u64 = 5;
 
@@ -120,6 +124,10 @@ pub async fn auth_ip_rate_limit(
     request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
+    if !state.config.security.rate_limit_enabled {
+        return Ok(next.run(request).await);
+    }
+
     const WINDOW_SECS: u64 = 15 * 60;
     const MAX_REQUESTS: u64 = 10;
 
@@ -148,6 +156,10 @@ pub async fn password_reset_ip_rate_limit(
     request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
+    if !state.config.security.rate_limit_enabled {
+        return Ok(next.run(request).await);
+    }
+
     const WINDOW_SECS: u64 = 15 * 60;
     const MAX_REQUESTS: u64 = 3;
 
@@ -159,7 +171,15 @@ pub async fn password_reset_ip_rate_limit(
         }
     };
 
-    if !check_ip_rate_limit(&state.redis, "password_reset", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
+    if !check_ip_rate_limit(
+        &state.redis,
+        "password_reset",
+        &ip,
+        WINDOW_SECS,
+        MAX_REQUESTS,
+    )
+    .await?
+    {
         return Err(AppError::TooManyRequests(
             "Too many password reset attempts. Please try again later.".to_string(),
         ));
@@ -176,6 +196,10 @@ pub async fn websocket_ip_rate_limit(
     request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
+    if !state.config.security.rate_limit_enabled {
+        return Ok(next.run(request).await);
+    }
+
     const WINDOW_SECS: u64 = 60;
     const MAX_REQUESTS: u64 = 20;
 

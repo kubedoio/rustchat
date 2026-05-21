@@ -165,9 +165,7 @@ pub async fn mark_channel_as_unread(
         })?;
 
     // Get the oldest post in the channel to set as unread point
-    let oldest_post_time = post_repo
-        .get_oldest_post_time(channel_id)
-        .await?;
+    let oldest_post_time = post_repo.get_oldest_post_time(channel_id).await?;
 
     // Set last_viewed_at to the oldest post time, or epoch if no posts
     let mark_time = oldest_post_time.unwrap_or(chrono::DateTime::UNIX_EPOCH);

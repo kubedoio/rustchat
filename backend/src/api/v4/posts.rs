@@ -244,7 +244,8 @@ async fn get_post(
         .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?
         .into();
 
-    repo.require_channel_membership(post.channel_id, auth.user_id).await?;
+    repo.require_channel_membership(post.channel_id, auth.user_id)
+        .await?;
 
     posts::normalize_post_avatar_urls(std::slice::from_mut(&mut post));
     let mut mm_post: mm::Post = post.into();
@@ -349,7 +350,8 @@ async fn get_post_files_info(
         .await?
         .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
-    repo.require_channel_membership(post.channel_id, auth.user_id).await?;
+    repo.require_channel_membership(post.channel_id, auth.user_id)
+        .await?;
 
     if post.file_ids.is_empty() {
         return Ok(Json(Vec::new()));
@@ -370,7 +372,8 @@ async fn pin_post(
 
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
     repo.pin_post(post_id).await?;
 
     Ok(status_ok())
@@ -386,7 +389,8 @@ async fn unpin_post(
 
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
     repo.unpin_post(post_id).await?;
 
     Ok(status_ok())
@@ -444,7 +448,8 @@ async fn get_post_thread(
         .ok_or_else(|| AppError::NotFound("Thread not found".to_string()))?;
 
     let repo = PostRepository::new(state.db.clone());
-    repo.require_channel_membership(first_post.channel_id, auth.user_id).await?;
+    repo.require_channel_membership(first_post.channel_id, auth.user_id)
+        .await?;
 
     // Convert to Mattermost-compatible format
     let order: Vec<String> = thread_response
@@ -507,7 +512,8 @@ async fn handle_post_action(
 
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     Ok(status_ok())
 }
@@ -531,7 +537,8 @@ async fn move_post(
 
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
 
     Ok(status_ok())
 }
@@ -545,7 +552,8 @@ async fn restore_post(
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
     Ok(status_ok())
 }
 
@@ -558,7 +566,8 @@ async fn reveal_post(
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
     Ok(status_ok())
 }
 
@@ -571,7 +580,8 @@ async fn burn_post(
         .ok_or_else(|| AppError::BadRequest("Invalid post_id".to_string()))?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
-    repo.require_channel_membership(channel_id, auth.user_id).await?;
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
     Ok(status_ok())
 }
 
@@ -628,13 +638,14 @@ async fn set_post_unread(
 
     let last_read_id = if seq > 0 { seq - 1 } else { 0 };
     let mark_view_at = post_created_at - chrono::Duration::milliseconds(1);
-    let crt_enabled_for_user =
-        repo.is_crt_enabled_for_user(user_id, state.config.unread.collapsed_threads_enabled)
-            .await?;
+    let crt_enabled_for_user = repo
+        .is_crt_enabled_for_user(user_id, state.config.unread.collapsed_threads_enabled)
+        .await?;
     let crt_supported_request = request.collapsed_threads_supported && crt_enabled_for_user;
     let is_reply = root_post_id.is_some();
 
-    repo.upsert_channel_read(user_id, channel_id, last_read_id).await?;
+    repo.upsert_channel_read(user_id, channel_id, last_read_id)
+        .await?;
 
     let username = repo.get_username(user_id).await?;
 
@@ -1272,7 +1283,8 @@ async fn set_post_reminder(
         .ok_or_else(|| AppError::Validation("Invalid target_at".to_string()))?;
 
     let repo = PostRepository::new(state.db.clone());
-    repo.set_post_reminder(auth.user_id, post_id, target_at).await?;
+    repo.set_post_reminder(auth.user_id, post_id, target_at)
+        .await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }

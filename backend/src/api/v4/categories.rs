@@ -104,7 +104,9 @@ async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<Uuid>
     }
 
     let repo = TeamRepository::new(&state.db);
-    let id = repo.get_id_by_name(team_id_str).await?
+    let id = repo
+        .get_id_by_name(team_id_str)
+        .await?
         .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
     Ok(id)
 }
@@ -131,11 +133,16 @@ async fn get_category(
     let cat_repo = CategoryRepository::new(&state.db);
 
     // Fetch the specific category
-    let category = cat_repo.get(category_id, user_id, team_id).await?
+    let category = cat_repo
+        .get(category_id, user_id, team_id)
+        .await?
         .ok_or_else(|| crate::error::AppError::NotFound("Category not found".to_string()))?;
 
     // Get channels for this category
-    let channel_ids = cat_repo.get_channel_ids(category_id).await.unwrap_or_default();
+    let channel_ids = cat_repo
+        .get_channel_ids(category_id)
+        .await
+        .unwrap_or_default();
 
     let channel_ids: Vec<String> = channel_ids
         .into_iter()
@@ -191,14 +198,18 @@ async fn update_category(
     let cat_repo = CategoryRepository::new(&state.db);
 
     // Update the category
-    let category = cat_repo.update_returning(
-        category_id, user_id, team_id,
-        input.display_name.as_deref(),
-        input.sorting.as_deref(),
-        input.muted,
-        input.collapsed,
-        now,
-    ).await?;
+    let category = cat_repo
+        .update_returning(
+            category_id,
+            user_id,
+            team_id,
+            input.display_name.as_deref(),
+            input.sorting.as_deref(),
+            input.muted,
+            input.collapsed,
+            now,
+        )
+        .await?;
 
     // Update channel assignments if provided
     if let Some(new_channel_ids) = &input.channel_ids {
@@ -208,13 +219,18 @@ async fn update_category(
         // Insert new associations
         for (idx, ch_id_str) in new_channel_ids.iter().enumerate() {
             if let Some(ch_id) = parse_mm_or_uuid(ch_id_str) {
-                cat_repo.insert_channel_association(category_id, ch_id, idx as i32).await?;
+                cat_repo
+                    .insert_channel_association(category_id, ch_id, idx as i32)
+                    .await?;
             }
         }
     }
 
     // Get current channel_ids
-    let channel_ids = cat_repo.get_channel_ids(category_id).await.unwrap_or_default();
+    let channel_ids = cat_repo
+        .get_channel_ids(category_id)
+        .await
+        .unwrap_or_default();
 
     let channel_ids: Vec<String> = channel_ids
         .into_iter()
@@ -253,7 +269,9 @@ async fn delete_category(
     let cat_repo = CategoryRepository::new(&state.db);
 
     // First check category exists
-    let category = cat_repo.get(category_id, user_id, team_id).await?
+    let category = cat_repo
+        .get(category_id, user_id, team_id)
+        .await?
         .ok_or_else(|| crate::error::AppError::NotFound("Category not found".to_string()))?;
 
     // Don't allow deleting default categories
@@ -273,7 +291,9 @@ async fn delete_category(
 
     // Move channels to default category if it exists
     if let Some(default_id) = default_category_id {
-        cat_repo.migrate_channels_to_category(category_id, default_id).await?;
+        cat_repo
+            .migrate_channels_to_category(category_id, default_id)
+            .await?;
     } else {
         // If no default category, just delete the channel associations
         cat_repo.delete_channel_associations(category_id).await?;

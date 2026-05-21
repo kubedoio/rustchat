@@ -1,8 +1,8 @@
 use chrono::Utc;
 use serde_json::Value;
 use tokio::sync::mpsc;
-use uuid::Uuid;
 use tracing::{debug, info, warn};
+use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::mattermost_compat::id::encode_mm_id;
@@ -112,7 +112,11 @@ pub(crate) async fn broadcast_raise_hand_event(
     )
     .await;
 }
-pub(crate) async fn broadcast_host_changed_event(state: &AppState, channel_id: Uuid, new_host_id: Uuid) {
+pub(crate) async fn broadcast_host_changed_event(
+    state: &AppState,
+    channel_id: Uuid,
+    new_host_id: Uuid,
+) {
     let encoded_host_id = encode_mm_id(new_host_id);
     let event_payload = serde_json::json!({
         "hostID": encoded_host_id,

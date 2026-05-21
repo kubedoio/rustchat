@@ -306,11 +306,10 @@ impl PostRepository {
 
     /// Get the channel_id for a post
     pub async fn get_post_channel_id(&self, post_id: Uuid) -> ApiResult<Uuid> {
-        let channel_id: Uuid =
-            sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
-                .bind(post_id)
-                .fetch_one(&self.db)
-                .await?;
+        let channel_id: Uuid = sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1")
+            .bind(post_id)
+            .fetch_one(&self.db)
+            .await?;
         Ok(channel_id)
     }
 
@@ -1190,11 +1189,7 @@ impl PostRepository {
     }
 
     /// Mark all threads as read for a user in a team
-    pub async fn mark_all_threads_read(
-        &self,
-        user_id: Uuid,
-        team_id: Uuid,
-    ) -> ApiResult<()> {
+    pub async fn mark_all_threads_read(&self, user_id: Uuid, team_id: Uuid) -> ApiResult<()> {
         sqlx::query(
             r#"
             UPDATE thread_memberships tm SET
@@ -1293,13 +1288,12 @@ impl PostRepository {
         post_id: Uuid,
         thread_id: Uuid,
     ) -> ApiResult<Option<DateTime<Utc>>> {
-        let created_at = sqlx::query_scalar(
-            "SELECT created_at FROM posts WHERE id = $1 AND root_post_id = $2",
-        )
-        .bind(post_id)
-        .bind(thread_id)
-        .fetch_optional(&self.db)
-        .await?;
+        let created_at =
+            sqlx::query_scalar("SELECT created_at FROM posts WHERE id = $1 AND root_post_id = $2")
+                .bind(post_id)
+                .bind(thread_id)
+                .fetch_optional(&self.db)
+                .await?;
         Ok(created_at)
     }
 
@@ -1514,14 +1508,18 @@ impl PostRepository {
         user_id: Uuid,
         channel_id: Uuid,
     ) -> ApiResult<Option<i64>> {
-        let last_read: Option<i64> = sqlx::query_scalar(
+        // last_read_message_id is a nullable BIGINT column, so we must decode
+        // as Option<i64> to avoid "unexpected null" errors when the row exists
+        // but the value is NULL. fetch_optional then gives Option<Option<i64>>,
+        // which we flatten.
+        let last_read: Option<Option<i64>> = sqlx::query_scalar::<_, Option<i64>>(
             "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
         )
         .bind(user_id)
         .bind(channel_id)
         .fetch_optional(&self.db)
         .await?;
-        Ok(last_read)
+        Ok(last_read.flatten())
     }
 
     /// Get first unread seq in a channel (optionally after a specific seq)
@@ -1531,14 +1529,14 @@ impl PostRepository {
         after_seq: Option<i64>,
     ) -> ApiResult<Option<i64>> {
         let seq = match after_seq {
-            Some(lr) => sqlx::query_scalar(
+            Some(lr) => sqlx::query_scalar::<_, Option<i64>>(
                 "SELECT MIN(seq) FROM posts WHERE channel_id = $1 AND seq > $2 AND deleted_at IS NULL",
             )
             .bind(channel_id)
             .bind(lr)
             .fetch_one(&self.db)
             .await?,
-            None => sqlx::query_scalar(
+            None => sqlx::query_scalar::<_, Option<i64>>(
                 "SELECT MIN(seq) FROM posts WHERE channel_id = $1 AND deleted_at IS NULL",
             )
             .bind(channel_id)
@@ -1751,12 +1749,10 @@ impl PostRepository {
         &self,
         post_id: Uuid,
     ) -> Result<Option<Uuid>, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT channel_id FROM posts WHERE id = $1 AND deleted_at IS NULL",
-        )
-        .bind(post_id)
-        .fetch_optional(&self.db)
-        .await
+        sqlx::query_scalar("SELECT channel_id FROM posts WHERE id = $1 AND deleted_at IS NULL")
+            .bind(post_id)
+            .fetch_optional(&self.db)
+            .await
     }
 
     /// Get the last read message sequence for a user in a channel.
@@ -1819,7 +1815,10 @@ impl PostRepository {
         .fetch_all(&self.db)
         .await?;
 
-        Ok(rows.into_iter().map(|r| PostWithUser::from(r).into()).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| PostWithUser::from(r).into())
+            .collect())
     }
 
     /// Acknowledge a post (upsert).

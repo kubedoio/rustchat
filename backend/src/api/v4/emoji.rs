@@ -150,7 +150,10 @@ pub async fn get_emoji_image(
 
     if !image_url.is_empty() {
         // Generate presigned URL for S3
-        let url = state.s3_client.presigned_download_url(&image_url, 3600).await?;
+        let url = state
+            .s3_client
+            .presigned_download_url(&image_url, 3600)
+            .await?;
         return Ok(axum::response::Redirect::temporary(&url).into_response());
     }
 
@@ -281,7 +284,9 @@ pub async fn delete_emoji(
     }
 
     // Soft delete
-    EmojiRepository::new(&state.db).soft_delete(emoji_id).await?;
+    EmojiRepository::new(&state.db)
+        .soft_delete(emoji_id)
+        .await?;
 
     Ok(Json(serde_json::json!({"status": "OK"})))
 }

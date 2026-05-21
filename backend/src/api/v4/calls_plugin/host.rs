@@ -9,10 +9,16 @@ use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 
-use super::broadcast::{broadcast_call_event, broadcast_call_state_event, broadcast_host_changed_event, broadcast_screen_share_event};
+use super::broadcast::{
+    broadcast_call_event, broadcast_call_state_event, broadcast_host_changed_event,
+    broadcast_screen_share_event,
+};
 use super::helpers::resolve_channel_id;
 use super::lifecycle::StatusResponse;
-use super::state_helpers::{can_manage_call, normalize_call_host_if_stale, reconcile_after_participant_left, schedule_empty_call_timeout};
+use super::state_helpers::{
+    can_manage_call, normalize_call_host_if_stale, reconcile_after_participant_left,
+    schedule_empty_call_timeout,
+};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct HostControlRequest {

@@ -55,10 +55,9 @@ async fn can_manage_incoming_hook(
     if auth.has_permission(&permissions::SYSTEM_MANAGE) {
         return Ok(true);
     }
-    let creator_id: Option<Uuid> =
-        IntegrationRepository::new(&state.db)
-            .get_incoming_webhook_creator_id(hook_id)
-            .await?;
+    let creator_id: Option<Uuid> = IntegrationRepository::new(&state.db)
+        .get_incoming_webhook_creator_id(hook_id)
+        .await?;
     Ok(creator_id == Some(auth.user_id))
 }
 
@@ -70,10 +69,9 @@ async fn can_manage_outgoing_hook(
     if auth.has_permission(&permissions::SYSTEM_MANAGE) {
         return Ok(true);
     }
-    let creator_id: Option<Uuid> =
-        IntegrationRepository::new(&state.db)
-            .get_outgoing_webhook_creator_id(hook_id)
-            .await?;
+    let creator_id: Option<Uuid> = IntegrationRepository::new(&state.db)
+        .get_outgoing_webhook_creator_id(hook_id)
+        .await?;
     Ok(creator_id == Some(auth.user_id))
 }
 
@@ -321,7 +319,11 @@ async fn update_incoming_hook(
     }
 
     let hook: IncomingWebhook = IntegrationRepository::new(&state.db)
-        .update_incoming_webhook(id, input.display_name.as_deref(), input.description.as_deref())
+        .update_incoming_webhook(
+            id,
+            input.display_name.as_deref(),
+            input.description.as_deref(),
+        )
         .await
         .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
 

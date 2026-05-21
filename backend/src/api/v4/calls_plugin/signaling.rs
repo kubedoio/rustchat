@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
-use uuid::Uuid;
 use tracing::debug;
+use uuid::Uuid;
 
 use crate::api::AppState;
 use crate::mattermost_compat::id::encode_mm_id;

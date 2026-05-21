@@ -9,13 +9,13 @@
 //! - Call ringing notifications when app is in background
 //! - Message notifications for mentions and direct messages
 
+use hmac::{Hmac, Mac};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
-use hmac::{Hmac, Mac};
-use sha2::{Sha256, Digest};
 
 use crate::api::AppState;
 use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, RetryConfig};
@@ -264,8 +264,9 @@ async fn send_via_push_proxy(
         },
     };
 
-    let body = serde_json::to_vec(&payload)
-        .map_err(|e| PushNotificationError::ProxyError(format!("JSON serialization error: {}", e)))?;
+    let body = serde_json::to_vec(&payload).map_err(|e| {
+        PushNotificationError::ProxyError(format!("JSON serialization error: {}", e))
+    })?;
     let body_hash = hex::encode(sha2::Sha256::digest(&body));
 
     let timestamp = std::time::SystemTime::now()
@@ -284,8 +285,9 @@ async fn send_via_push_proxy(
 
     if let Ok(auth_key) = std::env::var("PUSH_PROXY_AUTH_KEY") {
         if !auth_key.is_empty() {
-            let mut mac = Hmac::<Sha256>::new_from_slice(auth_key.as_bytes())
-                .map_err(|e| PushNotificationError::ProxyError(format!("Invalid push proxy auth key: {}", e)))?;
+            let mut mac = Hmac::<Sha256>::new_from_slice(auth_key.as_bytes()).map_err(|e| {
+                PushNotificationError::ProxyError(format!("Invalid push proxy auth key: {}", e))
+            })?;
             mac.update(sig_input.as_bytes());
             let signature = hex::encode(mac.finalize().into_bytes());
 

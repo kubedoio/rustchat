@@ -635,7 +635,11 @@ async fn handle_client_value_message(
     connection_id: &str,
     value: &serde_json::Value,
 ) {
-    let Some(action) = value.get("action").and_then(|v| v.as_str()) else {
+    let Some(action) = value
+        .get("action")
+        .or_else(|| value.get("event"))
+        .and_then(|v| v.as_str())
+    else {
         return;
     };
 
@@ -1038,8 +1042,6 @@ fn normalize_notify_props_for_snapshot(value: serde_json::Value) -> serde_json::
 
     value
 }
-
-
 
 fn extract_typing_channel_id(value: &serde_json::Value) -> Option<Uuid> {
     value

@@ -3,10 +3,10 @@ use crate::auth::policy::permissions;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use crate::models::channel::ChannelType;
-use crate::repositories::GroupRepository;
 use crate::repositories::group_repository::{
     GroupListRow, GroupRow, GroupSyncableRow, TrackedMembershipRow,
 };
+use crate::repositories::GroupRepository;
 use axum::{
     extract::{Path, State},
     routing::{get, post, put},
@@ -392,13 +392,17 @@ async fn ensure_syncable_exists(
 ) -> ApiResult<()> {
     match kind {
         SyncableKind::Team => {
-            let exists = GroupRepository::new(&state.db).team_exists(syncable_id).await?;
+            let exists = GroupRepository::new(&state.db)
+                .team_exists(syncable_id)
+                .await?;
             if !exists {
                 return Err(AppError::NotFound("Team not found".to_string()));
             }
         }
         SyncableKind::Channel => {
-            let exists = GroupRepository::new(&state.db).channel_exists(syncable_id).await?;
+            let exists = GroupRepository::new(&state.db)
+                .channel_exists(syncable_id)
+                .await?;
             if !exists {
                 return Err(AppError::NotFound("Channel not found".to_string()));
             }
@@ -772,7 +776,11 @@ async fn create_group(
 
     let created = GroupRepository::new(&state.db)
         .create_group_with_members(
-            group.name.as_deref().map(str::trim).filter(|value| !value.is_empty()),
+            group
+                .name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty()),
             display_name,
             group.description.unwrap_or_default(),
             source,

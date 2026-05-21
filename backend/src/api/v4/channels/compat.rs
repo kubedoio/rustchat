@@ -156,18 +156,20 @@ pub(super) async fn create_channel_bookmark(
     let sort_order = max_order.unwrap_or(0) + 1;
     let now = Utc::now();
 
-    let bookmark = repo.create_channel_bookmark(
-        channel_id,
-        auth.user_id,
-        file_id,
-        &req.display_name,
-        sort_order,
-        req.link_url.as_deref(),
-        req.image_url.as_deref(),
-        req.emoji.as_deref(),
-        &req.bookmark_type,
-        now,
-    ).await?;
+    let bookmark = repo
+        .create_channel_bookmark(
+            channel_id,
+            auth.user_id,
+            file_id,
+            &req.display_name,
+            sort_order,
+            req.link_url.as_deref(),
+            req.image_url.as_deref(),
+            req.emoji.as_deref(),
+            &req.bookmark_type,
+            now,
+        )
+        .await?;
 
     Ok(Json(bookmark.into()))
 }
@@ -217,17 +219,19 @@ pub(super) async fn patch_channel_bookmark(
 
     let file_id = req.file_id.as_ref().and_then(|id| parse_mm_or_uuid(id));
 
-    let bookmark = repo.update_channel_bookmark(
-        bookmark_id,
-        channel_id,
-        req.display_name.as_deref(),
-        req.link_url.as_deref(),
-        req.image_url.as_deref(),
-        req.emoji.as_deref(),
-        file_id,
-        req.sort_order,
-    ).await?
-    .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
+    let bookmark = repo
+        .update_channel_bookmark(
+            bookmark_id,
+            channel_id,
+            req.display_name.as_deref(),
+            req.link_url.as_deref(),
+            req.image_url.as_deref(),
+            req.emoji.as_deref(),
+            file_id,
+            req.sort_order,
+        )
+        .await?
+        .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     Ok(Json(UpdateBookmarkResponse {
         updated: bookmark.into(),
@@ -261,7 +265,8 @@ pub(super) async fn update_channel_bookmark_sort_order(
     let new_order: i64 = serde_json::from_slice(&body)
         .map_err(|_| AppError::BadRequest("Invalid sort order".to_string()))?;
 
-    repo.update_bookmark_sort_order(bookmark_id, channel_id, new_order).await?;
+    repo.update_bookmark_sort_order(bookmark_id, channel_id, new_order)
+        .await?;
 
     // Return all bookmarks for this channel
     let bookmarks = repo.list_channel_bookmarks(channel_id, 0).await?;
@@ -291,7 +296,9 @@ pub(super) async fn delete_channel_bookmark(
     }
 
     // Soft delete
-    let bookmark = repo.soft_delete_channel_bookmark(bookmark_id, channel_id).await?
+    let bookmark = repo
+        .soft_delete_channel_bookmark(bookmark_id, channel_id)
+        .await?
         .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
 
     Ok(Json(bookmark.into()))
@@ -379,7 +386,9 @@ pub(super) async fn get_channel_groups(
     let (paginate, offset, per_page) = pagination_from_group_query(&query);
 
     let repo = ChannelRepository::new(&state.db);
-    let rows = repo.list_channel_groups(channel_id, filter_allow_reference, &search_term).await?;
+    let rows = repo
+        .list_channel_groups(channel_id, filter_allow_reference, &search_term)
+        .await?;
 
     let total_group_count = rows.len();
     let paged_rows = if paginate {
@@ -429,7 +438,9 @@ async fn enforce_channel_group_read_permission(
 
     let repo = ChannelRepository::new(&state.db);
 
-    let (team_id, channel_type) = repo.get_channel_type_and_team(channel_id).await?
+    let (team_id, channel_type) = repo
+        .get_channel_type_and_team(channel_id)
+        .await?
         .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
 
     let is_channel_member = repo.is_channel_member(channel_id, auth.user_id).await?;
@@ -475,7 +486,10 @@ fn pagination_from_group_query(query: &GroupAssociationQuery) -> (bool, usize, u
     let _ = query.include_member_count.unwrap_or(false);
     let paginate = query.paginate.unwrap_or(true);
     let page = query.page.unwrap_or(0).max(0) as usize;
-    let per_page = query.per_page.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE) as usize;
+    let per_page = query
+        .per_page
+        .unwrap_or(DEFAULT_PAGE_SIZE)
+        .clamp(1, MAX_PAGE_SIZE) as usize;
     let offset = page.saturating_mul(per_page);
     (paginate, offset, per_page)
 }

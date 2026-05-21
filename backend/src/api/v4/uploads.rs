@@ -367,11 +367,7 @@ async fn upload_data(
             mini_preview: None,
         };
 
-        Ok((
-            StatusCode::CREATED,
-            Json(serde_json::to_value(file_info)?),
-        )
-            .into_response())
+        Ok((StatusCode::CREATED, Json(serde_json::to_value(file_info)?)).into_response())
     } else {
         // Upload incomplete
         Ok(StatusCode::NO_CONTENT.into_response())

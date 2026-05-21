@@ -2,8 +2,8 @@ use crate::error::AppError;
 use crate::models::SsoConfig;
 use crate::services::oidc_discovery::{find_signing_key, OidcDiscoveryService};
 
-use super::{UserInfo, GITHUB_API_URL, GITHUB_TOKEN_URL};
 use super::utils::send_with_retry;
+use super::{UserInfo, GITHUB_API_URL, GITHUB_TOKEN_URL};
 
 /// Token response from OAuth provider
 #[derive(Debug, serde::Deserialize)]

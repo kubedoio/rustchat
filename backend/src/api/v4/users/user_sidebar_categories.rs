@@ -16,7 +16,9 @@ use crate::mattermost_compat::{
     models as mm,
 };
 use crate::models::channel::ChannelType;
-use crate::repositories::{CategoryRepository, CategoryRow, SidebarCandidateChannel, TeamRepository};
+use crate::repositories::{
+    CategoryRepository, CategoryRow, SidebarCandidateChannel, TeamRepository,
+};
 
 #[derive(Deserialize)]
 pub struct CategoriesPath {
@@ -31,7 +33,9 @@ async fn resolve_team_id(state: &AppState, team_id_str: &str) -> ApiResult<Uuid>
     }
 
     let repo = TeamRepository::new(&state.db);
-    let id = repo.get_id_by_name(team_id_str).await?
+    let id = repo
+        .get_id_by_name(team_id_str)
+        .await?
         .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
     Ok(id)
 }
@@ -187,7 +191,9 @@ pub(crate) async fn get_categories_internal(
 
     // Mattermost backfills channels that are not explicitly mapped to any category so the
     // mobile sidebar never renders empty due to stale mappings.
-    let sidebar_channels = cat_repo.get_sidebar_candidate_channels(user_id, team_id).await?;
+    let sidebar_channels = cat_repo
+        .get_sidebar_candidate_channels(user_id, team_id)
+        .await?;
     backfill_orphaned_channels(
         &mut categories,
         &sidebar_channels,
@@ -216,8 +222,6 @@ fn sort_category_rows(rows: &mut [CategoryRow]) {
         });
     }
 }
-
-
 
 fn category_index_by_type_or_name(
     categories: &[mm::SidebarCategory],
@@ -299,7 +303,9 @@ async fn get_default_categories(
     team_id: Uuid,
 ) -> ApiResult<mm::SidebarCategories> {
     let cat_repo = CategoryRepository::new(&state.db);
-    let channels = cat_repo.get_sidebar_candidate_channels(user_id, team_id).await?;
+    let channels = cat_repo
+        .get_sidebar_candidate_channels(user_id, team_id)
+        .await?;
     let now = Utc::now().timestamp_millis();
     let channel_ids = channels
         .into_iter()
@@ -367,9 +373,18 @@ pub(crate) async fn create_category_internal(
     let cat_repo = CategoryRepository::new(&state.db);
     let next_order = cat_repo.get_next_sort_order(user_id, team_id).await?;
 
-    cat_repo.create(
-        id, team_id, user_id, &category_type, &input.display_name, &sorting, next_order, now,
-    ).await?;
+    cat_repo
+        .create(
+            id,
+            team_id,
+            user_id,
+            &category_type,
+            &input.display_name,
+            &sorting,
+            next_order,
+            now,
+        )
+        .await?;
 
     Ok(Json(mm::SidebarCategory {
         id: encode_mm_id(id),
@@ -453,19 +468,32 @@ pub(crate) async fn update_categories_internal(
             ));
         }
 
-        cat_repo.update_fields_in_tx(
-            &mut tx, cat_uuid, user_id, team_id,
-            &cat.display_name, &cat.sorting, cat.muted, cat.collapsed, now,
-        ).await?;
+        cat_repo
+            .update_fields_in_tx(
+                &mut tx,
+                cat_uuid,
+                user_id,
+                team_id,
+                &cat.display_name,
+                &cat.sorting,
+                cat.muted,
+                cat.collapsed,
+                now,
+            )
+            .await?;
 
         // Update channels
-        cat_repo.delete_channel_associations_in_tx(&mut tx, cat_uuid).await?;
+        cat_repo
+            .delete_channel_associations_in_tx(&mut tx, cat_uuid)
+            .await?;
 
         let mut parsed_channel_ids = Vec::new();
         for (i, channel_id_str) in cat.channel_ids.iter().enumerate() {
             let channel_uuid = parse_mm_or_uuid(channel_id_str)
                 .ok_or_else(|| AppError::BadRequest("Invalid channel ID".to_string()))?;
-            cat_repo.insert_channel_association_in_tx(&mut tx, cat_uuid, channel_uuid, i as i32).await?;
+            cat_repo
+                .insert_channel_association_in_tx(&mut tx, cat_uuid, channel_uuid, i as i32)
+                .await?;
             parsed_channel_ids.push(channel_uuid);
         }
 
@@ -507,7 +535,9 @@ pub(crate) async fn update_category_order_internal(
     for (i, cat_id_str) in order.iter().enumerate() {
         let cat_uuid = parse_mm_or_uuid(cat_id_str)
             .unwrap_or_else(|| Uuid::new_v5(&Uuid::NAMESPACE_OID, cat_id_str.as_bytes()));
-        cat_repo.update_sort_order_in_tx(&mut tx, cat_uuid, user_id, team_id, i as i32).await?;
+        cat_repo
+            .update_sort_order_in_tx(&mut tx, cat_uuid, user_id, team_id, i as i32)
+            .await?;
     }
 
     tx.commit().await?;

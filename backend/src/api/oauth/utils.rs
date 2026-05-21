@@ -96,7 +96,12 @@ pub async fn send_with_retry(
         request,
         &retry_config,
         move |e| AppError::ExternalService(format!("{}: {}", external_service_context, e)),
-        move || AppError::Internal(format!("Failed to clone request builder: {}", clone_context)),
+        move || {
+            AppError::Internal(format!(
+                "Failed to clone request builder: {}",
+                clone_context
+            ))
+        },
     )
     .await
 }

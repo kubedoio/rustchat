@@ -99,7 +99,10 @@ async fn list_posts(
     let last_read = repo.get_channel_read(auth.user_id, channel_id).await?;
     let first_unread = repo.get_first_unread_seq(channel_id, last_read).await?;
 
-    let limit = query.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).min(MAX_SEARCH_LIMIT);
+    let limit = query
+        .limit
+        .unwrap_or(DEFAULT_SEARCH_LIMIT)
+        .min(MAX_SEARCH_LIMIT);
 
     // Build SQL query safely without format!() for dynamic parts
     // Use separate condition arrays that we track in parallel with bound values
@@ -117,10 +120,16 @@ async fn list_posts(
     }
 
     if query.before.is_some() {
-        conditions.push(format!(" AND p.created_at < (SELECT created_at FROM posts WHERE id = ${})", arg_index));
+        conditions.push(format!(
+            " AND p.created_at < (SELECT created_at FROM posts WHERE id = ${})",
+            arg_index
+        ));
         arg_index += 1;
     } else if query.after.is_some() {
-        conditions.push(format!(" AND p.created_at > (SELECT created_at FROM posts WHERE id = ${})", arg_index));
+        conditions.push(format!(
+            " AND p.created_at > (SELECT created_at FROM posts WHERE id = ${})",
+            arg_index
+        ));
         arg_index += 1;
     }
 

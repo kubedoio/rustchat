@@ -913,8 +913,7 @@ pub async fn increment_unreads(
     let last_msg_key = format!("rc:channel:{}:last_msg_id", channel_id);
     let _: () = conn.set(last_msg_key, message_seq).await.unwrap_or(());
 
-    let non_author_members: Vec<Uuid> =
-        members.into_iter().filter(|m| *m != author_id).collect();
+    let non_author_members: Vec<Uuid> = members.into_iter().filter(|m| *m != author_id).collect();
 
     if non_author_members.is_empty() {
         return Ok(());
@@ -967,8 +966,7 @@ pub async fn increment_unreads(
         pipe.cmd("GET").arg(&unread_key);
     }
 
-    let counts: Vec<Option<i64>> =
-        pipe.query_async(&mut conn).await.unwrap_or_default();
+    let counts: Vec<Option<i64>> = pipe.query_async(&mut conn).await.unwrap_or_default();
 
     for (mid, count) in non_author_members.iter().zip(counts.iter()) {
         let broadcast = crate::realtime::WsEnvelope::event(

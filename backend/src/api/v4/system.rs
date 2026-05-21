@@ -291,11 +291,8 @@ async fn get_config(
         .map_err(|_| crate::error::AppError::NotFound("Config not found".to_string()))?;
 
     // Fetch default email provider settings
-    let provider_settings: Option<MailProviderSettings> = repo
-        .get_default_mail_provider()
-        .await
-        .ok()
-        .flatten();
+    let provider_settings: Option<MailProviderSettings> =
+        repo.get_default_mail_provider().await.ok().flatten();
     let configured_default_channels = get_configured_default_channels(&state).await?;
 
     // Convert to Mattermost-compatible format
@@ -475,7 +472,8 @@ async fn patch_config(
 
         if let Some(default_channels) = team_settings.get("ExperimentalDefaultChannels") {
             let normalized = normalize_configured_default_channels(default_channels);
-            repo.update_team_default_channels(&serde_json::json!(normalized), auth.user_id).await?;
+            repo.update_team_default_channels(&serde_json::json!(normalized), auth.user_id)
+                .await?;
         }
     }
 
@@ -498,11 +496,13 @@ async fn patch_config(
             .get("EnableIncomingWebhooks")
             .and_then(|v| v.as_bool())
         {
-            repo.update_enable_webhooks(enable_webhooks, auth.user_id).await?;
+            repo.update_enable_webhooks(enable_webhooks, auth.user_id)
+                .await?;
         }
         if let Some(enable_commands) = int_settings.get("EnableCommands").and_then(|v| v.as_bool())
         {
-            repo.update_enable_slash_commands(enable_commands, auth.user_id).await?;
+            repo.update_enable_slash_commands(enable_commands, auth.user_id)
+                .await?;
         }
     }
 
@@ -515,7 +515,8 @@ async fn patch_config(
             .get("MessageRetentionDays")
             .and_then(|v| v.as_i64())
         {
-            repo.update_message_retention_days(days, auth.user_id).await?;
+            repo.update_message_retention_days(days, auth.user_id)
+                .await?;
         }
         if let Some(days) = retention.get("FileRetentionDays").and_then(|v| v.as_i64()) {
             repo.update_file_retention_days(days, auth.user_id).await?;

@@ -108,9 +108,7 @@ pub async fn get_channel(
     let repo = ChannelRepository::new(&state.db);
 
     // Verify membership
-    let _membership = repo
-        .require_member(channel_id, auth.user_id)
-        .await?;
+    let _membership = repo.require_member(channel_id, auth.user_id).await?;
 
     let mut channel: crate::models::Channel = repo.get_by_id(channel_id).await?;
 

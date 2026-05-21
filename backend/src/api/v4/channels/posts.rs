@@ -1,12 +1,12 @@
+use super::{encode_mm_id, mm, parse_mm_or_uuid, ApiResult, AppState, MmAuthUser};
+use crate::models::post::PostResponse;
+use crate::repositories::PostRepository;
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
     Json,
 };
 use serde::Deserialize;
-use super::{encode_mm_id, mm, parse_mm_or_uuid, ApiResult, AppState, MmAuthUser};
-use crate::models::post::PostResponse;
-use crate::repositories::PostRepository;
 use serde_json::json;
 
 #[derive(Deserialize)]
@@ -42,8 +42,9 @@ pub async fn get_posts(
     let mut posts: Vec<PostResponse> =
         if let Some(since) = pagination.since {
             // Incremental sync: get posts created or edited since timestamp
-            let since_time = chrono::DateTime::from_timestamp_millis(since)
-                .ok_or_else(|| crate::error::AppError::BadRequest("Invalid since timestamp".to_string()))?;
+            let since_time = chrono::DateTime::from_timestamp_millis(since).ok_or_else(|| {
+                crate::error::AppError::BadRequest("Invalid since timestamp".to_string())
+            })?;
 
             repo.list_since(channel_id, since_time, per_page)
                 .await?

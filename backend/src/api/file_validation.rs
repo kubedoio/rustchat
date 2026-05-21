@@ -48,16 +48,12 @@ pub fn validate_file_upload(filename: &str, data: &[u8]) -> Result<(String, Stri
                 actual_mime.as_deref().unwrap_or("unknown")
             )))
         }
-        "pdf" if actual_mime.as_deref() != Some("application/pdf") => {
-            Err(AppError::BadRequest(
-                "File content does not match declared PDF extension".to_string(),
-            ))
-        }
-        "zip" if actual_mime.as_deref() != Some("application/zip") => {
-            Err(AppError::BadRequest(
-                "File content does not match declared ZIP extension".to_string(),
-            ))
-        }
+        "pdf" if actual_mime.as_deref() != Some("application/pdf") => Err(AppError::BadRequest(
+            "File content does not match declared PDF extension".to_string(),
+        )),
+        "zip" if actual_mime.as_deref() != Some("application/zip") => Err(AppError::BadRequest(
+            "File content does not match declared ZIP extension".to_string(),
+        )),
         "svg" => {
             validate_svg(data)?;
             Ok(())
@@ -92,9 +88,8 @@ pub fn validate_image_bytes(data: &[u8]) -> Result<String, AppError> {
         )));
     }
 
-    let mime = detect_mime_from_bytes(data).ok_or_else(|| {
-        AppError::BadRequest("Could not determine image format".to_string())
-    })?;
+    let mime = detect_mime_from_bytes(data)
+        .ok_or_else(|| AppError::BadRequest("Could not determine image format".to_string()))?;
 
     match mime.as_str() {
         "image/png" | "image/jpeg" | "image/gif" | "image/webp" => Ok(mime),
@@ -135,9 +130,7 @@ fn detect_mime_from_bytes(data: &[u8]) -> Option<String> {
     }
 
     // GIF
-    if data.len() >= 6
-        && (data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a"))
-    {
+    if data.len() >= 6 && (data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a")) {
         return Some("image/gif".to_string());
     }
 
@@ -208,16 +201,12 @@ pub fn validate_file_upload_head(
                 actual_mime.as_deref().unwrap_or("unknown")
             )))
         }
-        "pdf" if actual_mime.as_deref() != Some("application/pdf") => {
-            Err(AppError::BadRequest(
-                "File content does not match declared PDF extension".to_string(),
-            ))
-        }
-        "zip" if actual_mime.as_deref() != Some("application/zip") => {
-            Err(AppError::BadRequest(
-                "File content does not match declared ZIP extension".to_string(),
-            ))
-        }
+        "pdf" if actual_mime.as_deref() != Some("application/pdf") => Err(AppError::BadRequest(
+            "File content does not match declared PDF extension".to_string(),
+        )),
+        "zip" if actual_mime.as_deref() != Some("application/zip") => Err(AppError::BadRequest(
+            "File content does not match declared ZIP extension".to_string(),
+        )),
         _ => Ok(()),
     }?;
 
@@ -225,9 +214,8 @@ pub fn validate_file_upload_head(
 }
 
 fn validate_svg(data: &[u8]) -> Result<(), AppError> {
-    let text = std::str::from_utf8(data).map_err(|_| {
-        AppError::BadRequest("SVG must be valid UTF-8".to_string())
-    })?;
+    let text = std::str::from_utf8(data)
+        .map_err(|_| AppError::BadRequest("SVG must be valid UTF-8".to_string()))?;
 
     let trimmed = text.trim_start();
     if !trimmed.starts_with("<?xml")

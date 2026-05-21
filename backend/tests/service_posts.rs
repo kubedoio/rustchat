@@ -167,15 +167,13 @@ async fn setup_context() -> TestContext {
     }
 
     let channel_id = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO channels (id, team_id, name, type) VALUES ($1, $2, $3, 'public')",
-    )
-    .bind(channel_id)
-    .bind(team_id)
-    .bind(format!("posts-chan-{}", &channel_id.to_string()[..8]))
-    .execute(&app.db_pool)
-    .await
-    .expect("failed to create channel");
+    sqlx::query("INSERT INTO channels (id, team_id, name, type) VALUES ($1, $2, $3, 'public')")
+        .bind(channel_id)
+        .bind(team_id)
+        .bind(format!("posts-chan-{}", &channel_id.to_string()[..8]))
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to create channel");
 
     for uid in [sender_id, receiver_id] {
         sqlx::query("INSERT INTO channel_members (channel_id, user_id, role, notify_props) VALUES ($1, $2, 'member', '{}')")
@@ -335,14 +333,20 @@ async fn create_post_mentions_triggers_notification() {
     let post_id = post_res["id"].as_str().expect("post should have id");
 
     // Verify post props contain mentions metadata
-    let props = post_res["props"].as_object().expect("props should be object");
+    let props = post_res["props"]
+        .as_object()
+        .expect("props should be object");
     assert!(
         props.contains_key("mentions"),
         "post props should contain mentions key"
     );
-    let mentions = props["mentions"].as_array().expect("mentions should be array");
+    let mentions = props["mentions"]
+        .as_array()
+        .expect("mentions should be array");
     assert!(
-        mentions.iter().any(|m| m.as_str() == Some(&ctx.receiver_username)),
+        mentions
+            .iter()
+            .any(|m| m.as_str() == Some(&ctx.receiver_username)),
         "post mentions should include receiver username"
     );
 
@@ -352,10 +356,7 @@ async fn create_post_mentions_triggers_notification() {
     let activity_res = ctx
         .app
         .api_client
-        .get(format!(
-            "{}/api/v4/users/me/activity",
-            &ctx.app.address
-        ))
+        .get(format!("{}/api/v4/users/me/activity", &ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.receiver_token))
         .send()
         .await
@@ -366,13 +367,17 @@ async fn create_post_mentions_triggers_notification() {
         .await
         .expect("activity feed should be json");
 
-    let order = activity_res["order"].as_array().expect("order should be array");
+    let order = activity_res["order"]
+        .as_array()
+        .expect("order should be array");
     assert!(
         !order.is_empty(),
         "receiver activity feed should contain items after mention"
     );
 
-    let activities = activity_res["activities"].as_array().expect("activities should be array");
+    let activities = activity_res["activities"]
+        .as_array()
+        .expect("activities should be array");
     let mention_activity = activities.iter().find(|a| {
         a["type"] == "mention"
             && a["actor_id"].as_str() == Some(&encode_mm_id(ctx.sender_id))
@@ -386,7 +391,7 @@ async fn create_post_mentions_triggers_notification() {
 
     // Also verify via direct DB query for robustness
     let activity_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM activities WHERE user_id = $1 AND type = 'mention' AND post_id = $2"
+        "SELECT COUNT(*) FROM activities WHERE user_id = $1 AND type = 'mention' AND post_id = $2",
     )
     .bind(ctx.receiver_id)
     .bind(post_uuid)

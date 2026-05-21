@@ -686,7 +686,10 @@ async fn find_member_calls_for_user(
     .map_err(|e| format!("Database error while resolving call membership: {e}"))?;
 
     let allowed: HashSet<Uuid> = rows.into_iter().map(|r| r.0).collect();
-    Ok(calls.into_iter().filter(|c| allowed.contains(&c.channel_id)).collect())
+    Ok(calls
+        .into_iter()
+        .filter(|c| allowed.contains(&c.channel_id))
+        .collect())
 }
 fn resolve_ws_session_uuid(connection_id: &str, data: Option<&Value>) -> Result<Uuid, String> {
     let default_session_id = Uuid::parse_str(connection_id)
