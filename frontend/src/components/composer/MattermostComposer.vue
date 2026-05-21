@@ -1,3 +1,8 @@
+<!--
+  @deprecated This component is an alternative TipTap-based composer that is not currently used
+  in production views. MessageComposer.vue is the canonical composer. Do not use this for new
+  features unless explicitly migrating.
+-->
 <script setup lang="ts">
 import { log } from '@/utils/log';
 import { ref, computed, watch, nextTick, onMounted } from 'vue'

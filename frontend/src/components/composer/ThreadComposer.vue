@@ -1,6 +1,6 @@
 <template>
   <div class="thread-composer">
-    <FormattingToolbar
+    <ComposerToolbar
       v-if="editor"
       :show-preview="false"
       @format="handleFormat"
@@ -24,7 +24,7 @@ import { computed } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import FormattingToolbar from './FormattingToolbar.vue'
+import ComposerToolbar from './ComposerToolbar.vue'
 
 const props = defineProps<{
   modelValue: string
