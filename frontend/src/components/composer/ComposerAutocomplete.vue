@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import MentionAutocomplete from './MentionAutocomplete.vue'
 import EmojiAutocomplete from './autocomplete/EmojiAutocomplete.vue'
 import ChannelAutocomplete from './autocomplete/ChannelAutocomplete.vue'

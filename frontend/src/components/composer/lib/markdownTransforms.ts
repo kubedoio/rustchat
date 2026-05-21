@@ -4,7 +4,6 @@
  * Returns updated text and cursor position for optimal UX
  */
 
-import { log } from '@/utils/log';
 export interface TextSelection {
     text: string
     selectionStart: number
