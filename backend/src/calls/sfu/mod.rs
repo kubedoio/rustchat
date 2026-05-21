@@ -2,7 +2,6 @@
 //!
 //! Routes audio/video tracks between participants in a call.
 //! Each participant sends one stream and receives streams from all other participants.
-#![allow(dead_code)]
 
 use serde::Deserialize;
 use std::collections::HashMap;

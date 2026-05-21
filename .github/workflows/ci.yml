@@ -284,10 +284,10 @@ jobs:
       - name: Create dummy .env for docker compose validation
         run: |
           cat > .env <<'EOF'
-RUSTCHAT_JWT_SECRET=dummy-jwt-secret-min-32-chars-long
+RUSTCHAT_JWT_SECRET=$(openssl rand -hex 32)
 RUSTCHAT_JWT_ISSUER=dummy-issuer
 RUSTCHAT_JWT_AUDIENCE=dummy-audience
-RUSTCHAT_ENCRYPTION_KEY=dummy-encryption-key-32-bytes-long
+RUSTCHAT_ENCRYPTION_KEY=$(openssl rand -hex 32)
 RUSTCHAT_S3_ACCESS_KEY=dummy-s3-access-key
 RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key
 RUSTFS_ACCESS_KEY=dummy-rustfs-access-key
