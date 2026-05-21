@@ -757,7 +757,7 @@ impl PostRepository {
                     WHERE p.deleted_at IS NULL
                       AND p.seq > $2
                       AND (
-                          p.message LIKE '%@' || $3 || '%'
+                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
                           OR p.message LIKE '%@all%'
                           OR p.message LIKE '%@channel%'
                       )
@@ -767,7 +767,7 @@ impl PostRepository {
                       AND p.seq > $2
                       AND p.root_post_id IS NULL
                       AND (
-                          p.message LIKE '%@' || $3 || '%'
+                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
                           OR p.message LIKE '%@all%'
                           OR p.message LIKE '%@channel%'
                       )
@@ -776,7 +776,7 @@ impl PostRepository {
                     WHERE p.deleted_at IS NULL
                       AND p.seq > $2
                       AND (
-                          p.message LIKE '%@' || $3 || '%'
+                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
                           OR p.message LIKE '%@all%'
                           OR p.message LIKE '%@channel%'
                       )
@@ -806,7 +806,7 @@ impl PostRepository {
             r#"
             SELECT
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3)::BIGINT AS unread_replies_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3 AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $2 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count
             FROM posts p
             WHERE p.root_post_id = $1
             "#,
@@ -1377,9 +1377,9 @@ impl PostRepository {
             r#"
             SELECT
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2)::BIGINT AS msg_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count_root,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%') AND p.message LIKE '%@here%')::BIGINT AS urgent_mention_count,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count_root,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%') AND p.message LIKE '%@here%')::BIGINT AS urgent_mention_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL)::BIGINT AS msg_count_root
             FROM posts p
             WHERE p.channel_id = $1
@@ -2026,20 +2026,18 @@ impl PostRepository {
         cursor: Option<Uuid>,
         limit: i64,
     ) -> ApiResult<Vec<crate::models::post::PostResponse>> {
-        let mut query = format!(
-            r#"
-            SELECT {}
-            FROM posts p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
-            "#,
-            Self::POST_COLUMNS
-        );
-        if cursor.is_some() {
-            query.push_str(" AND (p.created_at, p.id) > (SELECT created_at, id FROM posts WHERE id = $2) ");
-        }
-        query.push_str("ORDER BY p.created_at ASC, p.id ASC LIMIT $3");
         let rows = if let Some(cursor_id) = cursor {
+            let query = format!(
+                r#"
+                SELECT {}
+                FROM posts p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
+                  AND (p.created_at, p.id) > (SELECT created_at, id FROM posts WHERE id = $2)
+                ORDER BY p.created_at ASC, p.id ASC LIMIT $3
+                "#,
+                Self::POST_COLUMNS
+            );
             sqlx::query_as(&query)
                 .bind(root_post_id)
                 .bind(cursor_id)
@@ -2047,8 +2045,17 @@ impl PostRepository {
                 .fetch_all(&self.db)
                 .await?
         } else {
-            let query_no_cursor = query.replace("AND (p.created_at, p.id) > (SELECT created_at, id FROM posts WHERE id = $2)", "");
-            sqlx::query_as(&query_no_cursor.replace("$3", "$2"))
+            let query = format!(
+                r#"
+                SELECT {}
+                FROM posts p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
+                ORDER BY p.created_at ASC, p.id ASC LIMIT $2
+                "#,
+                Self::POST_COLUMNS
+            );
+            sqlx::query_as(&query)
                 .bind(root_post_id)
                 .bind(limit)
                 .fetch_all(&self.db)
