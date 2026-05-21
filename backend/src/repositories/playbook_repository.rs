@@ -643,6 +643,17 @@ impl<'a> PlaybookRepository<'a> {
 
         Ok(update)
     }
+
+    /// Get playbooks with keyword triggers for a team
+    pub async fn get_playbooks_with_triggers(&self, team_id: Uuid) -> ApiResult<Vec<Playbook>> {
+        let playbooks = sqlx::query_as::<_, Playbook>(
+            "SELECT * FROM playbooks WHERE team_id = $1 AND is_archived = false AND keyword_triggers IS NOT NULL LIMIT 100",
+        )
+        .bind(team_id)
+        .fetch_all(self.pool)
+        .await?;
+        Ok(playbooks)
+    }
 }
 
 /// Calculate run progress from tasks

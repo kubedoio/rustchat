@@ -1231,4 +1231,60 @@ impl<'a> UserRepository<'a> {
             }
         }
     }
+
+    /// Get username, avatar_url, and email for a user
+    pub async fn get_username_avatar_email(
+        &self,
+        id: Uuid,
+    ) -> Result<(String, Option<String>, String), sqlx::Error> {
+        sqlx::query_as::<_, (String, Option<String>, String)>(
+            "SELECT username, avatar_url, email FROM users WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_one(self.pool)
+        .await
+    }
+
+    /// Get user IDs and usernames by username list
+    pub async fn get_ids_by_usernames(
+        &self,
+        usernames: &[&str],
+    ) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
+        sqlx::query_as::<_, (Uuid, String)>(
+            "SELECT id, username FROM users WHERE username = ANY($1)",
+        )
+        .bind(usernames)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Get a user's role by ID
+    pub async fn get_role_by_id(&self, id: Uuid) -> Result<String, sqlx::Error> {
+        sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
+            .bind(id)
+            .fetch_one(self.pool)
+            .await
+    }
+
+    /// Check if a role has a specific permission
+    pub async fn has_permission(
+        &self,
+        role: &str,
+        permission: &str,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM role_permissions WHERE role = $1 AND permission_id = $2)",
+        )
+        .bind(role)
+        .bind(permission)
+        .fetch_one(self.pool)
+        .await
+    }
+
+    /// Get the first bot user ID
+    pub async fn get_bot_user_id(&self) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE is_bot = true LIMIT 1")
+            .fetch_optional(self.pool)
+            .await
+    }
 }
