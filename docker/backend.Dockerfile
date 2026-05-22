@@ -24,7 +24,7 @@ COPY migrations ./migrations
 
 # Build with cache mounts for faster rebuilds
 # BuildKit caches cargo registry and build artifacts between builds
-ENV SQLX_OFFLINE=false
+ENV SQLX_OFFLINE=true
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     touch src/main.rs && \

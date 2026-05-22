@@ -285,7 +285,7 @@ jobs:
     name: Docker Validate
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 20
 
     steps:
@@ -363,7 +363,7 @@ jobs:
     name: Build Release
     needs: backend-check
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 40
 
     env:
