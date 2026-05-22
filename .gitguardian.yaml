@@ -1,0 +1,17 @@
+version: 2
+secret:
+  ignored_paths:
+    - '.github/workflows/ci.yml'
+    - '.github/workflows/security.yml'
+    - '.github/workflows/integration.yml'
+    - '.env.example'
+    - '**/tests/**'
+    - '**/test/**'
+    - 'docs/**'
+  ignored_matches:
+    - name: "dummy-jwt-secret"
+      match: "dummy-jwt-secret-min-32-chars-long"
+    - name: "dummy-encryption-key"
+      match: "dummy-encryption-key-32-bytes-long"
+    - name: "test-jwt-secret"
+      match: "test-jwt-secret-min-32-chars-long"
