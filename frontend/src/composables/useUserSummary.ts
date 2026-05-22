@@ -46,6 +46,16 @@ interface LiveUserStatusUpdate {
   statusExpiresAt?: string | number | null
 }
 
+function isSafeUserId(userId: unknown): userId is string {
+  return (
+    typeof userId === 'string' &&
+    /^[a-zA-Z0-9-]+$/i.test(userId) &&
+    userId !== '__proto__' &&
+    userId !== 'constructor' &&
+    userId !== 'prototype'
+  )
+}
+
 const hydratedUsers = ref<Record<string, HydratedUserRecord>>({})
 const pendingUsers = ref<Record<string, boolean>>({})
 const userErrors = ref<Record<string, string | undefined>>({})
@@ -60,6 +70,9 @@ export function clearUserSummaryCache() {
 }
 
 function clearExpiredCustomStatus(userId: string) {
+  if (!isSafeUserId(userId)) {
+    return
+  }
   const existing = hydratedUsers.value[userId]
   if (!existing) {
     return
@@ -83,6 +96,9 @@ function scheduleExpiry(userId: string, expiresAt: unknown) {
 }
 
 function upsertHydratedUser(userId: string, partial: Partial<HydratedUserRecord>) {
+  if (!isSafeUserId(userId)) {
+    return
+  }
   const existing = hydratedUsers.value[userId]
   const next: HydratedUserRecord = Object.assign({ id: userId, username: '' }, existing, partial)
 
@@ -99,6 +115,9 @@ function mergeUserSummary(
   teamStore = useTeamStore(),
   presenceStore = usePresenceStore()
 ): UserSummary | null {
+  if (!isSafeUserId(userId)) {
+    return null
+  }
   const teamMember = teamStore.members.find(member => member.user_id === userId)
   const hydrated = hydratedUsers.value[userId]
   const livePresence = presenceStore.getUserPresence(userId).value?.presence
@@ -130,8 +149,11 @@ function mergeUserSummary(
 }
 
 async function ensureUserSummary(userId: string) {
+  if (!isSafeUserId(userId)) {
+    return
+  }
   const existing = hydratedUsers.value[userId]
-  if (!userId || pendingUsers.value[userId] || existing?.fully_hydrated) {
+  if (pendingUsers.value[userId] || existing?.fully_hydrated) {
     return
   }
 
@@ -169,7 +191,9 @@ async function ensureUserSummary(userId: string) {
 function markPendingUsers(userIds: string[], pending: boolean) {
   const next = { ...pendingUsers.value }
   userIds.forEach(userId => {
-    next[userId] = pending
+    if (isSafeUserId(userId)) {
+      next[userId] = pending
+    }
   })
   pendingUsers.value = next
 }
@@ -196,18 +220,23 @@ function mapHydratedUser(user: User): HydratedUserRecord {
 function upsertUsers(users: HydratedUserRecord[]) {
   const nextErrors = { ...userErrors.value }
   users.forEach(user => {
-    upsertHydratedUser(user.id, user)
-    nextErrors[user.id] = undefined
+    if (isSafeUserId(user.id)) {
+      upsertHydratedUser(user.id, user)
+      nextErrors[user.id] = undefined
+    }
   })
   userErrors.value = nextErrors
 }
 
 export function getUserSummarySnapshot(userId: string) {
+  if (!isSafeUserId(userId)) {
+    return null
+  }
   return mergeUserSummary(userId)
 }
 
 export function prefetchUserSummaries(userIds: string[]) {
-  const uniqueIds = [...new Set(userIds.filter(Boolean))]
+  const uniqueIds = [...new Set(userIds.filter(isSafeUserId))]
   const missingIds = uniqueIds.filter(userId => {
     const existing = hydratedUsers.value[userId]
     return !pendingUsers.value[userId] && !existing?.fully_hydrated
@@ -249,6 +278,9 @@ export function prefetchUserSummaries(userIds: string[]) {
 }
 
 export function applyUserStatusSnapshot(update: LiveUserStatusUpdate) {
+  if (!isSafeUserId(update.userId)) {
+    return
+  }
   const partial: Partial<HydratedUserRecord> = {}
 
   if (update.presence !== undefined) {
@@ -281,12 +313,12 @@ export function useUserSummary(userIdSource: () => string | null | undefined) {
 
   const isLoading = computed(() => {
     const userId = userIdSource()
-    return !!(userId && pendingUsers.value[userId])
+    return !!(userId && isSafeUserId(userId) && pendingUsers.value[userId])
   })
 
   const error = computed(() => {
     const userId = userIdSource()
-    return (userId && userErrors.value[userId]) || ''
+    return (userId && isSafeUserId(userId) && userErrors.value[userId]) || ''
   })
 
   watchEffect(() => {

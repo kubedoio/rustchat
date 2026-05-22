@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { reactive, ref } from 'vue'
+import { reactive } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
