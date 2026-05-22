@@ -303,16 +303,16 @@ jobs:
           echo "RUSTFS_SECRET_KEY=dummy-rustfs-secret-key" >> .env
 
       - name: Validate docker-compose.yml
-        run: docker compose config
+        run: sudo docker compose config
 
       - name: Dry-run backend Docker build
-        run: docker build -f docker/backend.Dockerfile --target builder backend/
+        run: sudo docker build -f docker/backend.Dockerfile --target builder backend/
 
       - name: Dry-run frontend Docker build
-        run: docker build -f docker/frontend.Dockerfile frontend/
+        run: sudo docker build -f docker/frontend.Dockerfile frontend/
 
       - name: Dry-run push-proxy Docker build
-        run: docker build -f push-proxy/Dockerfile push-proxy/
+        run: sudo docker build -f push-proxy/Dockerfile push-proxy/
 
   frontend-e2e:
     name: Frontend E2E Tests
