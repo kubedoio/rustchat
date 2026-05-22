@@ -423,8 +423,6 @@ test.describe('Mattermost Composer E2E', () => {
   })
 
   test('file attachment via click', async ({ page }) => {
-    const composer = page.locator('[aria-label="Message composer"]')
-
     // Attach file
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),

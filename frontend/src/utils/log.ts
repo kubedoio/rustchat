@@ -1,12 +1,13 @@
 const isDev = import.meta.env.DEV
 
 function serialize(args: unknown[]): string {
-  return JSON.stringify(args, (_key, value) => {
+  const str = JSON.stringify(args, (_key, value) => {
     if (value instanceof Error) {
       return { name: value.name, message: value.message, stack: value.stack }
     }
     return value
   })
+  return str.replace(/[\r\n]/g, ' ')
 }
 
 export const log = {

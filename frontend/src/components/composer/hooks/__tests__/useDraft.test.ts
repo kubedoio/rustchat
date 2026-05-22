@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ref, nextTick } from 'vue'
 import { useDraft, useDrafts } from '../useDraft'
 
 // Mock localStorage
@@ -42,7 +41,7 @@ describe('useDraft', () => {
     }
     localStorageMock.setItem(`rustchat_draft:${channelId}`, JSON.stringify(draftData))
 
-    const { draft, isRestored, hasDraft } = useDraft(channelId)
+    const { draft } = useDraft(channelId)
 
     // Need to trigger onMounted
     expect(draft.value).toBeNull() // Before mount

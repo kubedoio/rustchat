@@ -122,6 +122,25 @@ const handleHostRemove = (sessionId: string) => {
   participantMenuOpen.value = null
 }
 
+const toggleParticipantMenu = (sessionId: string) => {
+  participantMenuOpen.value = participantMenuOpen.value === sessionId ? null : sessionId
+}
+
+const muteAllAndCloseMenu = () => {
+  handleMuteAll()
+  showMenu.value = false
+}
+
+const ringAllAndCloseMenu = () => {
+  handleRingAll()
+  showMenu.value = false
+}
+
+const endCallAndCloseMenu = () => {
+  handleEndCall()
+  showMenu.value = false
+}
+
 const formatDuration = (startAt: number | string | Date) => {
   const startTime = startAt instanceof Date ? startAt.getTime() : new Date(startAt).getTime()
   const elapsed = Math.floor((Date.now() - startTime) / 1000)
@@ -253,10 +272,7 @@ const formatDuration = (startAt: number | string | Date) => {
               >
                 <button
                   class="p-1 text-text-3 hover:text-text-1 rounded hover:bg-bg-surface-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  @click="
-                    participantMenuOpen =
-                      participantMenuOpen === participant.session_id ? null : participant.session_id
-                  "
+                  @click="toggleParticipantMenu(participant.session_id)"
                 >
                   <MoreVertical class="w-3.5 h-3.5" />
                 </button>
@@ -402,20 +418,14 @@ const formatDuration = (startAt: number | string | Date) => {
           <template v-if="isHost">
             <button
               class="w-full px-4 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center"
-              @click="
-                handleMuteAll()
-                showMenu = false
-              "
+              @click="muteAllAndCloseMenu"
             >
               <MicOff class="w-4 h-4 mr-2" />
               Mute All
             </button>
             <button
               class="w-full px-4 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 flex items-center"
-              @click="
-                handleRingAll()
-                showMenu = false
-              "
+              @click="ringAllAndCloseMenu"
             >
               <Bell class="w-4 h-4 mr-2" />
               Ring Everyone
@@ -423,10 +433,7 @@ const formatDuration = (startAt: number | string | Date) => {
             <div class="my-1 border-t border-border-1"></div>
             <button
               class="w-full px-4 py-2 text-left text-sm text-danger hover:bg-bg-surface-2 flex items-center"
-              @click="
-                handleEndCall()
-                showMenu = false
-              "
+              @click="endCallAndCloseMenu"
             >
               <PhoneOff class="w-4 h-4 mr-2" />
               End Call for Everyone

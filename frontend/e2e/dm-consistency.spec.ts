@@ -75,6 +75,11 @@ test.describe('DM Status Consistency', () => {
     // Presence labels should match across all three surfaces
     expect(infoPresenceText.trim().toLowerCase()).toBe(profilePresenceText.trim().toLowerCase())
 
+    // Custom status texts should match if present
+    if (infoCustomText) {
+      expect(profileCustomText.trim()).toBe(infoCustomText.trim())
+    }
+
     // Sidebar shows either custom status or presence label; if custom status exists,
     // it should appear in sidebar too
     if (infoCustomText) {

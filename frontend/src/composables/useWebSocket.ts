@@ -391,7 +391,14 @@ export function useWebSocket() {
         const unreadData = rawUnread as RawUnreadData
         const channelId =
           normalizeEntityId(unreadData.channel_id) ?? (unreadData.channel_id as string | undefined)
-        if (typeof channelId !== 'string' || !channelId) {
+        if (
+          typeof channelId !== 'string' ||
+          !channelId ||
+          !/^[a-zA-Z0-9-]+$/.test(channelId) ||
+          channelId === '__proto__' ||
+          channelId === 'constructor' ||
+          channelId === 'prototype'
+        ) {
           return
         }
 

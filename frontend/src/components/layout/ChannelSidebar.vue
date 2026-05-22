@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { log } from '@/utils/log'
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Hash,
   Lock,
@@ -46,6 +47,22 @@ const authStore = useAuthStore()
 const unreadStore = useUnreadStore()
 const channelPrefsStore = useChannelPreferencesStore()
 const presenceStore = usePresenceStore()
+const router = useRouter()
+
+function openSystemConsole() {
+  router.push('/admin')
+  showTeamMenu.value = false
+}
+
+function openBrowseTeams() {
+  showBrowseTeams.value = true
+  showTeamMenu.value = false
+}
+
+function openTeamSettings() {
+  showTeamSettings.value = true
+  showTeamMenu.value = false
+}
 
 const showCreateModal = ref(false)
 const showDirectMessageModal = ref(false)
@@ -466,10 +483,7 @@ async function handleLeaveTeam() {
         <button
           v-if="authStore.user?.role === 'system_admin' || authStore.user?.role === 'org_admin'"
           class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
-          @click="
-            $router.push('/admin')
-            showTeamMenu = false
-          "
+          @click="openSystemConsole"
         >
           <Shield class="w-4 h-4 text-brand" />
           System Console
@@ -482,10 +496,7 @@ async function handleLeaveTeam() {
 
         <button
           class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
-          @click="
-            showBrowseTeams = true
-            showTeamMenu = false
-          "
+          @click="openBrowseTeams"
         >
           <Compass class="w-4 h-4" />
           Browse Teams
@@ -493,10 +504,7 @@ async function handleLeaveTeam() {
         <button
           v-if="canManageCurrentTeam"
           class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-standard"
-          @click="
-            showTeamSettings = true
-            showTeamMenu = false
-          "
+          @click="openTeamSettings"
         >
           <Settings class="w-4 h-4" />
           Team Settings

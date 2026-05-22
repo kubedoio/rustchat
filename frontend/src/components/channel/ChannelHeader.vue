@@ -98,6 +98,16 @@ const handleLeave = async () => {
     }
   }
 }
+
+const viewChannelDetails = () => {
+  uiStore.toggleRhs('info')
+  showMenu.value = false
+}
+
+const mobileSearch = () => {
+  toggleView('search')
+  showMenu.value = false
+}
 </script>
 
 <template>
@@ -264,10 +274,7 @@ const handleLeave = async () => {
             <button
               data-testid="channel-details-button"
               class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-text-2 hover:bg-bg-surface-2 transition-standard"
-              @click="
-                uiStore.toggleRhs('info')
-                showMenu = false
-              "
+              @click="viewChannelDetails"
             >
               <Info class="w-4 h-4" />
               Channel Details
@@ -276,10 +283,7 @@ const handleLeave = async () => {
             <!-- Mobile-only search option -->
             <button
               class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-text-2 hover:bg-bg-surface-2 transition-standard sm:hidden"
-              @click="
-                toggleView('search')
-                showMenu = false
-              "
+              @click="mobileSearch"
             >
               <Search class="w-4 h-4" />
               Search

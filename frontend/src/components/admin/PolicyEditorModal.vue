@@ -312,6 +312,11 @@ async function savePolicy() {
   }
 }
 
+function confirmAndSave() {
+  showPreview.value = false
+  savePolicy()
+}
+
 // Cancel
 function cancel() {
   emit('close')
@@ -715,10 +720,7 @@ onMounted(() => {
         </button>
         <button
           class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-          @click="
-            showPreview = false
-            savePolicy()
-          "
+          @click="confirmAndSave"
         >
           Confirm & Save
         </button>

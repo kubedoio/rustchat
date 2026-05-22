@@ -159,6 +159,16 @@ function openProfile() {
   showUserMenu.value = false
 }
 
+function openAdminConsole() {
+  router.push('/admin')
+  showUserMenu.value = false
+}
+
+function handleLogout() {
+  auth.logout()
+  showUserMenu.value = false
+}
+
 const userPresence = computed(() => {
   return presenceStore.self?.presence || 'online'
 })
@@ -456,10 +466,7 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
                 )
               "
               class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
-              @click="
-                router.push('/admin')
-                showUserMenu = false
-              "
+              @click="openAdminConsole"
             >
               <Shield class="w-4 h-4 text-text-3" />
               <span>Admin Console</span>
@@ -470,10 +477,7 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
             <!-- Log out -->
             <button
               class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger hover:bg-danger/5 transition-colors"
-              @click="
-                auth.logout()
-                showUserMenu = false
-              "
+              @click="handleLogout"
             >
               <LogOut class="w-4 h-4" />
               <span>Log out</span>

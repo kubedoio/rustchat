@@ -54,6 +54,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
 
+function isSafeKey(key: string): boolean {
+  return (
+    typeof key === 'string' &&
+    /^[a-zA-Z0-9_.-]+$/.test(key) &&
+    key !== '__proto__' &&
+    key !== 'constructor' &&
+    key !== 'prototype' &&
+    !Object.prototype.hasOwnProperty.call(Object.prototype, key)
+  )
+}
+
 function shouldNormalizeSingleIdKey(key: string): boolean {
   return key === 'id' || key.endsWith('_id')
 }
@@ -73,6 +84,9 @@ export function normalizeIdsDeep<T>(value: T): T {
 
   const next: Record<string, unknown> = {}
   for (const [key, rawVal] of Object.entries(value)) {
+    if (!isSafeKey(key)) {
+      continue
+    }
     if (typeof rawVal === 'string' && shouldNormalizeSingleIdKey(key)) {
       next[key] = normalizeEntityId(rawVal) ?? rawVal
       continue

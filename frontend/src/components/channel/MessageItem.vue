@@ -49,6 +49,11 @@ function openUserProfile() {
   emit('openProfile', props.message.userId)
 }
 
+function toggleEmojiPicker() {
+  showEmojiPicker.value = !showEmojiPicker.value
+  showActions.value = true
+}
+
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
 const unreadStore = useUnreadStore()
@@ -569,10 +574,7 @@ async function toggleReaction(emoji: string) {
           class="p-1.5 hover:bg-bg-surface-2 text-text-3 hover:text-text-1 transition-colors rounded"
           :class="{ 'bg-bg-surface-2 text-brand': showEmojiPicker }"
           title="Add reaction"
-          @click.stop="
-            showEmojiPicker = !showEmojiPicker
-            showActions = true
-          "
+          @click.stop="toggleEmojiPicker"
         >
           <Smile class="w-4 h-4" />
         </button>
