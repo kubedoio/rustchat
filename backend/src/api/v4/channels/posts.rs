@@ -21,6 +21,11 @@ pub struct Pagination {
     pub since: Option<i64>,
 }
 
+fn parse_since_timestamp(since: i64) -> ApiResult<chrono::DateTime<chrono::Utc>> {
+    chrono::DateTime::from_timestamp_millis(since)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid since timestamp".to_string()))
+}
+
 pub async fn get_posts(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -41,9 +46,7 @@ pub async fn get_posts(
     // Determine query type based on pagination params
     let mut posts: Vec<PostResponse> = if let Some(since) = pagination.since {
         // Incremental sync: get posts created or edited since timestamp
-        let since_time = chrono::DateTime::from_timestamp_millis(since).ok_or_else(|| {
-            crate::error::AppError::BadRequest("Invalid since timestamp".to_string())
-        })?;
+        let since_time = parse_since_timestamp(since)?;
 
         repo.list_since(channel_id, since_time, per_page)
             .await?
@@ -120,6 +123,26 @@ pub async fn get_posts(
         next_post_id,
         prev_post_id,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_since_timestamp;
+    use crate::error::AppError;
+
+    #[test]
+    fn parse_since_timestamp_accepts_epoch_millis() {
+        let parsed = parse_since_timestamp(1_700_000_000_000).expect("valid timestamp");
+        assert_eq!(parsed.timestamp_millis(), 1_700_000_000_000);
+    }
+
+    #[test]
+    fn parse_since_timestamp_rejects_out_of_range_values() {
+        let err = parse_since_timestamp(i64::MAX).expect_err("invalid timestamp should fail");
+        assert!(
+            matches!(err, AppError::BadRequest(message) if message == "Invalid since timestamp")
+        );
+    }
 }
 
 #[derive(Deserialize)]

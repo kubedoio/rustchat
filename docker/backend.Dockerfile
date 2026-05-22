@@ -64,4 +64,7 @@ EXPOSE 3000
 
 ENV RUST_LOG=info
 
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/v1/health/live || exit 1
+
 CMD ["rustchat"]

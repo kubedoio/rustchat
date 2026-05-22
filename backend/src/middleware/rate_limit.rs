@@ -304,3 +304,62 @@ pub async fn check_rate_limit(
         reset_at: (now as u64) + config.window_secs,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{extract_client_ip, RateLimitConfig};
+    use axum::{body::Body, extract::ConnectInfo, http::Request};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    #[test]
+    fn auth_per_minute_uses_sixty_second_window() {
+        let config = RateLimitConfig::auth_per_minute(10);
+        assert_eq!(config.window_secs, 60);
+        assert_eq!(config.max_requests, 10);
+    }
+
+    #[test]
+    fn extract_client_ip_prefers_first_forwarded_for_ip() {
+        let request = Request::builder()
+            .header("X-Forwarded-For", "203.0.113.10, 10.0.0.2")
+            .body(Body::empty())
+            .expect("request");
+
+        assert_eq!(extract_client_ip(&request).as_deref(), Some("203.0.113.10"));
+    }
+
+    #[test]
+    fn extract_client_ip_uses_real_ip_when_forwarded_for_missing() {
+        let request = Request::builder()
+            .header("X-Real-IP", "203.0.113.20")
+            .body(Body::empty())
+            .expect("request");
+
+        assert_eq!(extract_client_ip(&request).as_deref(), Some("203.0.113.20"));
+    }
+
+    #[test]
+    fn extract_client_ip_falls_back_to_connect_info() {
+        let mut request = Request::builder().body(Body::empty()).expect("request");
+        request.extensions_mut().insert(ConnectInfo(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(203, 0, 113, 30)),
+            443,
+        )));
+
+        assert_eq!(extract_client_ip(&request).as_deref(), Some("203.0.113.30"));
+    }
+
+    #[test]
+    fn extract_client_ip_ignores_empty_forwarded_for() {
+        let mut request = Request::builder()
+            .header("X-Forwarded-For", "   ")
+            .body(Body::empty())
+            .expect("request");
+        request.extensions_mut().insert(ConnectInfo(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(203, 0, 113, 40)),
+            443,
+        )));
+
+        assert_eq!(extract_client_ip(&request).as_deref(), Some("203.0.113.40"));
+    }
+}

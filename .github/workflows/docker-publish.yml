@@ -22,6 +22,7 @@ jobs:
       push: true
       runner: ${{ github.event_name == 'workflow_dispatch' && inputs.runner || 'ubuntu-latest' }}
       platforms: ${{ github.event_name == 'workflow_dispatch' && inputs.platforms || 'linux/amd64,linux/arm64' }}
+      timeout-minutes: 120
       tags: |
         type=semver,pattern={{version}}
         type=semver,pattern={{major}}.{{minor}}

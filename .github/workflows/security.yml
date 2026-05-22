@@ -227,8 +227,12 @@ jobs:
 
       - name: Run npm audit
         run: |
+          set +e
+          npm audit --audit-level=high --json > dependency-audit.json
+          audit_status=$?
           npm audit --audit-level=high
-          npm audit --audit-level=high --json > dependency-audit.json || true
+          set -e
+          exit "$audit_status"
 
       - name: Upload npm audit results
         if: always()
