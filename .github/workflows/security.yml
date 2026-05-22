@@ -59,7 +59,11 @@ jobs:
       - name: Install SQLx CLI
         run: |
           if ! command -v sqlx &> /dev/null; then
-            cargo install sqlx-cli --no-default-features --features postgres
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm sqlx-cli --no-default-features --features postgres
           fi
 
       - name: Run migrations
@@ -95,7 +99,11 @@ jobs:
       - name: Install cargo-audit
         run: |
           if ! command -v cargo-audit &> /dev/null; then
-            cargo install cargo-audit --locked
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm cargo-audit
           fi
 
       - name: Run cargo audit
@@ -123,7 +131,11 @@ jobs:
       - name: Install cargo-audit
         run: |
           if ! command -v cargo-audit &> /dev/null; then
-            cargo install cargo-audit --locked
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm cargo-audit
           fi
 
       - name: Run cargo audit
@@ -151,7 +163,11 @@ jobs:
       - name: Install cargo-deny
         run: |
           if ! command -v cargo-deny &> /dev/null; then
-            cargo install cargo-deny --locked
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm cargo-deny
           fi
 
       - name: Run cargo deny check
@@ -179,7 +195,11 @@ jobs:
       - name: Install cargo-deny
         run: |
           if ! command -v cargo-deny &> /dev/null; then
-            cargo install cargo-deny --locked
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm cargo-deny
           fi
 
       - name: Run cargo deny check

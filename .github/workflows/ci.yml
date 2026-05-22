@@ -144,7 +144,11 @@ jobs:
       - name: Install SQLx CLI
         run: |
           if ! command -v sqlx &> /dev/null; then
-            cargo install sqlx-cli --no-default-features --features postgres
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm sqlx-cli --no-default-features --features postgres
           fi
 
       - name: Wait for RustFS
