@@ -62,7 +62,7 @@ pub async fn autocomplete_users(
             .await?;
 
         if !is_member {
-            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+            return Err(AppError::NotOnTeam);
         }
 
         UserRepository::new(&state.db)
@@ -124,7 +124,7 @@ pub async fn search_users(
             .await?;
 
         if !is_member {
-            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+            return Err(AppError::NotOnTeam);
         }
 
         UserRepository::new(&state.db)
@@ -215,7 +215,7 @@ pub async fn get_user_by_email(
     let user = UserRepository::new(&state.db)
         .get_by_email(&email)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     Ok(Json(user.into()))
 }
@@ -268,7 +268,7 @@ pub async fn list_users(
             .await?;
 
         if !is_member {
-            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+            return Err(AppError::NotOnTeam);
         }
 
         if let Some(not_in_channel) = query.not_in_channel.as_deref() {
@@ -279,7 +279,7 @@ pub async fn list_users(
             let channel = channel_repo
                 .get_by_id_optional(channel_id)
                 .await?
-                .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+                .ok_or_else(|| AppError::ChannelNotFound)?;
 
             if channel.team_id != team_id {
                 return Err(AppError::BadRequest(
@@ -320,7 +320,7 @@ pub async fn list_users(
             && !auth.has_permission(&permissions::SYSTEM_MANAGE)
             && !auth.has_permission(&permissions::ADMIN_FULL)
         {
-            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+            return Err(AppError::NotOnTeam);
         }
 
         UserRepository::new(&state.db)

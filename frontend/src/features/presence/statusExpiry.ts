@@ -22,7 +22,7 @@ export function scheduleStatusExpiry(
   timers: Map<string, ReturnType<typeof setTimeout>>,
   key: string,
   expiresAt: unknown,
-  onExpire: () => void,
+  onExpire: () => void
 ) {
   const existing = timers.get(key)
   if (existing) {
@@ -46,7 +46,7 @@ export function scheduleStatusExpiry(
     setTimeout(() => {
       onExpire()
       timers.delete(key)
-    }, remainingMs),
+    }, remainingMs)
   )
 
   return expiresAtMs
@@ -54,7 +54,7 @@ export function scheduleStatusExpiry(
 
 export function clearStatusExpiryTimer(
   timers: Map<string, ReturnType<typeof setTimeout>>,
-  key: string,
+  key: string
 ) {
   const timer = timers.get(key)
   if (!timer) {

@@ -23,10 +23,9 @@ pub async fn update_user_roles(
 ) -> ApiResult<Json<serde_json::Value>> {
     // Only system admins can grant system_admin role - prevents org_admin self-escalation
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+        return Err(AppError::InsufficientPermissions);
     }
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     let role = if input.roles.contains("system_admin") {
         "system_admin"
     } else {
@@ -51,10 +50,9 @@ pub async fn update_user_active(
     axum::extract::Path(user_id): axum::extract::Path<String>,
     Json(input): Json<UserActiveRequest>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     if !auth.can_access_owned(user_id, &permissions::USER_MANAGE) {
-        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+        return Err(AppError::InsufficientPermissions);
     }
     UserRepository::new(&state.db)
         .update_active(user_id, input.active)
@@ -68,10 +66,9 @@ pub async fn demote_user(
     axum::extract::Path(user_id): axum::extract::Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
     if !auth.has_permission(&permissions::USER_MANAGE) {
-        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+        return Err(AppError::InsufficientPermissions);
     }
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     UserRepository::new(&state.db)
         .update_role(user_id, "member")
         .await?;
@@ -85,10 +82,9 @@ pub async fn promote_user(
 ) -> ApiResult<Json<serde_json::Value>> {
     // Only system admins can promote to system_admin - prevents org_admin self-escalation
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+        return Err(AppError::InsufficientPermissions);
     }
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     UserRepository::new(&state.db)
         .update_role(user_id, "system_admin")
         .await?;
@@ -101,10 +97,9 @@ pub async fn convert_user_to_bot(
     axum::extract::Path(user_id): axum::extract::Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
     if !auth.has_permission(&permissions::USER_MANAGE) {
-        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+        return Err(AppError::InsufficientPermissions);
     }
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     UserRepository::new(&state.db)
         .update_is_bot(user_id)
         .await?;
@@ -127,7 +122,7 @@ pub async fn update_user_password(
     let user: User = UserRepository::new(&state.db)
         .get_by_id(user_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     if user_id != auth.user_id {
         // Admins resetting another user's password do not need current_password

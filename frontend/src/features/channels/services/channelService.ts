@@ -1,6 +1,7 @@
 // Channel Service - Business logic for channels
 // Handles channel selection, persistence, and orchestration
 
+import { log } from '@/utils/log'
 import { channelRepository, type CreateChannelRequest } from '../repositories/channelRepository'
 import type { Channel, ChannelId } from '../../../core/entities/Channel'
 import type { TeamId } from '../../../core/entities/Team'
@@ -36,18 +37,14 @@ class ChannelService {
         // Auto-select general channel if none selected or last not found
         const general = channels.find(c => c.name === 'general')
         const defaultChannel = general?.id || channels[0]?.id || null
-        
+
         if (defaultChannel) {
           this.store.setCurrentChannelId(defaultChannel)
           this.saveLastChannelId(teamId, defaultChannel)
         }
       }
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to fetch channels'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to fetch channels')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -71,7 +68,7 @@ class ChannelService {
     if (!channel) return
 
     this.store.setCurrentChannelId(channelId)
-    
+
     if (channel.teamId) {
       this.saveLastChannelId(channel.teamId, channelId)
     }
@@ -88,17 +85,13 @@ class ChannelService {
     try {
       const channel = await channelRepository.create(data)
       this.store.addChannel(channel)
-      
+
       // Auto-select the new channel
       this.selectChannel(channel.id)
-      
+
       return channel
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to create channel'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to create channel')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -109,18 +102,14 @@ class ChannelService {
   async joinChannel(channelId: ChannelId, userId: UserId): Promise<void> {
     try {
       await channelRepository.join(channelId, userId)
-      
+
       // Refresh channels to include the joined one
       const channel = await channelRepository.getById(channelId)
       if (channel) {
         this.store.addChannel(channel)
       }
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to join channel'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to join channel')
       throw error
     }
   }
@@ -131,11 +120,7 @@ class ChannelService {
       await channelRepository.leave(channelId)
       this.store.removeChannel(channelId)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to leave channel'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to leave channel')
       throw error
     }
   }
@@ -145,30 +130,19 @@ class ChannelService {
     try {
       await channelRepository.removeMember(channelId, userId)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to remove member'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to remove member')
       throw error
     }
   }
 
   // Update channel
-  async updateChannel(
-    channelId: ChannelId, 
-    data: Partial<CreateChannelRequest>
-  ): Promise<Channel> {
+  async updateChannel(channelId: ChannelId, data: Partial<CreateChannelRequest>): Promise<Channel> {
     try {
       const channel = await channelRepository.update(channelId, data)
       this.store.updateChannel(channel)
       return channel
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to update channel'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to update channel')
       throw error
     }
   }
@@ -179,11 +153,7 @@ class ChannelService {
       await channelRepository.delete(channelId)
       this.store.removeChannel(channelId)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to delete channel'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to delete channel')
       throw error
     }
   }
@@ -194,7 +164,7 @@ class ChannelService {
       await channelRepository.markAsRead(channelId)
       this.store.clearCounts(channelId)
     } catch (error) {
-      console.error('Failed to mark channel as read:', error)
+      log.error('Failed to mark channel as read:', error)
     }
   }
 
@@ -204,7 +174,7 @@ class ChannelService {
       const counts = await channelRepository.getUnreadCounts()
       this.store.setUnreadCounts(counts)
     } catch (error) {
-      console.error('Failed to load unread counts:', error)
+      log.error('Failed to load unread counts:', error)
     }
   }
 
@@ -223,11 +193,11 @@ class ChannelService {
 
   handleUserJoined(channelId: ChannelId, userId: UserId): void {
     // Could trigger a notification or update member list
-    console.log('User joined channel:', channelId, userId)
+    log.debug('User joined channel:', channelId, userId)
   }
 
   handleUserLeft(channelId: ChannelId, userId: UserId): void {
-    console.log('User left channel:', channelId, userId)
+    log.debug('User left channel:', channelId, userId)
     const authStore = useAuthStore()
     if (authStore.user?.id === userId) {
       this.store.removeChannel(channelId)

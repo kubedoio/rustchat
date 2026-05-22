@@ -61,7 +61,7 @@ pub struct RegisterEntityResponse {
 /// - Requires JWT authentication with admin role
 /// - Validates entity_type is non-human (agent, service, or ci)
 /// - Generates cryptographically secure API key
-/// - Hashes API key with bcrypt before storage
+/// - Hashes API key with argon2id before storage
 ///
 /// # Rate Limiting
 ///

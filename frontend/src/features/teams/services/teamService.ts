@@ -27,11 +27,7 @@ class TeamService {
         this.selectTeam(firstTeam.id)
       }
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to fetch teams'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to fetch teams')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -66,11 +62,7 @@ class TeamService {
       this.selectTeam(team.id)
       return team
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to create team'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to create team')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -89,11 +81,7 @@ class TeamService {
       // Select the joined team
       this.selectTeam(teamId)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to join team'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to join team')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -109,11 +97,7 @@ class TeamService {
       await teamRepository.leave(teamId)
       this.store.removeTeam(teamId)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to leave team'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to leave team')
       throw error
     } finally {
       this.store.setLoading(false)
@@ -127,11 +111,7 @@ class TeamService {
       this.store.updateTeam(team)
       return team
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to update team'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to update team')
       throw error
     }
   }
@@ -142,11 +122,7 @@ class TeamService {
       await teamRepository.delete(teamId)
       this.store.removeTeam(teamId)
     } catch (error) {
-      this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Failed to delete team'
-      )
+      this.store.setError(error instanceof AppError ? error.message : 'Failed to delete team')
       throw error
     }
   }

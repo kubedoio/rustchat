@@ -35,7 +35,7 @@ const hasReactions = computed(() => {
     <!-- User Avatar -->
     <div class="shrink-0 mt-0.5">
       <RcAvatar
-        :userId="reply.user_id"
+        :user-id="reply.user_id"
         :username="reply.username"
         :src="reply.avatar_url"
         size="sm"
@@ -63,11 +63,7 @@ const hasReactions = computed(() => {
 
       <!-- Files -->
       <div v-if="reply.files && reply.files.length > 0" class="mt-3 flex flex-wrap gap-2">
-        <FilePreview
-          v-for="file in reply.files"
-          :key="file.id"
-          :file="file"
-        />
+        <FilePreview v-for="file in reply.files" :key="file.id" :file="file" />
       </div>
 
       <!-- Reactions -->
@@ -76,9 +72,11 @@ const hasReactions = computed(() => {
           v-for="reaction in reply.reactions"
           :key="reaction.emoji"
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border"
-          :class="reaction.users.includes(authStore.user?.id || '')
-            ? 'bg-brand/10 border-brand/30 text-brand'
-            : 'bg-bg-surface-2 border-border-1 text-text-2'"
+          :class="
+            reaction.users.includes(authStore.user?.id || '')
+              ? 'bg-brand/10 border-brand/30 text-brand'
+              : 'bg-bg-surface-2 border-border-1 text-text-2'
+          "
         >
           <span>{{ getEmojiChar(reaction.emoji) }}</span>
           <span class="font-medium">{{ reaction.count }}</span>

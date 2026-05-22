@@ -26,7 +26,7 @@ const turnstileVerified = ref(false)
 
 onMounted(async () => {
   configStore.loadConfig()
-  
+
   // Fetch Turnstile configuration
   try {
     const response = await client.get('/auth/config')
@@ -69,7 +69,7 @@ async function handleSubmit() {
     await client.post('/auth/password/forgot', {
       email: email.value,
       'cf-turnstile-response': turnstileToken.value || undefined,
-      website: website.value || undefined
+      website: website.value || undefined,
     })
     success.value = true
   } catch (e: unknown) {
@@ -88,26 +88,33 @@ async function handleSubmit() {
   <AuthLayout>
     <template #title>Reset your password</template>
     <template #subtitle>
-      Remember your password? 
-      <router-link to="/login" class="font-medium text-primary hover:text-blue-500">Sign in</router-link>
+      Remember your password?
+      <router-link to="/login" class="font-medium text-primary hover:text-blue-500"
+        >Sign in</router-link
+      >
     </template>
 
     <!-- Success State -->
     <div v-if="success" class="text-center py-8">
-      <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
+      <div
+        class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6"
+      >
         <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M5 13l4 4L19 7"
+          ></path>
         </svg>
       </div>
-      <h3 class="text-xl font-semibold text-gray-900 mb-2">
-        Check your email
-      </h3>
+      <h3 class="text-xl font-semibold text-gray-900 mb-2">Check your email</h3>
       <p class="text-gray-600 mb-6">
-        If an account exists for <strong>{{ email }}</strong>, you will receive a password reset link.
-        Please check your inbox and spam folder.
+        If an account exists for <strong>{{ email }}</strong
+        >, you will receive a password reset link. Please check your inbox and spam folder.
       </p>
       <div class="space-y-4">
-        <BaseButton @click="router.push('/login')" variant="secondary" block>
+        <BaseButton variant="secondary" block @click="router.push('/login')">
           Back to Login
         </BaseButton>
       </div>
@@ -115,19 +122,16 @@ async function handleSubmit() {
 
     <!-- Forgot Password Form -->
     <form v-else class="space-y-6" @submit.prevent="handleSubmit">
-      <div v-if="error" class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
+      <div
+        v-if="error"
+        class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm"
+      >
         {{ error }}
       </div>
 
       <!-- Honeypot field - hidden from humans -->
       <div class="honeypot-field" aria-hidden="true">
-        <input
-          type="text"
-          name="website"
-          v-model="website"
-          tabindex="-1"
-          autocomplete="off"
-        />
+        <input v-model="website" type="text" name="website" tabindex="-1" autocomplete="off" />
       </div>
 
       <p class="text-sm text-gray-600">
@@ -136,9 +140,9 @@ async function handleSubmit() {
 
       <BaseInput
         id="email"
+        v-model="email"
         type="email"
         label="Email address"
-        v-model="email"
         required
         placeholder="you@example.com"
       />
@@ -152,9 +156,9 @@ async function handleSubmit() {
       />
 
       <div>
-        <BaseButton 
-          type="submit" 
-          block 
+        <BaseButton
+          type="submit"
+          block
           :loading="loading"
           :disabled="turnstileEnabled && !turnstileVerified"
         >

@@ -1,84 +1,84 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { X } from 'lucide-vue-next';
-import { useTeamStore } from '@/features/teams/stores/teamStore';
-import { useChannelStore } from '@/features/channels/stores/channelStore';
-import { useAuthStore } from '../../features/auth/stores/authStore';
-import { canCreateChannel as canCreateChannelForRole } from '../../features/permissions/capabilities';
-import BaseButton from '../atomic/BaseButton.vue';
-import BaseInput from '../atomic/BaseInput.vue';
-import { getApiErrorMessage } from '@/core/errors/errorUtils';
+import { ref, computed } from 'vue'
+import { X } from 'lucide-vue-next'
+import { useTeamStore } from '@/features/teams/stores/teamStore'
+import { useChannelStore } from '@/features/channels/stores/channelStore'
+import { useAuthStore } from '../../features/auth/stores/authStore'
+import { canCreateChannel as canCreateChannelForRole } from '../../features/permissions/capabilities'
+import BaseButton from '../atomic/BaseButton.vue'
+import BaseInput from '../atomic/BaseInput.vue'
+import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const props = defineProps<{
-    show: boolean
-}>();
+  show: boolean
+}>()
 
 const emit = defineEmits<{
-    (e: 'close'): void
-}>();
+  (e: 'close'): void
+}>()
 
-const teamStore = useTeamStore();
-const channelStore = useChannelStore();
-const authStore = useAuthStore();
+const teamStore = useTeamStore()
+const channelStore = useChannelStore()
+const authStore = useAuthStore()
 
-const name = ref('');
-const displayName = ref('');
-const channelType = ref<'public' | 'private'>('public');
-const purpose = ref('');
-const loading = ref(false);
-const error = ref('');
+const name = ref('')
+const displayName = ref('')
+const channelType = ref<'public' | 'private'>('public')
+const purpose = ref('')
+const loading = ref(false)
+const error = ref('')
 
-const currentTeam = computed(() => teamStore.currentTeam);
-const canCreateStandardChannel = computed(() => canCreateChannelForRole(authStore.user?.role));
+const currentTeam = computed(() => teamStore.currentTeam)
+const canCreateStandardChannel = computed(() => canCreateChannelForRole(authStore.user?.role))
 
 async function handleSubmit() {
-    if (!canCreateStandardChannel.value) {
-        error.value = 'You do not have permission to create channels';
-        return;
-    }
+  if (!canCreateStandardChannel.value) {
+    error.value = 'You do not have permission to create channels'
+    return
+  }
 
-    if (!name.value.trim()) {
-        error.value = 'Channel name is required';
-        return;
-    }
+  if (!name.value.trim()) {
+    error.value = 'Channel name is required'
+    return
+  }
 
-    if (!currentTeam.value) {
-        error.value = 'Please select a team first';
-        return;
-    }
+  if (!currentTeam.value) {
+    error.value = 'Please select a team first'
+    return
+  }
 
-    loading.value = true;
-    error.value = '';
+  loading.value = true
+  error.value = ''
 
-    try {
-        await channelStore.createChannel({
-            team_id: currentTeam.value.id,
-            name: name.value.trim().toLowerCase().replace(/\s+/g, '-'),
-            display_name: displayName.value.trim() || name.value.trim(),
-            channel_type: channelType.value,
-            purpose: purpose.value.trim() || undefined,
-        });
-        
-        // Reset and close
-        name.value = '';
-        displayName.value = '';
-        channelType.value = 'public';
-        purpose.value = '';
-        emit('close');
-    } catch (e: unknown) {
-        error.value = getApiErrorMessage(e) || 'Failed to create channel';
-    } finally {
-        loading.value = false;
-    }
+  try {
+    await channelStore.createChannel({
+      team_id: currentTeam.value.id,
+      name: name.value.trim().toLowerCase().replace(/\s+/g, '-'),
+      display_name: displayName.value.trim() || name.value.trim(),
+      channel_type: channelType.value,
+      purpose: purpose.value.trim() || undefined,
+    })
+
+    // Reset and close
+    name.value = ''
+    displayName.value = ''
+    channelType.value = 'public'
+    purpose.value = ''
+    emit('close')
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e) || 'Failed to create channel'
+  } finally {
+    loading.value = false
+  }
 }
 
 function handleClose() {
-    name.value = '';
-    displayName.value = '';
-    channelType.value = 'public';
-    purpose.value = '';
-    error.value = '';
-    emit('close');
+  name.value = ''
+  displayName.value = ''
+  channelType.value = 'public'
+  purpose.value = ''
+  error.value = ''
+  emit('close')
 }
 </script>
 
@@ -87,13 +87,13 @@ function handleClose() {
     <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center">
       <!-- Backdrop -->
       <div class="absolute inset-0 bg-black/50" @click="handleClose"></div>
-      
+
       <!-- Modal -->
       <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 class="text-xl font-bold text-gray-900">Create Channel</h2>
-          <button @click="handleClose" class="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+          <button class="p-1 hover:bg-gray-100 rounded-lg transition-colors" @click="handleClose">
             <X class="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -104,34 +104,36 @@ function handleClose() {
           </div>
 
           <div class="flex justify-end pt-2">
-            <BaseButton variant="secondary" @click="handleClose">
-              Close
-            </BaseButton>
+            <BaseButton variant="secondary" @click="handleClose"> Close </BaseButton>
           </div>
         </div>
 
         <!-- Form -->
-        <form v-else @submit.prevent="handleSubmit" class="p-6 space-y-4">
+        <form v-else class="p-6 space-y-4" @submit.prevent="handleSubmit">
           <!-- No Team Warning -->
-          <div v-if="!currentTeam" class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-600 text-sm">
+          <div
+            v-if="!currentTeam"
+            class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-600 text-sm"
+          >
             Please create or select a team first.
           </div>
 
           <!-- Error -->
-          <div v-if="error" class="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div
+            v-if="error"
+            class="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm"
+          >
             {{ error }}
           </div>
 
           <!-- Channel Type -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Channel Type
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-2"> Channel Type </label>
             <div class="flex space-x-4">
               <label class="flex items-center cursor-pointer">
-                <input 
-                  type="radio" 
-                  v-model="channelType" 
+                <input
+                  v-model="channelType"
+                  type="radio"
                   value="public"
                   class="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
                 />
@@ -140,9 +142,9 @@ function handleClose() {
                 </span>
               </label>
               <label class="flex items-center cursor-pointer">
-                <input 
-                  type="radio" 
-                  v-model="channelType" 
+                <input
+                  v-model="channelType"
+                  type="radio"
                   value="private"
                   class="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
                 />
@@ -169,9 +171,7 @@ function handleClose() {
           />
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Purpose
-            </label>
+            <label class="block text-sm font-medium text-gray-700 mb-1"> Purpose </label>
             <textarea
               v-model="purpose"
               rows="2"
@@ -183,7 +183,7 @@ function handleClose() {
 
           <!-- Actions -->
           <div class="flex justify-end space-x-3 pt-4">
-            <BaseButton variant="secondary" @click="handleClose" :disabled="loading">
+            <BaseButton variant="secondary" :disabled="loading" @click="handleClose">
               Cancel
             </BaseButton>
             <BaseButton type="submit" :loading="loading" :disabled="!currentTeam">

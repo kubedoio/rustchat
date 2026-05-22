@@ -92,7 +92,7 @@ async fn ensure_team_member(state: &AppState, team_id: Uuid, user_id: Uuid) -> A
         .is_team_member(team_id, user_id)
         .await?
     {
-        return Err(AppError::Forbidden("Not a member of this team".to_string()));
+        return Err(AppError::NotOnTeam);
     }
     Ok(())
 }
@@ -144,7 +144,7 @@ async fn get_incoming_webhook(
     let webhook = IntegrationRepository::new(&state.db)
         .get_incoming_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     if !auth.can_access_owned(webhook.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -163,7 +163,7 @@ async fn delete_incoming_webhook(
     let webhook = IntegrationRepository::new(&state.db)
         .get_incoming_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     if !auth.can_access_owned(webhook.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -259,7 +259,7 @@ async fn get_outgoing_webhook(
     let webhook = IntegrationRepository::new(&state.db)
         .get_outgoing_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     if !auth.can_access_owned(webhook.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -278,7 +278,7 @@ async fn delete_outgoing_webhook(
     let webhook = IntegrationRepository::new(&state.db)
         .get_outgoing_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     if !auth.can_access_owned(webhook.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -347,7 +347,7 @@ async fn get_slash_command(
     let command = IntegrationRepository::new(&state.db)
         .get_slash_command_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Command not found".to_string()))?;
+        .ok_or_else(|| AppError::CommandNotFound)?;
 
     if !auth.can_access_owned(command.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -366,7 +366,7 @@ async fn delete_slash_command(
     let command = IntegrationRepository::new(&state.db)
         .get_slash_command_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Command not found".to_string()))?;
+        .ok_or_else(|| AppError::CommandNotFound)?;
 
     if !auth.can_access_owned(command.creator_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden(
@@ -400,253 +400,173 @@ async fn execute_command(
     Ok(Json(response))
 }
 
-pub async fn execute_command_internal(
-    state: &AppState,
-    auth: CommandAuth,
-    payload: ExecuteCommand,
-) -> ApiResult<CommandResponse> {
-    // 1. Parse trigger
-    let parts: Vec<&str> = payload.command.split_whitespace().collect();
+const HELP_TEXT: &str = r#"**Available Commands:**
+• `/call [end]` - Start or end a video call
+• `/join ~channel` - Join a channel
+• `/leave` - Leave current channel
+• `/me [action]` - Post an action message
+• `/shrug [message]` - Add ¯\_(ツ)_/¯ to your message
+• `/echo [text]` - Echo text back to you"#;
+
+fn build_command_response(
+    response_type: impl Into<String>,
+    text: impl Into<String>,
+    goto_location: Option<String>,
+    attachments: Option<serde_json::Value>,
+) -> CommandResponse {
+    CommandResponse {
+        response_type: response_type.into(),
+        text: text.into(),
+        username: None,
+        icon_url: None,
+        goto_location,
+        attachments,
+    }
+}
+
+fn parse_command_input(command: &str) -> ApiResult<(&str, String)> {
+    let parts: Vec<&str> = command.split_whitespace().collect();
     if parts.is_empty() {
         return Err(AppError::BadRequest("Empty command".to_string()));
     }
-
     let trigger = parts[0].trim_start_matches('/');
     let args = if parts.len() > 1 {
         parts[1..].join(" ")
     } else {
         String::new()
     };
+    Ok((trigger, args))
+}
 
-    // 2. Handle built-in commands
-    match trigger {
-        "call" => {
-            // Check if Calls Plugin is enabled (from database or env)
-            let db_value: Option<String> = sqlx::query_scalar(
-                "SELECT plugins->'calls'->>'enabled' FROM server_config WHERE id = 'default'",
-            )
-            .fetch_optional(&state.db)
-            .await?;
+async fn resolve_team_id(state: &AppState, payload: &ExecuteCommand) -> ApiResult<Uuid> {
+    if let Some(tid) = payload.team_id {
+        Ok(tid)
+    } else {
+        ChannelRepository::new(&state.db)
+            .get_team_id(payload.channel_id)
+            .await?
+            .ok_or_else(|| AppError::ChannelNotFound)
+    }
+}
 
-            tracing::info!(
-                "Calls enabled - DB value: {:?}, Env value: {}",
-                db_value,
-                state.config.calls.enabled
-            );
+async fn execute_call_command(
+    state: &AppState,
+    auth: &CommandAuth,
+    payload: &ExecuteCommand,
+    args: &str,
+) -> ApiResult<CommandResponse> {
+    let db_value: Option<String> = sqlx::query_scalar(
+        "SELECT plugins->'calls'->>'enabled' FROM server_config WHERE id = 'default'",
+    )
+    .fetch_optional(&state.db)
+    .await?;
 
-            let calls_enabled = db_value
-                .as_ref()
-                .map(|v| v.parse::<bool>().unwrap_or(false))
-                .unwrap_or(state.config.calls.enabled);
+    tracing::info!(
+        "Calls enabled - DB value: {:?}, Env value: {}",
+        db_value,
+        state.config.calls.enabled
+    );
 
-            tracing::info!("Calls enabled - Final result: {}", calls_enabled);
+    let calls_enabled = db_value
+        .as_ref()
+        .map(|v| v.parse::<bool>().unwrap_or(false))
+        .unwrap_or(state.config.calls.enabled);
 
-            if !calls_enabled {
-                let db_val_clone = db_value.clone();
-                return Ok(CommandResponse {
-                    response_type: "ephemeral".to_string(),
-                    text: format!(
-                        "Calls are not enabled (db: {:?}, env: {})",
-                        db_val_clone, state.config.calls.enabled
-                    ),
-                    username: None,
-                    icon_url: None,
-                    goto_location: None,
-                    attachments: None,
-                });
-            }
+    tracing::info!("Calls enabled - Final result: {}", calls_enabled);
 
-            let user = UserRepository::new(&state.db)
-                .get_by_id_unchecked(auth.user_id)
-                .await?
-                .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+    if !calls_enabled {
+        let db_val_clone = db_value.clone();
+        return Ok(build_command_response(
+            "ephemeral",
+            format!(
+                "Calls are not enabled (db: {:?}, env: {})",
+                db_val_clone, state.config.calls.enabled
+            ),
+            None,
+            None,
+        ));
+    }
 
-            // Get call manager
-            let call_manager = state.call_state_manager.as_ref();
+    let user = UserRepository::new(&state.db)
+        .get_by_id_unchecked(auth.user_id)
+        .await?
+        .ok_or_else(|| AppError::UserNotFound)?;
 
-            // Handle end/stop command
-            if args == "end" || args == "stop" {
-                // Find active call in channel
-                if let Some(call) = call_manager.get_call_by_channel(&payload.channel_id).await {
-                    // Remove all participants and end the call
-                    let participants = call_manager.get_participants(call.call_id).await;
+    let call_manager = state.call_state_manager.as_ref();
 
-                    for participant in participants {
-                        call_manager
-                            .remove_participant(call.call_id, participant.user_id)
-                            .await;
+    if args == "end" || args == "stop" {
+        if let Some(call) = call_manager.get_call_by_channel(&payload.channel_id).await {
+            let participants = call_manager.get_participants(call.call_id).await;
+            for participant in participants {
+                call_manager
+                    .remove_participant(call.call_id, participant.user_id)
+                    .await;
 
-                        // Broadcast user_left event
-                        let event = crate::realtime::WsEnvelope {
-                            msg_type: "event".to_string(),
-                            event: "custom_com.mattermost.calls_user_left".to_string(),
-                            seq: None,
-                            channel_id: Some(payload.channel_id),
-                            data: serde_json::json!({
-                                "channel_id": encode_mm_id(payload.channel_id),
-                                "user_id": encode_mm_id(participant.user_id),
-                            }),
-                            broadcast: Some(crate::realtime::WsBroadcast {
-                                channel_id: Some(payload.channel_id),
-                                team_id: None,
-                                user_id: None,
-                                exclude_user_id: None,
-                            }),
-                        };
-                        state.ws_hub.broadcast(event).await;
-                    }
-
-                    // Remove the call
-                    call_manager.remove_call(call.call_id).await;
-
-                    // Remove SFU if exists
-                    state.sfu_manager.remove_sfu(call.call_id).await;
-
-                    // Broadcast call_end event
-                    let event = crate::realtime::WsEnvelope {
-                        msg_type: "event".to_string(),
-                        event: "custom_com.mattermost.calls_call_end".to_string(),
-                        seq: None,
+                let event = crate::realtime::WsEnvelope {
+                    msg_type: "event".to_string(),
+                    event: "custom_com.mattermost.calls_user_left".to_string(),
+                    seq: None,
+                    channel_id: Some(payload.channel_id),
+                    data: serde_json::json!({
+                        "channel_id": encode_mm_id(payload.channel_id),
+                        "user_id": encode_mm_id(participant.user_id),
+                    }),
+                    broadcast: Some(crate::realtime::WsBroadcast {
                         channel_id: Some(payload.channel_id),
-                        data: serde_json::json!({
-                            "channel_id": encode_mm_id(payload.channel_id),
-                            "call_id": encode_mm_id(call.call_id),
-                        }),
-                        broadcast: Some(crate::realtime::WsBroadcast {
-                            channel_id: Some(payload.channel_id),
-                            team_id: None,
-                            user_id: None,
-                            exclude_user_id: None,
-                        }),
-                    };
-                    state.ws_hub.broadcast(event).await;
-
-                    return Ok(CommandResponse {
-                        response_type: "ephemeral".to_string(),
-                        text: "Call ended".to_string(),
-                        username: None,
-                        icon_url: None,
-                        goto_location: None,
-                        attachments: None,
-                    });
-                }
-
-                return Ok(CommandResponse {
-                    response_type: "ephemeral".to_string(),
-                    text: "No active call found in this channel".to_string(),
-                    username: None,
-                    icon_url: None,
-                    goto_location: None,
-                    attachments: None,
-                });
+                        team_id: None,
+                        user_id: None,
+                        exclude_user_id: None,
+                    }),
+                };
+                state.ws_hub.broadcast(event).await;
             }
 
-            // Handle start/join command (default is start)
-            let now = Utc::now().timestamp_millis();
-            let channel_id = payload.channel_id;
+            call_manager.remove_call(call.call_id).await;
+            state.sfu_manager.remove_sfu(call.call_id).await;
 
-            // Check if there's already an active call in this channel
-            if let Some(existing_call) = call_manager.get_call_by_channel(&channel_id).await {
-                // Join existing call
-                if call_manager
-                    .get_participant(existing_call.call_id, auth.user_id)
-                    .await
-                    .is_none()
-                {
-                    let participant = Participant {
-                        user_id: auth.user_id,
-                        session_id: uuid::Uuid::new_v4(),
-                        joined_at: now,
-                        muted: true,
-                        screen_sharing: false,
-                        hand_raised: false,
-                    };
-
-                    call_manager
-                        .add_participant(existing_call.call_id, participant.clone())
-                        .await;
-
-                    // Get or create SFU
-                    if let Ok(sfu) = state
-                        .sfu_manager
-                        .get_or_create_sfu(existing_call.call_id)
-                        .await
-                    {
-                        let _ = sfu
-                            .add_participant(auth.user_id, participant.session_id)
-                            .await;
-                    }
-
-                    // Broadcast user_joined event
-                    let event = crate::realtime::WsEnvelope {
-                        msg_type: "event".to_string(),
-                        event: "custom_com.mattermost.calls_user_joined".to_string(),
-                        seq: None,
-                        channel_id: Some(channel_id),
-                        data: serde_json::json!({
-                            "channel_id": encode_mm_id(channel_id),
-                            "user_id": encode_mm_id(auth.user_id),
-                            "session_id": encode_mm_id(participant.session_id),
-                            "muted": true,
-                            "raised_hand": false,
-                        }),
-                        broadcast: Some(crate::realtime::WsBroadcast {
-                            channel_id: Some(channel_id),
-                            team_id: None,
-                            user_id: None,
-                            exclude_user_id: None,
-                        }),
-                    };
-                    state.ws_hub.broadcast(event).await;
-                }
-
-                let attachments = serde_json::json!([
-                    {
-                        "color": "#166de0",
-                        "title": "RustChat Call",
-                        "text": "A call is in progress. Click to join.",
-                        "actions": [
-                            {
-                                "id": "join_call",
-                                "name": "Join Call",
-                                "type": "button",
-                                "style": "primary",
-                                "integration": {
-                                    "url": format!("/plugins/com.mattermost.calls/calls/{}/join", encode_mm_id(channel_id)),
-                                    "context": { "action": "join_call" }
-                                }
-                            }
-                        ]
-                    }
-                ]);
-
-                return Ok(CommandResponse {
-                    response_type: "in_channel".to_string(),
-                    text: format!("@{} joined the call", user.username),
-                    username: None,
-                    icon_url: None,
-                    goto_location: None,
-                    attachments: Some(attachments),
-                });
-            }
-
-            // Create new call
-            let call_id = uuid::Uuid::new_v4();
-            let call = CallState {
-                call_id,
-                channel_id,
-                owner_id: auth.user_id,
-                host_id: auth.user_id,
-                started_at: now,
-                participants: std::collections::HashMap::new(),
-                screen_sharer: None,
-                thread_id: None,
-                dismissed_users: std::collections::HashSet::new(),
+            let event = crate::realtime::WsEnvelope {
+                msg_type: "event".to_string(),
+                event: "custom_com.mattermost.calls_call_end".to_string(),
+                seq: None,
+                channel_id: Some(payload.channel_id),
+                data: serde_json::json!({
+                    "channel_id": encode_mm_id(payload.channel_id),
+                    "call_id": encode_mm_id(call.call_id),
+                }),
+                broadcast: Some(crate::realtime::WsBroadcast {
+                    channel_id: Some(payload.channel_id),
+                    team_id: None,
+                    user_id: None,
+                    exclude_user_id: None,
+                }),
             };
+            state.ws_hub.broadcast(event).await;
 
-            call_manager.add_call(call).await;
+            return Ok(build_command_response(
+                "ephemeral",
+                "Call ended",
+                None,
+                None,
+            ));
+        }
 
-            // Add owner as first participant
+        return Ok(build_command_response(
+            "ephemeral",
+            "No active call found in this channel",
+            None,
+            None,
+        ));
+    }
+
+    let now = Utc::now().timestamp_millis();
+    let channel_id = payload.channel_id;
+
+    if let Some(existing_call) = call_manager.get_call_by_channel(&channel_id).await {
+        if call_manager
+            .get_participant(existing_call.call_id, auth.user_id)
+            .await
+            .is_none()
+        {
             let participant = Participant {
                 user_id: auth.user_id,
                 session_id: uuid::Uuid::new_v4(),
@@ -657,39 +577,19 @@ pub async fn execute_command_internal(
             };
 
             call_manager
-                .add_participant(call_id, participant.clone())
+                .add_participant(existing_call.call_id, participant.clone())
                 .await;
 
-            // Get or create SFU
-            if let Ok(sfu) = state.sfu_manager.get_or_create_sfu(call_id).await {
+            if let Ok(sfu) = state
+                .sfu_manager
+                .get_or_create_sfu(existing_call.call_id)
+                .await
+            {
                 let _ = sfu
                     .add_participant(auth.user_id, participant.session_id)
                     .await;
             }
 
-            // Broadcast call_start event
-            let event = crate::realtime::WsEnvelope {
-                msg_type: "event".to_string(),
-                event: "custom_com.mattermost.calls_call_start".to_string(),
-                seq: None,
-                channel_id: Some(channel_id),
-                data: serde_json::json!({
-                    "channel_id": encode_mm_id(channel_id),
-                    "user_id": encode_mm_id(auth.user_id),
-                    "call_id": encode_mm_id(call_id),
-                    "start_at": now.to_string(),
-                    "owner_id": encode_mm_id(auth.user_id),
-                }),
-                broadcast: Some(crate::realtime::WsBroadcast {
-                    channel_id: Some(channel_id),
-                    team_id: None,
-                    user_id: None,
-                    exclude_user_id: Some(auth.user_id),
-                }),
-            };
-            state.ws_hub.broadcast(event).await;
-
-            // Broadcast user_joined event
             let event = crate::realtime::WsEnvelope {
                 msg_type: "event".to_string(),
                 event: "custom_com.mattermost.calls_user_joined".to_string(),
@@ -710,278 +610,356 @@ pub async fn execute_command_internal(
                 }),
             };
             state.ws_hub.broadcast(event).await;
+        }
 
-            // Create post in channel
-            let attachments = serde_json::json!([
-                {
-                    "color": "#166de0",
-                    "title": "RustChat Call",
-                    "text": "A call has started. Click to join.",
-                    "actions": [
-                        {
-                            "id": "join_call",
-                            "name": "Join Call",
-                            "type": "button",
-                            "style": "primary",
-                            "integration": {
-                                "url": format!("/plugins/com.mattermost.calls/calls/{}/join", encode_mm_id(channel_id)),
-                                "context": { "action": "join_call" }
-                            }
+        let attachments = serde_json::json!([
+            {
+                "color": "#166de0",
+                "title": "RustChat Call",
+                "text": "A call is in progress. Click to join.",
+                "actions": [
+                    {
+                        "id": "join_call",
+                        "name": "Join Call",
+                        "type": "button",
+                        "style": "primary",
+                        "integration": {
+                            "url": format!("/plugins/com.mattermost.calls/calls/{}/join", encode_mm_id(channel_id)),
+                            "context": { "action": "join_call" }
                         }
-                    ]
-                }
-            ]);
-
-            let props = serde_json::json!({
-                "type": "custom_calls",
-                "attachments": attachments,
-                "call": {
-                    "call_id": encode_mm_id(call_id),
-                    "channel_id": encode_mm_id(channel_id),
-                }
-            });
-
-            let create_post_input = crate::models::CreatePost {
-                message: format!("Video call started by @ {}", user.username),
-                file_ids: vec![],
-                props: Some(props),
-                root_post_id: None,
-                client_msg_id: None,
-            };
-
-            let _ = crate::services::posts::create_post(
-                state,
-                auth.user_id,
-                channel_id,
-                create_post_input,
-                None,
-            )
-            .await?;
-
-            return Ok(CommandResponse {
-                response_type: "ephemeral".to_string(),
-                text: "Call started".to_string(),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
-        }
-        "echo" => {
-            return Ok(CommandResponse {
-                response_type: "ephemeral".to_string(),
-                text: format!("Echo: {}", args),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
-        }
-        "shrug" => {
-            return Ok(CommandResponse {
-                response_type: "in_channel".to_string(),
-                text: format!("{} ¯\\_(ツ)_/¯", args),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
-        }
-        "invite" => {
-            // Mock invite
-            return Ok(CommandResponse {
-                response_type: "ephemeral".to_string(),
-                text: format!("Invitation sent to {}", args),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
-        }
-        "join" => {
-            // Join a channel by name
-            if args.is_empty() {
-                return Ok(CommandResponse {
-                    response_type: "ephemeral".to_string(),
-                    text: "Usage: /join ~channel-name".to_string(),
-                    username: None,
-                    icon_url: None,
-                    goto_location: None,
-                    attachments: None,
-                });
+                    }
+                ]
             }
+        ]);
 
-            let channel_name = args.trim().trim_start_matches('~');
-
-            // Get team_id from current channel
-            let current_team_id: Uuid = ChannelRepository::new(&state.db)
-                .get_team_id(payload.channel_id)
-                .await?
-                .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
-
-            // Find channel
-            let target_channel = ChannelRepository::new(&state.db)
-                .find_by_team_and_name(current_team_id, channel_name)
-                .await?;
-
-            if let Some(ch) = target_channel {
-                // Add user to channel
-                ChannelRepository::new(&state.db)
-                    .add_member(ch.id, auth.user_id, "member")
-                    .await?;
-
-                return Ok(CommandResponse {
-                    response_type: "ephemeral".to_string(),
-                    text: format!("You have joined ~{}", ch.name),
-                    username: None,
-                    icon_url: None,
-                    goto_location: Some(format!("/channels/{}", ch.id)),
-                    attachments: None,
-                });
-            } else {
-                return Ok(CommandResponse {
-                    response_type: "ephemeral".to_string(),
-                    text: format!("Channel ~{} not found", channel_name),
-                    username: None,
-                    icon_url: None,
-                    goto_location: None,
-                    attachments: None,
-                });
-            }
-        }
-        "leave" => {
-            // Leave current channel
-            let channel = ChannelRepository::new(&state.db)
-                .get_by_id_optional(payload.channel_id)
-                .await?;
-
-            if let Some(ch) = channel {
-                if ch.channel_type == crate::models::ChannelType::Direct {
-                    return Ok(CommandResponse {
-                        response_type: "ephemeral".to_string(),
-                        text: "You cannot leave a direct message channel".to_string(),
-                        username: None,
-                        icon_url: None,
-                        goto_location: None,
-                        attachments: None,
-                    });
-                }
-
-                ChannelRepository::new(&state.db)
-                    .remove_member(payload.channel_id, auth.user_id)
-                    .await?;
-
-                // Broadcast member left
-                let event = crate::realtime::WsEnvelope::event(
-                    crate::realtime::EventType::MemberRemoved,
-                    serde_json::json!({
-                        "channel_id": payload.channel_id,
-                        "user_id": auth.user_id
-                    }),
-                    Some(payload.channel_id),
-                )
-                .with_broadcast(crate::realtime::WsBroadcast {
-                    channel_id: Some(payload.channel_id),
-                    team_id: None,
-                    user_id: None,
-                    exclude_user_id: None,
-                });
-                state.ws_hub.broadcast(event).await;
-
-                return Ok(CommandResponse {
-                    response_type: "ephemeral".to_string(),
-                    text: format!("You have left ~{}", ch.name),
-                    username: None,
-                    icon_url: None,
-                    goto_location: Some("/".to_string()),
-                    attachments: None,
-                });
-            }
-
-            return Ok(CommandResponse {
-                response_type: "ephemeral".to_string(),
-                text: "Channel not found".to_string(),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
-        }
-        "me" => {
-            // /me action - creates an italic-style action message
-            let user_name = UserRepository::new(&state.db)
-                .get_username(auth.user_id)
-                .await
-                .ok()
-                .flatten()
-                .unwrap_or_else(|| "someone".to_string());
-
-            let message = format!("*{} {}*", user_name, args);
-
-            let create_post_input = crate::models::CreatePost {
-                message,
-                file_ids: vec![],
-                props: Some(serde_json::json!({"from_command": "/me"})),
-                root_post_id: None,
-                client_msg_id: None,
-            };
-
-            let _ = crate::services::posts::create_post(
-                state,
-                auth.user_id,
-                payload.channel_id,
-                create_post_input,
-                None,
-            )
-            .await?;
-
-            return Ok(CommandResponse {
-                response_type: "ephemeral".to_string(),
-                text: String::new(),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
-        }
-        "help" => {
-            let help_text = r#"**Available Commands:**
-• `/call [end]` - Start or end a video call
-• `/join ~channel` - Join a channel
-• `/leave` - Leave current channel
-• `/me [action]` - Post an action message
-• `/shrug [message]` - Add ¯\_(ツ)_/¯ to your message
-• `/echo [text]` - Echo text back to you"#;
-
-            return Ok(CommandResponse {
-                response_type: "ephemeral".to_string(),
-                text: help_text.to_string(),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
-        }
-        _ => {}
+        return Ok(build_command_response(
+            "in_channel",
+            format!("@{} joined the call", user.username),
+            None,
+            Some(attachments),
+        ));
     }
 
-    // 3. Look up custom slash commands
-    // We need team_id. If not provided in payload (it's optional), try to get from channel.
-    let team_id = if let Some(tid) = payload.team_id {
-        tid
-    } else {
-        ChannelRepository::new(&state.db)
-            .get_team_id(payload.channel_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?
+    let call_id = uuid::Uuid::new_v4();
+    let call = CallState {
+        call_id,
+        channel_id,
+        owner_id: auth.user_id,
+        host_id: auth.user_id,
+        started_at: now,
+        participants: std::collections::HashMap::new(),
+        screen_sharer: None,
+        thread_id: None,
+        dismissed_users: std::collections::HashSet::new(),
     };
 
+    call_manager.add_call(call).await;
+
+    let participant = Participant {
+        user_id: auth.user_id,
+        session_id: uuid::Uuid::new_v4(),
+        joined_at: now,
+        muted: true,
+        screen_sharing: false,
+        hand_raised: false,
+    };
+
+    call_manager
+        .add_participant(call_id, participant.clone())
+        .await;
+
+    if let Ok(sfu) = state.sfu_manager.get_or_create_sfu(call_id).await {
+        let _ = sfu
+            .add_participant(auth.user_id, participant.session_id)
+            .await;
+    }
+
+    let event = crate::realtime::WsEnvelope {
+        msg_type: "event".to_string(),
+        event: "custom_com.mattermost.calls_call_start".to_string(),
+        seq: None,
+        channel_id: Some(channel_id),
+        data: serde_json::json!({
+            "channel_id": encode_mm_id(channel_id),
+            "user_id": encode_mm_id(auth.user_id),
+            "call_id": encode_mm_id(call_id),
+            "start_at": now.to_string(),
+            "owner_id": encode_mm_id(auth.user_id),
+        }),
+        broadcast: Some(crate::realtime::WsBroadcast {
+            channel_id: Some(channel_id),
+            team_id: None,
+            user_id: None,
+            exclude_user_id: Some(auth.user_id),
+        }),
+    };
+    state.ws_hub.broadcast(event).await;
+
+    let event = crate::realtime::WsEnvelope {
+        msg_type: "event".to_string(),
+        event: "custom_com.mattermost.calls_user_joined".to_string(),
+        seq: None,
+        channel_id: Some(channel_id),
+        data: serde_json::json!({
+            "channel_id": encode_mm_id(channel_id),
+            "user_id": encode_mm_id(auth.user_id),
+            "session_id": encode_mm_id(participant.session_id),
+            "muted": true,
+            "raised_hand": false,
+        }),
+        broadcast: Some(crate::realtime::WsBroadcast {
+            channel_id: Some(channel_id),
+            team_id: None,
+            user_id: None,
+            exclude_user_id: None,
+        }),
+    };
+    state.ws_hub.broadcast(event).await;
+
+    let attachments = serde_json::json!([
+        {
+            "color": "#166de0",
+            "title": "RustChat Call",
+            "text": "A call has started. Click to join.",
+            "actions": [
+                {
+                    "id": "join_call",
+                    "name": "Join Call",
+                    "type": "button",
+                    "style": "primary",
+                    "integration": {
+                        "url": format!("/plugins/com.mattermost.calls/calls/{}/join", encode_mm_id(channel_id)),
+                        "context": { "action": "join_call" }
+                    }
+                }
+            ]
+        }
+    ]);
+
+    let props = serde_json::json!({
+        "type": "custom_calls",
+        "attachments": attachments,
+        "call": {
+            "call_id": encode_mm_id(call_id),
+            "channel_id": encode_mm_id(channel_id),
+        }
+    });
+
+    let create_post_input = crate::models::CreatePost {
+        message: format!("Video call started by @ {}", user.username),
+        file_ids: vec![],
+        props: Some(props),
+        root_post_id: None,
+        client_msg_id: None,
+    };
+
+    let _ = crate::services::posts::create_post(
+        state,
+        auth.user_id,
+        channel_id,
+        create_post_input,
+        None,
+    )
+    .await?;
+
+    Ok(build_command_response(
+        "ephemeral",
+        "Call started",
+        None,
+        None,
+    ))
+}
+
+async fn execute_join_command(
+    state: &AppState,
+    auth: &CommandAuth,
+    payload: &ExecuteCommand,
+    args: &str,
+) -> ApiResult<CommandResponse> {
+    if args.is_empty() {
+        return Ok(build_command_response(
+            "ephemeral",
+            "Usage: /join ~channel-name",
+            None,
+            None,
+        ));
+    }
+
+    let channel_name = args.trim().trim_start_matches('~');
+
+    let current_team_id = ChannelRepository::new(&state.db)
+        .get_team_id(payload.channel_id)
+        .await?
+        .ok_or_else(|| AppError::ChannelNotFound)?;
+
+    let target_channel = ChannelRepository::new(&state.db)
+        .find_by_team_and_name(current_team_id, channel_name)
+        .await?;
+
+    if let Some(ch) = target_channel {
+        ChannelRepository::new(&state.db)
+            .add_member(ch.id, auth.user_id, "member")
+            .await?;
+
+        Ok(build_command_response(
+            "ephemeral",
+            format!("You have joined ~{}", ch.name),
+            Some(format!("/channels/{}", ch.id)),
+            None,
+        ))
+    } else {
+        Ok(build_command_response(
+            "ephemeral",
+            format!("Channel ~{} not found", channel_name),
+            None,
+            None,
+        ))
+    }
+}
+
+async fn execute_leave_command(
+    state: &AppState,
+    auth: &CommandAuth,
+    payload: &ExecuteCommand,
+) -> ApiResult<CommandResponse> {
+    let channel = ChannelRepository::new(&state.db)
+        .get_by_id_optional(payload.channel_id)
+        .await?;
+
+    if let Some(ch) = channel {
+        if ch.channel_type == crate::models::ChannelType::Direct {
+            return Ok(build_command_response(
+                "ephemeral",
+                "You cannot leave a direct message channel",
+                None,
+                None,
+            ));
+        }
+
+        ChannelRepository::new(&state.db)
+            .remove_member(payload.channel_id, auth.user_id)
+            .await?;
+
+        let event = crate::realtime::WsEnvelope::event(
+            crate::realtime::EventType::MemberRemoved,
+            serde_json::json!({
+                "channel_id": payload.channel_id,
+                "user_id": auth.user_id
+            }),
+            Some(payload.channel_id),
+        )
+        .with_broadcast(crate::realtime::WsBroadcast {
+            channel_id: Some(payload.channel_id),
+            team_id: None,
+            user_id: None,
+            exclude_user_id: None,
+        });
+        state.ws_hub.broadcast(event).await;
+
+        Ok(build_command_response(
+            "ephemeral",
+            format!("You have left ~{}", ch.name),
+            Some("/".to_string()),
+            None,
+        ))
+    } else {
+        Ok(build_command_response(
+            "ephemeral",
+            "Channel not found",
+            None,
+            None,
+        ))
+    }
+}
+
+async fn execute_me_command(
+    state: &AppState,
+    auth: &CommandAuth,
+    payload: &ExecuteCommand,
+    args: &str,
+) -> ApiResult<CommandResponse> {
+    let user_name = UserRepository::new(&state.db)
+        .get_username(auth.user_id)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "someone".to_string());
+
+    let message = format!("*{} {}*", user_name, args);
+
+    let create_post_input = crate::models::CreatePost {
+        message,
+        file_ids: vec![],
+        props: Some(serde_json::json!({"from_command": "/me"})),
+        root_post_id: None,
+        client_msg_id: None,
+    };
+
+    let _ = crate::services::posts::create_post(
+        state,
+        auth.user_id,
+        payload.channel_id,
+        create_post_input,
+        None,
+    )
+    .await?;
+
+    Ok(build_command_response("ephemeral", "", None, None))
+}
+
+async fn try_execute_builtin_command(
+    state: &AppState,
+    auth: &CommandAuth,
+    payload: &ExecuteCommand,
+    trigger: &str,
+    args: &str,
+) -> Option<ApiResult<CommandResponse>> {
+    match trigger {
+        "call" => Some(execute_call_command(state, auth, payload, args).await),
+        "echo" => Some(Ok(build_command_response(
+            "ephemeral",
+            format!("Echo: {}", args),
+            None,
+            None,
+        ))),
+        "shrug" => Some(Ok(build_command_response(
+            "in_channel",
+            format!("{} ¯\\_(ツ)_/¯", args),
+            None,
+            None,
+        ))),
+        "invite" => Some(Ok(build_command_response(
+            "ephemeral",
+            format!("Invitation sent to {}", args),
+            None,
+            None,
+        ))),
+        "join" => Some(execute_join_command(state, auth, payload, args).await),
+        "leave" => Some(execute_leave_command(state, auth, payload).await),
+        "me" => Some(execute_me_command(state, auth, payload, args).await),
+        "help" => Some(Ok(build_command_response(
+            "ephemeral",
+            HELP_TEXT,
+            None,
+            None,
+        ))),
+        _ => None,
+    }
+}
+
+async fn execute_custom_slash_command(
+    state: &AppState,
+    auth: &CommandAuth,
+    payload: &ExecuteCommand,
+    trigger: &str,
+    args: &str,
+) -> ApiResult<CommandResponse> {
+    let team_id = resolve_team_id(state, payload).await?;
     let command = IntegrationRepository::new(&state.db)
         .get_slash_command_by_team_and_trigger(team_id, trigger)
         .await?;
 
     if let Some(cmd) = command {
-        // Fetch username
         let user_name = UserRepository::new(&state.db)
             .get_username(auth.user_id)
             .await
@@ -989,7 +967,6 @@ pub async fn execute_command_internal(
             .flatten()
             .unwrap_or_else(|| "unknown".to_string());
 
-        // Fetch channel name
         let channel_name = ChannelRepository::new(&state.db)
             .get_name(payload.channel_id)
             .await
@@ -997,19 +974,15 @@ pub async fn execute_command_internal(
             .flatten()
             .unwrap_or_else(|| "unknown".to_string());
 
-        // Validate slash command URL to prevent SSRF
         if !is_valid_callback_url(&cmd.url) {
-            return Ok(CommandResponse {
-                response_type: "ephemeral".to_string(),
-                text: "Command URL is not valid or points to an internal address".to_string(),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
+            return Ok(build_command_response(
+                "ephemeral",
+                "Command URL is not valid or points to an internal address",
+                None,
+                None,
+            ));
         }
 
-        // Execute external command (HTTP POST)
         let client = reqwest::Client::new();
 
         let payload_out = OutgoingWebhookPayload {
@@ -1019,7 +992,7 @@ pub async fn execute_command_internal(
             channel_name,
             user_id: auth.user_id,
             user_name,
-            text: args,
+            text: args.to_string(),
             trigger_word: trigger.to_string(),
         };
 
@@ -1044,7 +1017,7 @@ pub async fn execute_command_internal(
         .await?;
 
         if res.status().is_success() {
-            let resp_body: CommandResponse =
+            let resp_body =
                 res.json::<CommandResponse>()
                     .await
                     .unwrap_or_else(|_| CommandResponse {
@@ -1055,27 +1028,44 @@ pub async fn execute_command_internal(
                         goto_location: None,
                         attachments: None,
                     });
-            return Ok(resp_body);
+            Ok(resp_body)
         } else {
-            return Ok(CommandResponse {
-                response_type: "ephemeral".to_string(),
-                text: format!("Command failed with status: {}", res.status()),
-                username: None,
-                icon_url: None,
-                goto_location: None,
-                attachments: None,
-            });
+            Ok(build_command_response(
+                "ephemeral",
+                format!("Command failed with status: {}", res.status()),
+                None,
+                None,
+            ))
         }
+    } else {
+        Ok(build_command_response(
+            "ephemeral",
+            format!("Command /{} not found", trigger),
+            None,
+            None,
+        ))
     }
+}
 
-    Ok(CommandResponse {
-        response_type: "ephemeral".to_string(),
-        text: format!("Command /{} not found", trigger),
-        username: None,
-        icon_url: None,
-        goto_location: None,
-        attachments: None,
-    })
+pub async fn execute_slash_command(
+    state: &AppState,
+    auth: CommandAuth,
+    payload: ExecuteCommand,
+) -> ApiResult<CommandResponse> {
+    let (trigger, args) = parse_command_input(&payload.command)?;
+    if let Some(result) = try_execute_builtin_command(state, &auth, &payload, trigger, &args).await
+    {
+        return result;
+    }
+    execute_custom_slash_command(state, &auth, &payload, trigger, &args).await
+}
+
+pub async fn execute_command_internal(
+    state: &AppState,
+    auth: CommandAuth,
+    payload: ExecuteCommand,
+) -> ApiResult<CommandResponse> {
+    execute_slash_command(state, auth, payload).await
 }
 
 // ============ Bots ============
@@ -1128,10 +1118,10 @@ async fn get_bot(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
-        return Err(AppError::Forbidden("Cannot access this bot".to_string()));
+        return Err(AppError::CannotAccessBot);
     }
 
     Ok(Json(bot))
@@ -1145,7 +1135,7 @@ async fn delete_bot(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
         return Err(AppError::Forbidden("Cannot delete this bot".to_string()));
@@ -1164,10 +1154,10 @@ async fn list_bot_tokens(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
-        return Err(AppError::Forbidden("Cannot access this bot".to_string()));
+        return Err(AppError::CannotAccessBot);
     }
 
     let tokens = IntegrationRepository::new(&state.db)
@@ -1191,10 +1181,10 @@ async fn create_bot_token(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
-        return Err(AppError::Forbidden("Cannot access this bot".to_string()));
+        return Err(AppError::CannotAccessBot);
     }
 
     let token = generate_token();
@@ -1214,10 +1204,10 @@ async fn revoke_bot_token(
     let bot = IntegrationRepository::new(&state.db)
         .get_bot_by_id(bot_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bot not found".to_string()))?;
+        .ok_or_else(|| AppError::BotNotFound)?;
 
     if !auth.can_access_owned(bot.owner_id, &permissions::ADMIN_FULL) {
-        return Err(AppError::Forbidden("Cannot access this bot".to_string()));
+        return Err(AppError::CannotAccessBot);
     }
 
     IntegrationRepository::new(&state.db)

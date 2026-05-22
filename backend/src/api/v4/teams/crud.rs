@@ -32,13 +32,12 @@ pub async fn get_team(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<mm::Team>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
     let team: Team = TeamRepository::new(&state.db)
         .get_team_by_id(team_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
 
     Ok(Json(team.into()))
 }
@@ -51,13 +50,12 @@ pub async fn patch_team(
     body: Bytes,
 ) -> ApiResult<Json<mm::Team>> {
     let _value: serde_json::Value = parse_body(&headers, &body, "Invalid patch body")?;
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
     let team: Team = TeamRepository::new(&state.db)
         .get_team_by_id(team_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     Ok(Json(team.into()))
 }
 
@@ -72,8 +70,7 @@ pub async fn update_team_privacy(
     Path(team_id): Path<String>,
     Json(input): Json<UpdatePrivacyRequest>,
 ) -> ApiResult<Json<mm::Team>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
     let privacy = match input.privacy.as_str() {
         "O" => "open",
@@ -87,7 +84,7 @@ pub async fn update_team_privacy(
     let updated: Team = TeamRepository::new(&state.db)
         .update_team_privacy(team_id, privacy)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     Ok(Json(updated.into()))
 }
 
@@ -96,21 +93,20 @@ pub async fn restore_team(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<mm::Team>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
     // Verify team exists and is archived (deleted_at IS NOT NULL)
     let team: Team = TeamRepository::new(&state.db)
         .get_team_by_id(team_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     if team.deleted_at.is_none() {
         return Err(AppError::BadRequest("Team is not archived".to_string()));
     }
     let restored: Team = TeamRepository::new(&state.db)
         .restore_team(team_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     Ok(Json(restored.into()))
 }
 
@@ -122,7 +118,7 @@ pub async fn get_team_by_name(
     let team: Team = TeamRepository::new(&state.db)
         .get_team_by_name(&name)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     ensure_team_member(&state, team.id, auth.user_id).await?;
     Ok(Json(team.into()))
 }

@@ -197,7 +197,7 @@ async fn get_provider(
     let provider = repo
         .get_mail_provider(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Provider not found".to_string()))?;
+        .ok_or_else(|| AppError::ProviderNotFound)?;
 
     Ok(Json(provider.into()))
 }
@@ -272,7 +272,7 @@ async fn update_provider(
     let existing = repo
         .get_mail_provider(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Provider not found".to_string()))?;
+        .ok_or_else(|| AppError::ProviderNotFound)?;
 
     // Process password if provided
     let password_encrypted = if let Some(ref password) = body.password {
@@ -331,7 +331,7 @@ async fn delete_provider(
     let deleted = repo.delete_mail_provider(id).await?;
 
     if !deleted {
-        return Err(AppError::NotFound("Provider not found".to_string()));
+        return Err(AppError::ProviderNotFound);
     }
 
     info!("Deleted mail provider: id={}", id);
@@ -351,7 +351,7 @@ async fn set_default_provider(
     let provider = repo
         .get_mail_provider(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Provider not found".to_string()))?;
+        .ok_or_else(|| AppError::ProviderNotFound)?;
 
     // Clear other defaults for this tenant
     repo.clear_default_mail_providers(provider.tenant_id)
@@ -382,7 +382,7 @@ async fn test_provider(
     let settings = repo
         .get_mail_provider(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Provider not found".to_string()))?;
+        .ok_or_else(|| AppError::ProviderNotFound)?;
 
     // Create provider and test connection
     let provider = SmtpProvider::new(settings.clone(), &state.config.encryption_key)
@@ -629,7 +629,7 @@ async fn get_template_version(
     let version = repo
         .get_email_template_version(version_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Template version not found".to_string()))?;
+        .ok_or_else(|| AppError::TemplateVersionNotFound)?;
 
     Ok(Json(version.into()))
 }
@@ -674,7 +674,7 @@ async fn update_template_version(
     let existing = repo
         .get_email_template_version(version_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Template version not found".to_string()))?;
+        .ok_or_else(|| AppError::TemplateVersionNotFound)?;
 
     if existing.status != TemplateStatus::Draft {
         return Err(AppError::Forbidden(
@@ -738,7 +738,7 @@ async fn preview_template(
     let version = repo
         .get_email_template_version(version_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Template version not found".to_string()))?;
+        .ok_or_else(|| AppError::TemplateVersionNotFound)?;
 
     let renderer = TemplateRenderer::new();
 
@@ -787,7 +787,7 @@ async fn send_preview_email(
     let version = repo
         .get_email_template_version(version_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Template version not found".to_string()))?;
+        .ok_or_else(|| AppError::TemplateVersionNotFound)?;
 
     // Render
     let renderer = TemplateRenderer::new();

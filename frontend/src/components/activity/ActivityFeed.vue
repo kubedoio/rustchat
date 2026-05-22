@@ -37,14 +37,14 @@
       </div>
 
       <!-- Filters -->
-      <ActivityFilters
-        :model-value="filter"
-        @update:model-value="handleFilterChange"
-      />
+      <ActivityFilters :model-value="filter" @update:model-value="handleFilterChange" />
 
       <!-- Activity List -->
       <div class="flex-1 overflow-y-auto">
-        <div v-if="isLoading && activities.length === 0" class="flex items-center justify-center py-12 text-gray-500">
+        <div
+          v-if="isLoading && activities.length === 0"
+          class="flex items-center justify-center py-12 text-gray-500"
+        >
           <Loader2 class="w-6 h-6 animate-spin mr-2" />
           Loading...
         </div>
@@ -80,15 +80,12 @@
 
   <!-- Backdrop -->
   <Transition name="fade">
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 bg-black/20 z-40"
-      @click="close"
-    />
+    <div v-if="isOpen" class="fixed inset-0 bg-black/20 z-40" @click="close" />
   </Transition>
 </template>
 
 <script setup lang="ts">
+import { log } from '@/utils/log'
 import { computed, onMounted, onUnmounted } from 'vue'
 import { Bell, X, Inbox, Loader2 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
@@ -134,7 +131,7 @@ async function handleMarkRead(activityId: string) {
   try {
     await activityService.markRead(activityId)
   } catch (error) {
-    console.error('Failed to mark activity as read:', error)
+    log.error('Failed to mark activity as read:', error)
   }
 }
 
@@ -142,7 +139,7 @@ async function handleMarkAllRead() {
   try {
     await activityService.markAllRead()
   } catch (error) {
-    console.error('Failed to mark all as read:', error)
+    log.error('Failed to mark all as read:', error)
   }
 }
 

@@ -50,7 +50,7 @@ pub fn router() -> Router<AppState> {
 pub fn require_admin(auth: &AuthUser) -> ApiResult<()> {
     match PolicyEngine::check_permission(&auth.role, &policy_permissions::SYSTEM_MANAGE) {
         AuthzResult::Allow => Ok(()),
-        AuthzResult::Deny(_) => Err(AppError::Forbidden("Admin access required".to_string())),
+        AuthzResult::Deny(_) => Err(AppError::AdminRequired),
     }
 }
 

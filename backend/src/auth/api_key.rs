@@ -1,13 +1,13 @@
 //! API key generation and validation for non-human entities
 //!
-//! This module provides secure API key generation and bcrypt-based hashing for
+//! This module provides secure API key generation and argon2-based hashing for
 //! authentication of agents, services, and CI/CD systems. API keys consist of
-//! "rck_" prefix plus 64 hex characters (68 total) hashed with bcrypt cost factor 12.
+//! "rck_" prefix plus 64 hex characters (68 total) hashed with argon2id.
 //!
 //! # Security Features
 //!
 //! - Cryptographically secure random generation using `rand::thread_rng()`
-//! - Bcrypt hashing with cost factor 12 for defense against brute force
+//! - Argon2id hashing for defense against brute force
 //! - Constant-time validation to resist timing attacks
 //! - Async-safe operations using `tokio::task::spawn_blocking` for CPU-intensive work
 //!
@@ -36,6 +36,10 @@
 
 use crate::error::AppError;
 use anyhow::{Context, Result};
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
 use rand::Rng;
 
 /// Generate a new API key with "rck_" prefix plus 64 hex characters
@@ -111,12 +115,11 @@ pub fn extract_prefix(key: &str) -> Result<String, AppError> {
     Ok(prefix.to_string())
 }
 
-/// Hash an API key using bcrypt with cost factor 12
+/// Hash an API key using argon2id
 ///
-/// This function performs CPU-intensive bcrypt hashing in a blocking thread
-/// pool to avoid blocking the async runtime. The bcrypt cost factor is set
-/// to 12 (4096 iterations), providing strong defense against brute force
-/// attacks while maintaining acceptable performance.
+/// This function performs CPU-intensive argon2 hashing in a blocking thread
+/// pool to avoid blocking the async runtime. Uses the default argon2id
+/// parameters, providing strong defense against brute force attacks.
 ///
 /// # Arguments
 ///
@@ -124,11 +127,11 @@ pub fn extract_prefix(key: &str) -> Result<String, AppError> {
 ///
 /// # Returns
 ///
-/// A bcrypt hash string (60 characters, format: `$2b$12$...`) or an error
+/// An argon2id hash string (format: `$argon2id$...`) or an error
 ///
 /// # Errors
 ///
-/// Returns an error if bcrypt hashing fails
+/// Returns an error if argon2 hashing fails
 ///
 /// # Example
 ///
@@ -146,24 +149,29 @@ pub fn extract_prefix(key: &str) -> Result<String, AppError> {
 pub async fn hash_api_key(api_key: &str) -> Result<String> {
     let api_key = api_key.to_string();
 
-    // Perform CPU-intensive bcrypt hashing in blocking thread pool
+    // Perform CPU-intensive argon2 hashing in blocking thread pool
     tokio::task::spawn_blocking(move || {
-        bcrypt::hash(api_key, bcrypt::DEFAULT_COST).context("Failed to hash API key")
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        argon2
+            .hash_password(api_key.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
+            .map_err(|e| anyhow::anyhow!("Failed to hash API key: {}", e))
     })
     .await
-    .context("Bcrypt hashing task panicked")?
+    .context("Argon2 hashing task panicked")?
 }
 
-/// Validate an API key against its bcrypt hash
+/// Validate an API key against its argon2id hash
 ///
-/// This function performs constant-time comparison using bcrypt's built-in
+/// This function performs constant-time comparison using argon2's built-in
 /// verification to resist timing attacks. The CPU-intensive verification is
 /// performed in a blocking thread pool to avoid blocking the async runtime.
 ///
 /// # Arguments
 ///
 /// * `api_key` - The plaintext API key to validate
-/// * `hash` - The bcrypt hash to verify against (60 characters)
+/// * `hash` - The argon2id hash to verify against
 ///
 /// # Returns
 ///
@@ -179,7 +187,7 @@ pub async fn hash_api_key(api_key: &str) -> Result<String> {
 ///
 /// # Security
 ///
-/// Uses constant-time comparison via bcrypt to prevent timing attacks that
+/// Uses constant-time comparison via argon2 to prevent timing attacks that
 /// could leak information about the hash.
 ///
 /// # Example
@@ -206,12 +214,16 @@ pub async fn validate_api_key(api_key: &str, hash: &str) -> Result<bool> {
     let api_key = api_key.to_string();
     let hash = hash.to_string();
 
-    // Perform CPU-intensive bcrypt verification in blocking thread pool
+    // Perform CPU-intensive argon2 verification in blocking thread pool
     tokio::task::spawn_blocking(move || {
-        bcrypt::verify(&api_key, &hash).context("Failed to verify API key")
+        let parsed_hash = PasswordHash::new(&hash)
+            .map_err(|e| anyhow::anyhow!("Invalid API key hash format: {}", e))?;
+        Ok(Argon2::default()
+            .verify_password(api_key.as_bytes(), &parsed_hash)
+            .is_ok())
     })
     .await
-    .context("Bcrypt verification task panicked")?
+    .context("Argon2 verification task panicked")?
 }
 
 #[cfg(test)]
@@ -240,8 +252,7 @@ mod tests {
         let key = generate_api_key();
         let hash = hash_api_key(&key).await.unwrap();
 
-        assert!(hash.starts_with("$2b$") || hash.starts_with("$2a$") || hash.starts_with("$2y$"));
-        assert_eq!(hash.len(), 60);
+        assert!(hash.starts_with("$argon2id$"));
 
         let is_valid = validate_api_key(&key, &hash).await.unwrap();
         assert!(is_valid);

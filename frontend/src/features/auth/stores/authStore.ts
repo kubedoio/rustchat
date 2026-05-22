@@ -1,8 +1,16 @@
+import { log } from '@/utils/log'
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useStorage } from '@vueuse/core'
 import client from '../../../api/client'
-import type { AuthUser, LoginCredentials, AuthResponse, AuthPolicy, StatusUpdateInput, StatusSnapshot } from '../../../core/entities/Auth'
+import type {
+  AuthUser,
+  LoginCredentials,
+  AuthResponse,
+  AuthPolicy,
+  StatusUpdateInput,
+  StatusSnapshot,
+} from '../../../core/entities/Auth'
 import type { PresenceStatus } from '../../../core/entities/User'
 import { clearUserSummaryCache } from '../../../composables/useUserSummary'
 import { clearChannelPermissionCache } from '../../permissions/capabilities'
@@ -93,7 +101,10 @@ export const useAuthStore = defineStore('authStore', () => {
       user.value.presence = nextPresence
     }
 
-    const nextExpiresAt = (snapshot.expiresAt ?? snapshot.expires_at ?? null) as string | number | null
+    const nextExpiresAt = (snapshot.expiresAt ?? snapshot.expires_at ?? null) as
+      | string
+      | number
+      | null
     user.value.status_text = snapshot.text ?? null
     user.value.status_emoji = snapshot.emoji ?? null
     user.value.status_expires_at = nextExpiresAt
@@ -250,7 +261,7 @@ export const useAuthStore = defineStore('authStore', () => {
         expiresAt: data.expires_at,
       })
     } catch (e) {
-      console.error('Failed to update status', e)
+      log.error('Failed to update status', e)
     }
   }
 
@@ -260,7 +271,7 @@ export const useAuthStore = defineStore('authStore', () => {
       authPolicy.value = data
       return data
     } catch (e) {
-      console.error('Failed to fetch auth policy', e)
+      log.error('Failed to fetch auth policy', e)
     }
   }
 
@@ -336,6 +347,6 @@ export const useAuthStore = defineStore('authStore', () => {
     setError,
     setInitializing,
     clearError,
-    clear
+    clear,
   }
 })

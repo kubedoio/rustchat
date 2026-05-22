@@ -4,14 +4,17 @@ import { ref, onMounted, onUnmounted } from 'vue'
 declare global {
   interface Window {
     turnstile?: {
-      render: (container: HTMLElement | string, options: {
-        sitekey: string
-        callback?: (token: string) => void
-        'error-callback'?: () => void
-        'expired-callback'?: () => void
-        theme?: 'light' | 'dark' | 'auto'
-        size?: 'normal' | 'compact' | 'invisible'
-      }) => string
+      render: (
+        container: HTMLElement | string,
+        options: {
+          sitekey: string
+          callback?: (token: string) => void
+          'error-callback'?: () => void
+          'expired-callback'?: () => void
+          theme?: 'light' | 'dark' | 'auto'
+          size?: 'normal' | 'compact' | 'invisible'
+        }
+      ) => string
       remove: (widgetId: string) => void
       reset: (widgetId: string) => void
     }
@@ -40,7 +43,7 @@ function onTurnstileLoad() {
 
 function renderWidget() {
   if (!containerRef.value || !window.turnstile) return
-  
+
   widgetId.value = window.turnstile.render(containerRef.value, {
     sitekey: props.siteKey,
     callback: (token: string) => {
@@ -67,7 +70,9 @@ onMounted(() => {
   window.onTurnstileLoad = onTurnstileLoad
 
   // Load Turnstile script if not already present
-  if (!document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]')) {
+  if (
+    !document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]')
+  ) {
     const script = document.createElement('script')
     script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad'
     script.async = true
@@ -87,7 +92,7 @@ defineExpose({
     if (widgetId.value && window.turnstile) {
       window.turnstile.reset(widgetId.value)
     }
-  }
+  },
 })
 </script>
 

@@ -6,7 +6,7 @@ import type {
   AdminUser,
   AuditLog,
   SystemStats,
-  HealthStatus
+  HealthStatus,
 } from '../../../api/admin'
 import { withRetry } from '../../../core/services/retry'
 
@@ -60,7 +60,7 @@ export const adminRepository = {
         username: data.username,
         password: data.password,
         role: data.role,
-        display_name: data.displayName
+        display_name: data.displayName,
       })
       return response.data
     })
@@ -111,5 +111,5 @@ export const adminRepository = {
       const response = await adminApi.getHealth()
       return response.data
     })
-  }
+  },
 }

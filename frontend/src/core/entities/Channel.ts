@@ -6,7 +6,7 @@ export type ChannelType = 'public' | 'private' | 'direct' | 'group'
 
 export interface Channel {
   id: ChannelId
-  teamId?: string  // Use string instead of TeamId to avoid circular dependency
+  teamId?: string // Use string instead of TeamId to avoid circular dependency
   name: string
   displayName: string
   type: ChannelType
@@ -15,14 +15,14 @@ export interface Channel {
   creatorId: UserId
   createdAt: Date
   updatedAt: Date
-  
+
   // Membership
   memberCount?: number
   isArchived: boolean
-  
+
   // For DM/Group channels
   participantIds?: UserId[]
-  
+
   // Unread state (client-side only)
   unreadCount?: number
   mentionCount?: number

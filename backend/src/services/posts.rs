@@ -8,6 +8,7 @@ use crate::models::{
     normalize_avatar_url, ChannelMember, CreatePost, FileUploadResponse, Post, PostResponse,
 };
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
+use crate::repositories::{ChannelRepository, PlaybookRepository, PostRepository, UserRepository};
 use crate::services::activity;
 use regex::Regex;
 
@@ -29,13 +30,9 @@ async fn validate_create_post(
     ensure_permission(state, user_id, "post.create").await?;
 
     // Check membership
-    let _: ChannelMember =
-        sqlx::query_as("SELECT * FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(user_id)
-            .fetch_optional(&state.db)
-            .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))?;
+    let _: ChannelMember = PostRepository::new(state.db.clone())
+        .require_channel_membership(channel_id, user_id)
+        .await?;
 
     // Validate message
     if input.message.trim().is_empty() && input.file_ids.is_empty() {
@@ -45,19 +42,9 @@ async fn validate_create_post(
     // Validate root_post_id if provided
     let root_post_id = input.root_post_id;
     if let Some(r_id) = root_post_id {
-        let root_post: Option<Post> = sqlx::query_as(
-            r#"
-            SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-                   is_pinned, created_at, edited_at, deleted_at,
-                   reply_count::int8 as reply_count,
-                   last_reply_at, seq
-            FROM posts WHERE id = $1 AND channel_id = $2
-            "#,
-        )
-        .bind(r_id)
-        .bind(channel_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let root_post = PostRepository::new(state.db.clone())
+            .get_post_by_id_and_channel(r_id, channel_id)
+            .await?;
 
         if root_post.is_none() {
             return Err(AppError::BadRequest("Invalid root post".to_string()));
@@ -74,24 +61,16 @@ async fn insert_post(
     input: &CreatePost,
     root_post_id: Option<Uuid>,
 ) -> ApiResult<Post> {
-    let post: Post = sqlx::query_as(
-        r#"
-        INSERT INTO posts (channel_id, user_id, root_post_id, message, props, file_ids)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                  is_pinned, created_at, edited_at, deleted_at,
-                  reply_count::int8 as reply_count,
-                  last_reply_at, seq
-        "#,
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .bind(root_post_id)
-    .bind(&input.message)
-    .bind(input.props.clone().unwrap_or(serde_json::json!({})))
-    .bind(&input.file_ids)
-    .fetch_one(&state.db)
-    .await?;
+    let post = PostRepository::new(state.db.clone())
+        .create_post(
+            channel_id,
+            user_id,
+            root_post_id,
+            &input.message,
+            input.props.clone().unwrap_or(serde_json::json!({})),
+            &input.file_ids,
+        )
+        .await?;
 
     Ok(post)
 }
@@ -104,31 +83,24 @@ async fn handle_reply_side_effects(
     root_post_id: Uuid,
     message: &str,
 ) -> ApiResult<()> {
-    sqlx::query(
-        "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1",
-    )
-    .bind(root_post_id)
-    .execute(&state.db)
-    .await?;
+    PostRepository::new(state.db.clone())
+        .increment_reply_count(root_post_id)
+        .await?;
 
     // Create reply/thread_reply activity for the parent post author
-    let parent_info: Option<(Uuid, Option<Uuid>)> =
-        sqlx::query_as("SELECT user_id, root_post_id FROM posts WHERE id = $1")
-            .bind(root_post_id)
-            .fetch_optional(&state.db)
-            .await
-            .ok()
-            .flatten();
+    let parent_info = PostRepository::new(state.db.clone())
+        .get_parent_info(root_post_id)
+        .await
+        .ok()
+        .flatten();
 
     if let Some((parent_user_id, parent_root_id)) = parent_info {
         if parent_user_id != user_id {
-            let team_id_for_reply: Option<Uuid> =
-                sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-                    .bind(channel_id)
-                    .fetch_optional(&state.db)
-                    .await
-                    .ok()
-                    .flatten();
+            let team_id_for_reply = ChannelRepository::new(&state.db)
+                .get_team_id(channel_id)
+                .await
+                .ok()
+                .flatten();
 
             if let Some(team_id) = team_id_for_reply {
                 if parent_root_id.is_some() {
@@ -170,18 +142,9 @@ async fn build_post_response(
     user_id: Uuid,
     client_msg_id: Option<String>,
 ) -> ApiResult<PostResponse> {
-    #[derive(sqlx::FromRow)]
-    struct PostUser {
-        username: String,
-        avatar_url: Option<String>,
-        email: String,
-    }
-
-    let user: PostUser =
-        sqlx::query_as("SELECT username, avatar_url, email FROM users WHERE id = $1")
-            .bind(user_id)
-            .fetch_one(&state.db)
-            .await?;
+    let (username, avatar_url, email) = UserRepository::new(&state.db)
+        .get_username_avatar_email(user_id)
+        .await?;
 
     let mut response = PostResponse {
         id: post.id,
@@ -195,9 +158,9 @@ async fn build_post_response(
         created_at: post.created_at,
         edited_at: post.edited_at,
         deleted_at: post.deleted_at,
-        username: Some(user.username),
-        avatar_url: user.avatar_url,
-        email: Some(user.email),
+        username: Some(username),
+        avatar_url,
+        email: Some(email),
         reply_count: post.reply_count,
         last_reply_at: post.last_reply_at,
         files: vec![],
@@ -275,19 +238,16 @@ async fn run_post_automation(
     // Check for outgoing webhook triggers
     if root_post_id.is_none() {
         // Get team_id for the channel
-        if let Ok(team_id) =
-            sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM channels WHERE id = $1")
-                .bind(channel_id)
-                .fetch_one(&state.db)
-                .await
+        if let Ok(Some(team_id)) = ChannelRepository::new(&state.db)
+            .get_team_id(channel_id)
+            .await
         {
-            // Get channel name and username
-            let channel_name: String =
-                sqlx::query_scalar("SELECT name FROM channels WHERE id = $1")
-                    .bind(channel_id)
-                    .fetch_one(&state.db)
-                    .await
-                    .unwrap_or_default();
+            let channel_name = ChannelRepository::new(&state.db)
+                .get_name(channel_id)
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_default();
             let username = response.username.clone().unwrap_or_default();
 
             let _ = crate::services::webhooks::check_outgoing_triggers(
@@ -323,10 +283,8 @@ async fn handle_mentions(
         props.insert("mentions".to_string(), serde_json::json!(&mentions));
 
         // Update DB with the new props
-        sqlx::query("UPDATE posts SET props = $1 WHERE id = $2")
-            .bind(serde_json::Value::Object(props.clone()))
-            .bind(post_id)
-            .execute(&state.db)
+        let _ = PostRepository::new(state.db.clone())
+            .update_props(post_id, serde_json::Value::Object(props.clone()))
             .await
             .ok();
 
@@ -334,23 +292,19 @@ async fn handle_mentions(
 
         // Create mention activities for mentioned users
         // Get team_id for the channel
-        let team_id_opt: Option<Uuid> =
-            sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-                .bind(channel_id)
-                .fetch_optional(&state.db)
-                .await
-                .ok()
-                .flatten();
+        let team_id_opt = ChannelRepository::new(&state.db)
+            .get_team_id(channel_id)
+            .await
+            .ok()
+            .flatten();
 
         if let Some(team_id) = team_id_opt {
             // Batch-resolve usernames to user IDs
             let usernames = mentions.iter().map(|m| m.as_str()).collect::<Vec<_>>();
-            let users: Vec<(Uuid, String)> =
-                sqlx::query_as("SELECT id, username FROM users WHERE username = ANY($1)")
-                    .bind(&usernames)
-                    .fetch_all(&state.db)
-                    .await
-                    .unwrap_or_default();
+            let users = UserRepository::new(&state.db)
+                .get_ids_by_usernames(&usernames)
+                .await
+                .unwrap_or_default();
 
             let mentioned_user_ids: Vec<Uuid> = users
                 .into_iter()
@@ -360,14 +314,10 @@ async fn handle_mentions(
 
             if !mentioned_user_ids.is_empty() {
                 // Batch-check channel memberships
-                let member_ids: Vec<Uuid> = sqlx::query_scalar::<_, Uuid>(
-                    "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = ANY($2)"
-                )
-                .bind(channel_id)
-                .bind(&mentioned_user_ids)
-                .fetch_all(&state.db)
-                .await
-                .unwrap_or_default();
+                let member_ids = ChannelRepository::new(&state.db)
+                    .get_member_ids_by_user_ids(channel_id, &mentioned_user_ids)
+                    .await
+                    .unwrap_or_default();
 
                 for mentioned_user_id in member_ids {
                     let _ = activity::create_mention_activity(
@@ -398,14 +348,11 @@ async fn send_push_notifications(
     username_for_push: String,
 ) {
     // Get channel info for push notifications
-    let channel_info: Option<(String, String, String)> = sqlx::query_as(
-        "SELECT c.name, c.display_name, c.type::text as channel_type FROM channels c WHERE c.id = $1"
-    )
-    .bind(channel_id)
-    .fetch_optional(&state.db)
-    .await
-    .ok()
-    .flatten();
+    let channel_info = ChannelRepository::new(&state.db)
+        .get_channel_push_info(channel_id)
+        .await
+        .ok()
+        .flatten();
 
     if let Some((channel_name, channel_display_name, channel_type)) = channel_info {
         let is_dm = channel_type == "direct";
@@ -415,25 +362,17 @@ async fn send_push_notifications(
         // Get channel members to notify
         let members_to_notify: Vec<Uuid> = if is_dm {
             // For DMs, notify the other participant
-            sqlx::query_scalar::<_, Uuid>(
-                "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id != $2",
-            )
-            .bind(channel_id)
-            .bind(user_id)
-            .fetch_all(&state.db)
-            .await
-            .unwrap_or_default()
+            ChannelRepository::new(&state.db)
+                .get_other_dm_participant(channel_id, user_id)
+                .await
+                .unwrap_or_default()
         } else if !mentions.is_empty() {
             // For mentions, find the mentioned users who are channel members
             let usernames = mentions.iter().map(|m| m.as_str()).collect::<Vec<_>>();
-            sqlx::query_scalar::<_, Uuid>(
-                "SELECT cm.user_id FROM channel_members cm JOIN users u ON cm.user_id = u.id WHERE cm.channel_id = $1 AND u.username = ANY($2)"
-            )
-            .bind(channel_id)
-            .bind(&usernames)
-            .fetch_all(&state.db)
-            .await
-            .unwrap_or_default()
+            ChannelRepository::new(&state.db)
+                .get_member_ids_by_usernames(channel_id, &usernames)
+                .await
+                .unwrap_or_default()
         } else {
             // No mentions and not a DM - don't send push notification for regular messages
             vec![]
@@ -551,21 +490,16 @@ fn truncate_preview(message: &str, max_chars: usize) -> String {
 }
 
 async fn ensure_permission(state: &AppState, user_id: Uuid, permission: &str) -> ApiResult<()> {
-    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_one(&state.db)
+    let role = UserRepository::new(&state.db)
+        .get_role_by_id(user_id)
         .await?;
 
-    let allowed: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM role_permissions WHERE role = $1 AND permission_id = $2)",
-    )
-    .bind(&role)
-    .bind(permission)
-    .fetch_one(&state.db)
-    .await?;
+    let allowed = UserRepository::new(&state.db)
+        .has_permission(&role, permission)
+        .await?;
 
     if !allowed {
-        return Err(AppError::Forbidden("Insufficient permissions".to_string()));
+        return Err(AppError::InsufficientPermissions);
     }
 
     Ok(())
@@ -574,32 +508,21 @@ async fn ensure_permission(state: &AppState, user_id: Uuid, permission: &str) ->
 /// Helper to ensure all participants of a DM are members (resurrects DM)
 pub async fn ensure_dm_membership(state: &AppState, channel_id: Uuid) -> ApiResult<()> {
     // 1. Get channel info
-    let chan: crate::models::Channel =
-        match sqlx::query_as("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
-            .bind(channel_id)
-            .fetch_optional(&state.db)
-            .await?
-        {
-            Some(c) => c,
-            None => return Ok(()),
-        };
+    let chan = match ChannelRepository::new(&state.db)
+        .get_by_id_optional(channel_id)
+        .await?
+    {
+        Some(c) => c,
+        None => return Ok(()),
+    };
 
     if chan.channel_type == crate::models::ChannelType::Direct {
         if let Some((u1, u2)) = crate::models::parse_direct_channel_name(&chan.name) {
             for target_user_id in [u1, u2] {
                 // Ensure member exists
-                let added: Option<Uuid> = sqlx::query_scalar(
-                    r#"
-                        INSERT INTO channel_members (channel_id, user_id, role) 
-                        VALUES ($1, $2, 'member') 
-                        ON CONFLICT (channel_id, user_id) DO NOTHING
-                        RETURNING user_id
-                        "#,
-                )
-                .bind(channel_id)
-                .bind(target_user_id)
-                .fetch_optional(&state.db)
-                .await?;
+                let added = ChannelRepository::new(&state.db)
+                    .ensure_membership(channel_id, target_user_id)
+                    .await?;
 
                 if added.is_some() {
                     // User was missing and just re-added.
@@ -639,11 +562,9 @@ pub async fn populate_files(state: &AppState, posts: &mut [PostResponse]) -> Api
     }
 
     // 2. Fetch file infos
-    let files: Vec<crate::models::FileInfo> =
-        sqlx::query_as("SELECT id, uploader_id, channel_id, post_id, name, key, mime_type, size, backend, width, height, has_thumbnail, thumbnail_key, sha256, created_at FROM files WHERE id = ANY($1)")
-            .bind(&all_file_ids)
-            .fetch_all(&state.db)
-            .await?;
+    let files = PostRepository::new(state.db.clone())
+        .get_post_files(&all_file_ids)
+        .await?;
 
     // 3. Generate authenticated API URLs (not presigned S3 URLs)
     // These URLs require authentication and don't expire
@@ -704,11 +625,10 @@ pub async fn create_system_message(
     props: Option<serde_json::Value>,
 ) -> ApiResult<()> {
     // 1. Find bot user
-    let bot_user =
-        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE is_bot = true LIMIT 1")
-            .fetch_optional(&state.db)
-            .await?
-            .unwrap_or_else(Uuid::nil);
+    let bot_user = UserRepository::new(&state.db)
+        .get_bot_user_id()
+        .await?
+        .unwrap_or_else(Uuid::nil);
 
     // 2. Prepare props
     let mut final_props = props.unwrap_or_else(|| serde_json::json!({}));
@@ -722,22 +642,9 @@ pub async fn create_system_message(
     }
 
     // 3. Insert post
-    let post: Post = sqlx::query_as(
-        r#"
-        INSERT INTO posts (channel_id, user_id, message, props)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                  is_pinned, created_at, edited_at, deleted_at,
-                  reply_count::int8 as reply_count,
-                  last_reply_at, seq
-        "#,
-    )
-    .bind(channel_id)
-    .bind(bot_user)
-    .bind(&message)
-    .bind(&final_props)
-    .fetch_one(&state.db)
-    .await?;
+    let post = PostRepository::new(state.db.clone())
+        .create_system_message_post(channel_id, bot_user, &message, final_props)
+        .await?;
 
     // 4. Construct response
     let response = PostResponse {
@@ -788,25 +695,18 @@ async fn check_playbook_triggers(
     message: &str,
 ) -> ApiResult<()> {
     // 1. Get team_id
-    let channel_info = sqlx::query_scalar::<_, Uuid>("SELECT team_id FROM channels WHERE id = $1")
-        .bind(channel_id)
-        .fetch_optional(&state.db)
+    let channel_info = ChannelRepository::new(&state.db)
+        .get_team_id(channel_id)
         .await?;
 
     if let Some(chan) = channel_info {
         // 2. Fetch playbooks with triggers
-        let playbooks = sqlx::query_as::<_, crate::models::Playbook>(
-            "SELECT * FROM playbooks WHERE team_id = $1 AND is_archived = false AND keyword_triggers IS NOT NULL LIMIT 100"
-        )
-        .bind(chan)
-        .fetch_all(&state.db)
-        .await?;
+        let playbooks = PlaybookRepository::new(&state.db)
+            .get_playbooks_with_triggers(chan)
+            .await?;
 
         // 3. Find bot user (optional)
-        let bot_user =
-            sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE is_bot = true LIMIT 1")
-                .fetch_optional(&state.db)
-                .await?;
+        let bot_user = UserRepository::new(&state.db).get_bot_user_id().await?;
 
         let lower_message = message.to_lowercase();
 
@@ -821,23 +721,19 @@ async fn check_playbook_triggers(
                         );
 
                         // Insert post
-                        sqlx::query(
-                            r#"
-                            INSERT INTO posts (channel_id, user_id, message, props)
-                            VALUES ($1, $2, $3, $4)
-                            "#,
-                        )
-                        .bind(channel_id)
-                        .bind(bot_user.unwrap_or_else(Uuid::nil))
-                        .bind(&system_msg)
-                        .bind(serde_json::json!({
-                            "type": "system_playbook_trigger",
-                            "override_username": "Playbook Bot",
-                            "playbook_id": playbook.id
-                        }))
-                        .execute(&state.db)
-                        .await
-                        .ok();
+                        let _ = PostRepository::new(state.db.clone())
+                            .insert_post_no_returning(
+                                channel_id,
+                                bot_user.unwrap_or_else(Uuid::nil),
+                                &system_msg,
+                                serde_json::json!({
+                                    "type": "system_playbook_trigger",
+                                    "override_username": "Playbook Bot",
+                                    "playbook_id": playbook.id
+                                }),
+                            )
+                            .await
+                            .ok();
 
                         return Ok(());
                     }
@@ -866,117 +762,47 @@ pub async fn get_posts(
         let since_time =
             chrono::DateTime::from_timestamp_millis(since).unwrap_or_else(chrono::Utc::now);
 
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 
-              AND (p.created_at >= $2 OR p.edited_at >= $2)
-            ORDER BY p.created_at ASC
-            LIMIT $3
-            "#,
-        )
-        .bind(channel_id)
-        .bind(since_time)
-        .bind(per_page)
-        .fetch_all(&state.db)
-        .await?
+        PostRepository::new(state.db.clone())
+            .list_since_including_edited(channel_id, since_time, per_page)
+            .await?
     } else if let Some(before_id) = query.before {
-        let before_time: Option<chrono::DateTime<chrono::Utc>> =
-            sqlx::query_scalar("SELECT created_at FROM posts WHERE id = $1")
-                .bind(before_id)
-                .fetch_optional(&state.db)
-                .await?;
+        let before_time = PostRepository::new(state.db.clone())
+            .get_created_at(before_id)
+            .await?;
 
-        let before_time =
-            before_time.ok_or_else(|| AppError::NotFound("Before post not found".to_string()))?;
+        let before_time = before_time.ok_or_else(|| AppError::BeforePostNotFound)?;
 
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 
-              AND p.deleted_at IS NULL
-              AND p.created_at < $2
-            ORDER BY p.created_at DESC
-            LIMIT $3
-            "#,
-        )
-        .bind(channel_id)
-        .bind(before_time)
-        .bind(per_page)
-        .fetch_all(&state.db)
-        .await?
+        PostRepository::new(state.db.clone())
+            .list_before(channel_id, before_time, per_page)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>()
     } else if let Some(after_id) = query.after {
-        let after_time: Option<chrono::DateTime<chrono::Utc>> =
-            sqlx::query_scalar("SELECT created_at FROM posts WHERE id = $1")
-                .bind(after_id)
-                .fetch_optional(&state.db)
-                .await?;
+        let after_time = PostRepository::new(state.db.clone())
+            .get_created_at(after_id)
+            .await?;
 
-        let after_time =
-            after_time.ok_or_else(|| AppError::NotFound("After post not found".to_string()))?;
+        let after_time = after_time.ok_or_else(|| AppError::AfterPostNotFound)?;
 
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 
-              AND p.deleted_at IS NULL
-              AND p.created_at > $2
-            ORDER BY p.created_at ASC
-            LIMIT $3
-            "#,
-        )
-        .bind(channel_id)
-        .bind(after_time)
-        .bind(per_page)
-        .fetch_all(&state.db)
-        .await?
+        PostRepository::new(state.db.clone())
+            .list_after(channel_id, after_time, per_page)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>()
     } else {
-        sqlx::query_as(
-            r#"
-            SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-                   p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-                   p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
-            FROM posts p
-            LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.channel_id = $1 
-              AND p.deleted_at IS NULL
-            ORDER BY p.created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-        )
-        .bind(channel_id)
-        .bind(per_page)
-        .bind(offset)
-        .fetch_all(&state.db)
-        .await?
+        PostRepository::new(state.db.clone())
+            .list_by_channel(channel_id, per_page, offset)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>()
     };
 
-    let total: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM posts WHERE channel_id = $1 AND deleted_at IS NULL",
-    )
-    .bind(channel_id)
-    .fetch_one(&state.db)
-    .await?;
+    let total = PostRepository::new(state.db.clone())
+        .count_posts_in_channel(channel_id)
+        .await?;
 
     let mut posts = posts;
     normalize_post_avatar_urls(&mut posts);
@@ -988,22 +814,10 @@ pub async fn get_posts(
 }
 
 pub async fn get_post_by_id(state: &AppState, post_id: Uuid) -> ApiResult<PostResponse> {
-    let post: PostResponse = sqlx::query_as(
-        r#"
-        SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-               p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-               p.reply_count::int8 as reply_count,
-               p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
-        FROM posts p
-        LEFT JOIN users u ON p.user_id = u.id
-        WHERE p.id = $1
-        "#,
-    )
-    .bind(post_id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let post = PostRepository::new(state.db.clone())
+        .find_by_id_include_deleted(post_id)
+        .await?
+        .ok_or_else(|| AppError::PostNotFound)?;
 
     let mut post = post;
     post.avatar_url = normalize_avatar_url(post.user_id, post.avatar_url.as_deref());
@@ -1029,61 +843,17 @@ pub async fn get_thread(
     let limit = limit.clamp(1, 100);
 
     // Fetch parent post with user info
-    let parent: Option<PostResponse> = sqlx::query_as(
-        r#"
-        SELECT
-            p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-            p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-            p.reply_count::int8 as reply_count, p.last_reply_at, p.seq,
-            u.username, u.avatar_url, u.email
-        FROM posts p
-        JOIN users u ON p.user_id = u.id
-        WHERE p.id = $1 AND p.deleted_at IS NULL
-        "#,
-    )
-    .bind(post_id)
-    .fetch_optional(&state.db)
-    .await?;
+    let parent = PostRepository::new(state.db.clone())
+        .find_by_id_strict(post_id)
+        .await?;
 
-    let mut parent = parent.ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    let mut parent = parent.ok_or_else(|| AppError::PostNotFound)?;
     parent.avatar_url = normalize_avatar_url(parent.user_id, parent.avatar_url.as_deref());
 
-    // Build query for replies
-    let mut query = String::from(
-        r#"
-        SELECT
-            p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
-            p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
-            p.reply_count::int8 as reply_count, p.last_reply_at, p.seq,
-            u.username, u.avatar_url, u.email
-        FROM posts p
-        JOIN users u ON p.user_id = u.id
-        WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
-        "#,
-    );
-
-    if cursor.is_some() {
-        query.push_str(" AND p.id > $2 ");
-    }
-
-    query.push_str("ORDER BY p.created_at ASC LIMIT $3");
-
     // Fetch replies
-    let replies: Vec<PostResponse> = if let Some(cursor_id) = cursor {
-        sqlx::query_as(&query)
-            .bind(post_id)
-            .bind(cursor_id)
-            .bind(limit + 1) // Fetch one extra to determine if there's more
-            .fetch_all(&state.db)
-            .await?
-    } else {
-        let query_no_cursor = query.replace("AND p.id > $2", "");
-        sqlx::query_as(&query_no_cursor.replace("$3", "$2"))
-            .bind(post_id)
-            .bind(limit + 1)
-            .fetch_all(&state.db)
-            .await?
-    };
+    let replies = PostRepository::new(state.db.clone())
+        .get_thread_replies_with_cursor(post_id, cursor, limit + 1)
+        .await?;
 
     // Determine pagination
     let has_more = replies.len() > limit as usize;

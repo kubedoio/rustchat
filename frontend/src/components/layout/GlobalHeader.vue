@@ -1,149 +1,177 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { Bell, Search, HelpCircle, LogOut, Smile, Shield, User, Check, Menu, ChevronDown, ChevronUp, ClipboardList } from 'lucide-vue-next';
-import { useAuthStore } from '../../features/auth/stores/authStore';
-import { useUIStore } from '../../features/ui/stores/uiStore';
-import SearchModal from '../modals/SearchModal.vue';
-import QuickSwitcherModal from '../navigation/QuickSwitcherModal.vue';
-import { useQuickSwitcher } from '../../composables/useQuickSwitcher';
-import type { QuickSwitcherItem } from '../../composables/useQuickSwitcher';
-import SetStatusModal from '../modals/SetStatusModal.vue';
-import RcAvatar from '../ui/RcAvatar.vue';
-import NotificationsDropdown from './NotificationsDropdown.vue';
-import ActivityFeed from '../activity/ActivityFeed.vue';
-import { useConfigStore } from '../../features/config/stores/configStore';
-import { useTeamStore } from '@/features/teams/stores/teamStore';
-import { usePresenceStore } from '../../features/presence';
-import { useUnreadStore } from '@/features/unreads/stores/unreadStore';
-import { useBreakpoints } from '../../composables/useBreakpoints';
-import { activityService } from '../../features/activity/services/activityService';
-import { useActivityStore } from '../../features/activity/stores/activityStore';
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  Bell,
+  Search,
+  HelpCircle,
+  LogOut,
+  Smile,
+  Shield,
+  User,
+  Check,
+  Menu,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+} from 'lucide-vue-next'
+import { useAuthStore } from '../../features/auth/stores/authStore'
+import { useUIStore } from '../../features/ui/stores/uiStore'
+import SearchModal from '../modals/SearchModal.vue'
+import QuickSwitcherModal from '../navigation/QuickSwitcherModal.vue'
+import { useQuickSwitcher } from '../../composables/useQuickSwitcher'
+import type { QuickSwitcherItem } from '../../composables/useQuickSwitcher'
+import SetStatusModal from '../modals/SetStatusModal.vue'
+import RcAvatar from '../ui/RcAvatar.vue'
+import NotificationsDropdown from './NotificationsDropdown.vue'
+import ActivityFeed from '../activity/ActivityFeed.vue'
+import { useConfigStore } from '../../features/config/stores/configStore'
+import { useTeamStore } from '@/features/teams/stores/teamStore'
+import { usePresenceStore } from '../../features/presence'
+import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
+import { useBreakpoints } from '../../composables/useBreakpoints'
+import { activityService } from '../../features/activity/services/activityService'
+import { useActivityStore } from '../../features/activity/stores/activityStore'
 import { useWebSocket } from '../../composables/useWebSocket'
 
-const auth = useAuthStore();
-const ui = useUIStore();
-const configStore = useConfigStore();
-const teamStore = useTeamStore();
-const presenceStore = usePresenceStore();
-const unreadStore = useUnreadStore();
-const activityStore = useActivityStore();
-const activityUnreadCount = computed(() => activityStore.unreadCount);
-const router = useRouter();
-const { isMobile } = useBreakpoints();
+const auth = useAuthStore()
+const ui = useUIStore()
+const configStore = useConfigStore()
+const teamStore = useTeamStore()
+const presenceStore = usePresenceStore()
+const unreadStore = useUnreadStore()
+const activityStore = useActivityStore()
+const activityUnreadCount = computed(() => activityStore.unreadCount)
+const router = useRouter()
+const { isMobile } = useBreakpoints()
 
-const { connectionStatus } = useWebSocket();
+const { connectionStatus } = useWebSocket()
 
 const connectionDotClass = computed(() => {
   switch (connectionStatus.value) {
-    case 'connected': return 'bg-green-500';
-    case 'reconnecting': return 'bg-amber-500 animate-pulse';
-    case 'disconnected': return 'bg-orange-500 animate-pulse';
-    case 'failed': return 'bg-red-500';
-    default: return 'bg-gray-400';
+    case 'connected':
+      return 'bg-green-500'
+    case 'reconnecting':
+      return 'bg-amber-500 animate-pulse'
+    case 'disconnected':
+      return 'bg-orange-500 animate-pulse'
+    case 'failed':
+      return 'bg-red-500'
+    default:
+      return 'bg-gray-400'
   }
-});
+})
 
-const showSearch = ref(false);
-const quickSwitcher = useQuickSwitcher();
-const showUserMenu = ref(false);
-const showSetStatus = ref(false);
-const showNotifications = ref(false);
-const showDndSubmenu = ref(false);
+const showSearch = ref(false)
+const quickSwitcher = useQuickSwitcher()
+const showUserMenu = ref(false)
+const showSetStatus = ref(false)
+const showNotifications = ref(false)
+const showDndSubmenu = ref(false)
 
 // Initialize self presence
 if (auth.user) {
   presenceStore.setSelfPresence({
     userId: auth.user.id,
     username: auth.user.username,
-    presence: (auth.user.presence as any) || 'online'
-  });
+    presence: (auth.user.presence as any) || 'online',
+  })
 }
 
 // Keyboard shortcut for search
 function handleKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault();
-    quickSwitcher.toggle();
+    e.preventDefault()
+    quickSwitcher.toggle()
   }
   if (e.key === 'Escape') {
     if (quickSwitcher.isOpen.value) {
-      e.stopPropagation();
-      quickSwitcher.close();
-      return;
+      e.stopPropagation()
+      quickSwitcher.close()
+      return
     }
-    showSearch.value = false;
-    showUserMenu.value = false;
-    showDndSubmenu.value = false;
-    showNotifications.value = false;
+    showSearch.value = false
+    showUserMenu.value = false
+    showDndSubmenu.value = false
+    showNotifications.value = false
   }
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', handleKeydown);
-});
+  document.addEventListener('keydown', handleKeydown)
+})
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown);
-});
+  document.removeEventListener('keydown', handleKeydown)
+})
 
 async function setPresence(status: 'online' | 'away' | 'dnd' | 'offline') {
-  await auth.updateStatus({ status });
-  presenceStore.updatePresenceFromEvent(auth.user?.id || '', status);
-  showUserMenu.value = false;
-  showDndSubmenu.value = false;
+  await auth.updateStatus({ status })
+  presenceStore.updatePresenceFromEvent(auth.user?.id || '', status)
+  showUserMenu.value = false
+  showDndSubmenu.value = false
 }
 
 function calculateDndEndTime(duration: string): number | undefined {
-  const now = new Date();
+  const now = new Date()
   switch (duration) {
     case 'thirty_minutes':
-      return now.getTime() + 30 * 60 * 1000;
+      return now.getTime() + 30 * 60 * 1000
     case 'one_hour':
-      return now.getTime() + 60 * 60 * 1000;
+      return now.getTime() + 60 * 60 * 1000
     case 'four_hours':
-      return now.getTime() + 4 * 60 * 60 * 1000;
+      return now.getTime() + 4 * 60 * 60 * 1000
     case 'tomorrow': {
-      const midnight = new Date(now);
-      midnight.setHours(24, 0, 0, 0);
-      return midnight.getTime();
+      const midnight = new Date(now)
+      midnight.setHours(24, 0, 0, 0)
+      return midnight.getTime()
     }
     case 'this_week': {
-      const endOfWeek = new Date(now);
-      const daysUntilSunday = (7 - endOfWeek.getDay()) % 7;
-      endOfWeek.setDate(endOfWeek.getDate() + daysUntilSunday + 1);
-      endOfWeek.setHours(0, 0, 0, 0);
-      return endOfWeek.getTime();
+      const endOfWeek = new Date(now)
+      const daysUntilSunday = (7 - endOfWeek.getDay()) % 7
+      endOfWeek.setDate(endOfWeek.getDate() + daysUntilSunday + 1)
+      endOfWeek.setHours(0, 0, 0, 0)
+      return endOfWeek.getTime()
     }
     default:
-      return undefined;
+      return undefined
   }
 }
 
 async function setDndWithDuration(duration: string) {
-  const dndEndTime = calculateDndEndTime(duration);
-  await auth.updateStatus({ 
+  const dndEndTime = calculateDndEndTime(duration)
+  await auth.updateStatus({
     status: 'dnd',
-    dnd_end_time: dndEndTime
-  });
-  presenceStore.updatePresenceFromEvent(auth.user?.id || '', 'dnd');
-  showUserMenu.value = false;
-  showDndSubmenu.value = false;
+    dnd_end_time: dndEndTime,
+  })
+  presenceStore.updatePresenceFromEvent(auth.user?.id || '', 'dnd')
+  showUserMenu.value = false
+  showDndSubmenu.value = false
 }
 
 function openCustomStatus() {
-  showSetStatus.value = true;
-  showUserMenu.value = false;
+  showSetStatus.value = true
+  showUserMenu.value = false
 }
 
 function openProfile() {
-  ui.openSettings('profile');
-  showUserMenu.value = false;
+  ui.openSettings('profile')
+  showUserMenu.value = false
+}
+
+function openAdminConsole() {
+  router.push('/admin')
+  showUserMenu.value = false
+}
+
+function handleLogout() {
+  auth.logout()
+  showUserMenu.value = false
 }
 
 const userPresence = computed(() => {
-  return presenceStore.self?.presence || 'online';
-});
+  return presenceStore.self?.presence || 'online'
+})
 
 const dndDurations = [
   { label: '30 minutes', value: 'thirty_minutes' },
@@ -151,29 +179,29 @@ const dndDurations = [
   { label: '4 hours', value: 'four_hours' },
   { label: 'Tomorrow', value: 'tomorrow' },
   { label: 'This week', value: 'this_week' },
-];
+]
 
 const siteInitial = computed(() => {
-  return configStore.siteConfig.site_name?.charAt(0).toUpperCase() || 'R';
-});
+  return configStore.siteConfig.site_name?.charAt(0).toUpperCase() || 'R'
+})
 
 const currentTeamLabel = computed(() => {
-  return teamStore.currentTeam?.display_name || teamStore.currentTeam?.name || '';
-});
+  return teamStore.currentTeam?.display_name || teamStore.currentTeam?.name || ''
+})
 
 function openActivityFeed() {
-  activityService.openFeed();
+  activityService.openFeed()
 }
 
 function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
-  quickSwitcher.addRecentItem(item.id);
-  router.push(item.to);
-  quickSwitcher.close();
+  quickSwitcher.addRecentItem(item.id)
+  router.push(item.to)
+  quickSwitcher.close()
 }
 </script>
 
 <template>
-  <header 
+  <header
     class="relative z-30 flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-border-1 bg-bg-surface-1/95 px-3 backdrop-blur-sm sm:px-4"
   >
     <!-- Left: Mobile Menu + Logo -->
@@ -181,25 +209,25 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
       <!-- Mobile Menu Button -->
       <button
         v-if="isMobile"
-        @click="ui.toggleLhs()"
         class="flex items-center justify-center w-11 h-11 rounded-r-2 hover:bg-bg-surface-2 text-text-2 transition-standard focus-ring"
         :class="{ 'bg-bg-surface-2 text-brand': ui.isLhsOpen }"
         aria-label="Toggle navigation menu"
         title="Menu"
+        @click="ui.toggleLhs()"
       >
         <Menu class="w-5 h-5" />
       </button>
 
       <!-- Logo -->
       <div class="flex min-w-0 items-center gap-3">
-        <img 
-          v-if="configStore.siteConfig.logo_url" 
-          :src="configStore.siteConfig.logo_url" 
+        <img
+          v-if="configStore.siteConfig.logo_url"
+          :src="configStore.siteConfig.logo_url"
           class="h-9 w-9 shrink-0 rounded-r-1 object-cover shadow-1"
-          alt="Logo" 
+          alt="Logo"
         />
-        <div 
-          v-else 
+        <div
+          v-else
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-r-1 bg-brand text-sm font-semibold text-brand-foreground shadow-1"
         >
           {{ siteInitial }}
@@ -218,11 +246,13 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
     <!-- Center: Search (hidden on mobile) -->
     <div class="hidden flex-1 px-4 md:block">
       <button
-        @click="showSearch = true"
         class="group mx-auto flex w-full max-w-md items-center gap-3 rounded-r-3 border border-border-1 bg-bg-surface-2/75 px-3.5 py-2.5 text-left transition-standard hover:border-border-2 hover:bg-bg-surface-1 focus-ring"
+        @click="showSearch = true"
       >
         <Search class="h-4 w-4 shrink-0 text-text-3 group-hover:text-text-2" />
-        <span class="min-w-0 flex-1 truncate text-sm font-medium text-text-2 group-hover:text-text-1">
+        <span
+          class="min-w-0 flex-1 truncate text-sm font-medium text-text-2 group-hover:text-text-1"
+        >
           Search
         </span>
         <kbd class="hidden items-center gap-0.5 text-[10px] font-medium text-text-4 lg:flex">
@@ -233,44 +263,43 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
     </div>
 
     <!-- Right: Actions -->
-    <div class="flex items-center gap-1 rounded-r-3 border border-border-1 bg-bg-surface-2/75 p-1 sm:gap-1.5">
+    <div
+      class="flex items-center gap-1 rounded-r-3 border border-border-1 bg-bg-surface-2/75 p-1 sm:gap-1.5"
+    >
       <!-- Mobile Search Button -->
-      <button 
-        @click="showSearch = true"
+      <button
         class="md:hidden flex items-center justify-center w-11 h-11 rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
         aria-label="Search"
+        @click="showSearch = true"
       >
         <Search class="w-5 h-5" />
       </button>
 
       <!-- Help Button -->
-      <button 
+      <button
         class="hidden sm:flex items-center justify-center w-11 h-11 rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
         aria-label="Help"
       >
         <HelpCircle class="w-5 h-5" />
       </button>
-      
+
       <!-- Notifications -->
       <div class="relative">
-        <button 
-          @click="showNotifications = !showNotifications"
+        <button
           class="relative flex items-center justify-center w-11 h-11 rounded-r-2 text-text-3 hover:text-text-1 hover:bg-bg-surface-2 transition-standard focus-ring"
           :class="{ 'bg-bg-surface-2 text-text-1': showNotifications }"
           aria-label="Notifications"
+          @click="showNotifications = !showNotifications"
         >
           <Bell class="w-5 h-5" />
-          <span 
+          <span
             v-if="unreadStore.totalUnreadCount > 0"
             class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger ring-2 ring-bg-surface-1"
           />
         </button>
-        
-        <NotificationsDropdown 
-          v-if="showNotifications" 
-          @close="showNotifications = false" 
-        />
-        
+
+        <NotificationsDropdown v-if="showNotifications" @close="showNotifications = false" />
+
         <!-- Click outside backdrop -->
         <div
           v-if="showNotifications"
@@ -297,7 +326,7 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
       </div>
 
       <!-- Connection indicator -->
-      <div 
+      <div
         :class="connectionDotClass"
         class="h-2 w-2 rounded-full"
         :title="`Connection: ${connectionStatus}`"
@@ -307,14 +336,14 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
       <div class="relative ml-1">
         <button
           data-testid="user-menu-trigger"
-          @click="showUserMenu = !showUserMenu"
           class="relative flex min-h-11 items-center gap-2 rounded-r-2 py-1 pl-1.5 pr-2.5 transition-standard focus-ring hover:bg-bg-surface-1"
           :class="{ 'bg-bg-surface-1': showUserMenu }"
+          @click="showUserMenu = !showUserMenu"
         >
-          <RcAvatar 
-            :userId="auth.user?.id"
-            :src="auth.user?.avatar_url" 
-            :username="auth.user?.username" 
+          <RcAvatar
+            :user-id="auth.user?.id"
+            :src="auth.user?.avatar_url"
+            :username="auth.user?.username"
             size="sm"
             class="w-7 h-7"
           />
@@ -332,16 +361,18 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
           leave-from-class="opacity-100 scale-100 translate-y-0"
           leave-to-class="opacity-0 scale-95 -translate-y-1"
         >
-          <div 
-            v-if="showUserMenu" 
+          <div
+            v-if="showUserMenu"
             class="absolute top-full right-0 mt-2 w-64 bg-bg-surface-1 border border-border-1 rounded-r-3 shadow-2xl py-1 z-50 origin-top-right"
           >
             <!-- Custom Status -->
-            <button 
-              @click="openCustomStatus"
+            <button
               class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="openCustomStatus"
             >
-              <span v-if="auth.user?.status_emoji" class="text-base">{{ auth.user.status_emoji }}</span>
+              <span v-if="auth.user?.status_emoji" class="text-base">{{
+                auth.user.status_emoji
+              }}</span>
               <Smile v-else class="w-4 h-4 text-text-3" />
               <span class="truncate">{{ auth.user?.status_text || 'Set custom status' }}</span>
             </button>
@@ -349,9 +380,9 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
             <div class="h-px bg-border-1 my-1" />
 
             <!-- Presence Options -->
-            <button 
-              @click="setPresence('online')"
+            <button
               class="w-full flex items-center justify-between px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="setPresence('online')"
             >
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full bg-success" />
@@ -360,9 +391,9 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
               <Check v-if="userPresence === 'online'" class="w-4 h-4 text-brand" />
             </button>
 
-            <button 
-              @click="setPresence('away')"
+            <button
               class="w-full flex items-center justify-between px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="setPresence('away')"
             >
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full bg-warning" />
@@ -372,9 +403,9 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
             </button>
 
             <!-- DND with Submenu -->
-            <button 
-              @click="showDndSubmenu = !showDndSubmenu"
+            <button
               class="w-full flex items-center justify-between px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="showDndSubmenu = !showDndSubmenu"
             >
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full bg-danger" />
@@ -384,7 +415,10 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
                 </div>
               </div>
               <div class="flex items-center">
-                <Check v-if="userPresence === 'dnd' && !showDndSubmenu" class="w-4 h-4 text-brand mr-2" />
+                <Check
+                  v-if="userPresence === 'dnd' && !showDndSubmenu"
+                  class="w-4 h-4 text-brand mr-2"
+                />
                 <ChevronDown v-if="!showDndSubmenu" class="w-4 h-4 text-text-3" />
                 <ChevronUp v-else class="w-4 h-4 text-text-3" />
               </div>
@@ -392,19 +426,19 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
 
             <!-- DND Duration Submenu -->
             <div v-if="showDndSubmenu" class="bg-bg-surface-2/50 py-1">
-              <button 
-                v-for="duration in dndDurations" 
+              <button
+                v-for="duration in dndDurations"
                 :key="duration.value"
-                @click="setDndWithDuration(duration.value)"
                 class="w-full text-left pl-11 pr-4 py-1.5 text-sm text-text-3 hover:bg-bg-surface-2 hover:text-text-1 transition-colors"
+                @click="setDndWithDuration(duration.value)"
               >
                 {{ duration.label }}
               </button>
             </div>
 
-            <button 
-              @click="setPresence('offline')"
+            <button
               class="w-full flex items-center justify-between px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="setPresence('offline')"
             >
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full border-2 border-text-3" />
@@ -416,9 +450,9 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
             <div class="h-px bg-border-1 my-1" />
 
             <!-- Profile -->
-            <button 
-              @click="openProfile"
+            <button
               class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="openProfile"
             >
               <User class="w-4 h-4 text-text-3" />
               <span>Profile</span>
@@ -426,9 +460,13 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
 
             <!-- Admin Console -->
             <button
-              v-if="['system_admin', 'org_admin', 'admin', 'administrator'].includes(auth.user?.role || '')"
-              @click="router.push('/admin'); showUserMenu = false"
+              v-if="
+                ['system_admin', 'org_admin', 'admin', 'administrator'].includes(
+                  auth.user?.role || ''
+                )
+              "
               class="w-full flex items-center gap-3 px-4 py-2 text-sm text-text-2 hover:bg-bg-surface-2 transition-colors"
+              @click="openAdminConsole"
             >
               <Shield class="w-4 h-4 text-text-3" />
               <span>Admin Console</span>
@@ -437,22 +475,18 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
             <div class="h-px bg-border-1 my-1" />
 
             <!-- Log out -->
-            <button 
-              @click="auth.logout(); showUserMenu = false"
+            <button
               class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger hover:bg-danger/5 transition-colors"
+              @click="handleLogout"
             >
               <LogOut class="w-4 h-4" />
               <span>Log out</span>
             </button>
           </div>
         </Transition>
-        
+
         <!-- Click outside backdrop -->
-        <div 
-          v-if="showUserMenu" 
-          class="fixed inset-0 z-40" 
-          @click="showUserMenu = false"
-        />
+        <div v-if="showUserMenu" class="fixed inset-0 z-40" @click="showUserMenu = false" />
       </div>
     </div>
 

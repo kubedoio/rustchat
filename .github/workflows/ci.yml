@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'GitHub runner label to run the jobs on'
+        type: string
+        default: 'self-hosted'
 
 permissions:
   contents: read
@@ -15,7 +21,7 @@ env:
 jobs:
   detect-changes:
     name: Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -54,8 +60,8 @@ jobs:
     name: Backend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 60
 
     services:
       postgres:
@@ -138,7 +144,11 @@ jobs:
       - name: Install SQLx CLI
         run: |
           if ! command -v sqlx &> /dev/null; then
-            cargo install sqlx-cli --no-default-features --features postgres
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm sqlx-cli --no-default-features --features postgres
           fi
 
       - name: Wait for RustFS
@@ -171,8 +181,8 @@ jobs:
     name: Frontend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: frontend
@@ -223,8 +233,8 @@ jobs:
     name: Push Proxy Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: push-proxy
@@ -275,24 +285,22 @@ jobs:
     name: Docker Validate
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Create dummy .env for docker compose validation
         run: |
-          cat > .env <<'EOF'
-RUSTCHAT_JWT_SECRET=dummy-jwt-secret-min-32-chars-long
-RUSTCHAT_JWT_ISSUER=dummy-issuer
-RUSTCHAT_JWT_AUDIENCE=dummy-audience
-RUSTCHAT_ENCRYPTION_KEY=dummy-encryption-key-32-bytes-long
-RUSTCHAT_S3_ACCESS_KEY=dummy-s3-access-key
-RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key
-RUSTFS_ACCESS_KEY=dummy-rustfs-access-key
-RUSTFS_SECRET_KEY=dummy-rustfs-secret-key
-EOF
+          echo "RUSTCHAT_JWT_SECRET=$(openssl rand -hex 32)" > .env
+          echo "RUSTCHAT_JWT_ISSUER=dummy-issuer" >> .env
+          echo "RUSTCHAT_JWT_AUDIENCE=dummy-audience" >> .env
+          echo "RUSTCHAT_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
+          echo "RUSTCHAT_S3_ACCESS_KEY=dummy-s3-access-key" >> .env
+          echo "RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key" >> .env
+          echo "RUSTFS_ACCESS_KEY=dummy-rustfs-access-key" >> .env
+          echo "RUSTFS_SECRET_KEY=dummy-rustfs-secret-key" >> .env
 
       - name: Validate docker-compose.yml
         run: docker compose config
@@ -306,12 +314,57 @@ EOF
       - name: Dry-run push-proxy Docker build
         run: docker build -f push-proxy/Dockerfile push-proxy/
 
+  frontend-e2e:
+    name: Frontend E2E Tests
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Apply dependency patches
+        run: npm run apply:dependency-patches
+
+      - name: Install Playwright browsers
+        run: |
+          if [ "$RUNNER_ENVIRONMENT" = "github-hosted" ]; then
+            npx playwright install --with-deps
+          else
+            npx playwright install
+          fi
+
+      - name: Run Playwright E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          if-no-files-found: ignore
+
   build-release:
     name: Build Release
     needs: backend-check
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 60
 
     env:
       CARGO_TERM_COLOR: always
@@ -341,8 +394,8 @@ EOF
 
   ci-complete:
     name: CI Complete
-    runs-on: ubuntu-latest
-    needs: [detect-changes, backend-check, frontend-check, push-proxy-check, docker-validate, build-release]
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    needs: [detect-changes, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
     if: always()
     timeout-minutes: 5
     steps:
@@ -352,7 +405,7 @@ EOF
 
       - name: Verify all checks passed
         run: |
-          for job in backend-check frontend-check push-proxy-check docker-validate build-release; do
+          for job in backend-check frontend-check frontend-e2e push-proxy-check docker-validate build-release; do
             result="${{ needs[job].result }}"
             echo "$job: $result"
             if [ "$result" = "failure" ]; then

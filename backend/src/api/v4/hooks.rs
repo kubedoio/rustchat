@@ -115,8 +115,8 @@ pub async fn create_incoming_hook(
     auth: MmAuthUser,
     Json(input): Json<CreateIncomingRequest>,
 ) -> ApiResult<Json<mm::IncomingWebhook>> {
-    let channel_id = parse_mm_or_uuid(&input.channel_id)
-        .ok_or_else(|| AppError::Validation("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::ValidationInvalidChannelId)?;
 
     // Get team_id for the channel and verify the caller is a member
     let team_id: Uuid = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
@@ -191,8 +191,8 @@ pub async fn create_outgoing_hook(
         }
     }
 
-    let team_id = parse_mm_or_uuid(&input.team_id)
-        .ok_or_else(|| AppError::Validation("Invalid team_id".to_string()))?;
+    let team_id =
+        parse_mm_or_uuid(&input.team_id).ok_or_else(|| AppError::ValidationInvalidTeamId)?;
 
     let channel_id = input.channel_id.and_then(|id| parse_mm_or_uuid(&id));
 
@@ -276,8 +276,7 @@ async fn get_incoming_hook(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<mm::IncomingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_incoming_hook(&state, id, &auth).await? {
@@ -289,7 +288,7 @@ async fn get_incoming_hook(
     let hook: IncomingWebhook = IntegrationRepository::new(&state.db)
         .get_incoming_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     Ok(Json(map_incoming_hook(hook)))
 }
@@ -308,8 +307,7 @@ async fn update_incoming_hook(
     Path(hook_id): Path<String>,
     Json(input): Json<UpdateIncomingRequest>,
 ) -> ApiResult<Json<mm::IncomingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_incoming_hook(&state, id, &auth).await? {
@@ -325,7 +323,7 @@ async fn update_incoming_hook(
             input.description.as_deref(),
         )
         .await
-        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+        .map_err(|_| AppError::WebhookNotFound)?;
 
     Ok(Json(map_incoming_hook(hook)))
 }
@@ -335,8 +333,7 @@ async fn delete_incoming_hook(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_incoming_hook(&state, id, &auth).await? {
@@ -357,8 +354,7 @@ async fn get_outgoing_hook(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<mm::OutgoingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_outgoing_hook(&state, id, &auth).await? {
@@ -370,7 +366,7 @@ async fn get_outgoing_hook(
     let hook: OutgoingWebhook = IntegrationRepository::new(&state.db)
         .get_outgoing_webhook_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Webhook not found".to_string()))?;
+        .ok_or_else(|| AppError::WebhookNotFound)?;
 
     Ok(Json(map_outgoing_hook(hook)))
 }
@@ -389,8 +385,7 @@ async fn update_outgoing_hook(
     Path(hook_id): Path<String>,
     Json(input): Json<UpdateOutgoingRequest>,
 ) -> ApiResult<Json<mm::OutgoingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_outgoing_hook(&state, id, &auth).await? {
@@ -420,7 +415,7 @@ async fn update_outgoing_hook(
             input.callback_urls.as_deref(),
         )
         .await
-        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+        .map_err(|_| AppError::WebhookNotFound)?;
 
     Ok(Json(map_outgoing_hook(hook)))
 }
@@ -430,8 +425,7 @@ async fn delete_outgoing_hook(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_outgoing_hook(&state, id, &auth).await? {
@@ -452,8 +446,7 @@ async fn regen_outgoing_hook_token(
     auth: MmAuthUser,
     Path(hook_id): Path<String>,
 ) -> ApiResult<Json<mm::OutgoingWebhook>> {
-    let id = parse_mm_or_uuid(&hook_id)
-        .ok_or_else(|| AppError::Validation("Invalid hook_id".to_string()))?;
+    let id = parse_mm_or_uuid(&hook_id).ok_or_else(|| AppError::ValidationInvalidHookId)?;
 
     // Check ownership/permission
     if !can_manage_outgoing_hook(&state, id, &auth).await? {
@@ -467,7 +460,7 @@ async fn regen_outgoing_hook_token(
     let hook: OutgoingWebhook = IntegrationRepository::new(&state.db)
         .update_outgoing_hook_token(id, &new_token)
         .await
-        .map_err(|_| AppError::NotFound("Webhook not found".to_string()))?;
+        .map_err(|_| AppError::WebhookNotFound)?;
 
     Ok(Json(map_outgoing_hook(hook)))
 }

@@ -67,7 +67,7 @@ async fn get_my_status(
         .get_user_status_fields(auth.user_id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     Ok(Json(UserStatus {
         presence: Some(user.0),
@@ -163,7 +163,7 @@ async fn update_my_status(
         .get_by_id(auth.user_id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     let update_event = WsEnvelope::event(
         EventType::UserUpdated,
@@ -218,7 +218,7 @@ async fn clear_my_status(
         .get_by_id(auth.user_id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     let update_event = WsEnvelope::event(
         EventType::UserUpdated,
@@ -249,7 +249,7 @@ async fn get_user_status(
         .get_user_status_fields(user_id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     // Check if status has expired
     let mut text = user.3;

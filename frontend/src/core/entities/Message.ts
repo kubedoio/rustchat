@@ -24,38 +24,38 @@ export interface Reaction {
 export interface Message {
   id: MessageId
   channelId: ChannelId
-  
+
   // Author - reference by ID, details in separate store
   userId: UserId
   author?: UserRef // Optional denormalized data
-  
+
   // Content
   content: string
   html?: string // Rendered markdown
-  
+
   // Threading
   rootId?: MessageId
   replyCount: number
   lastReplyAt?: Date
   participants?: UserId[] // Latest thread participants
-  
+
   // Media
   files: FileAttachment[]
-  
+
   // Engagement
   reactions: Reaction[]
   isPinned: boolean
-  
+
   // Metadata
   editedAt?: Date
-  updatedAt?: Date  // Alias for editedAt
+  updatedAt?: Date // Alias for editedAt
   createdAt: Date
-  
+
   // Client state
   clientId?: string // For optimistic updates
   status?: MessageStatus
   isSaved?: boolean
-  
+
   // Extended props (for integrations, calls, etc)
   props?: Record<string, any>
   type?: '' | 'system_join_leave' | 'system_purpose' | 'system_header' | 'calls'

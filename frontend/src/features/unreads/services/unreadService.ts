@@ -1,5 +1,6 @@
 // Unread Service - Business logic for unread counts
 
+import { log } from '@/utils/log'
 import { unreadRepository, type ReadState } from '../repositories/unreadRepository'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { TeamId } from '../../../core/entities/Team'
@@ -15,7 +16,7 @@ class UnreadService {
     this.store.setLoading(true)
     try {
       const overview = await unreadRepository.getOverview()
-      
+
       // Reset and populate
       this.store.clearAll()
 
@@ -28,7 +29,7 @@ class UnreadService {
         this.store.setTeamUnread(team.teamId, team.unreadCount)
       }
     } catch (error) {
-      console.error('Failed to load unread overview:', error)
+      log.error('Failed to load unread overview:', error)
     } finally {
       this.store.setLoading(false)
     }
@@ -45,13 +46,13 @@ class UnreadService {
         this.store.setChannelMentions(channelId, 0)
         this.store.setReadState(channelId, {
           last_read_message_id: null,
-          first_unread_message_id: null
+          first_unread_message_id: null,
         })
       }
       // If targetSeq is provided, it's "mark as unread from here"
       // Let the WebSocket event or next fetch handle the update
     } catch (error) {
-      console.error('Failed to mark channel as read:', error)
+      log.error('Failed to mark channel as read:', error)
       throw error
     }
   }
@@ -62,7 +63,7 @@ class UnreadService {
       await unreadRepository.markAllAsRead()
       this.store.clearAll()
     } catch (error) {
-      console.error('Failed to mark all as read:', error)
+      log.error('Failed to mark all as read:', error)
       throw error
     }
   }

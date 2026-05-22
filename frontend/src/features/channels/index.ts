@@ -14,10 +14,7 @@ export { channelRepository } from './repositories/channelRepository'
 export { handleChannelWebSocketEvent } from './handlers/channelSocketHandlers'
 
 // Types
-export type {
-  CreateChannelRequest,
-  ChannelUnreadCounts
-} from './repositories/channelRepository'
+export type { CreateChannelRequest, ChannelUnreadCounts } from './repositories/channelRepository'
 
 // Components (to be created)
 // export { default as ChannelList } from './components/ChannelList.vue'

@@ -46,6 +46,16 @@ interface LiveUserStatusUpdate {
   statusExpiresAt?: string | number | null
 }
 
+function isSafeUserId(userId: unknown): userId is string {
+  return (
+    typeof userId === 'string' &&
+    /^[a-zA-Z0-9-]+$/i.test(userId) &&
+    userId !== '__proto__' &&
+    userId !== 'constructor' &&
+    userId !== 'prototype'
+  )
+}
+
 const hydratedUsers = ref<Record<string, HydratedUserRecord>>({})
 const pendingUsers = ref<Record<string, boolean>>({})
 const userErrors = ref<Record<string, string | undefined>>({})
@@ -55,11 +65,14 @@ export function clearUserSummaryCache() {
   hydratedUsers.value = {}
   pendingUsers.value = {}
   userErrors.value = {}
-  expiryTimers.forEach((timer) => clearTimeout(timer))
+  expiryTimers.forEach(timer => clearTimeout(timer))
   expiryTimers.clear()
 }
 
 function clearExpiredCustomStatus(userId: string) {
+  if (!isSafeUserId(userId)) {
+    return
+  }
   const existing = hydratedUsers.value[userId]
   if (!existing) {
     return
@@ -83,12 +96,11 @@ function scheduleExpiry(userId: string, expiresAt: unknown) {
 }
 
 function upsertHydratedUser(userId: string, partial: Partial<HydratedUserRecord>) {
+  if (!isSafeUserId(userId)) {
+    return
+  }
   const existing = hydratedUsers.value[userId]
-  const next: HydratedUserRecord = Object.assign(
-    { id: userId, username: '' },
-    existing,
-    partial,
-  )
+  const next: HydratedUserRecord = Object.assign({ id: userId, username: '' }, existing, partial)
 
   hydratedUsers.value = {
     ...hydratedUsers.value,
@@ -98,11 +110,20 @@ function upsertHydratedUser(userId: string, partial: Partial<HydratedUserRecord>
   scheduleExpiry(userId, next.status_expires_at)
 }
 
-function mergeUserSummary(userId: string, teamStore = useTeamStore(), presenceStore = usePresenceStore()): UserSummary | null {
-  const teamMember = teamStore.members.find((member) => member.user_id === userId)
+function mergeUserSummary(
+  userId: string,
+  teamStore = useTeamStore(),
+  presenceStore = usePresenceStore()
+): UserSummary | null {
+  if (!isSafeUserId(userId)) {
+    return null
+  }
+  const teamMember = teamStore.members.find(member => member.user_id === userId)
   const hydrated = hydratedUsers.value[userId]
   const livePresence = presenceStore.getUserPresence(userId).value?.presence
-  const presence = normalizePresenceStatus(livePresence || hydrated?.presence || teamMember?.presence)
+  const presence = normalizePresenceStatus(
+    livePresence || hydrated?.presence || teamMember?.presence
+  )
   const statusExpiresAt = parseStatusExpiryMs(hydrated?.status_expires_at)
   const statusExpired = Boolean(statusExpiresAt && statusExpiresAt <= Date.now())
 
@@ -128,8 +149,11 @@ function mergeUserSummary(userId: string, teamStore = useTeamStore(), presenceSt
 }
 
 async function ensureUserSummary(userId: string) {
+  if (!isSafeUserId(userId)) {
+    return
+  }
   const existing = hydratedUsers.value[userId]
-  if (!userId || pendingUsers.value[userId] || existing?.fully_hydrated) {
+  if (pendingUsers.value[userId] || existing?.fully_hydrated) {
     return
   }
 
@@ -166,8 +190,10 @@ async function ensureUserSummary(userId: string) {
 
 function markPendingUsers(userIds: string[], pending: boolean) {
   const next = { ...pendingUsers.value }
-  userIds.forEach((userId) => {
-    next[userId] = pending
+  userIds.forEach(userId => {
+    if (isSafeUserId(userId)) {
+      next[userId] = pending
+    }
   })
   pendingUsers.value = next
 }
@@ -193,20 +219,25 @@ function mapHydratedUser(user: User): HydratedUserRecord {
 
 function upsertUsers(users: HydratedUserRecord[]) {
   const nextErrors = { ...userErrors.value }
-  users.forEach((user) => {
-    upsertHydratedUser(user.id, user)
-    nextErrors[user.id] = undefined
+  users.forEach(user => {
+    if (isSafeUserId(user.id)) {
+      upsertHydratedUser(user.id, user)
+      nextErrors[user.id] = undefined
+    }
   })
   userErrors.value = nextErrors
 }
 
 export function getUserSummarySnapshot(userId: string) {
+  if (!isSafeUserId(userId)) {
+    return null
+  }
   return mergeUserSummary(userId)
 }
 
 export function prefetchUserSummaries(userIds: string[]) {
-  const uniqueIds = [...new Set(userIds.filter(Boolean))]
-  const missingIds = uniqueIds.filter((userId) => {
+  const uniqueIds = [...new Set(userIds.filter(isSafeUserId))]
+  const missingIds = uniqueIds.filter(userId => {
     const existing = hydratedUsers.value[userId]
     return !pendingUsers.value[userId] && !existing?.fully_hydrated
   })
@@ -217,13 +248,14 @@ export function prefetchUserSummaries(userIds: string[]) {
 
   markPendingUsers(missingIds, true)
 
-  void usersApi.getByIds(missingIds)
+  void usersApi
+    .getByIds(missingIds)
     .then(({ data }) => {
       const users = data.map(mapHydratedUser)
       upsertUsers(users)
 
-      const returnedIds = new Set(users.map((user) => user.id))
-      missingIds.forEach((userId) => {
+      const returnedIds = new Set(users.map(user => user.id))
+      missingIds.forEach(userId => {
         if (!returnedIds.has(userId)) {
           userErrors.value = {
             ...userErrors.value,
@@ -235,7 +267,7 @@ export function prefetchUserSummaries(userIds: string[]) {
     .catch((err: any) => {
       const message = err?.response?.data?.message || 'Failed to load user profile'
       const nextErrors = { ...userErrors.value }
-      missingIds.forEach((userId) => {
+      missingIds.forEach(userId => {
         nextErrors[userId] = message
       })
       userErrors.value = nextErrors
@@ -246,6 +278,9 @@ export function prefetchUserSummaries(userIds: string[]) {
 }
 
 export function applyUserStatusSnapshot(update: LiveUserStatusUpdate) {
+  if (!isSafeUserId(update.userId)) {
+    return
+  }
   const partial: Partial<HydratedUserRecord> = {}
 
   if (update.presence !== undefined) {
@@ -278,12 +313,12 @@ export function useUserSummary(userIdSource: () => string | null | undefined) {
 
   const isLoading = computed(() => {
     const userId = userIdSource()
-    return !!(userId && pendingUsers.value[userId])
+    return !!(userId && isSafeUserId(userId) && pendingUsers.value[userId])
   })
 
   const error = computed(() => {
     const userId = userIdSource()
-    return (userId && userErrors.value[userId]) || ''
+    return (userId && isSafeUserId(userId) && userErrors.value[userId]) || ''
   })
 
   watchEffect(() => {

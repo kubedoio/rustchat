@@ -18,14 +18,15 @@ const selectedIndex = ref(0)
 
 const filteredMembers = computed(() => {
   const q = props.query.toLowerCase()
-  return teamStore.members
-    .filter(m => m.username.toLowerCase().includes(q))
-    .slice(0, 8) // Limit to top 8
+  return teamStore.members.filter(m => m.username.toLowerCase().includes(q)).slice(0, 8) // Limit to top 8
 })
 
-watch(() => props.query, () => {
-  selectedIndex.value = 0
-})
+watch(
+  () => props.query,
+  () => {
+    selectedIndex.value = 0
+  }
+)
 
 function select(username: string) {
   emit('select', username)
@@ -39,7 +40,8 @@ function handleKeydown(e: KeyboardEvent) {
     selectedIndex.value = (selectedIndex.value + 1) % filteredMembers.value.length
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
-    selectedIndex.value = (selectedIndex.value - 1 + filteredMembers.value.length) % filteredMembers.value.length
+    selectedIndex.value =
+      (selectedIndex.value - 1 + filteredMembers.value.length) % filteredMembers.value.length
   } else if (e.key === 'Enter' || e.key === 'Tab') {
     e.preventDefault()
     const member = filteredMembers.value[selectedIndex.value]
@@ -61,27 +63,29 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div 
+  <div
     v-if="show && filteredMembers.length > 0"
     class="absolute bottom-full left-0 mb-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden z-[120] animate-in fade-in slide-in-from-bottom-2 duration-200"
   >
     <div class="p-2 border-b border-gray-100 bg-gray-50">
-      <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Channel Members</span>
+      <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider"
+        >Channel Members</span
+      >
     </div>
-    
+
     <div class="max-h-64 overflow-y-auto">
       <button
         v-for="(member, index) in filteredMembers"
         :key="member.user_id"
-        @click="select(member.username)"
-        @mouseenter="selectedIndex = index"
         class="w-full px-3 py-2 flex items-center space-x-3 transition-colors text-left"
         :class="selectedIndex === index ? 'bg-blue-50' : 'hover:bg-gray-50'"
+        @click="select(member.username)"
+        @mouseenter="selectedIndex = index"
       >
-        <RcAvatar 
-          :userId="member.user_id" 
+        <RcAvatar
+          :user-id="member.user_id"
           :username="member.username"
-          :src="member.avatar_url" 
+          :src="member.avatar_url"
           size="sm"
           class="w-6 h-6 rounded"
         />
@@ -90,9 +94,13 @@ onUnmounted(() => {
             <span class="text-sm font-semibold text-gray-900 truncate">
               {{ member.username }}
             </span>
-            <span v-if="selectedIndex === index" class="text-[10px] text-blue-500 font-medium">Enter</span>
+            <span v-if="selectedIndex === index" class="text-[10px] text-blue-500 font-medium"
+              >Enter</span
+            >
           </div>
-          <p class="text-[11px] text-gray-500 truncate">{{ member.display_name || member.username }}</p>
+          <p class="text-[11px] text-gray-500 truncate">
+            {{ member.display_name || member.username }}
+          </p>
         </div>
       </button>
     </div>

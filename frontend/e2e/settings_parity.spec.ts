@@ -71,7 +71,7 @@ async function mockApi(page: Page) {
   const user = makeUser()
   let preferences = makePreferences()
 
-  await page.route('**/api/v1/site/info', async (route) => {
+  await page.route('**/api/v1/site/info', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -82,7 +82,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v1/oauth2/providers', async (route) => {
+  await page.route('**/api/v1/oauth2/providers', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -90,7 +90,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v1/auth/login', async (route) => {
+  await page.route('**/api/v1/auth/login', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -103,7 +103,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v1/auth/me', async (route) => {
+  await page.route('**/api/v1/auth/me', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -111,7 +111,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v1/theme/current', async (route) => {
+  await page.route('**/api/v1/theme/current', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -137,7 +137,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v4/notifications/test', async (route) => {
+  await page.route('**/api/v4/notifications/test', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -145,7 +145,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v1/teams**', async (route) => {
+  await page.route('**/api/v1/teams**', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -153,7 +153,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v1/channels**', async (route) => {
+  await page.route('**/api/v1/channels**', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -161,7 +161,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v1/posts**', async (route) => {
+  await page.route('**/api/v1/posts**', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -169,7 +169,7 @@ async function mockApi(page: Page) {
     })
   })
 
-  await page.route('**/api/v1/unreads/overview', async (route) => {
+  await page.route('**/api/v1/unreads/overview', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -201,13 +201,19 @@ async function openSettingsFromUserMenu(page: Page) {
   await expect(settingsModal).toBeVisible({ timeout: 10000 })
 
   await page.addStyleTag({
-    content: '*,:before,:after{animation:none!important;transition:none!important;caret-color:transparent!important;}',
+    content:
+      '*,:before,:after{animation:none!important;transition:none!important;caret-color:transparent!important;}',
   })
 
   return settingsModal
 }
 
-async function assertTabScreenshot(page: Page, modal: import('@playwright/test').Locator, tabName: string, filename: string) {
+async function assertTabScreenshot(
+  page: Page,
+  modal: import('@playwright/test').Locator,
+  tabName: string,
+  filename: string
+) {
   await page.getByRole('button', { name: tabName }).first().click()
   await page.waitForTimeout(200)
 

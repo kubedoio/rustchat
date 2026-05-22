@@ -1,6 +1,7 @@
 // WebSocket Manager - Minimal orchestrator that dispatches to feature handlers
 // Replaces the 668-line useWebSocket.ts god file
 
+import { log } from '@/utils/log'
 import { ref, computed, markRaw } from 'vue'
 
 export type ConnectionState = 'connecting' | 'open' | 'closed' | 'error'
@@ -54,7 +55,7 @@ class WebSocketManager {
       this.startHeartbeat()
     }
 
-    this.ws.onmessage = (event) => {
+    this.ws.onmessage = event => {
       this.handleMessage(event.data)
     }
 
@@ -119,7 +120,7 @@ class WebSocketManager {
           try {
             handler(event)
           } catch (err) {
-            console.error(`Handler error for ${event.event}:`, err)
+            log.error(`Handler error for ${event.event}:`, err)
           }
         })
       }
@@ -131,12 +132,12 @@ class WebSocketManager {
           try {
             handler(event)
           } catch (err) {
-            console.error(`Wildcard handler error:`, err)
+            log.error(`Wildcard handler error:`, err)
           }
         })
       }
     } catch (err) {
-      console.error('Failed to parse WebSocket message:', err)
+      log.error('Failed to parse WebSocket message:', err)
     }
   }
 
@@ -184,6 +185,6 @@ export function useWebSocket() {
     connect: wsManager.connect,
     disconnect: wsManager.disconnect,
     send: wsManager.send,
-    on: wsManager.on.bind(wsManager)
+    on: wsManager.on.bind(wsManager),
   }
 }

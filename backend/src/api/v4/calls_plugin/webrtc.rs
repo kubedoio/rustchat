@@ -58,14 +58,14 @@ pub(crate) async fn handle_offer(
         None => call_manager
             .get_call(channel_uuid)
             .await
-            .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?,
+            .ok_or_else(|| AppError::NoActiveCall)?,
     };
 
     // Get participant session_id
     let participant = call_manager
         .get_participant(call.call_id, auth.user_id)
         .await
-        .ok_or_else(|| AppError::Forbidden("You are not in this call".to_string()))?;
+        .ok_or_else(|| AppError::NotInCall)?;
 
     // Get or create SFU for this call. In multi-node or resumed-state scenarios,
     // call state can exist before a local SFU is hydrated.

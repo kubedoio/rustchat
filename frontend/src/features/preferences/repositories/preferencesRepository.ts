@@ -32,7 +32,7 @@ export const preferencesRepository = {
       return {
         emoji: response.data.emoji ?? undefined,
         text: response.data.text ?? undefined,
-        expiresAt: response.data.expires_at ?? undefined
+        expiresAt: response.data.expires_at ?? undefined,
       }
     })
   },
@@ -47,12 +47,12 @@ export const preferencesRepository = {
       const response = await preferencesApi.updateMyStatus({
         text: data.text,
         emoji: data.emoji,
-        duration_minutes: data.durationMinutes
+        duration_minutes: data.durationMinutes,
       })
       return {
         emoji: response.data.emoji ?? undefined,
         text: response.data.text ?? undefined,
-        expiresAt: response.data.expires_at ?? undefined
+        expiresAt: response.data.expires_at ?? undefined,
       }
     })
   },
@@ -64,7 +64,7 @@ export const preferencesRepository = {
       return {
         emoji: response.data.emoji ?? undefined,
         text: response.data.text ?? undefined,
-        expiresAt: response.data.expires_at ?? undefined
+        expiresAt: response.data.expires_at ?? undefined,
       }
     })
   },
@@ -94,21 +94,21 @@ export const preferencesRepository = {
         return {
           emoji: item.emoji as string,
           text: item.text as string,
-          durationMinutes: item.duration_minutes as number | undefined
+          durationMinutes: item.duration_minutes as number | undefined,
         }
       })
     })
-  }
+  },
 }
 
 function normalizePreferences(raw: unknown): UserPreferences {
   const r = raw as Record<string, unknown>
   const prefs: UserPreferences = { ...r }
-  
+
   // Normalize common fields
   if (r.collapsed_categories) {
     prefs.collapsedCategories = r.collapsed_categories as string[]
   }
-  
+
   return prefs
 }

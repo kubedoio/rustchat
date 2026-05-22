@@ -128,6 +128,6 @@ export const useActivityStore = defineStore('activityStore', () => {
     setLoading,
     openFeed,
     closeFeed,
-    clearActivities
+    clearActivities,
   }
 })

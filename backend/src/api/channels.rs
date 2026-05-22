@@ -148,7 +148,7 @@ async fn list_channels(
             .is_team_member(query.team_id, auth.user_id)
             .await?
         {
-            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+            return Err(AppError::NotOnTeam);
         }
 
         // List public and private channels user is NOT in
@@ -275,7 +275,7 @@ async fn create_channel(
         .is_team_member(input.team_id, auth.user_id)
         .await?
     {
-        return Err(AppError::Forbidden("Not a member of this team".to_string()));
+        return Err(AppError::NotOnTeam);
     }
 
     // Create channel
@@ -416,7 +416,7 @@ async fn delete_channel(
     let channel = ChannelRepository::new(&state.db)
         .get_by_id(id)
         .await
-        .map_err(|_| AppError::NotFound("Channel not found".to_string()))?;
+        .map_err(|_| AppError::ChannelNotFound)?;
 
     // Soft delete the channel
     ChannelRepository::new(&state.db).soft_delete(id).await?;
@@ -473,7 +473,7 @@ async fn add_member(
         input
             .user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Check permissions
@@ -521,7 +521,7 @@ async fn add_member(
         let username = UserRepository::new(&state.db)
             .get_username(target_user_id)
             .await?
-            .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+            .ok_or_else(|| AppError::UserNotFound)?;
 
         let _ = crate::services::posts::create_system_message(
             &state,
@@ -553,7 +553,7 @@ async fn remove_member(
     } else {
         user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Check admin membership (or user removing themselves)
@@ -589,7 +589,7 @@ async fn mark_channel_member_as_read(
     } else {
         user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Users can only mark their own channels as read
@@ -645,7 +645,7 @@ async fn update_notify_props(
     } else {
         user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Users can only update their own notify props

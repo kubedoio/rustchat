@@ -15,8 +15,7 @@ pub async fn import_team(
     Path(team_id): Path<String>,
     mut multipart: Multipart,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let _team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let _team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {
         return Err(AppError::Forbidden(

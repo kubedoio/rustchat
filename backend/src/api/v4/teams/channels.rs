@@ -21,8 +21,7 @@ pub async fn get_team_channels(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     let channels: Vec<Channel> = ChannelRepository::new(&state.db)
         .list_team_channels_for_user(team_id, auth.user_id, true, None)
         .await?;
@@ -36,8 +35,7 @@ pub async fn get_team_channel_ids(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<Vec<String>>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
     let ids = ChannelRepository::new(&state.db)
         .list_team_channel_ids(team_id, auth.user_id)
@@ -50,8 +48,7 @@ pub async fn get_team_private_channels(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
     let channels: Vec<Channel> = ChannelRepository::new(&state.db)
         .list_team_private_channels(team_id, auth.user_id)
@@ -64,8 +61,7 @@ pub async fn get_team_deleted_channels(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<Vec<mm::Channel>>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_member(&state, team_id, auth.user_id).await?;
     // Return public archived channels plus private archived channels the user belongs to
     let channels: Vec<Channel> = ChannelRepository::new(&state.db)
@@ -119,12 +115,11 @@ pub async fn get_team_channel_by_name(
     auth: MmAuthUser,
     Path((team_id, channel_name)): Path<(String, String)>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     let channel: Channel = ChannelRepository::new(&state.db)
         .get_channel_by_name(team_id, &channel_name)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+        .ok_or_else(|| AppError::ChannelNotFound)?;
 
     if channel.channel_type == ChannelType::Private {
         let is_member = ChannelRepository::new(&state.db)
@@ -148,7 +143,7 @@ pub async fn get_team_channel_by_name_for_team_name(
     let team: Team = TeamRepository::new(&state.db)
         .get_team_by_name(&team_name)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
     get_team_channel_by_name(
         State(state),
         auth,

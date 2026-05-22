@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 /// API Key for non-human entity authentication
 ///
-/// Stored in database with bcrypt hash. The plain-text key is only shown
+/// Stored in database with argon2id hash. The plain-text key is only shown
 /// once during creation and never stored.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ApiKey {

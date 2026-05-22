@@ -88,6 +88,14 @@ impl PostRepository {
         u.username, u.avatar_url, u.email
     "#;
 
+    /// Common SELECT columns for post queries without user JOIN
+    const POST_COLUMNS_NO_USER: &'static str = r#"
+        id, channel_id, user_id, root_post_id, message, props, file_ids,
+        is_pinned, created_at, edited_at, deleted_at,
+        reply_count::int8 as reply_count,
+        last_reply_at, seq
+    "#;
+
     /// Get a single post by ID with user info
     ///
     /// Returns None if the post doesn't exist or has been soft-deleted.
@@ -301,7 +309,7 @@ impl PostRepository {
                 .fetch_optional(&self.db)
                 .await?;
 
-        membership.ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))
+        membership.ok_or_else(|| AppError::NotAMember)
     }
 
     /// Get the channel_id for a post
@@ -623,8 +631,8 @@ impl PostRepository {
         let row = sqlx::query_as(
             r#"
             DELETE FROM scheduled_posts
-            WHERE id = $1 AND user_id = $2 AND processed_at = 0
-            RETURNING channel_id, user_id, root_id::text, message, props, file_ids, scheduled_at, create_at, update_at
+            WHERE id = $1 AND user_id = $2 AND state = 'pending'
+            RETURNING channel_id, user_id, COALESCE(root_id::text, ''), message, props, file_ids, (extract(epoch from scheduled_at) * 1000)::bigint, created_at, updated_at
             "#,
         )
         .bind(scheduled_id)
@@ -749,7 +757,7 @@ impl PostRepository {
                     WHERE p.deleted_at IS NULL
                       AND p.seq > $2
                       AND (
-                          p.message LIKE '%@' || $3 || '%'
+                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
                           OR p.message LIKE '%@all%'
                           OR p.message LIKE '%@channel%'
                       )
@@ -759,7 +767,7 @@ impl PostRepository {
                       AND p.seq > $2
                       AND p.root_post_id IS NULL
                       AND (
-                          p.message LIKE '%@' || $3 || '%'
+                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
                           OR p.message LIKE '%@all%'
                           OR p.message LIKE '%@channel%'
                       )
@@ -768,7 +776,7 @@ impl PostRepository {
                     WHERE p.deleted_at IS NULL
                       AND p.seq > $2
                       AND (
-                          p.message LIKE '%@' || $3 || '%'
+                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
                           OR p.message LIKE '%@all%'
                           OR p.message LIKE '%@channel%'
                       )
@@ -798,7 +806,7 @@ impl PostRepository {
             r#"
             SELECT
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3)::BIGINT AS unread_replies_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3 AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $2 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count
             FROM posts p
             WHERE p.root_post_id = $1
             "#,
@@ -1369,9 +1377,9 @@ impl PostRepository {
             r#"
             SELECT
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2)::BIGINT AS msg_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count_root,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%') AND p.message LIKE '%@here%')::BIGINT AS urgent_mention_count,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count_root,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%') AND p.message LIKE '%@here%')::BIGINT AS urgent_mention_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL)::BIGINT AS msg_count_root
             FROM posts p
             WHERE p.channel_id = $1
@@ -1418,15 +1426,13 @@ impl PostRepository {
 
     /// Get a post by ID (Post model, no user join)
     pub async fn get_post_by_id(&self, post_id: Uuid) -> ApiResult<Option<crate::models::Post>> {
-        let post = sqlx::query_as::<_, crate::models::Post>(
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
             r#"
-            SELECT id, channel_id, user_id, root_post_id, message, props, file_ids,
-                   is_pinned, created_at, edited_at, deleted_at,
-                   reply_count::int8 as reply_count,
-                   last_reply_at, seq
+            SELECT {}
             FROM posts WHERE id = $1 AND deleted_at IS NULL
             "#,
-        )
+            Self::POST_COLUMNS_NO_USER
+        ))
         .bind(post_id)
         .fetch_optional(&self.db)
         .await?;
@@ -1435,15 +1441,13 @@ impl PostRepository {
 
     /// Pin a post and return the updated Post
     pub async fn pin_post_returning(&self, post_id: Uuid) -> ApiResult<crate::models::Post> {
-        let post = sqlx::query_as::<_, crate::models::Post>(
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
             r#"
             UPDATE posts SET is_pinned = true WHERE id = $1
-            RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                      is_pinned, created_at, edited_at, deleted_at,
-                      reply_count::int8 as reply_count,
-                      last_reply_at, seq
+            RETURNING {}
             "#,
-        )
+            Self::POST_COLUMNS_NO_USER
+        ))
         .bind(post_id)
         .fetch_one(&self.db)
         .await?;
@@ -1452,15 +1456,13 @@ impl PostRepository {
 
     /// Unpin a post and return the updated Post
     pub async fn unpin_post_returning(&self, post_id: Uuid) -> ApiResult<crate::models::Post> {
-        let post = sqlx::query_as::<_, crate::models::Post>(
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
             r#"
             UPDATE posts SET is_pinned = false WHERE id = $1
-            RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                      is_pinned, created_at, edited_at, deleted_at,
-                      reply_count::int8 as reply_count,
-                      last_reply_at, seq
+            RETURNING {}
             "#,
-        )
+            Self::POST_COLUMNS_NO_USER
+        ))
         .bind(post_id)
         .fetch_one(&self.db)
         .await?;
@@ -1482,15 +1484,13 @@ impl PostRepository {
         post_id: Uuid,
         message: &str,
     ) -> ApiResult<crate::models::Post> {
-        let post = sqlx::query_as::<_, crate::models::Post>(
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
             r#"
             UPDATE posts SET message = $1, edited_at = NOW() WHERE id = $2
-            RETURNING id, channel_id, user_id, root_post_id, message, props, file_ids,
-                      is_pinned, created_at, edited_at, deleted_at,
-                      reply_count::int8 as reply_count,
-                      last_reply_at, seq
+            RETURNING {}
             "#,
-        )
+            Self::POST_COLUMNS_NO_USER
+        ))
         .bind(message)
         .bind(post_id)
         .fetch_one(&self.db)
@@ -1871,6 +1871,271 @@ impl PostRepository {
             .execute(&self.db)
             .await?;
 
+        Ok(())
+    }
+
+    // =======================================================================
+    // Methods moved from services/posts.rs
+    // =======================================================================
+
+    /// Get a post by ID and channel (no user join)
+    pub async fn get_post_by_id_and_channel(
+        &self,
+        post_id: Uuid,
+        channel_id: Uuid,
+    ) -> ApiResult<Option<crate::models::Post>> {
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
+            "SELECT {} FROM posts WHERE id = $1 AND channel_id = $2",
+            Self::POST_COLUMNS_NO_USER
+        ))
+        .bind(post_id)
+        .bind(channel_id)
+        .fetch_optional(&self.db)
+        .await?;
+        Ok(post)
+    }
+
+    /// Insert a new post and return it
+    pub async fn create_post(
+        &self,
+        channel_id: Uuid,
+        user_id: Uuid,
+        root_post_id: Option<Uuid>,
+        message: &str,
+        props: serde_json::Value,
+        file_ids: &[Uuid],
+    ) -> ApiResult<crate::models::Post> {
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
+            r#"
+            INSERT INTO posts (channel_id, user_id, root_post_id, message, props, file_ids)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING {}
+            "#,
+            Self::POST_COLUMNS_NO_USER
+        ))
+        .bind(channel_id)
+        .bind(user_id)
+        .bind(root_post_id)
+        .bind(message)
+        .bind(props)
+        .bind(file_ids)
+        .fetch_one(&self.db)
+        .await?;
+        Ok(post)
+    }
+
+    /// Increment reply_count and update last_reply_at for a post
+    pub async fn increment_reply_count(&self, post_id: Uuid) -> ApiResult<()> {
+        sqlx::query(
+            "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1",
+        )
+        .bind(post_id)
+        .execute(&self.db)
+        .await?;
+        Ok(())
+    }
+
+    /// Get user_id and root_post_id for a post
+    pub async fn get_parent_info(&self, post_id: Uuid) -> ApiResult<Option<(Uuid, Option<Uuid>)>> {
+        let info = sqlx::query_as::<_, (Uuid, Option<Uuid>)>(
+            "SELECT user_id, root_post_id FROM posts WHERE id = $1",
+        )
+        .bind(post_id)
+        .fetch_optional(&self.db)
+        .await?;
+        Ok(info)
+    }
+
+    /// Update post props
+    pub async fn update_props(&self, post_id: Uuid, props: serde_json::Value) -> ApiResult<()> {
+        sqlx::query("UPDATE posts SET props = $1 WHERE id = $2")
+            .bind(props)
+            .bind(post_id)
+            .execute(&self.db)
+            .await?;
+        Ok(())
+    }
+
+    /// Get created_at for a post
+    pub async fn get_created_at(
+        &self,
+        post_id: Uuid,
+    ) -> ApiResult<Option<chrono::DateTime<chrono::Utc>>> {
+        let time = sqlx::query_scalar("SELECT created_at FROM posts WHERE id = $1")
+            .bind(post_id)
+            .fetch_optional(&self.db)
+            .await?;
+        Ok(time)
+    }
+
+    /// Count non-deleted posts in a channel
+    pub async fn count_posts_in_channel(&self, channel_id: Uuid) -> ApiResult<i64> {
+        let total: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM posts WHERE channel_id = $1 AND deleted_at IS NULL",
+        )
+        .bind(channel_id)
+        .fetch_one(&self.db)
+        .await?;
+        Ok(total)
+    }
+
+    /// Find a post by ID including deleted posts
+    pub async fn find_by_id_include_deleted(
+        &self,
+        post_id: Uuid,
+    ) -> ApiResult<Option<crate::models::post::PostResponse>> {
+        let post = sqlx::query_as::<_, crate::models::post::PostResponse>(&format!(
+            r#"
+            SELECT {}
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.id = $1
+            "#,
+            Self::POST_COLUMNS
+        ))
+        .bind(post_id)
+        .fetch_optional(&self.db)
+        .await?;
+        Ok(post)
+    }
+
+    /// Find a post by ID with strict user JOIN (inner join)
+    pub async fn find_by_id_strict(
+        &self,
+        post_id: Uuid,
+    ) -> ApiResult<Option<crate::models::post::PostResponse>> {
+        let post = sqlx::query_as::<_, crate::models::post::PostResponse>(&format!(
+            r#"
+            SELECT {}
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            WHERE p.id = $1 AND p.deleted_at IS NULL
+            "#,
+            Self::POST_COLUMNS
+        ))
+        .bind(post_id)
+        .fetch_optional(&self.db)
+        .await?;
+        Ok(post)
+    }
+
+    /// Get thread replies with optional cursor pagination
+    pub async fn get_thread_replies_with_cursor(
+        &self,
+        root_post_id: Uuid,
+        cursor: Option<Uuid>,
+        limit: i64,
+    ) -> ApiResult<Vec<crate::models::post::PostResponse>> {
+        let rows = if let Some(cursor_id) = cursor {
+            let query = format!(
+                r#"
+                SELECT {}
+                FROM posts p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
+                  AND (p.created_at, p.id) > (SELECT created_at, id FROM posts WHERE id = $2)
+                ORDER BY p.created_at ASC, p.id ASC LIMIT $3
+                "#,
+                Self::POST_COLUMNS
+            );
+            sqlx::query_as(&query)
+                .bind(root_post_id)
+                .bind(cursor_id)
+                .bind(limit)
+                .fetch_all(&self.db)
+                .await?
+        } else {
+            let query = format!(
+                r#"
+                SELECT {}
+                FROM posts p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.root_post_id = $1 AND p.deleted_at IS NULL
+                ORDER BY p.created_at ASC, p.id ASC LIMIT $2
+                "#,
+                Self::POST_COLUMNS
+            );
+            sqlx::query_as(&query)
+                .bind(root_post_id)
+                .bind(limit)
+                .fetch_all(&self.db)
+                .await?
+        };
+        Ok(rows)
+    }
+
+    /// List posts since a timestamp including edited posts (no deleted_at filter)
+    pub async fn list_since_including_edited(
+        &self,
+        channel_id: Uuid,
+        since: chrono::DateTime<chrono::Utc>,
+        limit: i64,
+    ) -> ApiResult<Vec<crate::models::post::PostResponse>> {
+        let rows = sqlx::query_as::<_, crate::models::post::PostResponse>(&format!(
+            r#"
+            SELECT {}
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.channel_id = $1
+              AND (p.created_at >= $2 OR p.edited_at >= $2)
+            ORDER BY p.created_at ASC
+            LIMIT $3
+            "#,
+            Self::POST_COLUMNS
+        ))
+        .bind(channel_id)
+        .bind(since)
+        .bind(limit)
+        .fetch_all(&self.db)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Insert a system message post and return it
+    pub async fn create_system_message_post(
+        &self,
+        channel_id: Uuid,
+        user_id: Uuid,
+        message: &str,
+        props: serde_json::Value,
+    ) -> ApiResult<crate::models::Post> {
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
+            r#"
+            INSERT INTO posts (channel_id, user_id, message, props)
+            VALUES ($1, $2, $3, $4)
+            RETURNING {}
+            "#,
+            Self::POST_COLUMNS_NO_USER
+        ))
+        .bind(channel_id)
+        .bind(user_id)
+        .bind(message)
+        .bind(props)
+        .fetch_one(&self.db)
+        .await?;
+        Ok(post)
+    }
+
+    /// Insert a post without returning anything
+    pub async fn insert_post_no_returning(
+        &self,
+        channel_id: Uuid,
+        user_id: Uuid,
+        message: &str,
+        props: serde_json::Value,
+    ) -> ApiResult<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO posts (channel_id, user_id, message, props)
+            VALUES ($1, $2, $3, $4)
+            "#,
+        )
+        .bind(channel_id)
+        .bind(user_id)
+        .bind(message)
+        .bind(props)
+        .execute(&self.db)
+        .await?;
         Ok(())
     }
 }

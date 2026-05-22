@@ -7,6 +7,12 @@ use uuid::Uuid;
 use crate::error::{ApiResult, AppError};
 use crate::models::{Channel, ChannelMember, ChannelType};
 
+fn escape_like_pattern(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 /// Row returned from channel list queries that join team data
 #[derive(Debug, sqlx::FromRow)]
 pub struct ChannelWithTeamDataRow {
@@ -283,7 +289,7 @@ impl<'a> ChannelRepository<'a> {
             .bind(user_id)
             .fetch_optional(self.pool)
             .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))
+            .ok_or_else(|| AppError::NotAMember)
     }
 
     /// Update a channel with optional fields (COALESCE pattern)
@@ -806,7 +812,10 @@ impl<'a> ChannelRepository<'a> {
         .bind(channel_id)
         .bind(filter_allow_reference)
         .bind(search_term)
-        .bind(format!("%{}%", search_term))
+        .bind(format!(
+            "%{}%",
+            escape_like_pattern(&search_term.to_lowercase())
+        ))
         .fetch_all(self.pool)
         .await?;
         Ok(rows)
@@ -1206,5 +1215,83 @@ impl<'a> ChannelRepository<'a> {
             .bind(name)
             .fetch_optional(self.pool)
             .await
+    }
+
+    /// Get member IDs in a channel from a list of user IDs
+    pub async fn get_member_ids_by_user_ids(
+        &self,
+        channel_id: Uuid,
+        user_ids: &[Uuid],
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = ANY($2)",
+        )
+        .bind(channel_id)
+        .bind(user_ids)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Get channel info for push notifications
+    pub async fn get_channel_push_info(
+        &self,
+        channel_id: Uuid,
+    ) -> Result<Option<(String, String, String)>, sqlx::Error> {
+        sqlx::query_as::<_, (String, String, String)>(
+            "SELECT c.name, c.display_name, c.type::text as channel_type FROM channels c WHERE c.id = $1",
+        )
+        .bind(channel_id)
+        .fetch_optional(self.pool)
+        .await
+    }
+
+    /// Get the other participant in a DM channel
+    pub async fn get_other_dm_participant(
+        &self,
+        channel_id: Uuid,
+        exclude_user_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id != $2",
+        )
+        .bind(channel_id)
+        .bind(exclude_user_id)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Get member IDs by usernames in a channel
+    pub async fn get_member_ids_by_usernames(
+        &self,
+        channel_id: Uuid,
+        usernames: &[&str],
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT cm.user_id FROM channel_members cm JOIN users u ON cm.user_id = u.id WHERE cm.channel_id = $1 AND u.username = ANY($2)",
+        )
+        .bind(channel_id)
+        .bind(usernames)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Ensure a user is a member of a channel (insert if missing)
+    pub async fn ensure_membership(
+        &self,
+        channel_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            INSERT INTO channel_members (channel_id, user_id, role)
+            VALUES ($1, $2, 'member')
+            ON CONFLICT (channel_id, user_id) DO NOTHING
+            RETURNING user_id
+            "#,
+        )
+        .bind(channel_id)
+        .bind(user_id)
+        .fetch_optional(self.pool)
+        .await
     }
 }

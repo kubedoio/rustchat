@@ -102,8 +102,8 @@ pub async fn get_channel(
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -151,17 +151,15 @@ pub async fn create_channel(
     let input: CreateChannelRequest =
         super::utils::parse_body(&headers, &body, "Invalid channel body")?;
 
-    let team_id = parse_mm_or_uuid(&input.team_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id =
+        parse_mm_or_uuid(&input.team_id).ok_or_else(|| crate::error::AppError::InvalidTeamId)?;
 
     let repo = ChannelRepository::new(&state.db);
 
     // Verify team membership
     let is_member = repo.is_team_member(team_id, auth.user_id).await?;
     if !is_member {
-        return Err(crate::error::AppError::Forbidden(
-            "Not a member of this team".to_string(),
-        ));
+        return Err(crate::error::AppError::NotOnTeam);
     }
 
     // Map MM channel type to RustChat type
@@ -209,8 +207,8 @@ pub async fn update_channel(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
@@ -248,8 +246,8 @@ pub async fn delete_channel(
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     // Only channel admins or system admins may delete a channel
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
@@ -260,7 +258,7 @@ pub async fn delete_channel(
     let channel = repo
         .get_by_id_optional(channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+        .ok_or_else(|| AppError::ChannelNotFound)?;
 
     // Soft delete the channel
     repo.soft_delete(channel_id).await?;
@@ -305,8 +303,8 @@ pub async fn patch_channel(
     Path(channel_id): Path<String>,
     Json(input): Json<PatchChannelRequest>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
@@ -347,8 +345,8 @@ pub async fn update_channel_privacy(
     Path(channel_id): Path<String>,
     Json(input): Json<UpdatePrivacyRequest>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     // Only channel admins or system admins may change channel privacy
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
@@ -375,8 +373,8 @@ pub async fn restore_channel(
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     // Only channel admins or system admins may restore a deleted channel
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
@@ -401,10 +399,10 @@ pub async fn move_channel(
     Path(channel_id): Path<String>,
     Json(input): Json<MoveChannelRequest>,
 ) -> ApiResult<Json<mm::Channel>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    let new_team_id = parse_mm_or_uuid(&input.team_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid team_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let new_team_id =
+        parse_mm_or_uuid(&input.team_id).ok_or_else(|| crate::error::AppError::InvalidTeamId)?;
 
     // Only system admins may move a channel between teams
     if !auth.has_permission(&permissions::SYSTEM_MANAGE) {

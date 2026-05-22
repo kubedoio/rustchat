@@ -1,3 +1,4 @@
+import { log } from '@/utils/log'
 import { defineStore } from 'pinia'
 import { ref, computed, type ComputedRef } from 'vue'
 import { postsApi, type Post } from '../../../api/posts'
@@ -51,13 +52,7 @@ function toIsoTimestamp(value: unknown): string {
 }
 
 function toOptionalIsoTimestamp(value: unknown): string | undefined {
-  if (
-    value === null ||
-    value === undefined ||
-    value === '' ||
-    value === 0 ||
-    value === '0'
-  ) {
+  if (value === null || value === undefined || value === '' || value === 0 || value === '0') {
     return undefined
   }
   return toIsoTimestamp(value)
@@ -88,7 +83,9 @@ function numberValue(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-function resolveAuthorDetails(rawPost: Post & { username?: string; avatar_url?: string; email?: string }): {
+function resolveAuthorDetails(
+  rawPost: Post & { username?: string; avatar_url?: string; email?: string }
+): {
   username: string
   avatarUrl?: string
   email?: string
@@ -112,7 +109,7 @@ function resolveAuthorDetails(rawPost: Post & { username?: string; avatar_url?: 
   }
 
   const teamStore = useTeamStore()
-  const teamMember = teamStore.members.find((member) => idsMatch(member.user_id, rawPost.user_id))
+  const teamMember = teamStore.members.find(member => idsMatch(member.user_id, rawPost.user_id))
   if (teamMember) {
     return {
       username: teamMember.display_name || teamMember.username || 'Unknown',
@@ -136,7 +133,7 @@ function normalizeReactionUsers(users: unknown): string[] {
   return Array.from(
     new Set(
       users
-        .map((user) => normalizeEntityId(user) ?? user?.toString?.())
+        .map(user => normalizeEntityId(user) ?? user?.toString?.())
         .filter((user): user is string => typeof user === 'string' && user.length > 0)
     )
   )
@@ -166,9 +163,12 @@ function normalizeReaction(rawReaction: unknown): MessageReaction | null {
     emoji,
     apiKey: getPreferredEmojiName(r.emoji),
     users,
-    count: users.length > 0
-      ? users.length
-      : (Number.isFinite(numericCount) && numericCount > 0 ? numericCount : 1),
+    count:
+      users.length > 0
+        ? users.length
+        : Number.isFinite(numericCount) && numericCount > 0
+          ? numericCount
+          : 1,
   }
 }
 
@@ -186,10 +186,7 @@ function normalizeReactions(rawReactions: unknown): MessageReaction[] {
     }
 
     const existing = reactionsByEmoji.get(reaction.emoji)
-    reactionsByEmoji.set(
-      reaction.emoji,
-      existing ? mergeReaction(existing, reaction) : reaction
-    )
+    reactionsByEmoji.set(reaction.emoji, existing ? mergeReaction(existing, reaction) : reaction)
   }
 
   return Array.from(reactionsByEmoji.values())
@@ -254,7 +251,9 @@ export const useMessageStore = defineStore('messageStore', () => {
     return messagesCache.get(channelId)!
   }
 
-  const hasMoreOlder = computed(() => (channelId: string) => hasMoreOlderByChannel.value[channelId] ?? true)
+  const hasMoreOlder = computed(
+    () => (channelId: string) => hasMoreOlderByChannel.value[channelId] ?? true
+  )
 
   function visitLoadedMessages(visitor: (message: Message, collection: Message[]) => void) {
     for (const messages of Object.values(messagesByChannel.value)) {
@@ -296,9 +295,10 @@ export const useMessageStore = defineStore('messageStore', () => {
       }
 
       // If we got fewer than 50, we probably reached the end
-      hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
+      hasMoreOlderByChannel.value[channelId] =
+        response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
     } catch (e: unknown) {
-      console.error(`Failed to fetch messages for channel ${channelId}:`, e);
+      log.error(`Failed to fetch messages for channel ${channelId}:`, e)
       error.value = getApiErrorMessage(e) || getErrorMessage(e) || 'Failed to fetch messages'
     } finally {
       loading.value = false
@@ -330,9 +330,10 @@ export const useMessageStore = defineStore('messageStore', () => {
         messagesByChannel.value[channelId] = [...olderMessages, ...currentMessages]
       }
 
-      hasMoreOlderByChannel.value[channelId] = response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
+      hasMoreOlderByChannel.value[channelId] =
+        response.data.messages.length >= DEFAULT_MESSAGE_LIMIT
     } catch (e: unknown) {
-      console.error('Failed to fetch older messages:', e)
+      log.error('Failed to fetch older messages:', e)
     } finally {
       loading.value = false
       isLoadingOlder.value = false
@@ -351,7 +352,7 @@ export const useMessageStore = defineStore('messageStore', () => {
         .map(postToMessage)
       repliesByThread.value[rootId] = replies
     } catch (e: unknown) {
-      console.error(`Failed to fetch thread ${rootId}:`, e);
+      log.error(`Failed to fetch thread ${rootId}:`, e)
       error.value = getApiErrorMessage(e) || getErrorMessage(e) || 'Failed to fetch thread'
     } finally {
       loading.value = false
@@ -380,7 +381,9 @@ export const useMessageStore = defineStore('messageStore', () => {
     if (rootId) {
       const threadReplies = repliesByThread.value[rootId]
       if (threadReplies) {
-        const index = threadReplies.findIndex(m => m.clientMsgId === clientMsgId || m.id === clientMsgId)
+        const index = threadReplies.findIndex(
+          m => m.clientMsgId === clientMsgId || m.id === clientMsgId
+        )
         if (index !== -1) {
           threadReplies[index] = serverMsg
         } else {
@@ -390,7 +393,9 @@ export const useMessageStore = defineStore('messageStore', () => {
     } else {
       const channelMessages = messagesByChannel.value[channelId]
       if (channelMessages) {
-        const index = channelMessages.findIndex(m => m.clientMsgId === clientMsgId || m.id === clientMsgId)
+        const index = channelMessages.findIndex(
+          m => m.clientMsgId === clientMsgId || m.id === clientMsgId
+        )
         if (index !== -1) {
           channelMessages[index] = serverMsg
         } else {
@@ -414,7 +419,9 @@ export const useMessageStore = defineStore('messageStore', () => {
       }
       const threadReplies = repliesByThread.value[message.rootId]
       if (threadReplies) {
-        const index = threadReplies.findIndex(m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId))
+        const index = threadReplies.findIndex(
+          m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId)
+        )
         if (index !== -1) {
           threadReplies[index] = message
         } else {
@@ -425,7 +432,9 @@ export const useMessageStore = defineStore('messageStore', () => {
       // Important: If it was accidentally added to the main channel feed (e.g. by a bug in optimistic logic), remove it
       const channelMessages = messagesByChannel.value[message.channelId]
       if (channelMessages) {
-        const idx = channelMessages.findIndex(m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId))
+        const idx = channelMessages.findIndex(
+          m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId)
+        )
         if (idx !== -1) {
           channelMessages.splice(idx, 1)
         }
@@ -437,7 +446,9 @@ export const useMessageStore = defineStore('messageStore', () => {
       }
       const channelMessages = messagesByChannel.value[message.channelId]
       if (channelMessages) {
-        const index = channelMessages.findIndex(m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId))
+        const index = channelMessages.findIndex(
+          m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId)
+        )
         if (index !== -1) {
           channelMessages[index] = message
         } else {
@@ -458,7 +469,8 @@ export const useMessageStore = defineStore('messageStore', () => {
       // Check for mention
       const currentUser = authStore.user
       if (currentUser && message.content.includes(`@${currentUser.username}`)) {
-        unreadStore.channelMentions[message.channelId] = (unreadStore.channelMentions[message.channelId] || 0) + 1
+        unreadStore.channelMentions[message.channelId] =
+          (unreadStore.channelMentions[message.channelId] || 0) + 1
       }
     }
   }
@@ -664,12 +676,12 @@ export const useMessageStore = defineStore('messageStore', () => {
     const reactionKey = getReactionEmojiKey(emojiName)
     const apiKey = getPreferredEmojiName(emojiName)
 
-    visitLoadedMessages((message) => {
+    visitLoadedMessages(message => {
       if (message.id !== postId) {
         return
       }
 
-      const existingReaction = message.reactions.find((reaction) => reaction.emoji === reactionKey)
+      const existingReaction = message.reactions.find(reaction => reaction.emoji === reactionKey)
       if (existingReaction) {
         if (!existingReaction.users.includes(userId)) {
           existingReaction.users.push(userId)
@@ -695,12 +707,12 @@ export const useMessageStore = defineStore('messageStore', () => {
     const emojiName = stringValue(data.emoji_name) ?? ''
     const reactionKey = getReactionEmojiKey(emojiName)
 
-    visitLoadedMessages((message) => {
+    visitLoadedMessages(message => {
       if (message.id !== postId) {
         return
       }
 
-      const index = message.reactions.findIndex((reaction) => reaction.emoji === reactionKey)
+      const index = message.reactions.findIndex(reaction => reaction.emoji === reactionKey)
       if (index === -1) {
         return
       }
@@ -941,6 +953,6 @@ export const useMessageStore = defineStore('messageStore', () => {
     clearChannel,
     updateMessage,
     findMessageByClientId,
-    getMessageById
+    getMessageById,
   }
 })

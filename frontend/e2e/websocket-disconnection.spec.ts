@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 /**
  * WebSocket Disconnection UX E2E Tests
- * 
+ *
  * Tests the progressive disconnection UI states:
  * 1. Reconnecting (< 5s): Yellow banner, auto-retry
  * 2. Disconnected (5-30s): Orange banner, countdown, manual retry
@@ -17,7 +17,7 @@ test.describe('WebSocket Connection States', () => {
     await page.fill('[data-testid="login-password"]', 'testpass')
     await page.click('[data-testid="login-submit"]')
     await page.waitForURL('**/channels/**')
-    
+
     // Wait for WebSocket to connect
     await page.waitForSelector('[data-testid="connection-indicator"][data-status="connected"]')
   })
@@ -25,7 +25,7 @@ test.describe('WebSocket Connection States', () => {
   test('shows reconnecting banner on brief disconnect', async ({ page }) => {
     // Simulate WebSocket disconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
 
     // Should show yellow banner
@@ -49,7 +49,7 @@ test.describe('WebSocket Connection States', () => {
 
     // Restore connection
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketOpen()
+      ;(window as any).testHelpers.simulateWebSocketOpen()
     })
 
     // Should return to normal
@@ -61,7 +61,7 @@ test.describe('WebSocket Connection States', () => {
   test('shows disconnected state with countdown', async ({ page }) => {
     // Simulate disconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
 
     // Wait for state transition (5 seconds)
@@ -89,7 +89,7 @@ test.describe('WebSocket Connection States', () => {
   test('manual retry button triggers immediate reconnect', async ({ page }) => {
     // Simulate disconnect and wait for extended state
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
     await page.waitForTimeout(5500)
 
@@ -105,7 +105,7 @@ test.describe('WebSocket Connection States', () => {
   test('shows critical disconnection modal after timeout', async ({ page }) => {
     // Simulate disconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
 
     // Wait for critical state (30 seconds)
@@ -133,7 +133,7 @@ test.describe('WebSocket Connection States', () => {
   test('reconnect button in modal restores connection', async ({ page }) => {
     // Simulate disconnect and reach critical state
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
     await page.waitForTimeout(30500)
 
@@ -153,7 +153,7 @@ test.describe('WebSocket Connection States', () => {
   test('refresh button in modal reloads page', async ({ page }) => {
     // Simulate disconnect and reach critical state
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
     await page.waitForTimeout(30500)
 
@@ -176,11 +176,11 @@ test.describe('WebSocket Connection States', () => {
 
     // Simulate disconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
 
     // Send button should be disabled in reconnecting state
-    let sendButton = page.locator('[data-testid="send-button"]')
+    const sendButton = page.locator('[data-testid="send-button"]')
     await expect(sendButton).toBeDisabled()
 
     // Wait for disconnected state
@@ -193,7 +193,7 @@ test.describe('WebSocket Connection States', () => {
 
     // Restore connection
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketOpen()
+      ;(window as any).testHelpers.simulateWebSocketOpen()
     })
 
     // Send button should be enabled
@@ -206,7 +206,7 @@ test.describe('WebSocket Connection States', () => {
   test('tooltip shows correct disabled reason', async ({ page }) => {
     // Simulate disconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
 
     const sendButton = page.locator('[data-testid="send-button"]')
@@ -222,7 +222,7 @@ test.describe('WebSocket Connection States', () => {
 
     // Disconnect (yellow)
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
     await expect(indicator).toHaveAttribute('data-status', 'reconnecting')
     await expect(indicator).toHaveClass(/bg-amber-500/)
@@ -254,17 +254,17 @@ test.describe('WebSocket Reconnection Sync', () => {
 
     // Disconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
 
     // Send a message from another client (simulated)
-    await page.evaluate((channel) => {
+    await page.evaluate(channel => {
       return (window as any).testHelpers.sendMessageAsOtherUser(channel, 'Missed message')
     }, channelId)
 
     // Reconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketOpen()
+      ;(window as any).testHelpers.simulateWebSocketOpen()
     })
 
     // Wait for sync
@@ -280,17 +280,17 @@ test.describe('WebSocket Reconnection Sync', () => {
 
     // Disconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
 
     // Simulate unread messages arriving while disconnected
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateUnreadCounts({ channel_id: 'test', unread_count: 5 })
+      ;(window as any).testHelpers.simulateUnreadCounts({ channel_id: 'test', unread_count: 5 })
     })
 
     // Reconnect
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketOpen()
+      ;(window as any).testHelpers.simulateWebSocketOpen()
     })
 
     // Unread count should update
@@ -303,7 +303,7 @@ test.describe('WebSocket Reconnection Sync', () => {
 test.describe('Accessibility', () => {
   test('status bar has correct ARIA attributes', async ({ page }) => {
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
 
     const banner = page.locator('[data-testid="connection-status-bar"]')
@@ -313,7 +313,7 @@ test.describe('Accessibility', () => {
 
   test('modal has correct ARIA attributes', async ({ page }) => {
     await page.evaluate(() => {
-      (window as any).testHelpers.simulateWebSocketClose()
+      ;(window as any).testHelpers.simulateWebSocketClose()
     })
     await page.waitForTimeout(30500)
 
@@ -324,6 +324,9 @@ test.describe('Accessibility', () => {
 
   test('status indicator has aria-label', async ({ page }) => {
     const indicator = page.locator('[data-testid="connection-indicator"]')
-    await expect(indicator).toHaveAttribute('aria-label', /Connection: (connected|reconnecting|disconnected|failed)/)
+    await expect(indicator).toHaveAttribute(
+      'aria-label',
+      /Connection: (connected|reconnecting|disconnected|failed)/
+    )
   })
 })

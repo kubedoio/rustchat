@@ -24,79 +24,80 @@ const authStore = useAuthStore()
 const unreadStore = useUnreadStore()
 const configStore = useConfigStore()
 const route = useRoute()
-const { 
-    connect, 
-    disconnect, 
-    connectionStatus,
-    nextRetryIn
-} = useWebSocket()
+const { connect, disconnect, connectionStatus, nextRetryIn } = useWebSocket()
 const singleTabEnabled = computed(() => authStore.isAuthenticated)
 const { isActiveTab, takeOver } = useSingleActiveTab(singleTabEnabled)
 
 const showTermsModal = computed(() => {
-    // Only show terms modal for authenticated users outside of admin section
-    return authStore.isAuthenticated && !route.path.startsWith('/admin')
+  // Only show terms modal for authenticated users outside of admin section
+  return authStore.isAuthenticated && !route.path.startsWith('/admin')
 })
 
 // Connection action handlers
 function handleRetryConnection() {
-    // Force immediate reconnect attempt
-    disconnect()
-    setTimeout(() => connect(), 100)
+  // Force immediate reconnect attempt
+  disconnect()
+  setTimeout(() => connect(), 100)
 }
 
 function handleRefreshPage() {
-    window.location.reload()
+  window.location.reload()
 }
 
 onMounted(async () => {
-    if (toastManagerRef.value) {
-        register(toastManagerRef.value)
-    }
-    await configStore.fetchPublicConfig()
-    configStore.initSync()
+  if (toastManagerRef.value) {
+    register(toastManagerRef.value)
+  }
+  await configStore.fetchPublicConfig()
+  configStore.initSync()
 })
 
 // Connect realtime only when this tab is the active tab for the session.
-watch([() => authStore.isAuthenticated, isActiveTab], async ([isAuth, isActive]) => {
+watch(
+  [() => authStore.isAuthenticated, isActiveTab],
+  async ([isAuth, isActive]) => {
     if (isAuth && isActive) {
-        connect()
-        await unreadStore.fetchOverview()
+      connect()
+      await unreadStore.fetchOverview()
     } else {
-        disconnect()
+      disconnect()
     }
-}, { immediate: true })
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
   <ToastManager ref="toastManagerRef" />
-  
+
   <!-- Connection status banner (States 1 & 2) -->
   <ConnectionStatusBar
-    v-if="authStore.isAuthenticated && connectionStatus !== 'connected' && connectionStatus !== 'failed'"
+    v-if="
+      authStore.isAuthenticated && connectionStatus !== 'connected' && connectionStatus !== 'failed'
+    "
     :status="connectionStatus"
     :next-retry-in="nextRetryIn"
     @retry="handleRetryConnection"
   />
-  
+
   <!-- Connection lost modal (State 3) -->
   <ConnectionLostModal
     v-if="authStore.isAuthenticated && connectionStatus === 'failed'"
     @reconnect="handleRetryConnection"
     @refresh="handleRefreshPage"
   />
-  
+
   <CommandPalette v-if="isActiveTab" />
-  <SettingsModal v-if="isActiveTab" :isOpen="ui.isSettingsOpen" @close="ui.closeSettings()" />
+  <SettingsModal v-if="isActiveTab" :is-open="ui.isSettingsOpen" @close="ui.closeSettings()" />
   <ActiveCall v-if="isActiveTab" />
   <IncomingCallModal v-if="isActiveTab" />
   <TermsAcceptanceModal v-if="showTermsModal" />
-  
+
   <!-- Main content with dimming when disconnected -->
-  <div 
-    :class="{ 
+  <div
+    :class="{
       'opacity-60': authStore.isAuthenticated && connectionStatus === 'disconnected',
-      'opacity-80': authStore.isAuthenticated && connectionStatus === 'reconnecting'
+      'opacity-80': authStore.isAuthenticated && connectionStatus === 'reconnecting',
     }"
     class="transition-opacity duration-500"
   >
@@ -106,7 +107,9 @@ watch([() => authStore.isAuthenticated, isActiveTab], async ([isAuth, isActive])
     v-if="authStore.isAuthenticated && !isActiveTab"
     class="fixed inset-0 z-[120] flex items-center justify-center bg-bg-app/90 backdrop-blur-sm p-6"
   >
-    <div class="w-full max-w-md rounded-r-2 border border-border-1 bg-bg-surface-1 p-6 text-center shadow-2">
+    <div
+      class="w-full max-w-md rounded-r-2 border border-border-1 bg-bg-surface-1 p-6 text-center shadow-2"
+    >
       <h2 class="text-lg font-semibold text-text-1">This tab is inactive</h2>
       <p class="mt-2 text-sm text-text-2">
         Another tab is currently active for messaging in this browser session.

@@ -1,6 +1,6 @@
 <template>
   <div class="thread-composer">
-    <FormattingToolbar
+    <ComposerToolbar
       v-if="editor"
       :show-preview="false"
       @format="handleFormat"
@@ -8,11 +8,7 @@
     />
     <div class="composer-input-wrapper">
       <EditorContent :editor="editor" class="composer-editor" />
-      <button
-        class="send-btn"
-        :disabled="!canSend || isSending"
-        @click="send"
-      >
+      <button class="send-btn" :disabled="!canSend || isSending" @click="send">
         {{ isSending ? 'Sending...' : 'Send' }}
       </button>
     </div>
@@ -24,7 +20,7 @@ import { computed } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import FormattingToolbar from './FormattingToolbar.vue'
+import ComposerToolbar from './ComposerToolbar.vue'
 
 const props = defineProps<{
   modelValue: string
@@ -38,10 +34,7 @@ const emit = defineEmits<{
 
 const editor = useEditor({
   content: props.modelValue,
-  extensions: [
-    StarterKit,
-    Placeholder.configure({ placeholder: 'Reply in thread...' }),
-  ],
+  extensions: [StarterKit, Placeholder.configure({ placeholder: 'Reply in thread...' })],
   onUpdate: ({ editor }) => {
     emit('update:modelValue', editor.getHTML())
   },

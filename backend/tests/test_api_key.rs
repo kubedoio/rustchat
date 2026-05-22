@@ -2,7 +2,7 @@
 //!
 //! This test suite validates the full API key lifecycle:
 //! - Generation of API keys with "rck_" prefix (68 chars: rck_ + 64 hex)
-//! - Bcrypt hashing with cost factor 12
+//! - Argon2id hashing
 //! - Validation against hashed values
 //! - Resistance to timing attacks via constant-time comparison
 //! - Thread-safe operation in async contexts
@@ -57,18 +57,17 @@ async fn test_generate_api_key_uniqueness() {
     assert_ne!(key1, key3, "Generated keys should be unique");
 }
 
-/// Test that hash_api_key produces valid bcrypt hashes
+/// Test that hash_api_key produces valid argon2id hashes
 #[tokio::test]
 async fn test_hash_api_key_format() {
     let key = generate_api_key();
     let hash = hash_api_key(&key).await.expect("Hashing should succeed");
 
-    // Bcrypt hashes start with $2b$ (or $2a$, $2y$) and are 60 characters
+    // Argon2id hashes start with $argon2id$
     assert!(
-        hash.starts_with("$2b$") || hash.starts_with("$2a$") || hash.starts_with("$2y$"),
-        "Hash should be a valid bcrypt hash"
+        hash.starts_with("$argon2id$"),
+        "Hash should be a valid argon2id hash"
     );
-    assert_eq!(hash.len(), 60, "Bcrypt hash should be 60 characters");
 }
 
 /// Test that hash_api_key produces different hashes for the same key (due to salt)
@@ -236,20 +235,18 @@ async fn test_api_key_entropy() {
     );
 }
 
-/// Test that bcrypt cost factor is set to 12 (defensive check)
-/// This test inspects the hash format to ensure proper cost factor
+/// Test that argon2id parameters are present in the hash (defensive check)
+/// This test inspects the hash format to ensure proper algorithm identifier
 #[tokio::test]
-async fn test_bcrypt_cost_factor() {
+async fn test_argon2id_algorithm() {
     let key = generate_api_key();
     let hash = hash_api_key(&key).await.expect("Hashing should succeed");
 
-    // Bcrypt hash format: $2b$12$... where "12" is the cost factor
-    // Extract cost factor from hash
-    let parts: Vec<&str> = hash.split('$').collect();
-    assert!(parts.len() >= 4, "Hash should have proper bcrypt format");
-
-    let cost = parts[2];
-    assert_eq!(cost, "12", "Bcrypt cost factor should be 12");
+    // Argon2id hash format: $argon2id$v=19$m=...,t=...,p=...$...
+    assert!(
+        hash.starts_with("$argon2id$"),
+        "Hash should use argon2id algorithm"
+    );
 }
 
 #[test]

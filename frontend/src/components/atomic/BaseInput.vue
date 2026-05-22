@@ -27,17 +27,19 @@ const inputId = computed(() => props.id || `input-${Math.random().toString(36).s
         :id="inputId"
         :type="type || 'text'"
         :value="modelValue"
-        @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
         :placeholder="placeholder"
         :required="required"
         :disabled="disabled"
         class="block w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm transition-colors"
         :class="[
-          error ? 'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500' : '',
-          disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+          error
+            ? 'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500'
+            : '',
+          disabled ? 'bg-gray-100 cursor-not-allowed' : '',
         ]"
+        @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       />
     </div>
-    <p v-if="error" class="mt-2 text-sm text-red-600" :id="`${inputId}-error`">{{ error }}</p>
+    <p v-if="error" :id="`${inputId}-error`" class="mt-2 text-sm text-red-600">{{ error }}</p>
   </div>
 </template>

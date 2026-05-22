@@ -25,6 +25,16 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+For a production-oriented single-host deployment, use the standalone production Compose file instead:
+
+```bash
+cp .env.example .env
+# Set all required production secrets and public URLs.
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+The production Compose file does not publish PostgreSQL, Redis, or RustFS management ports to the host. Only the web frontend and calls media ports are exposed by default.
+
 ### Generate Required Secrets
 
 ```bash
@@ -43,6 +53,9 @@ RUSTFS_SECRET_KEY="${RUSTCHAT_S3_SECRET_KEY}"
 # All services healthy?
 docker compose ps
 
+# Production Compose
+docker compose -f docker-compose.prod.yml ps
+
 # Backend responding?
 curl -s http://localhost:3000/api/v1/health/live | jq .
 
@@ -56,6 +69,8 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8080
 ## Production-Oriented Deployment
 
 Before running RustChat in production:
+
+Use `docker-compose.prod.yml` as the production baseline for single-host deployments. The default `docker-compose.yml` remains optimized for local development and exposes internal services for debugging.
 
 ### 1. Environment Hardening Checklist
 
@@ -175,20 +190,16 @@ For the complete reference, see [Admin Configuration](./admin/configuration.md).
 
 **Backup:**
 ```bash
-# Running in Docker
-docker exec rustchat-postgres pg_dump -U rustchat rustchat > rustchat-backup-$(date +%Y%m%d).sql
+# Production Compose helper
+./tools/backup-postgres.sh
 
-# Or from host if PostgreSQL is exposed
-pg_dump -h localhost -U rustchat rustchat > rustchat-backup.sql
+# Optional output path
+./tools/backup-postgres.sh backups/rustchat.sql.gz
 ```
 
 **Restore:**
 ```bash
-# Drop and recreate the database first
-docker exec -i rustchat-postgres psql -U rustchat -c "DROP DATABASE rustchat; CREATE DATABASE rustchat;"
-
-# Restore from backup
-docker exec -i rustchat-postgres psql -U rustchat -d rustchat < rustchat-backup.sql
+RUSTCHAT_RESTORE_CONFIRM=YES ./tools/restore-postgres.sh backups/rustchat.sql.gz
 ```
 
 ### S3 / File Storage

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log'
 import { computed, onMounted, ref } from 'vue'
 import { AlertTriangle, ExternalLink, Lightbulb, Pencil } from 'lucide-vue-next'
 import api from '../../../api/client'
@@ -62,7 +63,10 @@ const emailNotificationsLabel = computed(() => {
 })
 
 const keywordsTriggerLabel = computed(() => {
-  const keywords = localMentionKeywords.value.length > 0 ? localMentionKeywords.value : defaultMentionKeywords.value
+  const keywords =
+    localMentionKeywords.value.length > 0
+      ? localMentionKeywords.value
+      : defaultMentionKeywords.value
   return formatKeywordList(keywords)
 })
 
@@ -84,20 +88,30 @@ const permissionRequired = computed(() => {
 const pageEyebrowClass = 'text-[11px] font-semibold uppercase tracking-[0.24em] text-brand'
 const titleClass = 'text-3xl font-semibold tracking-[-0.04em] text-text-1 sm:text-[2rem]'
 const summaryClass = 'mt-2 max-w-2xl text-sm text-text-3'
-const linkClass = 'inline-flex items-center gap-2 rounded-full border border-border-1 bg-bg-surface-1 px-3 py-2 text-sm font-medium text-text-2 transition-standard hover:border-border-2 hover:bg-bg-surface-2 hover:text-text-1'
+const linkClass =
+  'inline-flex items-center gap-2 rounded-full border border-border-1 bg-bg-surface-1 px-3 py-2 text-sm font-medium text-text-2 transition-standard hover:border-border-2 hover:bg-bg-surface-2 hover:text-text-1'
 const panelClass = 'overflow-hidden rounded-r-3 border border-border-1 bg-bg-surface-1 shadow-1'
-const rowButtonClass = 'flex w-full items-start justify-between gap-4 border-b border-border-1 px-5 py-4 text-left transition-standard hover:bg-bg-surface-2'
-const rowTitleClass = 'text-base font-semibold leading-tight tracking-[-0.01em] text-text-1 sm:text-lg'
+const rowButtonClass =
+  'flex w-full items-start justify-between gap-4 border-b border-border-1 px-5 py-4 text-left transition-standard hover:bg-bg-surface-2'
+const rowTitleClass =
+  'text-base font-semibold leading-tight tracking-[-0.01em] text-text-1 sm:text-lg'
 const rowValueClass = 'mt-1 text-sm text-text-3'
-const editChipClass = 'inline-flex items-center gap-1 rounded-full border border-border-1 bg-bg-surface-2 px-2.5 py-1 text-xs font-semibold text-text-2'
-const permissionChipClass = 'inline-flex items-center gap-1 rounded-full border border-secondary/20 bg-secondary/10 px-2.5 py-1 text-xs font-semibold text-secondary'
-const optionCardClass = 'flex items-start gap-3 rounded-r-2 border border-border-1 bg-bg-surface-1 p-3 text-sm text-text-2 transition-standard hover:border-border-2 hover:bg-bg-surface-2'
-const toggleCardClass = 'flex items-center justify-between rounded-r-2 border border-border-1 bg-bg-surface-1 p-3 text-sm text-text-1'
+const editChipClass =
+  'inline-flex items-center gap-1 rounded-full border border-border-1 bg-bg-surface-2 px-2.5 py-1 text-xs font-semibold text-text-2'
+const permissionChipClass =
+  'inline-flex items-center gap-1 rounded-full border border-secondary/20 bg-secondary/10 px-2.5 py-1 text-xs font-semibold text-secondary'
+const optionCardClass =
+  'flex items-start gap-3 rounded-r-2 border border-border-1 bg-bg-surface-1 p-3 text-sm text-text-2 transition-standard hover:border-border-2 hover:bg-bg-surface-2'
+const toggleCardClass =
+  'flex items-center justify-between rounded-r-2 border border-border-1 bg-bg-surface-1 p-3 text-sm text-text-1'
 const fieldLabelClass = 'mb-1 block text-sm font-medium text-text-1'
-const fieldInputClass = 'w-full rounded-r-2 border border-border-1 bg-bg-surface-1 px-3 py-2 text-sm text-text-1 outline-none transition-standard placeholder:text-text-3 focus:border-brand focus:ring-2 focus:ring-brand/15'
+const fieldInputClass =
+  'w-full rounded-r-2 border border-border-1 bg-bg-surface-1 px-3 py-2 text-sm text-text-1 outline-none transition-standard placeholder:text-text-3 focus:border-brand focus:ring-2 focus:ring-brand/15'
 const helperCardClass = 'rounded-r-2 border border-secondary/20 bg-secondary/10 p-4'
-const helperButtonClass = 'mt-3 rounded-r-2 bg-brand px-3 py-2 text-sm font-medium text-brand-foreground transition-standard hover:bg-brand-hover'
-const ghostButtonClass = 'inline-flex items-center gap-1 rounded-r-2 border border-border-1 bg-bg-surface-1 px-4 py-2 text-sm font-medium text-text-2 transition-standard hover:border-border-2 hover:bg-bg-surface-2 hover:text-text-1'
+const helperButtonClass =
+  'mt-3 rounded-r-2 bg-brand px-3 py-2 text-sm font-medium text-brand-foreground transition-standard hover:bg-brand-hover'
+const ghostButtonClass =
+  'inline-flex items-center gap-1 rounded-r-2 border border-border-1 bg-bg-surface-1 px-4 py-2 text-sm font-medium text-text-2 transition-standard hover:border-border-2 hover:bg-bg-surface-2 hover:text-text-1'
 
 onMounted(async () => {
   if (typeof Notification !== 'undefined') {
@@ -116,15 +130,18 @@ function syncLocalState() {
     localNotifySounds.value = prefs.notify_sounds !== false
 
     const notifyEmail = prefs.notify_email
-    localNotifyEmail.value = notifyEmail === 'true' || notifyEmail === 'all' || notifyEmail === 'mentions'
+    localNotifyEmail.value =
+      notifyEmail === 'true' || notifyEmail === 'all' || notifyEmail === 'mentions'
 
-    localMentionKeywords.value = prefs.mention_keywords && prefs.mention_keywords.length > 0
-      ? prefs.mention_keywords
-      : [...defaultMentionKeywords.value]
+    localMentionKeywords.value =
+      prefs.mention_keywords && prefs.mention_keywords.length > 0
+        ? prefs.mention_keywords
+        : [...defaultMentionKeywords.value]
   }
 
   localHighlightKeywords.value = readJsonArray(HIGHLIGHT_KEYWORDS_STORAGE_KEY)
-  localAutoResponderEnabled.value = localStorage.getItem(AUTO_RESPONDER_ENABLED_STORAGE_KEY) === 'true'
+  localAutoResponderEnabled.value =
+    localStorage.getItem(AUTO_RESPONDER_ENABLED_STORAGE_KEY) === 'true'
   localAutoResponderMessage.value = localStorage.getItem(AUTO_RESPONDER_MESSAGE_STORAGE_KEY) || ''
 
   mentionKeywordsInput.value = localMentionKeywords.value.join(', ')
@@ -208,7 +225,7 @@ async function requestNotificationPermission() {
 
     toast.error('Permission required', 'Please enable notifications in your browser settings')
   } catch (error) {
-    console.error('Failed to request notification permission', error)
+    log.error('Failed to request notification permission', error)
     toast.error('Permission request failed', 'Could not request notification permission')
   }
 }
@@ -231,7 +248,7 @@ function testNotificationSound() {
 
     toast.success('Sound test', 'Played notification sound')
   } catch (error) {
-    console.error('Failed to play notification sound', error)
+    log.error('Failed to play notification sound', error)
     toast.error('Sound test failed', 'Could not play notification sound')
   }
 }
@@ -247,22 +264,29 @@ async function sendTestNotification() {
 
     toast.error('Failed to send test notification', 'Unexpected response from server')
   } catch (error) {
-    console.error('Failed to send test notification', error)
-    toast.error('Failed to send test notification', 'Please check your notification configuration and try again')
+    log.error('Failed to send test notification', error)
+    toast.error(
+      'Failed to send test notification',
+      'Please check your notification configuration and try again'
+    )
   } finally {
     sendingTestNotification.value = false
   }
 }
 
 function openTroubleshootingDocs() {
-  window.open('https://mattermost.com/pl/troubleshoot-notifications', '_blank', 'noopener,noreferrer')
+  window.open(
+    'https://mattermost.com/pl/troubleshoot-notifications',
+    '_blank',
+    'noopener,noreferrer'
+  )
 }
 
 function parseKeywords(value: string): string[] {
   return value
     .split(',')
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
+    .map(part => part.trim())
+    .filter(part => part.length > 0)
 }
 
 function readJsonArray(key: string): string[] {
@@ -277,14 +301,14 @@ function readJsonArray(key: string): string[] {
       return []
     }
 
-    return parsed.filter((item) => typeof item === 'string')
+    return parsed.filter(item => typeof item === 'string')
   } catch {
     return []
   }
 }
 
 function formatKeywordList(keywords: string[]): string {
-  return keywords.map((keyword) => `"${keyword}"`).join(', ')
+  return keywords.map(keyword => `"${keyword}"`).join(', ')
 }
 </script>
 
@@ -294,7 +318,9 @@ function formatKeywordList(keywords: string[]): string {
       <div>
         <p :class="pageEyebrowClass">Delivery Controls</p>
         <h3 :class="titleClass">Notifications</h3>
-        <p :class="summaryClass">Tune desktop, push, email, and keyword behavior without losing readability across themes.</p>
+        <p :class="summaryClass">
+          Tune desktop, push, email, and keyword behavior without losing readability across themes.
+        </p>
       </div>
       <a
         href="https://mattermost.com/pl/about-notifications"
@@ -338,7 +364,9 @@ function formatKeywordList(keywords: string[]): string {
         <div class="space-y-5">
           <div v-if="permissionRequired" :class="helperCardClass">
             <div class="text-sm font-semibold text-secondary">Permission required</div>
-            <p class="mt-1 text-xs text-text-2">Allow browser notifications to receive desktop alerts.</p>
+            <p class="mt-1 text-xs text-text-2">
+              Allow browser notifications to receive desktop alerts.
+            </p>
             <button type="button" :class="helperButtonClass" @click="requestNotificationPermission">
               Allow notifications
             </button>
@@ -348,15 +376,30 @@ function formatKeywordList(keywords: string[]): string {
             <div class="mb-2 text-sm font-semibold text-text-1">Desktop</div>
             <div class="space-y-2">
               <label :class="optionCardClass">
-                <input v-model="localNotifyDesktop" type="radio" value="all" class="mt-0.5 h-4 w-4 accent-brand" />
+                <input
+                  v-model="localNotifyDesktop"
+                  type="radio"
+                  value="all"
+                  class="mt-0.5 h-4 w-4 accent-brand"
+                />
                 <span>For all activity</span>
               </label>
               <label :class="optionCardClass">
-                <input v-model="localNotifyDesktop" type="radio" value="mentions" class="mt-0.5 h-4 w-4 accent-brand" />
+                <input
+                  v-model="localNotifyDesktop"
+                  type="radio"
+                  value="mentions"
+                  class="mt-0.5 h-4 w-4 accent-brand"
+                />
                 <span>For mentions and direct messages</span>
               </label>
               <label :class="optionCardClass">
-                <input v-model="localNotifyDesktop" type="radio" value="none" class="mt-0.5 h-4 w-4 accent-brand" />
+                <input
+                  v-model="localNotifyDesktop"
+                  type="radio"
+                  value="none"
+                  class="mt-0.5 h-4 w-4 accent-brand"
+                />
                 <span>Never</span>
               </label>
             </div>
@@ -366,15 +409,30 @@ function formatKeywordList(keywords: string[]): string {
             <div class="mb-2 text-sm font-semibold text-text-1">Mobile</div>
             <div class="space-y-2">
               <label :class="optionCardClass">
-                <input v-model="localNotifyPush" type="radio" value="all" class="mt-0.5 h-4 w-4 accent-brand" />
+                <input
+                  v-model="localNotifyPush"
+                  type="radio"
+                  value="all"
+                  class="mt-0.5 h-4 w-4 accent-brand"
+                />
                 <span>For all activity</span>
               </label>
               <label :class="optionCardClass">
-                <input v-model="localNotifyPush" type="radio" value="mentions" class="mt-0.5 h-4 w-4 accent-brand" />
+                <input
+                  v-model="localNotifyPush"
+                  type="radio"
+                  value="mentions"
+                  class="mt-0.5 h-4 w-4 accent-brand"
+                />
                 <span>For mentions and direct messages</span>
               </label>
               <label :class="optionCardClass">
-                <input v-model="localNotifyPush" type="radio" value="none" class="mt-0.5 h-4 w-4 accent-brand" />
+                <input
+                  v-model="localNotifyPush"
+                  type="radio"
+                  value="none"
+                  class="mt-0.5 h-4 w-4 accent-brand"
+                />
                 <span>Never</span>
               </label>
             </div>
@@ -533,7 +591,11 @@ function formatKeywordList(keywords: string[]): string {
         <div class="space-y-3">
           <label :class="toggleCardClass">
             <span>Enable automatic direct message replies</span>
-            <input v-model="localAutoResponderEnabled" type="checkbox" class="h-4 w-4 accent-brand" />
+            <input
+              v-model="localAutoResponderEnabled"
+              type="checkbox"
+              class="h-4 w-4 accent-brand"
+            />
           </label>
           <div>
             <label :class="fieldLabelClass">Auto-reply message</label>
@@ -554,7 +616,9 @@ function formatKeywordList(keywords: string[]): string {
         <div class="flex-1">
           <h4 class="text-base font-semibold text-text-1">Troubleshooting notifications</h4>
           <p class="mt-1 text-sm text-text-2">
-            Not receiving notifications? Start by sending a test notification to all your devices to check if they are working as expected. If issues persist, explore ways to solve them with troubleshooting steps.
+            Not receiving notifications? Start by sending a test notification to all your devices to
+            check if they are working as expected. If issues persist, explore ways to solve them
+            with troubleshooting steps.
           </p>
           <div class="mt-4 flex flex-wrap gap-2">
             <button
@@ -563,7 +627,9 @@ function formatKeywordList(keywords: string[]): string {
               :disabled="sendingTestNotification"
               @click="sendTestNotification"
             >
-              {{ sendingTestNotification ? 'Sending a test notification' : 'Send a test notification' }}
+              {{
+                sendingTestNotification ? 'Sending a test notification' : 'Send a test notification'
+              }}
             </button>
             <button type="button" :class="ghostButtonClass" @click="openTroubleshootingDocs">
               Troubleshooting docs

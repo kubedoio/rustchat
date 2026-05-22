@@ -1,7 +1,6 @@
 //! WebRTC Signaling Messages
 //!
 //! Handles offer/answer exchange and ICE candidate communication.
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

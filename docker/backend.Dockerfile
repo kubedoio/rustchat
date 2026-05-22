@@ -24,7 +24,7 @@ COPY migrations ./migrations
 
 # Build with cache mounts for faster rebuilds
 # BuildKit caches cargo registry and build artifacts between builds
-ENV SQLX_OFFLINE=false
+ENV SQLX_OFFLINE=true
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     touch src/main.rs && \
@@ -63,5 +63,8 @@ USER rustchat
 EXPOSE 3000
 
 ENV RUST_LOG=info
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/v1/health/live || exit 1
 
 CMD ["rustchat"]

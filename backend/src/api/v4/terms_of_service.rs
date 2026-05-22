@@ -86,7 +86,7 @@ async fn accept_terms(
     // Verify terms exist
     let terms = repo.get_terms_by_id(req.terms_id).await?;
     if terms.is_none() {
-        return Err(AppError::NotFound("Terms not found".to_string()));
+        return Err(AppError::TermsNotFound);
     }
 
     // Insert acceptance
@@ -106,7 +106,7 @@ async fn list_terms(
     auth_user: MmAuthUser,
 ) -> ApiResult<Json<Vec<TermsOfService>>> {
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::AdminRequired);
     }
     let repo = TermsRepository::new(&state.db);
     let terms = repo.list_terms().await?;
@@ -119,13 +119,13 @@ async fn get_terms(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<TermsOfService>> {
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::AdminRequired);
     }
     let repo = TermsRepository::new(&state.db);
     let terms = repo
         .get_terms_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Terms not found".to_string()))?;
+        .ok_or_else(|| AppError::TermsNotFound)?;
 
     Ok(Json(terms))
 }
@@ -136,7 +136,7 @@ async fn create_terms(
     Json(req): Json<CreateTermsRequest>,
 ) -> ApiResult<Json<TermsOfService>> {
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::AdminRequired);
     }
     let repo = TermsRepository::new(&state.db);
 
@@ -167,13 +167,13 @@ async fn update_terms(
     Json(req): Json<UpdateTermsRequest>,
 ) -> ApiResult<Json<TermsOfService>> {
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::AdminRequired);
     }
     let repo = TermsRepository::new(&state.db);
 
     let terms = repo.get_terms_by_id(id).await?;
     if terms.is_none() {
-        return Err(AppError::NotFound("Terms not found".to_string()));
+        return Err(AppError::TermsNotFound);
     }
 
     let updated = repo
@@ -195,7 +195,7 @@ async fn delete_terms(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::AdminRequired);
     }
     let repo = TermsRepository::new(&state.db);
 
@@ -218,13 +218,13 @@ async fn activate_terms(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<TermsOfService>> {
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::AdminRequired);
     }
     let repo = TermsRepository::new(&state.db);
     let terms = repo
         .activate_terms(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Terms not found".to_string()))?;
+        .ok_or_else(|| AppError::TermsNotFound)?;
 
     Ok(Json(terms))
 }
@@ -235,7 +235,7 @@ async fn get_terms_stats(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<TermsStats>> {
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::AdminRequired);
     }
     let repo = TermsRepository::new(&state.db);
     let stats = repo.get_terms_stats(id).await?;
@@ -247,7 +247,7 @@ async fn get_all_terms_stats(
     auth_user: MmAuthUser,
 ) -> ApiResult<Json<serde_json::Value>> {
     if !auth_user.has_permission(&permissions::SYSTEM_MANAGE) {
-        return Err(AppError::Forbidden("Admin access required".to_string()));
+        return Err(AppError::AdminRequired);
     }
     let repo = TermsRepository::new(&state.db);
 

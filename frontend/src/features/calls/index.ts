@@ -21,7 +21,7 @@ export type {
   CurrentCallSession,
   IncomingCall,
   CallId,
-  SessionId
+  SessionId,
 } from '../../core/entities/Call'
 
 // Components (to be created)

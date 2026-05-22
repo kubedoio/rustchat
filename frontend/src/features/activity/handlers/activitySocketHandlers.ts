@@ -2,6 +2,7 @@
  * Activity Socket Handlers - WebSocket event handlers for activity feed
  */
 
+import { log } from '@/utils/log'
 import { activityService } from '../services/activityService'
 import type { Activity } from '../types'
 import { ActivityType } from '../types'
@@ -12,11 +13,11 @@ function parseActivityType(raw: string): ActivityType {
     reply: ActivityType.REPLY,
     reaction: ActivityType.REACTION,
     dm: ActivityType.DM,
-    thread_reply: ActivityType.THREAD_REPLY
+    thread_reply: ActivityType.THREAD_REPLY,
   }
   const type = map[raw]
   if (type === undefined) {
-    console.warn(`[ActivitySocket] Unknown activity type: ${raw}, defaulting to MENTION`)
+    log.warn(`[ActivitySocket] Unknown activity type: ${raw}, defaulting to MENTION`)
     return ActivityType.MENTION
   }
   return type
@@ -38,7 +39,7 @@ export function handleActivityCreated(data: Record<string, unknown>): void {
     message: data.message_text as string | undefined,
     reaction: data.reaction as string | undefined,
     read: false,
-    createdAt: data.created_at ? new Date(data.created_at as string) : new Date()
+    createdAt: data.created_at ? new Date(data.created_at as string) : new Date(),
   }
 
   activityService.handleNewActivity(activity)

@@ -27,26 +27,20 @@ class ActivityService {
     this.store.setLoading(true)
 
     try {
-      const cursor = refresh ? undefined : this.store.cursor ?? undefined
+      const cursor = refresh ? undefined : (this.store.cursor ?? undefined)
       const filter = this.store.filter
 
       const response = await activityRepository.getFeed(userId, {
         cursor,
         limit: 50,
         type: filter ?? undefined,
-        unreadOnly: false
+        unreadOnly: false,
       })
 
       if (refresh || !cursor) {
-        this.store.setActivities(
-          Object.values(response.activities),
-          response.order
-        )
+        this.store.setActivities(Object.values(response.activities), response.order)
       } else {
-        this.store.appendActivities(
-          Object.values(response.activities),
-          response.order
-        )
+        this.store.appendActivities(Object.values(response.activities), response.order)
       }
 
       this.store.setUnreadCount(response.unreadCount)
@@ -59,7 +53,7 @@ class ActivityService {
 
   async loadMore(): Promise<void> {
     if (!this.store.hasMore || this.store.isLoading) return
-    if (this._loadPromise) return  // Prevent concurrent loads
+    if (this._loadPromise) return // Prevent concurrent loads
     this._loadPromise = this.loadActivities().finally(() => {
       this._loadPromise = null
     })

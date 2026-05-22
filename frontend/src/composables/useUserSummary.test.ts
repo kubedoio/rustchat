@@ -167,11 +167,8 @@ describe('useUserSummary', () => {
       ],
     })
 
-    const {
-      applyUserStatusSnapshot,
-      getUserSummarySnapshot,
-      prefetchUserSummaries,
-    } = await import('./useUserSummary')
+    const { applyUserStatusSnapshot, getUserSummarySnapshot, prefetchUserSummaries } =
+      await import('./useUserSummary')
 
     prefetchUserSummaries(['user-3'])
     await flushPromises()

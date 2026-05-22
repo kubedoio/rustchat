@@ -43,8 +43,11 @@ export function useQuickSwitcher() {
         type: 'channel',
         name: channel.display_name || channel.name,
         subtitle: team?.display_name || team?.name,
-        icon: (channel.channel_type === 'private' || (channel as any).type === 'private') ? 'Lock' : 'Hash',
-        to: `/channels/${channel.id}`
+        icon:
+          channel.channel_type === 'private' || (channel as any).type === 'private'
+            ? 'Lock'
+            : 'Hash',
+        to: `/channels/${channel.id}`,
       })
     }
 
@@ -55,7 +58,7 @@ export function useQuickSwitcher() {
         type: 'team',
         name: team.display_name || team.name,
         icon: 'Users',
-        to: `/teams/${team.id}`
+        to: `/teams/${team.id}`,
       })
     }
 
@@ -68,9 +71,15 @@ export function useQuickSwitcher() {
       .filter((item): item is QuickSwitcherItem => item !== undefined)
   })
 
-  function open() { isOpen.value = true }
-  function close() { isOpen.value = false }
-  function toggle() { isOpen.value = !isOpen.value }
+  function open() {
+    isOpen.value = true
+  }
+  function close() {
+    isOpen.value = false
+  }
+  function toggle() {
+    isOpen.value = !isOpen.value
+  }
 
   function addRecentItem(id: string) {
     recentItemIds.value = [id, ...recentItemIds.value.filter(i => i !== id)].slice(0, 10)

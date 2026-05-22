@@ -3,13 +3,13 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
-import type { 
-  CallState, 
+import type {
+  CallState,
   CallConfig,
   CurrentCallSession,
   IncomingCall,
   SessionId,
-  CallParticipant
+  CallParticipant,
 } from '../../../core/entities/Call'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
@@ -32,7 +32,7 @@ export const useCallStore = defineStore('callStore', () => {
 
   // Getters
   const isInCall = computed(() => !!currentCall.value)
-  
+
   const currentUserId = computed((): UserId | null => {
     return useAuthStore().user?.id ?? null
   })
@@ -96,7 +96,7 @@ export const useCallStore = defineStore('callStore', () => {
       callId: call.id,
       channelId,
       mySessionId,
-      remoteStreams: new Map()
+      remoteStreams: new Map(),
     }
   }
 
@@ -263,7 +263,7 @@ export const useCallStore = defineStore('callStore', () => {
     clearRemoteStreams,
     addSpeakingParticipant,
     removeSpeakingParticipant,
-    clearSpeakingParticipants
+    clearSpeakingParticipants,
   }
 })
 

@@ -1,7 +1,12 @@
+import { log } from '@/utils/log'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useStorage } from '@vueuse/core'
-import { channelsApi, type CreateChannelRequest, type ChannelNotifyProps } from '../../../api/channels'
+import {
+  channelsApi,
+  type CreateChannelRequest,
+  type ChannelNotifyProps,
+} from '../../../api/channels'
 import type { ChannelId } from '../../../core/entities/Channel'
 import { getApiErrorMessage } from '../../../core/errors/errorUtils'
 
@@ -17,8 +22,8 @@ export const useChannelStore = defineStore('channelStore', () => {
   // Legacy-compatible computed: channels as Array
   const channels = computed(() => Array.from(_channelsMap.value.values()))
 
-  const currentChannel = computed(() =>
-    channels.value.find(c => c.id === currentChannelId.value) || null
+  const currentChannel = computed(
+    () => channels.value.find(c => c.id === currentChannelId.value) || null
   )
 
   const publicChannels = computed(() =>
@@ -30,9 +35,12 @@ export const useChannelStore = defineStore('channelStore', () => {
   )
 
   const directMessages = computed(() =>
-    channels.value.filter(c =>
-      c.channel_type === 'direct' || c.channel_type === 'group' ||
-      (c as any).type === 'direct' || (c as any).type === 'group'
+    channels.value.filter(
+      c =>
+        c.channel_type === 'direct' ||
+        c.channel_type === 'group' ||
+        (c as any).type === 'direct' ||
+        (c as any).type === 'group'
     )
   )
 
@@ -70,7 +78,9 @@ export const useChannelStore = defineStore('channelStore', () => {
     joinableChannels.value = items
   }
 
-  function setUnreadCounts(counts: { channelId: ChannelId; unreadCount: number; mentionCount: number }[]) {
+  function setUnreadCounts(
+    counts: { channelId: ChannelId; unreadCount: number; mentionCount: number }[]
+  ) {
     for (const { channelId, unreadCount, mentionCount } of counts) {
       const channel = _channelsMap.value.get(channelId)
       if (channel) {
@@ -208,7 +218,7 @@ export const useChannelStore = defineStore('channelStore', () => {
       const response = await channelsApi.listJoinable(teamId)
       joinableChannels.value = response.data
     } catch (e: unknown) {
-      console.error('Failed to fetch joinable channels', e)
+      log.error('Failed to fetch joinable channels', e)
     } finally {
       loading.value = false
     }
@@ -259,6 +269,6 @@ export const useChannelStore = defineStore('channelStore', () => {
     joinChannel,
     leaveChannel,
     selectChannel,
-    updateNotifyProps
+    updateNotifyProps,
   }
 })

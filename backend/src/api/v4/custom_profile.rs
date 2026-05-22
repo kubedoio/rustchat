@@ -139,8 +139,7 @@ async fn get_user_custom_profile_attributes(
     _auth: MmAuthUser,
     Path(user_id): Path<String>,
 ) -> ApiResult<Json<UserCustomProfileAttributeSimple>> {
-    let user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
 
     let attrs: Vec<CustomProfileAttribute> = sqlx::query_as(
         r#"
@@ -181,8 +180,7 @@ async fn patch_user_custom_profile_attributes(
     Path(user_id): Path<String>,
     Json(values): Json<UserCustomProfileAttributeSimple>,
 ) -> ApiResult<Json<UserCustomProfileAttributeSimple>> {
-    let target_user_id = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let target_user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
 
     if !auth.can_access_owned(target_user_id, &permissions::USER_MANAGE) {
         return Err(AppError::Forbidden(

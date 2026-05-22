@@ -104,7 +104,7 @@ async fn get_user(
     let user: User = UserRepository::new(&state.db)
         .get_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     // Check access: same user, same org, or system admin
     let can_view = auth.user_id == user.id
@@ -206,7 +206,7 @@ async fn update_user(
     let user: User = repo
         .get_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     // Broadcast update
     let user_response = UserResponse::from(user.clone());
@@ -244,7 +244,7 @@ async fn change_password(
     let _user: User = UserRepository::new(&state.db)
         .get_by_id_unchecked(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| AppError::UserNotFound)?;
 
     // Validate new password complexity
     let config = crate::services::auth_config::get_password_rules(&state.db).await?;
@@ -464,7 +464,7 @@ async fn mark_thread_as_read(
     } else {
         user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Users can only mark their own threads as read

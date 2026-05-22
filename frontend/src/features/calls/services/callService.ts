@@ -1,12 +1,9 @@
 // Call Service - Business logic for calls
 // Handles WebRTC, state management, and orchestration
 
+import { log } from '@/utils/log'
 import { callRepository } from '../repositories/callRepository'
-import type { 
-  CallState, 
-  CallConfig,
-  SessionId
-} from '../../../core/entities/Call'
+import type { CallState, CallConfig, SessionId } from '../../../core/entities/Call'
 import type { ChannelId } from '../../../core/entities/Channel'
 import type { UserId } from '../../../core/entities/User'
 import { useCallStore } from '../stores/callStore'
@@ -29,7 +26,7 @@ class CallService {
       this.store.setConfig(config)
       return config
     } catch (error) {
-      console.error('Failed to load calls config', error)
+      log.error('Failed to load calls config', error)
       return null
     }
   }
@@ -40,7 +37,7 @@ class CallService {
       const calls = await callRepository.getActiveCalls()
       this.store.setActiveCalls(calls)
     } catch (error) {
-      console.error('Failed to load active calls', error)
+      log.error('Failed to load active calls', error)
     }
   }
 
@@ -49,20 +46,20 @@ class CallService {
       const channelState = await callRepository.getCallForChannel(channelId)
       if (channelState?.call) {
         this.store.updateActiveCall(channelId, channelState.call)
-        
+
         // If we're in this call, update current call state
         if (this.store.currentCall?.channelId === channelId) {
           this.store.updateCurrentCall(channelState.call)
           this.syncSelfFlags(channelState.call)
         }
-        
+
         return channelState.call
       } else {
         this.store.removeActiveCall(channelId)
         return null
       }
     } catch (error) {
-      console.error('Failed to load call for channel', error)
+      log.error('Failed to load call for channel', error)
       return null
     }
   }
@@ -77,10 +74,10 @@ class CallService {
     try {
       const call = await callRepository.startCall(channelId)
       this.store.setCurrentCall(channelId, call)
-      
+
       // Initialize WebRTC
       await this.initializeWebRTC(channelId, config.iceServers)
-      
+
       this.store.setIsExpanded(true)
       this.toast.success('Call started', 'You are now in a call')
     } catch (error) {
@@ -104,7 +101,7 @@ class CallService {
 
     try {
       await callRepository.joinCall(channelId)
-      
+
       // Refresh call state after joining
       await this.loadCallForChannel(channelId)
       const call = this.store.getActiveCall(channelId)
@@ -113,10 +110,10 @@ class CallService {
       }
 
       this.store.setCurrentCall(channelId, call)
-      
+
       // Initialize WebRTC
       await this.initializeWebRTC(channelId, config.iceServers)
-      
+
       this.store.setIsExpanded(true)
       this.toast.success('Joined call', 'You are now in the call')
     } catch (error) {
@@ -136,7 +133,7 @@ class CallService {
       this.cleanupWebRTC()
       await callRepository.leaveCall(channelId)
     } catch (error) {
-      console.error('Failed to leave call', error)
+      log.error('Failed to leave call', error)
     } finally {
       this.store.clearCurrentCall()
     }
@@ -181,7 +178,7 @@ class CallService {
       }
       this.store.setIsMuted(!this.store.isMuted)
     } catch (error) {
-      console.error('Failed to toggle mute', error)
+      log.error('Failed to toggle mute', error)
     }
   }
 
@@ -199,7 +196,7 @@ class CallService {
       }
       this.store.setIsHandRaised(!this.store.isHandRaised)
     } catch (error) {
-      console.error('Failed to toggle hand', error)
+      log.error('Failed to toggle hand', error)
     }
   }
 
@@ -221,12 +218,12 @@ class CallService {
         // Start screen sharing
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
-          audio: false
+          audio: false,
         })
 
         this.store.setScreenStream(stream)
         const [videoTrack] = stream.getVideoTracks()
-        
+
         if (videoTrack) {
           videoTrack.contentHint = 'detail'
           videoTrack.onended = () => {
@@ -248,7 +245,7 @@ class CallService {
         this.store.setIsScreenSharing(true)
       }
     } catch (error) {
-      console.error('Failed to toggle screen share', error)
+      log.error('Failed to toggle screen share', error)
       await this.stopLocalScreenShare()
       this.store.setIsScreenSharing(false)
     }
@@ -261,7 +258,7 @@ class CallService {
     try {
       await callRepository.sendReaction(currentCall.channelId, emoji)
     } catch (error) {
-      console.error('Failed to send reaction', error)
+      log.error('Failed to send reaction', error)
     }
   }
 
@@ -273,7 +270,7 @@ class CallService {
     try {
       await callRepository.hostMute(currentCall.channelId, sessionId)
     } catch (error) {
-      console.error('Failed to host mute', error)
+      log.error('Failed to host mute', error)
     }
   }
 
@@ -285,7 +282,7 @@ class CallService {
       await callRepository.hostMuteOthers(currentCall.channelId)
       this.toast.success('Muted all', 'All other participants have been muted')
     } catch (error) {
-      console.error('Failed to host mute others', error)
+      log.error('Failed to host mute others', error)
     }
   }
 
@@ -296,7 +293,7 @@ class CallService {
     try {
       await callRepository.hostRemove(currentCall.channelId, sessionId)
     } catch (error) {
-      console.error('Failed to host remove', error)
+      log.error('Failed to host remove', error)
     }
   }
 
@@ -308,7 +305,7 @@ class CallService {
       await callRepository.ringUsers(currentCall.channelId)
       this.toast.success('Ringing participants', 'Other channel members have been notified')
     } catch (error) {
-      console.error('Failed to ring users', error)
+      log.error('Failed to ring users', error)
     }
   }
 
@@ -434,13 +431,15 @@ class CallService {
     const pc = currentCall.peerConnection
 
     if (signal.type === 'ice-candidate' && signal.candidate) {
-      void pc.addIceCandidate({
-        candidate: signal.candidate as string,
-        sdpMid: (signal.sdp_mid ?? null) as string | null,
-        sdpMLineIndex: (signal.sdp_mline_index ?? null) as number | null
-      }).catch(error => {
-        console.error('Failed to handle signaling event', error)
-      })
+      void pc
+        .addIceCandidate({
+          candidate: signal.candidate as string,
+          sdpMid: (signal.sdp_mid ?? null) as string | null,
+          sdpMLineIndex: (signal.sdp_mline_index ?? null) as number | null,
+        })
+        .catch(error => {
+          log.error('Failed to handle signaling event', error)
+        })
     }
   }
 
@@ -458,7 +457,7 @@ class CallService {
       // Get user media
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: false // Audio only for now
+        video: false, // Audio only for now
       })
 
       // Calls start muted server-side, keep local tracks consistent
@@ -470,9 +469,7 @@ class CallService {
 
       // Create peer connection
       const pc = new RTCPeerConnection({
-        iceServers: iceServers.length > 0 ? iceServers : [
-          { urls: 'stun:stun.l.google.com:19302' }
-        ]
+        iceServers: iceServers.length > 0 ? iceServers : [{ urls: 'stun:stun.l.google.com:19302' }],
       })
 
       this.store.setPeerConnection(pc)
@@ -483,12 +480,12 @@ class CallService {
       })
 
       // Handle incoming tracks
-      pc.ontrack = (event) => {
+      pc.ontrack = event => {
         this.handleRemoteTrack(event)
       }
 
       // Handle ICE candidates
-      pc.onicecandidate = async (event) => {
+      pc.onicecandidate = async event => {
         if (event.candidate) {
           await callRepository.sendIceCandidate(
             channelId,
@@ -502,14 +499,14 @@ class CallService {
       // Create and send offer
       await this.createAndSendOffer(channelId, pc)
     } catch (error) {
-      console.error('WebRTC initialization failed', error)
+      log.error('WebRTC initialization failed', error)
       throw error
     }
   }
 
   private async createAndSendOffer(channelId: ChannelId, pc: RTCPeerConnection): Promise<void> {
     this.applyVideoCodecPreferences(pc)
-    
+
     const offer = await pc.createOffer()
     const rawSdp = offer.sdp || ''
     const preparedSdp = this.prepareOfferSdp(rawSdp)
@@ -518,30 +515,32 @@ class CallService {
     try {
       await pc.setLocalDescription({
         type: 'offer',
-        sdp: preparedSdp
+        sdp: preparedSdp,
       })
     } catch (error) {
       // Brave can reject aggressively munged SDP. Fall back to the
       // browser-generated offer so call setup still succeeds.
-      console.warn('Prepared SDP rejected by browser, retrying with original SDP', error)
+      log.warn('Prepared SDP rejected by browser, retrying with original SDP', error)
       selectedSdp = rawSdp
       await pc.setLocalDescription({
         type: 'offer',
-        sdp: rawSdp
+        sdp: rawSdp,
       })
     }
 
     const answer = await callRepository.sendOffer(channelId, selectedSdp)
-    
-    await pc.setRemoteDescription(new RTCSessionDescription({
-      type: 'answer',
-      sdp: answer.sdp
-    }))
+
+    await pc.setRemoteDescription(
+      new RTCSessionDescription({
+        type: 'answer',
+        sdp: answer.sdp,
+      })
+    )
   }
 
   private handleRemoteTrack(event: RTCTrackEvent): void {
-    console.log('Received remote track:', event.track.kind, event.streams)
-    
+    log.debug('Received remote track:', event.track.kind, event.streams)
+
     if (event.streams && event.streams[0]) {
       const remoteStream = event.streams[0]
       this.store.addRemoteStream(remoteStream.id, remoteStream)
@@ -552,11 +551,11 @@ class CallService {
       const existing = this.store.getRemoteStream(syntheticStreamId)
       const synthetic = existing || new MediaStream()
       const hasTrack = synthetic.getTracks().some(t => t.id === event.track.id)
-      
+
       if (!hasTrack) {
         synthetic.addTrack(event.track)
       }
-      
+
       this.store.addRemoteStream(syntheticStreamId, synthetic)
     }
 
@@ -569,11 +568,11 @@ class CallService {
   private handleTrackEnded(trackId: string): void {
     for (const [key, stream] of this.store.remoteStreams) {
       const remainingTracks = stream.getTracks().filter((t: MediaStreamTrack) => t.id !== trackId)
-      
+
       if (remainingTracks.length === stream.getTracks().length) {
         continue // Track not in this stream
       }
-      
+
       if (remainingTracks.length === 0) {
         this.store.removeRemoteStream(key)
       } else {
@@ -636,7 +635,7 @@ class CallService {
         mySession = {
           sessionId,
           isMuted: participant.isMuted,
-          raisedHandAt: participant.raisedHandAt
+          raisedHandAt: participant.raisedHandAt,
         }
         break
       }
@@ -669,7 +668,7 @@ class CallService {
       .filter(line => line.length > 0)
 
     let removedAny = false
-    const filtered = lines.filter((line) => {
+    const filtered = lines.filter(line => {
       const lower = line.toLowerCase()
       if (lower.startsWith('a=simulcast:')) {
         removedAny = true
@@ -726,7 +725,7 @@ class CallService {
       try {
         transceiver.setCodecPreferences(preferred)
       } catch (error) {
-        console.debug('Failed to set codec preferences on transceiver', error)
+        log.debug('Failed to set codec preferences on transceiver', error)
       }
     }
   }

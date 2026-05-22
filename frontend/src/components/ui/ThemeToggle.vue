@@ -16,11 +16,13 @@ const themes = [
     <button
       v-for="t in themes"
       :key="t.id"
-      @click="themeStore.setTheme(t.id)"
       class="flex min-h-10 items-center space-x-2 rounded-r-1 px-3 py-1.5 text-sm font-medium transition-standard"
-      :class="themeStore.theme === t.id
-        ? 'bg-bg-surface-1 text-brand shadow-1'
-        : 'text-text-2 hover:bg-bg-surface-1 hover:text-text-1'"
+      :class="
+        themeStore.theme === t.id
+          ? 'bg-bg-surface-1 text-brand shadow-1'
+          : 'text-text-2 hover:bg-bg-surface-1 hover:text-text-1'
+      "
+      @click="themeStore.setTheme(t.id)"
     >
       <component :is="t.icon" class="w-4 h-4" />
       <span class="hidden sm:inline">{{ t.name }}</span>

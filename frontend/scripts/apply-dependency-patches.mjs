@@ -44,14 +44,10 @@ for (const patch of patches) {
   }
 
   console.log(`applying dependency patch for ${patch.package} from ${patch.patchFile}`)
-  execFileSync(
-    'git',
-    ['apply', '--directory', packageDir, '--whitespace=nowarn', patchPath],
-    {
-      cwd: rootDir,
-      stdio: 'inherit',
-    }
-  )
+  execFileSync('git', ['apply', '--directory', packageDir, '--whitespace=nowarn', patchPath], {
+    cwd: rootDir,
+    stdio: 'inherit',
+  })
 }
 
 console.log('frontend dependency patches applied successfully')

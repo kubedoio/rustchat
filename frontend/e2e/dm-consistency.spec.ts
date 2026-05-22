@@ -37,7 +37,7 @@ test.describe('DM Status Consistency', () => {
     // Capture sidebar status text (may include emoji + text or just presence label)
     const sidebarStatus = page.locator('[data-testid="dm-sidebar-status"]').first()
     await expect(sidebarStatus).toBeVisible()
-    const sidebarText = await sidebarStatus.textContent() || ''
+    const sidebarText = (await sidebarStatus.textContent()) || ''
 
     // Open channel info panel via header menu
     await page.click('[data-testid="channel-header-menu"]')
@@ -46,13 +46,13 @@ test.describe('DM Status Consistency', () => {
     // Capture info panel presence label
     const infoPresence = page.locator('[data-testid="channel-info-presence"]')
     await expect(infoPresence).toBeVisible()
-    const infoPresenceText = await infoPresence.textContent() || ''
+    const infoPresenceText = (await infoPresence.textContent()) || ''
 
     // Capture info panel custom status if present
     const infoCustomStatus = page.locator('[data-testid="channel-info-custom-status"]')
     let infoCustomText = ''
     if (await infoCustomStatus.isVisible().catch(() => false)) {
-      infoCustomText = await infoCustomStatus.textContent() || ''
+      infoCustomText = (await infoCustomStatus.textContent()) || ''
     }
 
     // Click a message avatar to open the profile modal
@@ -63,17 +63,22 @@ test.describe('DM Status Consistency', () => {
     // Capture profile modal presence label
     const profilePresence = page.locator('[data-testid="profile-modal-presence"]')
     await expect(profilePresence).toBeVisible()
-    const profilePresenceText = await profilePresence.textContent() || ''
+    const profilePresenceText = (await profilePresence.textContent()) || ''
 
     // Capture profile modal custom status if present
     const profileCustomStatus = page.locator('[data-testid="profile-modal-custom-status"]')
     let profileCustomText = ''
     if (await profileCustomStatus.isVisible().catch(() => false)) {
-      profileCustomText = await profileCustomStatus.textContent() || ''
+      profileCustomText = (await profileCustomStatus.textContent()) || ''
     }
 
     // Presence labels should match across all three surfaces
     expect(infoPresenceText.trim().toLowerCase()).toBe(profilePresenceText.trim().toLowerCase())
+
+    // Custom status texts should match if present
+    if (infoCustomText) {
+      expect(profileCustomText.trim()).toBe(infoCustomText.trim())
+    }
 
     // Sidebar shows either custom status or presence label; if custom status exists,
     // it should appear in sidebar too
@@ -97,25 +102,27 @@ test.describe('DM Status Consistency', () => {
 
     // Capture initial sidebar status
     const sidebarStatus = page.locator('[data-testid="dm-sidebar-status"]').first()
-    const initialStatus = await sidebarStatus.textContent() || ''
+    const initialStatus = (await sidebarStatus.textContent()) || ''
 
     // Open info panel and capture presence
     await page.click('[data-testid="channel-header-menu"]')
     await page.click('[data-testid="channel-details-button"]')
     const infoPresence = page.locator('[data-testid="channel-info-presence"]')
-    const initialPresence = await infoPresence.textContent() || ''
+    const initialPresence = (await infoPresence.textContent()) || ''
 
     // Simulate WebSocket disconnect and reconnect via page evaluate.
     // This relies on the app exposing its WebSocket instance or test helpers.
     // If not available, the test will skip the reconnect assertion gracefully.
     const canSimulate = await page.evaluate(() => {
-      return typeof (window as any).testHelpers !== 'undefined' &&
+      return (
+        typeof (window as any).testHelpers !== 'undefined' &&
         typeof (window as any).testHelpers.simulateWebSocketClose === 'function'
+      )
     })
 
     if (canSimulate) {
       await page.evaluate(() => {
-        (window as any).testHelpers.simulateWebSocketClose()
+        ;(window as any).testHelpers.simulateWebSocketClose()
       })
 
       // Wait for reconnecting UI
@@ -123,7 +130,7 @@ test.describe('DM Status Consistency', () => {
 
       // Restore connection
       await page.evaluate(() => {
-        (window as any).testHelpers.simulateWebSocketOpen()
+        ;(window as any).testHelpers.simulateWebSocketOpen()
       })
 
       // Wait for reconnected state
@@ -131,11 +138,11 @@ test.describe('DM Status Consistency', () => {
       await page.waitForTimeout(500)
 
       // Re-read sidebar status after reconnect
-      const postReconnectStatus = await sidebarStatus.textContent() || ''
+      const postReconnectStatus = (await sidebarStatus.textContent()) || ''
       expect(postReconnectStatus.trim()).toBe(initialStatus.trim())
 
       // Re-read info panel presence after reconnect
-      const postReconnectPresence = await infoPresence.textContent() || ''
+      const postReconnectPresence = (await infoPresence.textContent()) || ''
       expect(postReconnectPresence.trim().toLowerCase()).toBe(initialPresence.trim().toLowerCase())
     } else {
       test.skip(true, 'WebSocket test helpers not available; skipping reconnect simulation')

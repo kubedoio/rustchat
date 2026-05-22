@@ -341,13 +341,12 @@ async fn get_file(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+        .ok_or_else(|| AppError::FileNotFound)?;
     check_file_access(&state, &file, auth.user_id).await?;
 
     let stream = state.s3_client.download_stream(&file.key).await?;
@@ -387,13 +386,12 @@ async fn get_file_info(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<Json<mm::FileInfo>> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+        .ok_or_else(|| AppError::FileNotFound)?;
     check_file_access(&state, &file, auth.user_id).await?;
 
     // Get file extension from name
@@ -425,13 +423,12 @@ async fn get_thumbnail(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+        .ok_or_else(|| AppError::FileNotFound)?;
     check_file_access(&state, &file, auth.user_id).await?;
 
     if file.has_thumbnail {
@@ -475,13 +472,12 @@ async fn get_preview(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+        .ok_or_else(|| AppError::FileNotFound)?;
     check_file_access(&state, &file, auth.user_id).await?;
 
     if file.mime_type.starts_with("image/") {
@@ -554,13 +550,12 @@ async fn get_link(
     auth: MmAuthUser,
     Path(file_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let file_id = parse_mm_or_uuid(&file_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid file_id".to_string()))?;
+    let file_id = parse_mm_or_uuid(&file_id).ok_or_else(|| AppError::InvalidFileId)?;
     let file_repo = FileRepository::new(&state.db);
     let file = file_repo
         .get_by_id(file_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+        .ok_or_else(|| AppError::FileNotFound)?;
     check_file_access(&state, &file, auth.user_id).await?;
 
     let url = state
@@ -594,8 +589,7 @@ async fn search_files_for_team(
     Path(team_id): Path<String>,
     Json(params): Json<FileSearchParams>,
 ) -> ApiResult<Json<FileSearchResult>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     search_files_impl(&state, auth.user_id, Some(team_id), &params.terms).await
 }
 

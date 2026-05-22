@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { log } from '@/utils/log'
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { Send, Loader2 } from 'lucide-vue-next'
 import { useThreadStore } from '../../features/messages/stores/threadStore'
@@ -50,7 +51,7 @@ async function sendReply() {
     // Scroll to bottom after sending
     replyListRef.value?.scrollToBottom()
   } catch (error) {
-    console.error('Failed to send reply:', error)
+    log.error('Failed to send reply:', error)
   }
 }
 
@@ -59,13 +60,16 @@ function handleLoadMore() {
 }
 
 // Focus composer when thread opens
-watch(() => threadStore.isOpen, (isOpen) => {
-  if (isOpen) {
-    setTimeout(() => {
-      composerRef.value?.focus()
-    }, 100)
+watch(
+  () => threadStore.isOpen,
+  isOpen => {
+    if (isOpen) {
+      setTimeout(() => {
+        composerRef.value?.focus()
+      }, 100)
+    }
   }
-})
+)
 
 // Handle global escape key
 function handleGlobalKeydown(e: KeyboardEvent) {
@@ -73,8 +77,9 @@ function handleGlobalKeydown(e: KeyboardEvent) {
     // Only close if not in an input/textarea (unless it's our composer)
     const activeElement = document.activeElement
     const isInComposer = activeElement === composerRef.value
-    const isInOtherInput = activeElement instanceof HTMLInputElement ||
-                           (activeElement instanceof HTMLTextAreaElement && !isInComposer)
+    const isInOtherInput =
+      activeElement instanceof HTMLInputElement ||
+      (activeElement instanceof HTMLTextAreaElement && !isInComposer)
 
     if (!isInOtherInput || isInComposer) {
       closeThread()
@@ -107,8 +112,8 @@ onUnmounted(() => {
   >
     <!-- Header with Parent Message -->
     <ThreadHeader
-      :parentPost="threadStore.parentPost"
-      :replyCount="threadStore.replyCount"
+      :parent-post="threadStore.parentPost"
+      :reply-count="threadStore.replyCount"
       @close="closeThread"
     />
 
@@ -116,9 +121,9 @@ onUnmounted(() => {
     <ThreadReplyList
       ref="replyListRef"
       :replies="threadStore.replies"
-      :hasMore="threadStore.hasMore"
-      :isLoading="threadStore.isLoading"
-      @loadMore="handleLoadMore"
+      :has-more="threadStore.hasMore"
+      :is-loading="threadStore.isLoading"
+      @load-more="handleLoadMore"
     />
 
     <!-- Reply Composer -->
@@ -129,17 +134,17 @@ onUnmounted(() => {
         <textarea
           ref="composerRef"
           v-model="threadStore.draft"
-          @keydown="handleKeydown"
           rows="2"
           class="flex-1 px-3 py-2 bg-transparent text-text-1 resize-none border-none focus:ring-0 text-[14px] scrollbar-none"
           placeholder="Reply to thread..."
           :disabled="threadStore.isSending"
+          @keydown="handleKeydown"
         ></textarea>
 
         <button
-          @click="sendReply"
           :disabled="!threadStore.draft.trim() || threadStore.isSending"
           class="mb-1 mr-1 flex items-center justify-center rounded-lg bg-brand p-2.5 text-brand-foreground shadow-lg shadow-brand/20 transition-all hover:bg-brand-hover active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          @click="sendReply"
         >
           <Loader2 v-if="threadStore.isSending" class="w-4 h-4 animate-spin" />
           <Send v-else class="w-4 h-4" />
@@ -149,9 +154,15 @@ onUnmounted(() => {
       <!-- Keyboard hint -->
       <div class="mt-2 text-[11px] text-text-3 text-right">
         <span>Press </span>
-        <kbd class="px-1.5 py-0.5 bg-bg-surface-1 border border-border-1 rounded text-[10px] font-mono">Enter</kbd>
+        <kbd
+          class="px-1.5 py-0.5 bg-bg-surface-1 border border-border-1 rounded text-[10px] font-mono"
+          >Enter</kbd
+        >
         <span> to send, </span>
-        <kbd class="px-1.5 py-0.5 bg-bg-surface-1 border border-border-1 rounded text-[10px] font-mono">Shift+Enter</kbd>
+        <kbd
+          class="px-1.5 py-0.5 bg-bg-surface-1 border border-border-1 rounded text-[10px] font-mono"
+          >Shift+Enter</kbd
+        >
         <span> for new line</span>
       </div>
     </div>

@@ -7,7 +7,11 @@ export function registerThreadHandlers() {
   return {
     handleNewPost(post: Post) {
       // If this is a reply to the currently open thread
-      if (post.root_post_id && post.root_post_id !== post.id && post.root_post_id === threadStore.parentPostId) {
+      if (
+        post.root_post_id &&
+        post.root_post_id !== post.id &&
+        post.root_post_id === threadStore.parentPostId
+      ) {
         threadStore.onNewReply(post)
       }
     },
