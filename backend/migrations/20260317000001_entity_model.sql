@@ -38,6 +38,6 @@ UPDATE users SET entity_type = 'agent', rate_limit_tier = 'agent_high' WHERE is_
 
 -- Comments for documentation
 COMMENT ON COLUMN users.entity_type IS 'Type of entity: human, agent, service, or ci';
-COMMENT ON COLUMN users.api_key_hash IS 'argon2id hash of API key for non-human entities';
+COMMENT ON COLUMN users.api_key_hash IS 'bcrypt hash of API key for non-human entities';
 COMMENT ON COLUMN users.entity_metadata IS 'Flexible JSON metadata specific to entity type';
 COMMENT ON COLUMN users.rate_limit_tier IS 'Rate limiting tier for this entity';
