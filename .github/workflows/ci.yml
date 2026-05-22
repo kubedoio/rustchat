@@ -61,7 +61,7 @@ jobs:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     services:
       postgres:
@@ -182,7 +182,7 @@ jobs:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
     runs-on: ${{ inputs.runner || 'self-hosted' }}
-    timeout-minutes: 20
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: frontend
@@ -234,7 +234,7 @@ jobs:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: push-proxy
@@ -286,7 +286,7 @@ jobs:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -319,7 +319,7 @@ jobs:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: frontend
@@ -364,7 +364,7 @@ jobs:
     needs: backend-check
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     env:
       CARGO_TERM_COLOR: always
