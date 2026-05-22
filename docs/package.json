@@ -12,9 +12,17 @@
     "ci": "npm run docs:check-links && npm run docs:build"
   },
   "devDependencies": {
+    "esbuild": "0.27.0",
+    "postcss": "8.5.12",
+    "vite": "7.3.3",
     "vitepress": "^1.6.4"
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "vite": "7.3.3",
+    "esbuild": "0.27.0",
+    "postcss": "8.5.12"
   }
 }
