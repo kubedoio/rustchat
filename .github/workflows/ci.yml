@@ -148,7 +148,7 @@ jobs:
             if ! command -v cargo-binstall &> /dev/null; then
               curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
             fi
-            cargo binstall --locked --no-confirm sqlx-cli --no-default-features --features postgres
+            cargo binstall --locked --no-confirm sqlx-cli
           fi
 
       - name: Wait for RustFS
