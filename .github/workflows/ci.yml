@@ -285,7 +285,7 @@ jobs:
     name: Docker Validate
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 20
 
     steps:
@@ -303,22 +303,22 @@ jobs:
           echo "RUSTFS_SECRET_KEY=dummy-rustfs-secret-key" >> .env
 
       - name: Validate docker-compose.yml
-        run: sudo docker compose config
+        run: docker compose config
 
       - name: Dry-run backend Docker build
-        run: sudo docker build -f docker/backend.Dockerfile --target builder backend/
+        run: docker build -f docker/backend.Dockerfile --target builder backend/
 
       - name: Dry-run frontend Docker build
-        run: sudo docker build -f docker/frontend.Dockerfile frontend/
+        run: docker build -f docker/frontend.Dockerfile frontend/
 
       - name: Dry-run push-proxy Docker build
-        run: sudo docker build -f push-proxy/Dockerfile push-proxy/
+        run: docker build -f push-proxy/Dockerfile push-proxy/
 
   frontend-e2e:
     name: Frontend E2E Tests
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 25
     defaults:
       run:
