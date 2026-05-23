@@ -16,7 +16,7 @@ permissions:
 jobs:
   codeql:
     name: CodeQL Analysis
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 45
 
     services:
@@ -27,7 +27,7 @@ jobs:
           POSTGRES_PASSWORD: rustchat
           POSTGRES_DB: rustchat
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -35,7 +35,7 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
+      DATABASE_URL: postgres://rustchat:rustchat@localhost:5433/rustchat
       CARGO_TERM_COLOR: always
 
     steps:

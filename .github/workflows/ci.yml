@@ -21,7 +21,7 @@ env:
 jobs:
   detect-changes:
     name: Detect Changes
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -60,7 +60,7 @@ jobs:
     name: Backend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 60
 
     services:
@@ -71,7 +71,7 @@ jobs:
           POSTGRES_PASSWORD: rustchat
           POSTGRES_DB: rustchat
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -81,7 +81,7 @@ jobs:
       redis:
         image: redis:7
         ports:
-          - 6379:6379
+          - 6380:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -94,13 +94,13 @@ jobs:
           RUSTFS_ACCESS_KEY: testaccesskey
           RUSTFS_SECRET_KEY: testsecretkey
         ports:
-          - 9000:9000
+          - 9010:9000
 
     env:
-      DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
-      RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
-      RUSTCHAT_TEST_REDIS_URL: redis://localhost:6379/
-      RUSTCHAT_S3_ENDPOINT: http://localhost:9000
+      DATABASE_URL: postgres://rustchat:rustchat@localhost:5433/rustchat
+      RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@localhost:5433/rustchat
+      RUSTCHAT_TEST_REDIS_URL: redis://localhost:6380/
+      RUSTCHAT_S3_ENDPOINT: http://localhost:9010
       RUSTCHAT_S3_BUCKET: test-bucket
       RUSTCHAT_S3_ACCESS_KEY: testaccesskey
       RUSTCHAT_S3_SECRET_KEY: testsecretkey
@@ -154,7 +154,7 @@ jobs:
       - name: Wait for RustFS
         run: |
           for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:9000/health >/dev/null 2>&1; then
+            if curl -fsS http://127.0.0.1:9010/health >/dev/null 2>&1; then
               echo "RustFS is ready"
               break
             fi
@@ -233,7 +233,7 @@ jobs:
     name: Push Proxy Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 60
     defaults:
       run:
@@ -285,7 +285,7 @@ jobs:
     name: Docker Validate
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 60
 
     steps:
@@ -318,7 +318,7 @@ jobs:
     name: Frontend E2E Tests
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 60
     defaults:
       run:
@@ -341,12 +341,7 @@ jobs:
         run: npm run apply:dependency-patches
 
       - name: Install Playwright browsers
-        run: |
-          if [ "$RUNNER_ENVIRONMENT" = "github-hosted" ]; then
-            npx playwright install --with-deps
-          else
-            npx playwright install
-          fi
+        run: npx playwright install --with-deps
 
       - name: Run Playwright E2E tests
         run: npm run test:e2e
@@ -363,7 +358,7 @@ jobs:
     name: Build Release
     needs: backend-check
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 60
 
     env:
@@ -394,7 +389,7 @@ jobs:
 
   ci-complete:
     name: CI Complete
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     needs: [detect-changes, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
     if: always()
     timeout-minutes: 5
