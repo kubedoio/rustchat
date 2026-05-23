@@ -60,7 +60,7 @@ jobs:
     name: Backend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     services:
@@ -288,7 +288,7 @@ jobs:
     name: Docker Validate
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
@@ -321,7 +321,7 @@ jobs:
     name: Frontend E2E Tests
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
       run:
@@ -344,7 +344,7 @@ jobs:
         run: npm run apply:dependency-patches
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium firefox webkit
+        run: npx playwright install --with-deps
 
       - name: Run Playwright E2E tests
         run: npm run test:e2e
