@@ -36,6 +36,12 @@ jobs:
 
           commits_missing_signoff=0
           while IFS= read -r commit; do
+            parent_count="$(git rev-list --parents -n 1 "${commit}" | wc -w)"
+            if [[ "${parent_count}" -gt 2 ]]; then
+              echo "Skipping merge commit ${commit}."
+              continue
+            fi
+
             if ! git log -1 --format="%B" "${commit}" | grep -q "^Signed-off-by:"; then
               echo "::error::Commit ${commit} is missing DCO sign-off."
               git log -1 --oneline "${commit}"
