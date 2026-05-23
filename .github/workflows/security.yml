@@ -27,7 +27,7 @@ jobs:
           POSTGRES_PASSWORD: rustchat
           POSTGRES_DB: rustchat
         ports:
-          - 5433:5432
+          - 5432/tcp
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -35,11 +35,13 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgres://rustchat:rustchat@localhost:5433/rustchat
       CARGO_TERM_COLOR: always
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure service endpoints
+        run: echo "DATABASE_URL=postgres://rustchat:rustchat@localhost:${{ job.services.postgres.ports[5432] }}/rustchat" >> "$GITHUB_ENV"
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@45775bd8235c68ba998cffa5171334d58593da47 # v3.28.15
