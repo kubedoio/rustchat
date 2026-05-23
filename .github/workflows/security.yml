@@ -27,7 +27,7 @@ jobs:
           POSTGRES_PASSWORD: rustchat
           POSTGRES_DB: rustchat
         ports:
-          - 5432:5432
+          - 5432/tcp
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -35,11 +35,13 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
       CARGO_TERM_COLOR: always
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure service endpoints
+        run: echo "DATABASE_URL=postgres://rustchat:rustchat@localhost:${{ job.services.postgres.ports[5432] }}/rustchat" >> "$GITHUB_ENV"
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@45775bd8235c68ba998cffa5171334d58593da47 # v3.28.15
@@ -63,7 +65,7 @@ jobs:
             if ! command -v cargo-binstall &> /dev/null; then
               curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
             fi
-            cargo binstall --locked --no-confirm sqlx-cli --no-default-features --features postgres
+            cargo binstall --locked --no-confirm sqlx-cli
           fi
 
       - name: Run migrations
@@ -79,7 +81,7 @@ jobs:
 
   cargo-audit-backend:
     name: Cargo Audit (Backend)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
@@ -111,7 +113,7 @@ jobs:
 
   cargo-audit-push-proxy:
     name: Cargo Audit (Push Proxy)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
@@ -143,7 +145,7 @@ jobs:
 
   cargo-deny-backend:
     name: Cargo Deny (Backend)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
@@ -175,7 +177,7 @@ jobs:
 
   cargo-deny-push-proxy:
     name: Cargo Deny (Push Proxy)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
@@ -207,7 +209,7 @@ jobs:
 
   npm-audit:
     name: npm Audit
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:

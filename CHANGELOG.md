@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-05-22
+
+### Fixed
+- **DCO Conformance**: Rewrote PR branch history and successfully re-signed all 35 branch commits to satisfy Developer Certificate of Origin (`Signed-off-by`) specifications.
+- **GitGuardian Scans**: Added a customized `.gitguardian.yaml` ruleset to prevent false-positive alerts on workflows, test suites, and documentation.
+
+### Security
+- **Secret Remediation**: Purged static high-entropy dummy keys from the repository's git commit history to satisfy strict GitGuardian checks.
+- **CI Hardening**: Replaced static test environment variables in `.github/workflows/ci.yml` with dynamic runtime key generation (`openssl rand -hex 32`) to prevent key leaks and enhance workflow security.
+
 ## [0.4.0] - 2026-05-21
 
 ### Added

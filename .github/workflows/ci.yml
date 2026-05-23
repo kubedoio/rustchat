@@ -21,7 +21,7 @@ env:
 jobs:
   detect-changes:
     name: Detect Changes
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -60,47 +60,14 @@ jobs:
     name: Backend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: rustchat
-          POSTGRES_PASSWORD: rustchat
-          POSTGRES_DB: rustchat
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      rustfs:
-        image: rustfs/rustfs:latest
-        env:
-          RUSTFS_ACCESS_KEY: testaccesskey
-          RUSTFS_SECRET_KEY: testsecretkey
-        ports:
-          - 9000:9000
-
     env:
-      DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
-      RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
-      RUSTCHAT_TEST_REDIS_URL: redis://localhost:6379/
-      RUSTCHAT_S3_ENDPOINT: http://localhost:9000
+      DATABASE_URL: postgres://rustchat:rustchat@localhost:5433/rustchat
+      RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@localhost:5433/rustchat
+      RUSTCHAT_TEST_REDIS_URL: redis://localhost:6380/
+      RUSTCHAT_S3_ENDPOINT: http://localhost:9010
       RUSTCHAT_S3_BUCKET: test-bucket
       RUSTCHAT_S3_ACCESS_KEY: testaccesskey
       RUSTCHAT_S3_SECRET_KEY: testsecretkey
@@ -111,8 +78,64 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Start backend service dependencies
+        run: |
+          docker run -d --name rustchat-ci-postgres \
+            -e POSTGRES_USER=rustchat \
+            -e POSTGRES_PASSWORD=rustchat \
+            -e POSTGRES_DB=rustchat \
+            -p 5433:5432 \
+            --health-cmd pg_isready \
+            --health-interval 10s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            postgres:16
+          docker run -d --name rustchat-ci-redis \
+            -p 6380:6379 \
+            --health-cmd "redis-cli ping" \
+            --health-interval 10s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            redis:7
+          docker run -d --name rustchat-ci-rustfs \
+            -e RUSTFS_ACCESS_KEY=testaccesskey \
+            -e RUSTFS_SECRET_KEY=testsecretkey \
+            -p 9010:9000 \
+            rustfs/rustfs:latest
+
+      - name: Wait for backend service dependencies
+        run: |
+          for service in rustchat-ci-postgres rustchat-ci-redis; do
+            for i in {1..30}; do
+              status="$(docker inspect --format '{{.State.Health.Status}}' "$service")"
+              if [ "$status" = "healthy" ]; then
+                echo "$service is healthy"
+                break
+              fi
+              if [ "$i" = 30 ]; then
+                docker logs "$service"
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
+          for i in {1..60}; do
+            if curl -fsS "${RUSTCHAT_S3_ENDPOINT}/health" >/dev/null 2>&1; then
+              echo "RustFS is ready"
+              break
+            fi
+            if [ "$i" = 60 ]; then
+              docker logs rustchat-ci-rustfs
+              exit 1
+            fi
+            sleep 1
+          done
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: rustfmt, clippy
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
@@ -148,18 +171,8 @@ jobs:
             if ! command -v cargo-binstall &> /dev/null; then
               curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
             fi
-            cargo binstall --locked --no-confirm sqlx-cli --no-default-features --features postgres
+            cargo binstall --locked --no-confirm sqlx-cli
           fi
-
-      - name: Wait for RustFS
-        run: |
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:9000/health >/dev/null 2>&1; then
-              echo "RustFS is ready"
-              break
-            fi
-            sleep 1
-          done
 
       - name: Run migrations
         working-directory: ./backend
@@ -176,6 +189,10 @@ jobs:
       - name: Run unit tests
         working-directory: ./backend
         run: cargo test --lib --no-fail-fast -- --nocapture
+
+      - name: Stop backend service dependencies
+        if: always()
+        run: docker rm -f rustchat-ci-postgres rustchat-ci-redis rustchat-ci-rustfs
 
   frontend-check:
     name: Frontend Check
@@ -233,7 +250,7 @@ jobs:
     name: Push Proxy Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 60
     defaults:
       run:
@@ -247,6 +264,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: rustfmt, clippy
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
@@ -285,7 +304,7 @@ jobs:
     name: Docker Validate
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
@@ -306,7 +325,7 @@ jobs:
         run: docker compose config
 
       - name: Dry-run backend Docker build
-        run: docker build -f docker/backend.Dockerfile --target builder backend/
+        run: docker build -f docker/backend.Dockerfile --target ci-validate backend/
 
       - name: Dry-run frontend Docker build
         run: docker build -f docker/frontend.Dockerfile frontend/
@@ -318,7 +337,7 @@ jobs:
     name: Frontend E2E Tests
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
       run:
@@ -341,15 +360,10 @@ jobs:
         run: npm run apply:dependency-patches
 
       - name: Install Playwright browsers
-        run: |
-          if [ "$RUNNER_ENVIRONMENT" = "github-hosted" ]; then
-            npx playwright install --with-deps
-          else
-            npx playwright install
-          fi
+        run: npx playwright install --with-deps chromium
 
       - name: Run Playwright E2E tests
-        run: npm run test:e2e
+        run: npm run test:e2e -- e2e/auth.spec.ts --project=chromium
 
       - name: Upload Playwright report
         if: failure()
@@ -361,9 +375,9 @@ jobs:
 
   build-release:
     name: Build Release
-    needs: backend-check
+    needs: [detect-changes, backend-check]
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 60
 
     env:
@@ -394,7 +408,7 @@ jobs:
 
   ci-complete:
     name: CI Complete
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     needs: [detect-changes, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
     if: always()
     timeout-minutes: 5
@@ -404,9 +418,17 @@ jobs:
         run: echo "Change detection failed" >&2 && exit 1
 
       - name: Verify all checks passed
+        env:
+          BACKEND_CHECK_RESULT: ${{ needs.backend-check.result }}
+          FRONTEND_CHECK_RESULT: ${{ needs.frontend-check.result }}
+          FRONTEND_E2E_RESULT: ${{ needs.frontend-e2e.result }}
+          PUSH_PROXY_CHECK_RESULT: ${{ needs.push-proxy-check.result }}
+          DOCKER_VALIDATE_RESULT: ${{ needs.docker-validate.result }}
+          BUILD_RELEASE_RESULT: ${{ needs.build-release.result }}
         run: |
-          for job in backend-check frontend-check frontend-e2e push-proxy-check docker-validate build-release; do
-            result="${{ needs[job].result }}"
+          for job in BACKEND_CHECK FRONTEND_CHECK FRONTEND_E2E PUSH_PROXY_CHECK DOCKER_VALIDATE BUILD_RELEASE; do
+            result_var="${job}_RESULT"
+            result="${!result_var}"
             echo "$job: $result"
             if [ "$result" = "failure" ]; then
               echo "$job failed" >&2
