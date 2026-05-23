@@ -81,7 +81,7 @@ jobs:
 
   cargo-audit-backend:
     name: Cargo Audit (Backend)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
@@ -113,7 +113,7 @@ jobs:
 
   cargo-audit-push-proxy:
     name: Cargo Audit (Push Proxy)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
@@ -145,7 +145,7 @@ jobs:
 
   cargo-deny-backend:
     name: Cargo Deny (Backend)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
@@ -177,7 +177,7 @@ jobs:
 
   cargo-deny-push-proxy:
     name: Cargo Deny (Push Proxy)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
@@ -209,7 +209,7 @@ jobs:
 
   npm-audit:
     name: npm Audit
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
