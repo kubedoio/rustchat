@@ -29,6 +29,10 @@ on:
         description: 'Cache export target for docker/build-push-action'
         type: string
         default: 'type=gha,mode=max'
+      backend_target:
+        description: 'Optional Docker target for the backend image'
+        type: string
+        default: ''
 
 env:
   REGISTRY: ghcr.io
@@ -87,6 +91,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.service == 'backend' && inputs.backend_target || '' }}
           push: ${{ inputs.push }}
           platforms: ${{ inputs.platforms }}
           tags: ${{ steps.meta.outputs.tags }}

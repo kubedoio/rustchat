@@ -24,6 +24,7 @@ jobs:
       platforms: linux/amd64
       timeout-minutes: 90
       cache_to: ""
+      backend_target: ci-validate
       tags: |
         type=ref,event=pr
         type=sha,format=long
