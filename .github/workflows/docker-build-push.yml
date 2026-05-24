@@ -25,6 +25,14 @@ on:
         description: 'Platforms to build for (comma-separated list)'
         type: string
         default: 'linux/amd64'
+      cache_to:
+        description: 'Cache export target for docker/build-push-action'
+        type: string
+        default: 'type=gha,mode=max'
+      backend_target:
+        description: 'Optional Docker target for the backend image'
+        type: string
+        default: ''
 
 env:
   REGISTRY: ghcr.io
@@ -34,9 +42,6 @@ jobs:
   build-and-push:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
-    permissions:
-      contents: read
-      packages: write
 
     strategy:
       fail-fast: false
@@ -86,6 +91,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.service == 'backend' && inputs.backend_target || '' }}
           push: ${{ inputs.push }}
           platforms: ${{ inputs.platforms }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -95,4 +101,4 @@ jobs:
             BUILD_DATE=${{ steps.meta.outputs.created }}
             VCS_REF=${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: ${{ inputs.cache_to }}

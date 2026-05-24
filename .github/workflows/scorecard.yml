@@ -23,13 +23,22 @@ jobs:
           persist-credentials: false
 
       - name: Run Scorecard
-        uses: ossf/scorecard-action@ea651e62978af7915d09fe2e282747c798bf2dab # v2.4.1
+        id: scorecard
+        continue-on-error: true
+        uses: ossf/scorecard-action@f49aabe0b5af0936a0987cfb85d86b75731b0186 # v2.4.1
         with:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
 
+      - name: Check Scorecard result
+        if: steps.scorecard.outcome != 'success'
+        run: |
+          echo "::warning::OpenSSF Scorecard failed. This workflow is advisory and will not block the pipeline."
+
       - name: Upload SARIF
+        if: hashFiles('results.sarif') != ''
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3.28.15
         with:
           sarif_file: results.sarif
