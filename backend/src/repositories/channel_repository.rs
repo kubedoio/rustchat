@@ -616,6 +616,7 @@ impl<'a> ChannelRepository<'a> {
                 c.creator_id,
                 c.created_at,
                 c.updated_at,
+                c.deleted_at,
                 t.display_name AS team_display_name,
                 t.name AS team_name,
                 t.updated_at AS team_updated_at

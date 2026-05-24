@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_borrows_for_generic_args)]
 use crate::common::spawn_app;
-use rustchat::mattermost_compat::id::encode_mm_id;
+use rustchat::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -77,7 +77,7 @@ async fn setup_context() -> TestContext {
 
     let sender_id = sender_me["id"]
         .as_str()
-        .and_then(|s| uuid::Uuid::parse_str(s).ok())
+        .and_then(parse_mm_or_uuid)
         .expect("sender id should parse");
 
     // Register receiver
@@ -129,7 +129,7 @@ async fn setup_context() -> TestContext {
 
     let receiver_id = receiver_me["id"]
         .as_str()
-        .and_then(|s| uuid::Uuid::parse_str(s).ok())
+        .and_then(parse_mm_or_uuid)
         .expect("receiver id should parse");
 
     // Create team and channel
