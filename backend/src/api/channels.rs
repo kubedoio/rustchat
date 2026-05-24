@@ -17,21 +17,15 @@ use crate::models::{
     normalize_avatar_url, Channel, ChannelMember, ChannelType, CreateChannel, UpdateChannel,
 };
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
-use crate::repositories::{AdminRepository, ChannelRepository, UserRepository};
+use crate::repositories::{ChannelRepository, UserRepository};
 
 /// Check if user is channel creator, admin, or has system manage permission
 async fn is_channel_creator_or_admin(
     state: &AppState,
     channel_id: Uuid,
-    user_id: Uuid,
+    auth: &AuthUser,
 ) -> ApiResult<bool> {
-    // Check system manage permission first
-    let has_system_manage = AdminRepository::new(&state.db)
-        .has_system_manage_permission(user_id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-
-    if has_system_manage {
+    if auth.has_permission(&permissions::SYSTEM_MANAGE) {
         return Ok(true);
     }
 
@@ -40,13 +34,13 @@ async fn is_channel_creator_or_admin(
         .get_creator_id(channel_id)
         .await?;
 
-    if creator_id == Some(user_id) {
+    if creator_id == Some(auth.user_id) {
         return Ok(true);
     }
 
     // Check if user is channel admin
     let role: Option<String> = ChannelRepository::new(&state.db)
-        .get_member_role(channel_id, user_id)
+        .get_member_role(channel_id, auth.user_id)
         .await?;
 
     let is_admin = matches!(
@@ -349,7 +343,7 @@ async fn update_channel(
     Json(input): Json<UpdateChannel>,
 ) -> ApiResult<Json<Channel>> {
     // Check if user is creator or admin
-    let can_update = is_channel_creator_or_admin(&state, id, auth.user_id).await?;
+    let can_update = is_channel_creator_or_admin(&state, id, &auth).await?;
 
     if !can_update {
         return Err(AppError::Forbidden(
@@ -404,7 +398,7 @@ async fn delete_channel(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Check if user is creator or admin
-    let can_delete = is_channel_creator_or_admin(&state, id, auth.user_id).await?;
+    let can_delete = is_channel_creator_or_admin(&state, id, &auth).await?;
 
     if !can_delete {
         return Err(AppError::Forbidden(

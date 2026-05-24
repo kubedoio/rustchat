@@ -54,17 +54,17 @@ pub async fn create_activity(
     message_text: Option<String>,
     reaction: Option<String>,
 ) -> ApiResult<Activity> {
-    let activity: Activity = sqlx::query_as(
+    let row = sqlx::query(
         r#"
         INSERT INTO activities
             (user_id, type, actor_id, channel_id, team_id, post_id, root_id, message_text, reaction)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id, user_id, type as "type: ActivityType", actor_id, channel_id, team_id,
+        RETURNING id, user_id, type as activity_type, actor_id, channel_id, team_id,
                   post_id, root_id, message_text, reaction, read, created_at
         "#,
     )
     .bind(user_id)
-    .bind(activity_type)
+    .bind(activity_type.as_str())
     .bind(actor_id)
     .bind(channel_id)
     .bind(team_id)
@@ -74,6 +74,21 @@ pub async fn create_activity(
     .bind(reaction)
     .fetch_one(&state.db)
     .await?;
+    let activity = Activity {
+        id: row.get("id"),
+        user_id: row.get("user_id"),
+        r#type: ActivityType::parse(&row.get::<String, _>("activity_type"))
+            .expect("unknown activity type"),
+        actor_id: row.get("actor_id"),
+        channel_id: row.get("channel_id"),
+        team_id: row.get("team_id"),
+        post_id: row.get("post_id"),
+        root_id: row.get("root_id"),
+        message_text: row.get("message_text"),
+        reaction: row.get("reaction"),
+        read: row.get("read"),
+        created_at: row.get("created_at"),
+    };
 
     // Fetch full ActivityResponse for broadcast (includes joined actor/channel/team data)
     let activity_response: Option<ActivityResponse> = sqlx::query(
