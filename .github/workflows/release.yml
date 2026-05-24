@@ -78,11 +78,27 @@ jobs:
           fi
           echo "CHANGELOG.md section [${version}] has content"
 
+  docker-release:
+    name: Build and push release images
+    needs: validate
+    uses: ./.github/workflows/docker-build-push.yml
+    with:
+      push: true
+      platforms: linux/amd64,linux/arm64
+      tags: |
+        type=semver,pattern={{version}}
+        type=semver,pattern={{major}}.{{minor}}
+        type=raw,value=latest
+      timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: validate
+    needs: [validate, docker-release]
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -143,16 +159,3 @@ jobs:
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  docker-release:
-    name: Build and push release images
-    needs: [validate, release]
-    if: needs.validate.result == 'success' && needs.release.result == 'success'
-    uses: ./.github/workflows/docker-build-push.yml
-    with:
-      push: true
-      tags: |
-        type=semver,pattern={{version}}
-        type=semver,pattern={{major}}.{{minor}}
-        type=raw,value=latest
-      timeout-minutes: 120

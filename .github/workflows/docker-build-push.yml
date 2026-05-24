@@ -25,6 +25,10 @@ on:
         description: 'Platforms to build for (comma-separated list)'
         type: string
         default: 'linux/amd64'
+      cache_to:
+        description: 'Cache export target for docker/build-push-action'
+        type: string
+        default: 'type=gha,mode=max'
 
 env:
   REGISTRY: ghcr.io
@@ -34,9 +38,6 @@ jobs:
   build-and-push:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
-    permissions:
-      contents: read
-      packages: write
 
     strategy:
       fail-fast: false
@@ -95,4 +96,4 @@ jobs:
             BUILD_DATE=${{ steps.meta.outputs.created }}
             VCS_REF=${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: ${{ inputs.cache_to }}
