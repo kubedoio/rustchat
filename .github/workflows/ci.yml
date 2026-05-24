@@ -11,6 +11,12 @@ on:
         description: 'GitHub runner label to run the jobs on'
         type: string
         default: 'self-hosted'
+  workflow_call:
+    inputs:
+      runner:
+        description: 'GitHub runner label to run the jobs on'
+        type: string
+        default: 'self-hosted'
 
 permissions:
   contents: read
