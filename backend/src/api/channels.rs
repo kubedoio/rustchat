@@ -412,8 +412,12 @@ async fn delete_channel(
         .await
         .map_err(|_| AppError::ChannelNotFound)?;
 
+    if channel.deleted_at.is_some() {
+        return Err(AppError::ChannelAlreadyArchived);
+    }
+
     // Soft delete the channel
-    ChannelRepository::new(&state.db).soft_delete(id).await?;
+    let _ = ChannelRepository::new(&state.db).soft_delete(id).await?;
 
     // Broadcast ChannelDeleted event
     let broadcast = WsBroadcast {

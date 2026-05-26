@@ -552,3 +552,220 @@ async fn v4_patch_channel_duplicate_name_returns_conflict() {
 
     assert_eq!(response.status(), StatusCode::CONFLICT);
 }
+
+#[tokio::test]
+async fn v4_delete_channel_archives_and_list_deleted_includes_it() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Archive Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "archive_user",
+        "archive_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "archive-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "archive-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // Archive the channel
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // List deleted channels should include it
+    let response = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/teams/{}/channels/deleted",
+            app.address, team_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("list deleted channels request should complete");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let channels: Vec<serde_json::Value> = response
+        .json()
+        .await
+        .expect("list deleted channels should be JSON");
+
+    let found = channels.iter().any(|c| c["id"] == channel_id.to_string());
+    assert!(
+        found,
+        "archived channel should appear in deleted channels list"
+    );
+
+    // Verify delete_at is set in the MM response
+    let archived = channels
+        .iter()
+        .find(|c| c["id"] == channel_id.to_string())
+        .expect("archived channel should be present");
+    assert!(
+        archived["delete_at"].as_i64().unwrap_or(0) > 0,
+        "delete_at should be greater than 0 for archived channel"
+    );
+}
+
+#[tokio::test]
+async fn v4_delete_already_archived_channel_returns_bad_request() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Double Archive Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "double_archive_user",
+        "double_archive_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "double-archive-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "double-archive-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // First archive
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("first channel delete request should complete");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Second archive should fail
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("second channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn v4_restore_channel_clears_archive_state() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Restore Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "restore_user",
+        "restore_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "restore-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "restore-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // Archive the channel
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify it's in deleted list
+    let response = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/teams/{}/channels/deleted",
+            app.address, team_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("list deleted channels request should complete");
+    let channels: Vec<serde_json::Value> = response.json().await.unwrap();
+    assert!(channels.iter().any(|c| c["id"] == channel_id.to_string()));
+
+    // Restore the channel
+    let response = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/channels/{}/restore",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel restore request should complete");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let restored: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(restored["delete_at"], 0);
+
+    // Verify it's no longer in deleted list
+    let response = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/teams/{}/channels/deleted",
+            app.address, team_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("list deleted channels request should complete");
+    let channels: Vec<serde_json::Value> = response.json().await.unwrap();
+    assert!(
+        !channels.iter().any(|c| c["id"] == channel_id.to_string()),
+        "restored channel should not appear in deleted channels list"
+    );
+}
+
+#[tokio::test]
+async fn v4_restore_non_archived_channel_returns_bad_request() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Restore Non-Archived Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "restore_na_user",
+        "restore_na_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "restore-na-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "restore-na-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // Try to restore a channel that was never archived
+    let response = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/channels/{}/restore",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel restore request should complete");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
