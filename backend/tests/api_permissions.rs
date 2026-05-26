@@ -444,3 +444,111 @@ async fn add_channel_member(app: &common::TestApp, channel_id: Uuid, user_id: Uu
     .await
     .expect("failed to add channel member");
 }
+
+#[tokio::test]
+async fn update_channel_duplicate_name_returns_conflict() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Conflict Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "conflict_user",
+        "conflict_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "conflict-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel1_id = insert_channel(&app, team_id, user_id, "channel-one").await;
+    let channel2_id = insert_channel(&app, team_id, user_id, "channel-two").await;
+    add_channel_member(&app, channel1_id, user_id, "admin").await;
+    add_channel_member(&app, channel2_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .put(format!("{}/api/v1/channels/{}", app.address, channel1_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&serde_json::json!({
+            "name": "channel-two"
+        }))
+        .send()
+        .await
+        .expect("channel update request should complete");
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn v4_update_channel_duplicate_name_returns_conflict() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "V4 Conflict Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "v4_conflict_user",
+        "v4_conflict_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "v4-conflict-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel1_id = insert_channel(&app, team_id, user_id, "v4-channel-one").await;
+    let channel2_id = insert_channel(&app, team_id, user_id, "v4-channel-two").await;
+    add_channel_member(&app, channel1_id, user_id, "admin").await;
+    add_channel_member(&app, channel2_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .put(format!("{}/api/v4/channels/{}", app.address, channel1_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&serde_json::json!({
+            "name": "v4-channel-two"
+        }))
+        .send()
+        .await
+        .expect("v4 channel update request should complete");
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn v4_patch_channel_duplicate_name_returns_conflict() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "V4 Patch Conflict Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "v4_patch_conflict_user",
+        "v4_patch_conflict_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "v4-patch-conflict-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel1_id = insert_channel(&app, team_id, user_id, "v4-patch-channel-one").await;
+    let channel2_id = insert_channel(&app, team_id, user_id, "v4-patch-channel-two").await;
+    add_channel_member(&app, channel1_id, user_id, "admin").await;
+    add_channel_member(&app, channel2_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .put(format!(
+            "{}/api/v4/channels/{}/patch",
+            app.address, channel1_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&serde_json::json!({
+            "name": "v4-patch-channel-two"
+        }))
+        .send()
+        .await
+        .expect("v4 channel patch request should complete");
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
