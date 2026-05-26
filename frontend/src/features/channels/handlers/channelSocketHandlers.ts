@@ -92,7 +92,8 @@ function handleChannelRestored(event: WebSocketChannelEvent) {
   log.debug('Channel restored:', event)
   const data = readEventData(event)
 
-  if (!data.channel_id) return
+  // Backend sends full mm::Channel which uses 'id', not 'channel_id'
+  if (!data.id && !data.channel_id) return
 
   const channel = normalizeChannel(data)
   channelService.handleChannelRestored(channel)
