@@ -58,7 +58,14 @@ export interface Message {
 
   // Extended props (for integrations, calls, etc)
   props?: Record<string, any>
-  type?: '' | 'system_join_leave' | 'system_purpose' | 'system_header' | 'calls'
+  type?:
+    | ''
+    | 'system_join_leave'
+    | 'system_purpose'
+    | 'system_header'
+    | 'system_channel_archived'
+    | 'system_channel_restored'
+    | 'calls'
 }
 
 // For optimistic updates

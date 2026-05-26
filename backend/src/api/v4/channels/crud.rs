@@ -429,21 +429,15 @@ pub async fn restore_channel(
     .await;
 
     // Broadcast ChannelRestored event
+    let mm_channel: mm::Channel = channel.clone().into();
     let broadcast = WsBroadcast {
         channel_id: Some(channel_id),
         team_id: Some(channel.team_id),
         user_id: None,
         exclude_user_id: Some(auth.user_id),
     };
-    let event = WsEnvelope::event(
-        EventType::ChannelRestored,
-        serde_json::json!({
-            "channel_id": channel_id.to_string(),
-            "team_id": channel.team_id.to_string(),
-        }),
-        Some(channel_id),
-    )
-    .with_broadcast(broadcast);
+    let event = WsEnvelope::event(EventType::ChannelRestored, &mm_channel, Some(channel_id))
+        .with_broadcast(broadcast);
     state.ws_hub.broadcast(event).await;
 
     Ok(Json(channel.into()))

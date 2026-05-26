@@ -87,7 +87,13 @@ const canEditMessage = computed(() => {
 
 const isSystemMessage = computed(() => {
   const type = props.message.props?.type
-  return type === 'system_join_leave' || type === 'system_purpose' || type === 'system_header'
+  return (
+    type === 'system_join_leave' ||
+    type === 'system_purpose' ||
+    type === 'system_header' ||
+    type === 'system_channel_archived' ||
+    type === 'system_channel_restored'
+  )
 })
 
 const isVideoCall = computed(() => props.message.props?.type === 'video_call')

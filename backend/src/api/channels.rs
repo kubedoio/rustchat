@@ -437,8 +437,7 @@ async fn delete_channel(
     // Post system message
     let username = UserRepository::new(&state.db)
         .get_username(auth.user_id)
-        .await
-        .unwrap_or(None)
+        .await?
         .unwrap_or_else(|| "System".to_string());
     let _ = create_system_message(
         &state,
