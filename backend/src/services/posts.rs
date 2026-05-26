@@ -624,11 +624,15 @@ pub async fn create_system_message(
     message: String,
     props: Option<serde_json::Value>,
 ) -> ApiResult<()> {
-    // 1. Find bot user
-    let bot_user = UserRepository::new(&state.db)
-        .get_bot_user_id()
-        .await?
-        .unwrap_or_else(Uuid::nil);
+    // 1. Find bot user (create one if none exists)
+    let bot_user = match UserRepository::new(&state.db).get_bot_user_id().await? {
+        Some(id) => id,
+        None => {
+            crate::repositories::IntegrationRepository::new(&state.db)
+                .create_bot_user("system", "system@rustchat.local")
+                .await?
+        }
+    };
 
     // 2. Prepare props
     let mut final_props = props.unwrap_or_else(|| serde_json::json!({}));
