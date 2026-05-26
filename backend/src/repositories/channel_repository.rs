@@ -300,8 +300,8 @@ impl<'a> ChannelRepository<'a> {
         display_name: Option<&str>,
         purpose: Option<&str>,
         header: Option<&str>,
-    ) -> Result<Channel, sqlx::Error> {
-        sqlx::query_as(
+    ) -> ApiResult<Channel> {
+        let result = sqlx::query_as(
             r#"
             UPDATE channels SET
                 name = COALESCE($2, name),
@@ -319,7 +319,24 @@ impl<'a> ChannelRepository<'a> {
         .bind(purpose)
         .bind(header)
         .fetch_one(self.pool)
-        .await
+        .await;
+
+        match result {
+            Ok(channel) => Ok(channel),
+            Err(sqlx::Error::RowNotFound) => Err(AppError::ChannelNotFound),
+            Err(e) => {
+                if let Some(db_err) = e.as_database_error() {
+                    if let Some(constraint) = db_err.constraint() {
+                        if constraint.contains("channels_name_team_unique") {
+                            return Err(AppError::Conflict(
+                                "Channel name already exists in this team".to_string(),
+                            ));
+                        }
+                    }
+                }
+                Err(AppError::Database(e))
+            }
+        }
     }
 
     /// Soft delete a channel
