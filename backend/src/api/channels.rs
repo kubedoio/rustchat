@@ -18,6 +18,7 @@ use crate::models::{
 };
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
 use crate::repositories::{ChannelRepository, UserRepository};
+use crate::services::posts::create_system_message;
 
 /// Check if user is channel creator, admin, or has system manage permission
 async fn is_channel_creator_or_admin(
@@ -416,8 +417,36 @@ async fn delete_channel(
         return Err(AppError::ChannelAlreadyArchived);
     }
 
+    // Block archiving default channels
+    if channel.name == "town-square" || channel.name == "off-topic" {
+        return Err(AppError::BadRequest(
+            "Cannot archive default channels".to_string(),
+        ));
+    }
+
+    // Block archiving direct and group messages
+    if channel.channel_type == ChannelType::Direct || channel.channel_type == ChannelType::Group {
+        return Err(AppError::BadRequest(
+            "Cannot archive direct or group message channels".to_string(),
+        ));
+    }
+
     // Soft delete the channel
     let _ = ChannelRepository::new(&state.db).soft_delete(id).await?;
+
+    // Post system message
+    let username = UserRepository::new(&state.db)
+        .get_username(auth.user_id)
+        .await
+        .unwrap_or(None)
+        .unwrap_or_else(|| "System".to_string());
+    let _ = create_system_message(
+        &state,
+        id,
+        format!("{username} archived the channel."),
+        Some(serde_json::json!({"type": "system_channel_archived"})),
+    )
+    .await;
 
     // Broadcast ChannelDeleted event
     let broadcast = WsBroadcast {
