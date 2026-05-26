@@ -148,11 +148,10 @@ impl From<Channel> for mm::Channel {
             id: encode_mm_id(channel.id),
             create_at: channel.created_at.timestamp_millis(),
             update_at: channel.updated_at.timestamp_millis(),
-            delete_at: if channel.is_archived {
-                channel.updated_at.timestamp_millis()
-            } else {
-                0
-            },
+            delete_at: channel
+                .deleted_at
+                .map(|t| t.timestamp_millis())
+                .unwrap_or(0),
             team_id: encode_mm_id(channel.team_id),
             channel_type: match channel.channel_type {
                 ChannelType::Public => "O",

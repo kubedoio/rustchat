@@ -132,6 +132,12 @@ pub enum AppError {
     #[error("Bad request: Invalid channel_id")]
     InvalidChannelId,
 
+    #[error("Bad request: Channel is already archived")]
+    ChannelAlreadyArchived,
+
+    #[error("Bad request: Channel is not archived")]
+    ChannelNotArchived,
+
     #[error("Bad request: Invalid user_id")]
     InvalidUserId,
 
@@ -353,6 +359,8 @@ impl AppError {
             // BadRequest typed variants
             AppError::InvalidPostId => "BAD_REQUEST",
             AppError::InvalidChannelId => "BAD_REQUEST",
+            AppError::ChannelAlreadyArchived => "BAD_REQUEST",
+            AppError::ChannelNotArchived => "BAD_REQUEST",
             AppError::InvalidUserId => "BAD_REQUEST",
             AppError::InvalidTeamId => "BAD_REQUEST",
             AppError::InvalidId => "BAD_REQUEST",
@@ -455,6 +463,8 @@ impl AppError {
             // BadRequest typed variants
             AppError::InvalidPostId => StatusCode::BAD_REQUEST,
             AppError::InvalidChannelId => StatusCode::BAD_REQUEST,
+            AppError::ChannelAlreadyArchived => StatusCode::BAD_REQUEST,
+            AppError::ChannelNotArchived => StatusCode::BAD_REQUEST,
             AppError::InvalidUserId => StatusCode::BAD_REQUEST,
             AppError::InvalidTeamId => StatusCode::BAD_REQUEST,
             AppError::InvalidId => StatusCode::BAD_REQUEST,

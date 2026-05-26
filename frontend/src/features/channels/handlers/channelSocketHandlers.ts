@@ -25,6 +25,9 @@ export function handleChannelWebSocketEvent(event: WebSocketChannelEvent) {
     case 'channel_deleted':
       handleChannelDeleted(event)
       break
+    case 'channel_restored':
+      handleChannelRestored(event)
+      break
     case 'user_added':
       handleUserAdded(event)
       break
@@ -83,6 +86,17 @@ function handleChannelDeleted(event: WebSocketChannelEvent) {
   if (channelId) {
     channelService.handleChannelDeleted(channelId)
   }
+}
+
+function handleChannelRestored(event: WebSocketChannelEvent) {
+  log.debug('Channel restored:', event)
+  const data = readEventData(event)
+
+  // Backend sends full mm::Channel which uses 'id', not 'channel_id'
+  if (!data.id && !data.channel_id) return
+
+  const channel = normalizeChannel(data)
+  channelService.handleChannelRestored(channel)
 }
 
 function handleUserAdded(event: WebSocketChannelEvent) {

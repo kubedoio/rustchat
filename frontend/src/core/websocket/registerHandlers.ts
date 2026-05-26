@@ -114,6 +114,9 @@ export function registerWebSocketHandlers(): void {
   wsManager.on('channel_deleted', (event: WebSocketEvent) =>
     handleChannelWebSocketEvent(event as WebSocketChannelEvent)
   )
+  wsManager.on('channel_restored', (event: WebSocketEvent) =>
+    handleChannelWebSocketEvent(event as WebSocketChannelEvent)
+  )
   wsManager.on('user_added', (event: WebSocketEvent) =>
     handleChannelWebSocketEvent(event as WebSocketChannelEvent)
   )

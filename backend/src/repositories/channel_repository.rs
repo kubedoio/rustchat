@@ -339,13 +339,28 @@ impl<'a> ChannelRepository<'a> {
         }
     }
 
-    /// Soft delete a channel
-    pub async fn soft_delete(&self, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE channels SET deleted_at = NOW() WHERE id = $1")
-            .bind(id)
-            .execute(self.pool)
-            .await?;
-        Ok(())
+    /// Soft delete (archive) a channel.
+    /// Returns the updated channel, or an error if the channel is already archived or does not exist.
+    pub async fn soft_delete(&self, id: Uuid) -> ApiResult<Channel> {
+        let result = sqlx::query_as(
+            r#"
+            UPDATE channels
+            SET deleted_at = NOW(),
+                is_archived = true,
+                updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+            RETURNING *
+            "#,
+        )
+        .bind(id)
+        .fetch_one(self.pool)
+        .await;
+
+        match result {
+            Ok(channel) => Ok(channel),
+            Err(sqlx::Error::RowNotFound) => Err(AppError::ChannelAlreadyArchived),
+            Err(e) => Err(AppError::Database(e)),
+        }
     }
 
     /// List channel members with user details
@@ -743,15 +758,28 @@ impl<'a> ChannelRepository<'a> {
         Ok(channel)
     }
 
-    /// Restore a soft-deleted channel
+    /// Restore an archived (soft-deleted) channel.
+    /// Returns the restored channel, or an error if the channel is not archived or does not exist.
     pub async fn restore(&self, id: Uuid) -> ApiResult<Channel> {
-        let channel: Channel = sqlx::query_as(
-            r#"UPDATE channels SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *"#,
+        let result = sqlx::query_as(
+            r#"
+            UPDATE channels
+            SET deleted_at = NULL,
+                is_archived = false,
+                updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NOT NULL
+            RETURNING *
+            "#,
         )
         .bind(id)
         .fetch_one(self.pool)
-        .await?;
-        Ok(channel)
+        .await;
+
+        match result {
+            Ok(channel) => Ok(channel),
+            Err(sqlx::Error::RowNotFound) => Err(AppError::ChannelNotArchived),
+            Err(e) => Err(AppError::Database(e)),
+        }
     }
 
     /// Move a channel to another team
@@ -1206,7 +1234,7 @@ impl<'a> ChannelRepository<'a> {
         sqlx::query_as(
             r#"
             SELECT c.* FROM channels c
-            WHERE c.team_id = $1 AND c.is_archived = true
+            WHERE c.team_id = $1 AND c.deleted_at IS NOT NULL
               AND (
                 c.type != 'private'
                 OR EXISTS (

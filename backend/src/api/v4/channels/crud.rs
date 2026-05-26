@@ -12,8 +12,10 @@ use super::{
     mm, parse_mm_or_uuid, permissions, ApiResult, AppError, AppState, Channel, MmAuthUser,
 };
 use crate::api::v4::channels::utils::map_channel_with_team_data_row;
+use crate::models::ChannelType;
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
-use crate::repositories::ChannelRepository;
+use crate::repositories::{ChannelRepository, UserRepository};
+use crate::services::posts::create_system_message;
 use serde_json::json;
 
 #[derive(Debug, Deserialize, Default)]
@@ -260,8 +262,39 @@ pub async fn delete_channel(
         .await?
         .ok_or_else(|| AppError::ChannelNotFound)?;
 
+    if channel.deleted_at.is_some() {
+        return Err(AppError::ChannelAlreadyArchived);
+    }
+
+    // Block archiving default channels
+    if channel.name == "town-square" || channel.name == "off-topic" {
+        return Err(AppError::BadRequest(
+            "Cannot archive default channels".to_string(),
+        ));
+    }
+
+    // Block archiving direct and group messages
+    if channel.channel_type == ChannelType::Direct || channel.channel_type == ChannelType::Group {
+        return Err(AppError::BadRequest(
+            "Cannot archive direct or group message channels".to_string(),
+        ));
+    }
+
     // Soft delete the channel
-    repo.soft_delete(channel_id).await?;
+    let _ = repo.soft_delete(channel_id).await?;
+
+    // Post system message
+    let username = UserRepository::new(&state.db)
+        .get_username(auth.user_id)
+        .await?
+        .unwrap_or_else(|| "System".to_string());
+    let _ = create_system_message(
+        &state,
+        channel_id,
+        format!("{username} archived the channel."),
+        Some(serde_json::json!({"type": "system_channel_archived"})),
+    )
+    .await;
 
     // Broadcast ChannelDeleted event
     let broadcast = WsBroadcast {
@@ -381,6 +414,31 @@ pub async fn restore_channel(
 
     let repo = ChannelRepository::new(&state.db);
     let channel: Channel = repo.restore(channel_id).await?;
+
+    // Post system message
+    let username = UserRepository::new(&state.db)
+        .get_username(auth.user_id)
+        .await?
+        .unwrap_or_else(|| "System".to_string());
+    let _ = create_system_message(
+        &state,
+        channel_id,
+        format!("{username} unarchived the channel."),
+        Some(serde_json::json!({"type": "system_channel_restored"})),
+    )
+    .await;
+
+    // Broadcast ChannelRestored event
+    let mm_channel: mm::Channel = channel.clone().into();
+    let broadcast = WsBroadcast {
+        channel_id: Some(channel_id),
+        team_id: Some(channel.team_id),
+        user_id: None,
+        exclude_user_id: Some(auth.user_id),
+    };
+    let event = WsEnvelope::event(EventType::ChannelRestored, &mm_channel, Some(channel_id))
+        .with_broadcast(broadcast);
+    state.ws_hub.broadcast(event).await;
 
     Ok(Json(channel.into()))
 }

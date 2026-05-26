@@ -191,6 +191,10 @@ class ChannelService {
     this.store.removeChannel(channelId)
   }
 
+  handleChannelRestored(channel: Channel): void {
+    this.store.addChannel(channel)
+  }
+
   handleUserJoined(channelId: ChannelId, userId: UserId): void {
     // Could trigger a notification or update member list
     log.debug('User joined channel:', channelId, userId)
