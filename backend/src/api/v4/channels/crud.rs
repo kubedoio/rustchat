@@ -256,9 +256,9 @@ pub async fn delete_channel(
 
     let repo = ChannelRepository::new(&state.db);
 
-    // Get channel info for the broadcast
+    // Get channel info for the broadcast (including archived channels)
     let channel = repo
-        .get_by_id_optional(channel_id)
+        .get_by_id_any(channel_id)
         .await?
         .ok_or_else(|| AppError::ChannelNotFound)?;
 

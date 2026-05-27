@@ -2,7 +2,7 @@
 import { log } from '@/utils/log'
 import { computed, onMounted, ref } from 'vue'
 import { AlertTriangle, ExternalLink, Lightbulb, Pencil } from 'lucide-vue-next'
-import api from '../../../api/client'
+import { v4Api } from '../../../api/client'
 import SettingItemMax from '../SettingItemMax.vue'
 import { useAuthStore } from '../../../features/auth/stores/authStore'
 import { usePreferencesStore } from '../../../features/preferences/stores/preferencesStore'
@@ -256,7 +256,7 @@ function testNotificationSound() {
 async function sendTestNotification() {
   sendingTestNotification.value = true
   try {
-    const response = await api.post('/api/v4/notifications/test')
+    const response = await v4Api.post('/notifications/test')
     if (response.data?.status === 'OK') {
       toast.success('Test notification sent', 'Check your devices for a test notification')
       return
