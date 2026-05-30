@@ -1,4 +1,7 @@
-export function getDirectMessageCounterpartyId(channelName?: string | null, currentUserId?: string | null): string | null {
+export function getDirectMessageCounterpartyId(
+  channelName?: string | null,
+  currentUserId?: string | null
+): string | null {
   if (!channelName || !currentUserId) {
     return null
   }

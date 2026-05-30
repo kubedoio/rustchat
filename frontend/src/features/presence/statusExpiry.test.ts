@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  clearStatusExpiryTimer,
-  parseStatusExpiryMs,
-  scheduleStatusExpiry,
-} from './statusExpiry'
+import { clearStatusExpiryTimer, parseStatusExpiryMs, scheduleStatusExpiry } from './statusExpiry'
 
 describe('statusExpiry', () => {
   beforeEach(() => {
@@ -19,9 +15,7 @@ describe('statusExpiry', () => {
   it('parses unix seconds, unix milliseconds, and ISO timestamps', () => {
     expect(parseStatusExpiryMs(1_775_185_200)).toBe(1_775_185_200_000)
     expect(parseStatusExpiryMs(1_775_185_200_123)).toBe(1_775_185_200_123)
-    expect(parseStatusExpiryMs('2026-03-29T12:05:00Z')).toBe(
-      Date.parse('2026-03-29T12:05:00Z'),
-    )
+    expect(parseStatusExpiryMs('2026-03-29T12:05:00Z')).toBe(Date.parse('2026-03-29T12:05:00Z'))
   })
 
   it('replaces an existing timer and expires once at the latest deadline', () => {
@@ -43,12 +37,7 @@ describe('statusExpiry', () => {
     const timers = new Map<string, ReturnType<typeof setTimeout>>()
     const onExpire = vi.fn()
 
-    const expiresAt = scheduleStatusExpiry(
-      timers,
-      'user-1',
-      '2026-03-29T11:59:59Z',
-      onExpire,
-    )
+    const expiresAt = scheduleStatusExpiry(timers, 'user-1', '2026-03-29T11:59:59Z', onExpire)
 
     expect(expiresAt).toBe(Date.parse('2026-03-29T11:59:59Z'))
     expect(onExpire).toHaveBeenCalledTimes(1)

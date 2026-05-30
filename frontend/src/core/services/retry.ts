@@ -13,7 +13,7 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
   initialDelay: 1000,
   maxDelay: 10000,
   backoffMultiplier: 2,
-  shouldRetry: (error) => error.recoverable
+  shouldRetry: error => error.recoverable,
 }
 
 export async function withRetry<T>(
@@ -28,9 +28,7 @@ export async function withRetry<T>(
     try {
       return await operation()
     } catch (error) {
-      lastError = error instanceof AppError 
-        ? error 
-        : new AppError(String(error))
+      lastError = error instanceof AppError ? error : new AppError(String(error))
 
       // Don't retry on last attempt
       if (attempt === opts.maxAttempts) {
@@ -44,7 +42,7 @@ export async function withRetry<T>(
 
       // Wait before retrying
       await sleep(delay)
-      
+
       // Exponential backoff
       delay = Math.min(delay * opts.backoffMultiplier, opts.maxDelay)
     }
@@ -59,17 +57,13 @@ function sleep(ms: number): Promise<void> {
 
 // Decorator for retry logic
 export function retryable(options: RetryOptions = {}) {
-  return function (
-    _target: any,
-    _propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
+  return function (_target: any, _propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value
-    
+
     descriptor.value = async function (...args: any[]) {
       return withRetry(() => originalMethod.apply(this, args), options)
     }
-    
+
     return descriptor
   }
 }

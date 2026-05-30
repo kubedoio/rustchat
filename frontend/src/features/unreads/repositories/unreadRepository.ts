@@ -49,28 +49,23 @@ export const unreadRepository = {
           channelId: c.channel_id as ChannelId,
           teamId: c.team_id as TeamId,
           unreadCount: c.unread_count,
-          mentionCount: c.mention_count || 0
+          mentionCount: c.mention_count || 0,
         })),
         teams: response.data.teams.map(t => ({
           teamId: t.team_id as TeamId,
-          unreadCount: t.unread_count
-        }))
+          unreadCount: t.unread_count,
+        })),
       }
     })
   },
 
   // Mark channel as read
-  async markAsRead(
-    channelId: ChannelId,
-    targetSeq?: string | number | null
-  ): Promise<void> {
-    await withRetry(() =>
-      client.post(`/channels/${channelId}/read`, { target_seq: targetSeq })
-    )
+  async markAsRead(channelId: ChannelId, targetSeq?: string | number | null): Promise<void> {
+    await withRetry(() => client.post(`/channels/${channelId}/read`, { target_seq: targetSeq }))
   },
 
   // Mark all channels as read
   async markAllAsRead(): Promise<void> {
     await withRetry(() => client.post('/unreads/mark_all_read'))
-  }
+  },
 }

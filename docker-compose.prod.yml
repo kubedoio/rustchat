@@ -1,0 +1,140 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    image: rustchat-backend
+    restart: always
+    environment:
+      - RUSTCHAT_SERVER_HOST=0.0.0.0
+      - RUSTCHAT_SERVER_PORT=3000
+      - RUSTCHAT_ENVIRONMENT=production
+      - RUSTCHAT_SITE_URL=${RUSTCHAT_SITE_URL:?set public HTTPS URL in .env}
+      - RUSTCHAT_CORS_ALLOWED_ORIGINS=${RUSTCHAT_CORS_ALLOWED_ORIGINS:?set allowed HTTPS origins in .env}
+      - RUSTCHAT_DATABASE_URL=postgres://rustchat:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/rustchat
+      - RUSTCHAT_REDIS_URL=redis://redis:6379
+      - RUSTCHAT_JWT_SECRET=${RUSTCHAT_JWT_SECRET:?set RUSTCHAT_JWT_SECRET in .env}
+      - RUSTCHAT_JWT_ISSUER=${RUSTCHAT_JWT_ISSUER:?set RUSTCHAT_JWT_ISSUER in .env}
+      - RUSTCHAT_JWT_AUDIENCE=${RUSTCHAT_JWT_AUDIENCE:?set RUSTCHAT_JWT_AUDIENCE in .env}
+      - RUSTCHAT_ENCRYPTION_KEY=${RUSTCHAT_ENCRYPTION_KEY:?set RUSTCHAT_ENCRYPTION_KEY in .env}
+      - RUSTCHAT_S3_ENDPOINT=http://rustfs:9000
+      - RUSTCHAT_S3_PUBLIC_ENDPOINT=${RUSTCHAT_S3_PUBLIC_ENDPOINT:?set public S3 endpoint in .env}
+      - RUSTCHAT_S3_BUCKET=${RUSTCHAT_S3_BUCKET:-rustchat-uploads}
+      - RUSTCHAT_S3_ACCESS_KEY=${RUSTCHAT_S3_ACCESS_KEY:?set RUSTCHAT_S3_ACCESS_KEY in .env}
+      - RUSTCHAT_S3_SECRET_KEY=${RUSTCHAT_S3_SECRET_KEY:?set RUSTCHAT_S3_SECRET_KEY in .env}
+      - RUSTCHAT_ADMIN_USER=${RUSTCHAT_ADMIN_USER:?set first admin email in .env}
+      - RUSTCHAT_ADMIN_PASSWORD=${RUSTCHAT_ADMIN_PASSWORD:?set first admin password in .env}
+      - RUSTCHAT_SECURITY_RATE_LIMIT_ENABLED=true
+      - RUSTCHAT_SECURITY_WS_ALLOW_QUERY_TOKEN=false
+      - RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=cookie
+      - RUSTCHAT_CALLS_ENABLED=${RUSTCHAT_CALLS_ENABLED:-true}
+      - RUSTCHAT_CALLS_UDP_PORT=${RUSTCHAT_CALLS_UDP_PORT:-8443}
+      - RUSTCHAT_CALLS_TCP_PORT=${RUSTCHAT_CALLS_TCP_PORT:-8443}
+      - RUSTCHAT_CALLS_ICE_HOST_OVERRIDE=${RUSTCHAT_CALLS_ICE_HOST_OVERRIDE:-}
+      - RUSTCHAT_CALLS_STATE_BACKEND=${RUSTCHAT_CALLS_STATE_BACKEND:-auto}
+      - TURN_SERVER_ENABLED=${TURN_SERVER_ENABLED:-false}
+      - TURN_SERVER_URL=${TURN_SERVER_URL:-}
+      - TURN_SERVER_USERNAME=${TURN_SERVER_USERNAME:-}
+      - TURN_SERVER_CREDENTIAL=${TURN_SERVER_CREDENTIAL:-}
+      - RUSTCHAT_PUSH_PROXY_URL=${RUSTCHAT_PUSH_PROXY_URL:-http://push-proxy:3000}
+      - PUSH_PROXY_AUTH_KEY=${PUSH_PROXY_AUTH_KEY:-}
+      - RUSTCHAT_TURNSTILE_ENABLED=${RUSTCHAT_TURNSTILE_ENABLED:-false}
+      - RUSTCHAT_TURNSTILE_SITE_KEY=${RUSTCHAT_TURNSTILE_SITE_KEY:-}
+      - RUSTCHAT_TURNSTILE_SECRET_KEY=${RUSTCHAT_TURNSTILE_SECRET_KEY:-}
+    ports:
+      - "8443:8443/tcp"
+      - "8443:8443/udp"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/v1/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    image: rustchat-frontend
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: rustchat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: rustchat
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rustchat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rustfs:
+    image: rustfs/rustfs@sha256:103dd40b84d5aa3d5ab02f3a693797eb1d14cb842554b222dfbb589f364aa47f
+    restart: always
+    environment:
+      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY in .env}
+      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY in .env}
+    volumes:
+      - rustfs_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  push-proxy:
+    build:
+      context: ./push-proxy
+      dockerfile: Dockerfile
+    image: rustchat-push-proxy
+    restart: always
+    profiles:
+      - push
+    environment:
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/firebase-key.json
+      - APNS_KEY_PATH=/secrets/apns-key.p8
+      - APNS_KEY_ID=${APNS_KEY_ID:-}
+      - APNS_TEAM_ID=${APNS_TEAM_ID:-}
+      - APNS_BUNDLE_ID=${APNS_BUNDLE_ID:-}
+      - APNS_USE_PRODUCTION=${APNS_USE_PRODUCTION:-true}
+      - RUSTCHAT_PUSH_PORT=3000
+      - RUST_LOG=push_proxy=info,tower_http=info
+      - PUSH_PROXY_AUTH_KEY=${PUSH_PROXY_AUTH_KEY:-}
+    volumes:
+      - ${FIREBASE_KEY_PATH:-./secrets/firebase-key.json}:/secrets/firebase-key.json:ro
+      - ${APNS_KEY_HOST_PATH:-${APNS_KEY_PATH:-./secrets/apns-key.p8}}:/secrets/apns-key.p8:ro
+
+volumes:
+  postgres_data:
+  redis_data:
+  rustfs_data:

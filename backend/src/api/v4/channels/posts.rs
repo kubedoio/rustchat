@@ -21,14 +21,19 @@ pub struct Pagination {
     pub since: Option<i64>,
 }
 
+fn parse_since_timestamp(since: i64) -> ApiResult<chrono::DateTime<chrono::Utc>> {
+    chrono::DateTime::from_timestamp_millis(since)
+        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid since timestamp".to_string()))
+}
+
 pub async fn get_posts(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(channel_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> ApiResult<Json<mm::PostList>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let repo = PostRepository::new(state.db.clone());
 
@@ -39,59 +44,58 @@ pub async fn get_posts(
     let per_page = pagination.per_page.unwrap_or(60).min(200) as i64;
 
     // Determine query type based on pagination params
-    let mut posts: Vec<PostResponse> =
-        if let Some(since) = pagination.since {
-            // Incremental sync: get posts created or edited since timestamp
-            let since_time = chrono::DateTime::from_timestamp_millis(since).ok_or_else(|| {
-                crate::error::AppError::BadRequest("Invalid since timestamp".to_string())
-            })?;
+    let mut posts: Vec<PostResponse> = if let Some(since) = pagination.since {
+        // Incremental sync: get posts created or edited since timestamp
+        let since_time = parse_since_timestamp(since)?;
 
-            repo.list_since(channel_id, since_time, per_page)
-                .await?
-                .into_iter()
-                .map(Into::into)
-                .collect()
-        } else if let Some(before) = &pagination.before {
-            // Cursor pagination: get posts before a specific post
-            let before_id = parse_mm_or_uuid(before).ok_or_else(|| {
-                crate::error::AppError::BadRequest("Invalid before post_id".to_string())
-            })?;
+        repo.list_since(channel_id, since_time, per_page)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    } else if let Some(before) = &pagination.before {
+        // Cursor pagination: get posts before a specific post
+        let before_id = parse_mm_or_uuid(before).ok_or_else(|| {
+            crate::error::AppError::BadRequest("Invalid before post_id".to_string())
+        })?;
 
-            let before_time = repo.get_post_created_at(before_id).await?.ok_or_else(|| {
-                crate::error::AppError::NotFound("Before post not found".to_string())
-            })?;
+        let before_time = repo
+            .get_post_created_at(before_id)
+            .await?
+            .ok_or_else(|| crate::error::AppError::BeforePostNotFound)?;
 
-            repo.list_before(channel_id, before_time, per_page)
-                .await?
-                .into_iter()
-                .map(Into::into)
-                .collect()
-        } else if let Some(after) = &pagination.after {
-            // Cursor pagination: get posts after a specific post
-            let after_id = parse_mm_or_uuid(after).ok_or_else(|| {
-                crate::error::AppError::BadRequest("Invalid after post_id".to_string())
-            })?;
+        repo.list_before(channel_id, before_time, per_page)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    } else if let Some(after) = &pagination.after {
+        // Cursor pagination: get posts after a specific post
+        let after_id = parse_mm_or_uuid(after).ok_or_else(|| {
+            crate::error::AppError::BadRequest("Invalid after post_id".to_string())
+        })?;
 
-            let after_time = repo.get_post_created_at(after_id).await?.ok_or_else(|| {
-                crate::error::AppError::NotFound("After post not found".to_string())
-            })?;
+        let after_time = repo
+            .get_post_created_at(after_id)
+            .await?
+            .ok_or_else(|| crate::error::AppError::AfterPostNotFound)?;
 
-            repo.list_after(channel_id, after_time, per_page)
-                .await?
-                .into_iter()
-                .map(Into::into)
-                .collect()
-        } else {
-            // Standard page-based pagination
-            let page = pagination.page.unwrap_or(0);
-            let offset = (page * per_page as u64) as i64;
+        repo.list_after(channel_id, after_time, per_page)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    } else {
+        // Standard page-based pagination
+        let page = pagination.page.unwrap_or(0);
+        let offset = (page * per_page as u64) as i64;
 
-            repo.list_by_channel(channel_id, per_page, offset)
-                .await?
-                .into_iter()
-                .map(Into::into)
-                .collect()
-        };
+        repo.list_by_channel(channel_id, per_page, offset)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    };
 
     crate::services::posts::populate_files(&state, &mut posts).await?;
 
@@ -121,6 +125,26 @@ pub async fn get_posts(
     }))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::parse_since_timestamp;
+    use crate::error::AppError;
+
+    #[test]
+    fn parse_since_timestamp_accepts_epoch_millis() {
+        let parsed = parse_since_timestamp(1_700_000_000_000).expect("valid timestamp");
+        assert_eq!(parsed.timestamp_millis(), 1_700_000_000_000);
+    }
+
+    #[test]
+    fn parse_since_timestamp_rejects_out_of_range_values() {
+        let err = parse_since_timestamp(i64::MAX).expect_err("invalid timestamp should fail");
+        assert!(
+            matches!(err, AppError::BadRequest(message) if message == "Invalid since timestamp")
+        );
+    }
+}
+
 #[derive(Deserialize)]
 pub struct PinnedPostsQuery {
     pub page: Option<u64>,
@@ -134,8 +158,8 @@ pub async fn get_pinned_posts(
     Path(channel_id): Path<String>,
     Query(query): Query<PinnedPostsQuery>,
 ) -> ApiResult<Json<mm::PostList>> {
-    let channel_id = parse_mm_or_uuid(&channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
     let repo = PostRepository::new(state.db.clone());
 
@@ -180,9 +204,9 @@ pub async fn pin_post(
     Path(path): Path<PinPath>,
 ) -> ApiResult<impl IntoResponse> {
     let channel_id = parse_mm_or_uuid(&path.channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    let post_id = parse_mm_or_uuid(&path.post_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid post_id".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let post_id =
+        parse_mm_or_uuid(&path.post_id).ok_or_else(|| crate::error::AppError::InvalidPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
 
@@ -203,9 +227,9 @@ pub async fn unpin_post(
     Path(path): Path<PinPath>,
 ) -> ApiResult<impl IntoResponse> {
     let channel_id = parse_mm_or_uuid(&path.channel_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid channel_id".to_string()))?;
-    let post_id = parse_mm_or_uuid(&path.post_id)
-        .ok_or_else(|| crate::error::AppError::BadRequest("Invalid post_id".to_string()))?;
+        .ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
+    let post_id =
+        parse_mm_or_uuid(&path.post_id).ok_or_else(|| crate::error::AppError::InvalidPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
 

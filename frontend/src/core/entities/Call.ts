@@ -63,7 +63,7 @@ export interface CurrentCallSession {
   callId: CallId
   channelId: ChannelId
   mySessionId: SessionId
-  call?: CallState  // The actual call state
+  call?: CallState // The actual call state
   peerConnection?: RTCPeerConnection
   screenSender?: RTCRtpSender | null
   localStream?: MediaStream

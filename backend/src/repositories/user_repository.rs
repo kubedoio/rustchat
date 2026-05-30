@@ -5,6 +5,12 @@ use uuid::Uuid;
 
 use crate::models::User;
 
+fn escape_like_pattern(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 pub struct UserRepository<'a> {
     pool: &'a PgPool,
 }
@@ -118,7 +124,7 @@ impl<'a> UserRepository<'a> {
     ) -> Result<Vec<User>, sqlx::Error> {
         match (org_id, search_term) {
             (None, Some(term)) => {
-                let like = format!("%{}%", term);
+                let like = format!("%{}%", escape_like_pattern(term));
                 sqlx::query_as::<_, User>(
                     "SELECT * FROM users WHERE deleted_at IS NULL AND (username ILIKE $1 OR display_name ILIKE $1) ORDER BY created_at DESC LIMIT $2 OFFSET $3"
                 )
@@ -138,7 +144,7 @@ impl<'a> UserRepository<'a> {
                 .await
             }
             (Some(org_id), Some(term)) => {
-                let like = format!("%{}%", term);
+                let like = format!("%{}%", escape_like_pattern(term));
                 sqlx::query_as::<_, User>(
                     "SELECT * FROM users WHERE org_id = $1 AND deleted_at IS NULL AND (username ILIKE $2 OR display_name ILIKE $2) ORDER BY created_at DESC LIMIT $3 OFFSET $4"
                 )
@@ -164,7 +170,7 @@ impl<'a> UserRepository<'a> {
 
     /// Search active users by username or email (ILIKE match).
     pub async fn search_active(&self, query: &str, limit: i64) -> Result<Vec<User>, sqlx::Error> {
-        let like = format!("%{}%", query);
+        let like = format!("%{}%", escape_like_pattern(query));
         sqlx::query_as::<_, User>(
             "SELECT * FROM users WHERE (username ILIKE $1 OR email ILIKE $1) AND is_active = true ORDER BY username ASC LIMIT $2"
         )
@@ -181,7 +187,7 @@ impl<'a> UserRepository<'a> {
         query: &str,
         limit: i64,
     ) -> Result<Vec<User>, sqlx::Error> {
-        let like = format!("%{}%", query);
+        let like = format!("%{}%", escape_like_pattern(query));
         sqlx::query_as::<_, User>(
             r#"
             SELECT u.*
@@ -208,7 +214,7 @@ impl<'a> UserRepository<'a> {
         query: &str,
         limit: i64,
     ) -> Result<Vec<User>, sqlx::Error> {
-        let like = format!("%{}%", query);
+        let like = format!("%{}%", escape_like_pattern(query));
         sqlx::query_as::<_, User>(
             r#"
             SELECT u.*
@@ -1230,5 +1236,57 @@ impl<'a> UserRepository<'a> {
                 .await
             }
         }
+    }
+
+    /// Get username, avatar_url, and email for a user
+    pub async fn get_username_avatar_email(
+        &self,
+        id: Uuid,
+    ) -> Result<(String, Option<String>, String), sqlx::Error> {
+        sqlx::query_as::<_, (String, Option<String>, String)>(
+            "SELECT username, avatar_url, email FROM users WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_one(self.pool)
+        .await
+    }
+
+    /// Get user IDs and usernames by username list
+    pub async fn get_ids_by_usernames(
+        &self,
+        usernames: &[&str],
+    ) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
+        sqlx::query_as::<_, (Uuid, String)>(
+            "SELECT id, username FROM users WHERE username = ANY($1)",
+        )
+        .bind(usernames)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Get a user's role by ID
+    pub async fn get_role_by_id(&self, id: Uuid) -> Result<String, sqlx::Error> {
+        sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
+            .bind(id)
+            .fetch_one(self.pool)
+            .await
+    }
+
+    /// Check if a role has a specific permission
+    pub async fn has_permission(&self, role: &str, permission: &str) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM role_permissions WHERE role = $1 AND permission_id = $2)",
+        )
+        .bind(role)
+        .bind(permission)
+        .fetch_one(self.pool)
+        .await
+    }
+
+    /// Get the first bot user ID
+    pub async fn get_bot_user_id(&self) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE is_bot = true LIMIT 1")
+            .fetch_optional(self.pool)
+            .await
     }
 }

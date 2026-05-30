@@ -37,12 +37,12 @@ pub(crate) async fn send_reaction(
     let call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
     let session_id = call_manager
         .get_participant(call.call_id, auth.user_id)
         .await
         .map(|p| p.session_id.to_string())
-        .ok_or_else(|| AppError::Forbidden("You are not in this call".to_string()))?;
+        .ok_or_else(|| AppError::NotInCall)?;
 
     // Broadcast reaction event
     broadcast_call_event(
@@ -83,13 +83,13 @@ pub(crate) async fn toggle_screen_share(
     let call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
 
     // Check if user is in call
     let participant = call_manager
         .get_participant(call.call_id, auth.user_id)
         .await
-        .ok_or_else(|| AppError::Forbidden("You are not in this call".to_string()))?;
+        .ok_or_else(|| AppError::NotInCall)?;
 
     // Toggle screen sharing
     let is_sharing = !participant.screen_sharing;
@@ -147,13 +147,13 @@ pub(crate) async fn mute_user(
     let call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
 
     // Verify user is in the call
     let participant = call_manager
         .get_participant(call.call_id, auth.user_id)
         .await
-        .ok_or_else(|| AppError::Forbidden("You are not in this call".to_string()))?;
+        .ok_or_else(|| AppError::NotInCall)?;
     let session_id = participant.session_id.to_string();
 
     // Set muted
@@ -196,13 +196,13 @@ pub(crate) async fn unmute_user(
     let call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
 
     // Verify user is in the call
     let participant = call_manager
         .get_participant(call.call_id, auth.user_id)
         .await
-        .ok_or_else(|| AppError::Forbidden("You are not in this call".to_string()))?;
+        .ok_or_else(|| AppError::NotInCall)?;
     let session_id = participant.session_id.to_string();
 
     // Set unmuted
@@ -245,12 +245,12 @@ pub(crate) async fn raise_hand(
     let call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
 
     let participant = call_manager
         .get_participant(call.call_id, auth.user_id)
         .await
-        .ok_or_else(|| AppError::Forbidden("You are not in this call".to_string()))?;
+        .ok_or_else(|| AppError::NotInCall)?;
 
     // Set hand raised
     call_manager
@@ -286,12 +286,12 @@ pub(crate) async fn lower_hand(
     let call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
 
     let participant = call_manager
         .get_participant(call.call_id, auth.user_id)
         .await
-        .ok_or_else(|| AppError::Forbidden("You are not in this call".to_string()))?;
+        .ok_or_else(|| AppError::NotInCall)?;
 
     // Set hand lowered
     call_manager

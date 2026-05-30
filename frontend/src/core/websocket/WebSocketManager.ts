@@ -1,7 +1,7 @@
 // WebSocket Manager - Minimal orchestrator that dispatches to feature handlers
 // Replaces the 668-line useWebSocket.ts god file
 
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { ref, computed, markRaw } from 'vue'
 
 export type ConnectionState = 'connecting' | 'open' | 'closed' | 'error'
@@ -55,7 +55,7 @@ class WebSocketManager {
       this.startHeartbeat()
     }
 
-    this.ws.onmessage = (event) => {
+    this.ws.onmessage = event => {
       this.handleMessage(event.data)
     }
 
@@ -185,6 +185,6 @@ export function useWebSocket() {
     connect: wsManager.connect,
     disconnect: wsManager.disconnect,
     send: wsManager.send,
-    on: wsManager.on.bind(wsManager)
+    on: wsManager.on.bind(wsManager),
   }
 }

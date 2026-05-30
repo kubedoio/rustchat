@@ -44,8 +44,7 @@ pub(super) async fn search_team_posts(
     headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> ApiResult<Json<mm::PostListWithSearchMatches>> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     let input: SearchPostsRequest = parse_body(&headers, &body, "Invalid search body")?;
 
@@ -55,7 +54,7 @@ pub(super) async fn search_team_posts(
             .bind(auth.user_id)
             .fetch_optional(&state.db)
             .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this team".to_string()))?;
+            .ok_or_else(|| AppError::NotOnTeam)?;
 
     let (limit, offset) = compute_limit_and_offset(input.page, input.per_page);
     let search_terms = build_search_terms(&input.terms);

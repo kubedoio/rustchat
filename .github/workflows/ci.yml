@@ -5,6 +5,18 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'GitHub runner label to run the jobs on'
+        type: string
+        default: 'self-hosted'
+  workflow_call:
+    inputs:
+      runner:
+        description: 'GitHub runner label to run the jobs on'
+        type: string
+        default: 'self-hosted'
 
 permissions:
   contents: read
@@ -15,7 +27,7 @@ env:
 jobs:
   detect-changes:
     name: Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -24,9 +36,9 @@ jobs:
       push-proxy: ${{ steps.filter.outputs.push-proxy }}
       scripts: ${{ steps.filter.outputs.scripts }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3.0.3
         id: filter
         with:
           filters: |
@@ -55,46 +67,13 @@ jobs:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: rustchat
-          POSTGRES_PASSWORD: rustchat
-          POSTGRES_DB: rustchat
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      rustfs:
-        image: rustfs/rustfs:latest
-        env:
-          RUSTFS_ACCESS_KEY: testaccesskey
-          RUSTFS_SECRET_KEY: testsecretkey
-        ports:
-          - 9000:9000
+    timeout-minutes: 60
 
     env:
-      DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
-      RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
-      RUSTCHAT_TEST_REDIS_URL: redis://localhost:6379/
-      RUSTCHAT_S3_ENDPOINT: http://localhost:9000
+      DATABASE_URL: postgres://rustchat:rustchat@localhost:5433/rustchat
+      RUSTCHAT_TEST_DATABASE_URL: postgres://rustchat:rustchat@localhost:5433/rustchat
+      RUSTCHAT_TEST_REDIS_URL: redis://localhost:6380/
+      RUSTCHAT_S3_ENDPOINT: http://localhost:9010
       RUSTCHAT_S3_BUCKET: test-bucket
       RUSTCHAT_S3_ACCESS_KEY: testaccesskey
       RUSTCHAT_S3_SECRET_KEY: testsecretkey
@@ -103,34 +82,90 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Start backend service dependencies
+        run: |
+          docker run -d --name rustchat-ci-postgres \
+            -e POSTGRES_USER=rustchat \
+            -e POSTGRES_PASSWORD=rustchat \
+            -e POSTGRES_DB=rustchat \
+            -p 5433:5432 \
+            --health-cmd pg_isready \
+            --health-interval 10s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            postgres:16
+          docker run -d --name rustchat-ci-redis \
+            -p 6380:6379 \
+            --health-cmd "redis-cli ping" \
+            --health-interval 10s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            redis:7
+          docker run -d --name rustchat-ci-rustfs \
+            -e RUSTFS_ACCESS_KEY=testaccesskey \
+            -e RUSTFS_SECRET_KEY=testsecretkey \
+            -p 9010:9000 \
+            rustfs/rustfs:latest
+
+      - name: Wait for backend service dependencies
+        run: |
+          for service in rustchat-ci-postgres rustchat-ci-redis; do
+            for i in {1..30}; do
+              status="$(docker inspect --format '{{.State.Health.Status}}' "$service")"
+              if [ "$status" = "healthy" ]; then
+                echo "$service is healthy"
+                break
+              fi
+              if [ "$i" = 30 ]; then
+                docker logs "$service"
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
+          for i in {1..60}; do
+            if curl -fsS "${RUSTCHAT_S3_ENDPOINT}/health" >/dev/null 2>&1; then
+              echo "RustFS is ready"
+              break
+            fi
+            if [ "$i" = 60 ]; then
+              docker logs rustchat-ci-rustfs
+              exit 1
+            fi
+            sleep 1
+          done
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: rustfmt, clippy
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
 
       - name: Cache cargo registry
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Cache cargo index
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Cache cargo build target
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: backend/target
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Cache sqlx-cli
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/sqlx
           key: ${{ runner.os }}-sqlx-cli-${{ hashFiles('backend/Cargo.lock') }}
@@ -138,18 +173,12 @@ jobs:
       - name: Install SQLx CLI
         run: |
           if ! command -v sqlx &> /dev/null; then
-            cargo install sqlx-cli --no-default-features --features postgres
-          fi
-
-      - name: Wait for RustFS
-        run: |
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:9000/health >/dev/null 2>&1; then
-              echo "RustFS is ready"
-              break
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
             fi
-            sleep 1
-          done
+            cargo binstall --locked --no-confirm sqlx-cli
+          fi
 
       - name: Run migrations
         working-directory: ./backend
@@ -167,21 +196,25 @@ jobs:
         working-directory: ./backend
         run: cargo test --lib --no-fail-fast -- --nocapture
 
+      - name: Stop backend service dependencies
+        if: always()
+        run: docker rm -f rustchat-ci-postgres rustchat-ci-redis rustchat-ci-rustfs
+
   frontend-check:
     name: Frontend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           cache: 'npm'
@@ -223,8 +256,8 @@ jobs:
     name: Push Proxy Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: push-proxy
@@ -233,28 +266,30 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: rustfmt, clippy
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
 
       - name: Cache cargo registry
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('push-proxy/Cargo.lock') }}
 
       - name: Cache cargo index
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('push-proxy/Cargo.lock') }}
 
       - name: Cache cargo build target
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: push-proxy/target
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('push-proxy/Cargo.lock') }}
@@ -276,29 +311,27 @@ jobs:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.docker == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Create dummy .env for docker compose validation
         run: |
-          cat > .env <<'EOF'
-RUSTCHAT_JWT_SECRET=dummy-jwt-secret-min-32-chars-long
-RUSTCHAT_JWT_ISSUER=dummy-issuer
-RUSTCHAT_JWT_AUDIENCE=dummy-audience
-RUSTCHAT_ENCRYPTION_KEY=dummy-encryption-key-32-bytes-long
-RUSTCHAT_S3_ACCESS_KEY=dummy-s3-access-key
-RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key
-RUSTFS_ACCESS_KEY=dummy-rustfs-access-key
-RUSTFS_SECRET_KEY=dummy-rustfs-secret-key
-EOF
+          echo "RUSTCHAT_JWT_SECRET=$(openssl rand -hex 32)" > .env
+          echo "RUSTCHAT_JWT_ISSUER=dummy-issuer" >> .env
+          echo "RUSTCHAT_JWT_AUDIENCE=dummy-audience" >> .env
+          echo "RUSTCHAT_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
+          echo "RUSTCHAT_S3_ACCESS_KEY=dummy-s3-access-key" >> .env
+          echo "RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key" >> .env
+          echo "RUSTFS_ACCESS_KEY=dummy-rustfs-access-key" >> .env
+          echo "RUSTFS_SECRET_KEY=dummy-rustfs-secret-key" >> .env
 
       - name: Validate docker-compose.yml
         run: docker compose config
 
       - name: Dry-run backend Docker build
-        run: docker build -f docker/backend.Dockerfile --target builder backend/
+        run: docker build -f docker/backend.Dockerfile --target ci-validate backend/
 
       - name: Dry-run frontend Docker build
         run: docker build -f docker/frontend.Dockerfile frontend/
@@ -306,18 +339,58 @@ EOF
       - name: Dry-run push-proxy Docker build
         run: docker build -f push-proxy/Dockerfile push-proxy/
 
+  frontend-e2e:
+    name: Frontend E2E Tests
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Apply dependency patches
+        run: npm run apply:dependency-patches
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: npm run test:e2e -- e2e/auth.spec.ts --project=chromium
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          if-no-files-found: ignore
+
   build-release:
     name: Build Release
-    needs: backend-check
+    needs: [detect-changes, backend-check]
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    timeout-minutes: 60
 
     env:
       CARGO_TERM_COLOR: always
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -326,7 +399,7 @@ EOF
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
 
       - name: Cache cargo build target
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: backend/target
           key: ${{ runner.os }}-cargo-release-target-${{ hashFiles('backend/Cargo.lock') }}
@@ -341,8 +414,8 @@ EOF
 
   ci-complete:
     name: CI Complete
-    runs-on: ubuntu-latest
-    needs: [detect-changes, backend-check, frontend-check, push-proxy-check, docker-validate, build-release]
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    needs: [detect-changes, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
     if: always()
     timeout-minutes: 5
     steps:
@@ -351,9 +424,17 @@ EOF
         run: echo "Change detection failed" >&2 && exit 1
 
       - name: Verify all checks passed
+        env:
+          BACKEND_CHECK_RESULT: ${{ needs.backend-check.result }}
+          FRONTEND_CHECK_RESULT: ${{ needs.frontend-check.result }}
+          FRONTEND_E2E_RESULT: ${{ needs.frontend-e2e.result }}
+          PUSH_PROXY_CHECK_RESULT: ${{ needs.push-proxy-check.result }}
+          DOCKER_VALIDATE_RESULT: ${{ needs.docker-validate.result }}
+          BUILD_RELEASE_RESULT: ${{ needs.build-release.result }}
         run: |
-          for job in backend-check frontend-check push-proxy-check docker-validate build-release; do
-            result="${{ needs[job].result }}"
+          for job in BACKEND_CHECK FRONTEND_CHECK FRONTEND_E2E PUSH_PROXY_CHECK DOCKER_VALIDATE BUILD_RELEASE; do
+            result_var="${job}_RESULT"
+            result="${!result_var}"
             echo "$job: $result"
             if [ "$result" = "failure" ]; then
               echo "$job failed" >&2

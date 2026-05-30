@@ -25,34 +25,24 @@ defineEmits<{
       </div>
       <button
         type="button"
-        @click="$emit('cancel')"
         class="rounded-r-1 p-1 text-text-3 transition-standard hover:bg-bg-surface-1 hover:text-text-2"
+        @click="$emit('cancel')"
       >
         <X class="w-4 h-4" />
       </button>
     </div>
-    
+
     <!-- Content slot -->
     <div class="p-4">
       <slot />
     </div>
-    
+
     <!-- Actions -->
     <div class="flex items-center justify-end gap-2 border-t border-border-1 px-4 py-3">
-      <BaseButton 
-        size="sm" 
-        variant="secondary" 
-        @click="$emit('cancel')"
-        :disabled="loading"
-      >
+      <BaseButton size="sm" variant="secondary" :disabled="loading" @click="$emit('cancel')">
         Cancel
       </BaseButton>
-      <BaseButton 
-        size="sm" 
-        @click="$emit('save')"
-        :loading="loading"
-        :disabled="saveDisabled"
-      >
+      <BaseButton size="sm" :loading="loading" :disabled="saveDisabled" @click="$emit('save')">
         Save
       </BaseButton>
     </div>

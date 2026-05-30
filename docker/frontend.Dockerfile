@@ -1,5 +1,5 @@
 # Build stage
-FROM node:26-alpine AS builder
+FROM node:24-alpine AS builder
 RUN apk add --no-cache git
 WORKDIR /app
 COPY package.json package-lock.json .npmrc dependency-policy.json dependency-patches.json ./
@@ -24,5 +24,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/ || exit 1
 
 CMD ["/usr/local/openresty/bin/openresty", "-g", "daemon off;"]

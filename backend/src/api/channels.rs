@@ -17,21 +17,16 @@ use crate::models::{
     normalize_avatar_url, Channel, ChannelMember, ChannelType, CreateChannel, UpdateChannel,
 };
 use crate::realtime::events::{EventType, WsBroadcast, WsEnvelope};
-use crate::repositories::{AdminRepository, ChannelRepository, UserRepository};
+use crate::repositories::{ChannelRepository, UserRepository};
+use crate::services::posts::create_system_message;
 
 /// Check if user is channel creator, admin, or has system manage permission
 async fn is_channel_creator_or_admin(
     state: &AppState,
     channel_id: Uuid,
-    user_id: Uuid,
+    auth: &AuthUser,
 ) -> ApiResult<bool> {
-    // Check system manage permission first
-    let has_system_manage = AdminRepository::new(&state.db)
-        .has_system_manage_permission(user_id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-
-    if has_system_manage {
+    if auth.has_permission(&permissions::SYSTEM_MANAGE) {
         return Ok(true);
     }
 
@@ -40,13 +35,13 @@ async fn is_channel_creator_or_admin(
         .get_creator_id(channel_id)
         .await?;
 
-    if creator_id == Some(user_id) {
+    if creator_id == Some(auth.user_id) {
         return Ok(true);
     }
 
     // Check if user is channel admin
     let role: Option<String> = ChannelRepository::new(&state.db)
-        .get_member_role(channel_id, user_id)
+        .get_member_role(channel_id, auth.user_id)
         .await?;
 
     let is_admin = matches!(
@@ -148,7 +143,7 @@ async fn list_channels(
             .is_team_member(query.team_id, auth.user_id)
             .await?
         {
-            return Err(AppError::Forbidden("Not a member of this team".to_string()));
+            return Err(AppError::NotOnTeam);
         }
 
         // List public and private channels user is NOT in
@@ -275,7 +270,7 @@ async fn create_channel(
         .is_team_member(input.team_id, auth.user_id)
         .await?
     {
-        return Err(AppError::Forbidden("Not a member of this team".to_string()));
+        return Err(AppError::NotOnTeam);
     }
 
     // Create channel
@@ -349,7 +344,7 @@ async fn update_channel(
     Json(input): Json<UpdateChannel>,
 ) -> ApiResult<Json<Channel>> {
     // Check if user is creator or admin
-    let can_update = is_channel_creator_or_admin(&state, id, auth.user_id).await?;
+    let can_update = is_channel_creator_or_admin(&state, id, &auth).await?;
 
     if !can_update {
         return Err(AppError::Forbidden(
@@ -404,7 +399,7 @@ async fn delete_channel(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Check if user is creator or admin
-    let can_delete = is_channel_creator_or_admin(&state, id, auth.user_id).await?;
+    let can_delete = is_channel_creator_or_admin(&state, id, &auth).await?;
 
     if !can_delete {
         return Err(AppError::Forbidden(
@@ -416,10 +411,41 @@ async fn delete_channel(
     let channel = ChannelRepository::new(&state.db)
         .get_by_id(id)
         .await
-        .map_err(|_| AppError::NotFound("Channel not found".to_string()))?;
+        .map_err(|_| AppError::ChannelNotFound)?;
+
+    if channel.deleted_at.is_some() {
+        return Err(AppError::ChannelAlreadyArchived);
+    }
+
+    // Block archiving default channels
+    if channel.name == "town-square" || channel.name == "off-topic" {
+        return Err(AppError::BadRequest(
+            "Cannot archive default channels".to_string(),
+        ));
+    }
+
+    // Block archiving direct and group messages
+    if channel.channel_type == ChannelType::Direct || channel.channel_type == ChannelType::Group {
+        return Err(AppError::BadRequest(
+            "Cannot archive direct or group message channels".to_string(),
+        ));
+    }
 
     // Soft delete the channel
-    ChannelRepository::new(&state.db).soft_delete(id).await?;
+    let _ = ChannelRepository::new(&state.db).soft_delete(id).await?;
+
+    // Post system message
+    let username = UserRepository::new(&state.db)
+        .get_username(auth.user_id)
+        .await?
+        .unwrap_or_else(|| "System".to_string());
+    let _ = create_system_message(
+        &state,
+        id,
+        format!("{username} archived the channel."),
+        Some(serde_json::json!({"type": "system_channel_archived"})),
+    )
+    .await;
 
     // Broadcast ChannelDeleted event
     let broadcast = WsBroadcast {
@@ -473,7 +499,7 @@ async fn add_member(
         input
             .user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Check permissions
@@ -521,7 +547,7 @@ async fn add_member(
         let username = UserRepository::new(&state.db)
             .get_username(target_user_id)
             .await?
-            .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+            .ok_or_else(|| AppError::UserNotFound)?;
 
         let _ = crate::services::posts::create_system_message(
             &state,
@@ -553,7 +579,7 @@ async fn remove_member(
     } else {
         user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Check admin membership (or user removing themselves)
@@ -589,7 +615,7 @@ async fn mark_channel_member_as_read(
     } else {
         user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Users can only mark their own channels as read
@@ -645,7 +671,7 @@ async fn update_notify_props(
     } else {
         user_id
             .parse::<Uuid>()
-            .map_err(|_| AppError::BadRequest("Invalid user_id".to_string()))?
+            .map_err(|_| AppError::InvalidUserId)?
     };
 
     // Users can only update their own notify props

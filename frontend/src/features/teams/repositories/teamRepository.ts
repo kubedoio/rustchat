@@ -48,7 +48,7 @@ export const teamRepository = {
       const response = await teamsApi.create({
         name: data.name,
         display_name: data.displayName,
-        description: data.description
+        description: data.description,
       })
       return normalizeTeam(response.data)
     })
@@ -60,7 +60,7 @@ export const teamRepository = {
       const response = await teamsApi.update(teamId, {
         name: data.name,
         display_name: data.displayName,
-        description: data.description
+        description: data.description,
       })
       return normalizeTeam(response.data)
     })
@@ -87,7 +87,7 @@ export const teamRepository = {
       const response = await teamsApi.getMembers(teamId)
       return response.data.map(normalizeTeamMember)
     })
-  }
+  },
 }
 
 function normalizeTeam(raw: unknown): Team {
@@ -99,7 +99,7 @@ function normalizeTeam(raw: unknown): Team {
     description: r.description as string | undefined,
     createdAt: new Date((r.created_at || Date.now()) as string | number),
     updatedAt: new Date((r.updated_at || r.created_at || Date.now()) as string | number),
-    isArchived: Boolean(r.delete_at)
+    isArchived: Boolean(r.delete_at),
   }
 }
 
@@ -109,6 +109,6 @@ function normalizeTeamMember(raw: unknown): TeamMember {
     teamId: r.team_id as TeamId,
     userId: r.user_id as UserId,
     roles: (r.roles as string[] | undefined) || [],
-    joinedAt: new Date((r.joined_at || Date.now()) as string | number)
+    joinedAt: new Date((r.joined_at || Date.now()) as string | number),
   }
 }

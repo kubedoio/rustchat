@@ -81,8 +81,7 @@ async fn trigger_keycloak_user_sync(
         ));
     }
 
-    let user_uuid: Uuid = parse_mm_or_uuid(&user_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid user_id".to_string()))?;
+    let user_uuid: Uuid = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
     let report = keycloak_sync::resync_user(&state, user_uuid).await?;
     Ok(Json(serde_json::json!({
         "status": "OK",

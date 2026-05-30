@@ -90,7 +90,7 @@ async fn setup_context() -> TestContext {
 
     let sender_id = sender_me["id"]
         .as_str()
-        .and_then(|s| uuid::Uuid::parse_str(s).ok())
+        .and_then(parse_mm_or_uuid)
         .expect("sender id should parse");
 
     let receiver_username = format!("receiver_{}", &Uuid::new_v4().to_string()[..8]);
@@ -142,7 +142,7 @@ async fn setup_context() -> TestContext {
 
     let receiver_id = receiver_me["id"]
         .as_str()
-        .and_then(|s| uuid::Uuid::parse_str(s).ok())
+        .and_then(parse_mm_or_uuid)
         .expect("receiver id should parse");
 
     let team_id = Uuid::new_v4();
@@ -376,12 +376,19 @@ async fn create_post_mentions_triggers_notification() {
     );
 
     let activities = activity_res["activities"]
-        .as_array()
-        .expect("activities should be array");
-    let mention_activity = activities.iter().find(|a| {
-        a["type"] == "mention"
-            && a["actor_id"].as_str() == Some(&encode_mm_id(ctx.sender_id))
-            && a["post_id"].as_str() == Some(post_id)
+        .as_object()
+        .expect("activities should be keyed by activity id");
+    let mention_activity = activities.values().find(|a| {
+        let actor_matches = a["actor_id"]
+            .as_str()
+            .and_then(parse_mm_or_uuid)
+            .is_some_and(|id| id == ctx.sender_id);
+        let post_matches = a["post_id"]
+            .as_str()
+            .and_then(parse_mm_or_uuid)
+            .is_some_and(|id| id == post_uuid);
+
+        a["type"] == "mention" && actor_matches && post_matches
     });
 
     assert!(

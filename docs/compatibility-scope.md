@@ -10,11 +10,15 @@ RustChat prioritizes compatibility with Mattermost mobile and desktop clients on
 
 | Scope | Coverage | Last Audited |
 |---|---:|---|
-| Mobile-critical endpoints | 39/41 (95.1%) | 2026-03-17 |
+| Mobile-critical endpoints | 41/41 implemented | 2026-05-22 |
 
-Known gaps:
+Previously tracked gaps now implemented:
 - `POST /api/v4/emoji`
 - `POST /api/v4/posts/search`
+
+Known limitations:
+- Post search is currently a basic message search implementation, not full Mattermost advanced search parity.
+- Plugin, LDAP, SAML, compliance, and some enterprise/admin APIs remain compatibility stubs or intentionally scoped out.
 
 ## Protected Compatibility Surface
 

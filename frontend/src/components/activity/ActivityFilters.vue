@@ -7,7 +7,7 @@
       :class="[
         modelValue === filter.value
           ? 'bg-gray-900 text-white'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
       ]"
       @click="$emit('update:modelValue', filter.value)"
     >
@@ -30,7 +30,7 @@ const filters: FilterOption[] = [
   { label: 'Replies', value: ActivityType.REPLY },
   { label: 'Threads', value: ActivityType.THREAD_REPLY },
   { label: 'Reactions', value: ActivityType.REACTION },
-  { label: 'DMs', value: ActivityType.DM }
+  { label: 'DMs', value: ActivityType.DM },
 ]
 
 defineProps<{

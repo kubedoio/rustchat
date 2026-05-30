@@ -32,6 +32,14 @@ docker compose up -d --build
 
 That's it. The stack builds and starts in the background.
 
+For a production-oriented single-host deployment, use:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+See [Deployment Guide](deployment.md) before exposing the service publicly.
+
 ### What the setup script does
 
 `dev-setup.sh` automates the boring parts:

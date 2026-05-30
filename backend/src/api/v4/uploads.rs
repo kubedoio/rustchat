@@ -101,8 +101,8 @@ async fn create_upload(
     auth: MmAuthUser,
     Json(input): Json<CreateUploadRequest>,
 ) -> ApiResult<(StatusCode, Json<mm::UploadSession>)> {
-    let channel_id = parse_mm_or_uuid(&input.channel_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid channel_id".to_string()))?;
+    let channel_id =
+        parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
 
     // Verify user has access to channel
     let _ = ChannelRepository::new(&state.db)
@@ -146,13 +146,12 @@ async fn get_upload(
     auth: MmAuthUser,
     Path(upload_id): Path<String>,
 ) -> ApiResult<Json<mm::UploadSession>> {
-    let upload_id = parse_mm_or_uuid(&upload_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid upload_id".to_string()))?;
+    let upload_id = parse_mm_or_uuid(&upload_id).ok_or_else(|| AppError::InvalidUploadId)?;
 
     let session = UploadRepository::new(&state.db)
         .get_session(upload_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Upload session not found".to_string()))?;
+        .ok_or_else(|| AppError::UploadNotFound)?;
 
     // Only the creator can view the session
     if session.user_id != auth.user_id {
@@ -177,13 +176,12 @@ async fn upload_data(
     Path(upload_id): Path<String>,
     body: Bytes,
 ) -> ApiResult<impl IntoResponse> {
-    let upload_id = parse_mm_or_uuid(&upload_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid upload_id".to_string()))?;
+    let upload_id = parse_mm_or_uuid(&upload_id).ok_or_else(|| AppError::InvalidUploadId)?;
 
     let session = UploadRepository::new(&state.db)
         .get_session(upload_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Upload session not found".to_string()))?;
+        .ok_or_else(|| AppError::UploadNotFound)?;
 
     if session.user_id != auth.user_id {
         return Err(AppError::Forbidden("Not your upload session".to_string()));

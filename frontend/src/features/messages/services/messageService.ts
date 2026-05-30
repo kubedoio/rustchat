@@ -2,7 +2,11 @@
 // This is where business logic lives (optimistic updates, deduplication, etc)
 
 import { messageRepository } from '../repositories/messageRepository'
-import type { Message as DomainMessage, MessageDraft, MessageId } from '../../../core/entities/Message'
+import type {
+  Message as DomainMessage,
+  MessageDraft,
+  MessageId,
+} from '../../../core/entities/Message'
 import type { ChannelId } from '../../../core/entities/Channel'
 import { useMessageStore } from '../stores/messageStore'
 import { AppError } from '../../../core/errors/AppError'
@@ -21,7 +25,7 @@ class MessageService {
     try {
       const { messages, readState } = await messageRepository.findByChannel(channelId, {
         before: options?.before,
-        limit: options?.limit ?? 50
+        limit: options?.limit ?? 50,
       })
 
       if (options?.before) {
@@ -53,7 +57,7 @@ class MessageService {
     if (!oldestMessage) return
 
     this.store.setLoadingOlder(true)
-    
+
     try {
       await this.loadMessages(channelId, { before: oldestMessage.id })
     } finally {
@@ -63,7 +67,7 @@ class MessageService {
 
   async loadThread(rootId: MessageId) {
     this.store.setThreadLoading(rootId, true)
-    
+
     try {
       const replies = await messageRepository.findThread(rootId)
       this.store.setThreadReplies(rootId, replies as unknown as StoreMessage[])
@@ -89,13 +93,21 @@ class MessageService {
       // 2. API call
       const message = await messageRepository.create({
         ...draft,
-        props: { ...draft.props, client_msg_id: clientId }
+        props: { ...draft.props, client_msg_id: clientId },
       })
 
       // 3. Replace optimistic with real
-      this.store.replaceOptimisticMessage(draft.channelId, clientId, message as unknown as StoreMessage)
+      this.store.replaceOptimisticMessage(
+        draft.channelId,
+        clientId,
+        message as unknown as StoreMessage
+      )
       if (draft.rootId) {
-        this.store.replaceOptimisticThreadReply(draft.rootId, clientId, message as unknown as StoreMessage)
+        this.store.replaceOptimisticThreadReply(
+          draft.rootId,
+          clientId,
+          message as unknown as StoreMessage
+        )
       }
 
       return message
@@ -133,7 +145,7 @@ class MessageService {
   async addReaction(messageId: MessageId, emoji: string, userId: string) {
     // Optimistic
     this.store.addOptimisticReaction(messageId, emoji, userId)
-    
+
     try {
       await messageRepository.addReaction(messageId, emoji)
     } catch (error) {
@@ -146,7 +158,7 @@ class MessageService {
   async removeReaction(messageId: MessageId, emoji: string, userId: string) {
     // Optimistic
     this.store.removeReaction(messageId, emoji, userId)
-    
+
     try {
       await messageRepository.removeReaction(messageId, emoji)
     } catch (error) {
@@ -163,7 +175,11 @@ class MessageService {
       const existing = this.store.findMessageByClientId(message.channelId, message.clientId)
       if (existing) {
         // Replace optimistic with server version
-        this.store.replaceOptimisticMessage(message.channelId, message.clientId, message as unknown as StoreMessage)
+        this.store.replaceOptimisticMessage(
+          message.channelId,
+          message.clientId,
+          message as unknown as StoreMessage
+        )
         return
       }
     }
@@ -214,7 +230,7 @@ class MessageService {
       status: 'sending',
       clientId,
       createdAt: now,
-      props: draft.props
+      props: draft.props,
     }
   }
 }

@@ -40,7 +40,12 @@ export const threadService = {
   /**
    * Send a reply to a thread
    */
-  async sendReply(channelId: string, rootId: string, message: string, fileIds: string[] = []): Promise<Post> {
+  async sendReply(
+    channelId: string,
+    rootId: string,
+    message: string,
+    fileIds: string[] = []
+  ): Promise<Post> {
     try {
       const response = await api.post<Post>('/posts', {
         channel_id: channelId,

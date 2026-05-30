@@ -444,3 +444,576 @@ async fn add_channel_member(app: &common::TestApp, channel_id: Uuid, user_id: Uu
     .await
     .expect("failed to add channel member");
 }
+
+#[tokio::test]
+async fn update_channel_duplicate_name_returns_conflict() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Conflict Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "conflict_user",
+        "conflict_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "conflict-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel1_id = insert_channel(&app, team_id, user_id, "channel-one").await;
+    let channel2_id = insert_channel(&app, team_id, user_id, "channel-two").await;
+    add_channel_member(&app, channel1_id, user_id, "admin").await;
+    add_channel_member(&app, channel2_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .put(format!("{}/api/v1/channels/{}", app.address, channel1_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&serde_json::json!({
+            "name": "channel-two"
+        }))
+        .send()
+        .await
+        .expect("channel update request should complete");
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn v4_update_channel_duplicate_name_returns_conflict() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "V4 Conflict Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "v4_conflict_user",
+        "v4_conflict_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "v4-conflict-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel1_id = insert_channel(&app, team_id, user_id, "v4-channel-one").await;
+    let channel2_id = insert_channel(&app, team_id, user_id, "v4-channel-two").await;
+    add_channel_member(&app, channel1_id, user_id, "admin").await;
+    add_channel_member(&app, channel2_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .put(format!("{}/api/v4/channels/{}", app.address, channel1_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&serde_json::json!({
+            "name": "v4-channel-two"
+        }))
+        .send()
+        .await
+        .expect("v4 channel update request should complete");
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn v4_patch_channel_duplicate_name_returns_conflict() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "V4 Patch Conflict Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "v4_patch_conflict_user",
+        "v4_patch_conflict_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "v4-patch-conflict-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel1_id = insert_channel(&app, team_id, user_id, "v4-patch-channel-one").await;
+    let channel2_id = insert_channel(&app, team_id, user_id, "v4-patch-channel-two").await;
+    add_channel_member(&app, channel1_id, user_id, "admin").await;
+    add_channel_member(&app, channel2_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .put(format!(
+            "{}/api/v4/channels/{}/patch",
+            app.address, channel1_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .json(&serde_json::json!({
+            "name": "v4-patch-channel-two"
+        }))
+        .send()
+        .await
+        .expect("v4 channel patch request should complete");
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn v4_delete_channel_archives_and_list_deleted_includes_it() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Archive Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "archive_user",
+        "archive_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "archive-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "archive-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // Archive the channel
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // List deleted channels should include it
+    let response = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/teams/{}/channels/deleted",
+            app.address, team_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("list deleted channels request should complete");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let channels: Vec<serde_json::Value> = response
+        .json()
+        .await
+        .expect("list deleted channels should be JSON");
+
+    let found = channels
+        .iter()
+        .any(|c| c["id"] == rustchat::mattermost_compat::id::encode_mm_id(channel_id));
+    assert!(
+        found,
+        "archived channel should appear in deleted channels list"
+    );
+
+    // Verify delete_at is set in the MM response
+    let archived = channels
+        .iter()
+        .find(|c| c["id"] == rustchat::mattermost_compat::id::encode_mm_id(channel_id))
+        .expect("archived channel should be present");
+    assert!(
+        archived["delete_at"].as_i64().unwrap_or(0) > 0,
+        "delete_at should be greater than 0 for archived channel"
+    );
+}
+
+#[tokio::test]
+async fn v4_delete_already_archived_channel_returns_bad_request() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Double Archive Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "double_archive_user",
+        "double_archive_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "double-archive-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "double-archive-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // First archive
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("first channel delete request should complete");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Second archive should fail
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("second channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn v4_restore_channel_clears_archive_state() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Restore Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "restore_user",
+        "restore_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "restore-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "restore-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // Archive the channel
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify it's in deleted list
+    let response = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/teams/{}/channels/deleted",
+            app.address, team_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("list deleted channels request should complete");
+    let channels: Vec<serde_json::Value> = response.json().await.unwrap();
+    assert!(channels
+        .iter()
+        .any(|c| c["id"] == rustchat::mattermost_compat::id::encode_mm_id(channel_id)));
+
+    // Restore the channel
+    let response = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/channels/{}/restore",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel restore request should complete");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let restored: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(restored["delete_at"], 0);
+
+    // Verify it's no longer in deleted list
+    let response = app
+        .api_client
+        .get(format!(
+            "{}/api/v4/teams/{}/channels/deleted",
+            app.address, team_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("list deleted channels request should complete");
+    let channels: Vec<serde_json::Value> = response.json().await.unwrap();
+    assert!(
+        !channels
+            .iter()
+            .any(|c| c["id"] == rustchat::mattermost_compat::id::encode_mm_id(channel_id)),
+        "restored channel should not appear in deleted channels list"
+    );
+}
+
+#[tokio::test]
+async fn v4_restore_non_archived_channel_returns_bad_request() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Restore Non-Archived Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "restore_na_user",
+        "restore_na_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "restore-na-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "restore-na-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // Try to restore a channel that was never archived
+    let response = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/channels/{}/restore",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel restore request should complete");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn v4_delete_town_square_returns_bad_request() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Town Square Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "townsquare_user",
+        "townsquare_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "townsquare-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "town-square").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn v4_delete_off_topic_returns_bad_request() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Off Topic Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "offtopic_user",
+        "offtopic_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "offtopic-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "off-topic").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn v4_delete_direct_channel_returns_bad_request() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "DM Archive Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "dm_archive_user",
+        "dm_archive_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "dm-archive-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO channels (id, team_id, name, display_name, type, creator_id) VALUES ($1, $2, $3, $4, 'direct', $5)",
+    )
+    .bind(channel_id)
+    .bind(team_id)
+    .bind(format!("{user_id}_{user_id}"))
+    .bind("DM")
+    .bind(user_id)
+    .execute(&app.db_pool)
+    .await
+    .expect("failed to create direct channel");
+
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn v4_delete_group_channel_returns_bad_request() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "GM Archive Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "gm_archive_user",
+        "gm_archive_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "gm-archive-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO channels (id, team_id, name, display_name, type, creator_id) VALUES ($1, $2, $3, $4, 'group', $5)",
+    )
+    .bind(channel_id)
+    .bind(team_id)
+    .bind(format!("{user_id}_{user_id}_{user_id}"))
+    .bind("GM")
+    .bind(user_id)
+    .execute(&app.db_pool)
+    .await
+    .expect("failed to create group channel");
+
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn v4_archive_channel_creates_system_message() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "System Msg Org").await;
+    let (token, user_id) =
+        register_and_login(&app, org_id, "sysmsg_user", "sysmsg_user@example.com", None).await;
+
+    let team_id = insert_team(&app, org_id, "sysmsg-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "sysmsg-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // Archive the channel
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify a system post was created
+    let post_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM posts
+        WHERE channel_id = $1
+          AND props->>'type' = 'system_channel_archived'
+        "#,
+    )
+    .bind(channel_id)
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("should count posts");
+
+    assert_eq!(post_count, 1, "archive system message should be created");
+}
+
+#[tokio::test]
+async fn v4_restore_channel_creates_system_message() {
+    let app = spawn_app().await;
+    let org_id = insert_org(&app, "Restore SysMsg Org").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "restore_sysmsg_user",
+        "restore_sysmsg_user@example.com",
+        None,
+    )
+    .await;
+
+    let team_id = insert_team(&app, org_id, "restore-sysmsg-team").await;
+    add_team_member(&app, team_id, user_id, "member").await;
+
+    let channel_id = insert_channel(&app, team_id, user_id, "restore-sysmsg-channel").await;
+    add_channel_member(&app, channel_id, user_id, "admin").await;
+
+    // Archive the channel
+    let response = app
+        .api_client
+        .delete(format!("{}/api/v4/channels/{}", app.address, channel_id))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel delete request should complete");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Restore the channel
+    let response = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/channels/{}/restore",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .expect("channel restore request should complete");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Verify a system post was created
+    let post_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM posts
+        WHERE channel_id = $1
+          AND props->>'type' = 'system_channel_restored'
+        "#,
+    )
+    .bind(channel_id)
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("should count posts");
+
+    assert_eq!(post_count, 1, "restore system message should be created");
+}

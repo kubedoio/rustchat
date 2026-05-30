@@ -1,7 +1,7 @@
 # Repo Current State
 
-**Last updated:** 2026-03-22
-**Version:** v0.3.5
+**Last updated:** 2026-05-22
+**Version:** v0.4.0
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
 
@@ -9,7 +9,7 @@
 
 ## 1. Version
 
-**Current:** v0.3.5
+**Current:** v0.4.0
 
 Version is synchronized across two files:
 - `backend/Cargo.toml` → `[package] version`
@@ -41,9 +41,9 @@ For local setup see `docs/running_environment.md`.
 
 ## 3. Compatibility Status
 
-- **Mobile-critical endpoints:** 39/41 (95.1%) — compatible with Mattermost Mobile v2.x
-- **Last audited:** 2026-03-17
-- **Gaps:** `POST /api/v4/emoji` (custom emoji upload), `POST /api/v4/posts/search` (advanced search) — both planned for Phase 2
+- **Mobile-critical endpoints:** 41/41 previously tracked endpoints implemented
+- **Last audited:** 2026-05-22 by repository inspection
+- **Notes:** `POST /api/v4/emoji` and `POST /api/v4/posts/search` are now implemented. Post search is currently a pragmatic `ILIKE` implementation, not full Mattermost advanced search parity.
 
 For details see `docs/compatibility-scope.md`.
 
@@ -53,10 +53,10 @@ For details see `docs/compatibility-scope.md`.
 
 | Gap | Area | Priority |
 |---|---|---|
-| Custom emoji upload (`POST /api/v4/emoji`) | compat | Phase 2 |
-| Advanced search (`POST /api/v4/posts/search`) | compat | Phase 2 |
+| Advanced post search semantics beyond simple `ILIKE` | compat/search | Phase 2 |
+| Plugin upload/install/enable/disable/remove flows are compatibility stubs | compat/plugins | Phase 2 |
+| LDAP and SAML v4 endpoints are compatibility stubs | compat/enterprise | Phase 2 |
 | No unit/component test framework for frontend | testing | Low |
-| No Dependabot configured | dependencies | Low |
 | Approach C (CI enforcement) not implemented | governance | Deferred |
 
 ---

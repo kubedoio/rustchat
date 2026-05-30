@@ -27,7 +27,7 @@ jobs:
           POSTGRES_PASSWORD: rustchat
           POSTGRES_DB: rustchat
         ports:
-          - 5432:5432
+          - 5432/tcp
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -35,14 +35,16 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgres://rustchat:rustchat@localhost:5432/rustchat
       CARGO_TERM_COLOR: always
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Configure service endpoints
+        run: echo "DATABASE_URL=postgres://rustchat:rustchat@localhost:${{ job.services.postgres.ports[5432] }}/rustchat" >> "$GITHUB_ENV"
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@45775bd8235c68ba998cffa5171334d58593da47 # v3.28.15
+        uses: github/codeql-action/init@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
         with:
           languages: rust, javascript
           queries: security-extended,security-and-quality
@@ -51,7 +53,7 @@ jobs:
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Cache sqlx-cli
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/sqlx
           key: ${{ runner.os }}-sqlx-cli-${{ hashFiles('backend/Cargo.lock') }}
@@ -59,7 +61,11 @@ jobs:
       - name: Install SQLx CLI
         run: |
           if ! command -v sqlx &> /dev/null; then
-            cargo install sqlx-cli --no-default-features --features postgres
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm sqlx-cli
           fi
 
       - name: Run migrations
@@ -71,7 +77,7 @@ jobs:
         run: cargo build --all-targets --all-features
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@45775bd8235c68ba998cffa5171334d58593da47 # v3.28.15
+        uses: github/codeql-action/analyze@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
 
   cargo-audit-backend:
     name: Cargo Audit (Backend)
@@ -81,13 +87,13 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Cache cargo-audit binary
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/cargo-audit
           key: ${{ runner.os }}-cargo-audit-v1
@@ -95,7 +101,11 @@ jobs:
       - name: Install cargo-audit
         run: |
           if ! command -v cargo-audit &> /dev/null; then
-            cargo install cargo-audit --locked
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm cargo-audit
           fi
 
       - name: Run cargo audit
@@ -109,13 +119,13 @@ jobs:
       run:
         working-directory: push-proxy
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Cache cargo-audit binary
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/cargo-audit
           key: ${{ runner.os }}-cargo-audit-v1
@@ -123,7 +133,11 @@ jobs:
       - name: Install cargo-audit
         run: |
           if ! command -v cargo-audit &> /dev/null; then
-            cargo install cargo-audit --locked
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm cargo-audit
           fi
 
       - name: Run cargo audit
@@ -137,13 +151,13 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Cache cargo-deny binary
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/cargo-deny
           key: ${{ runner.os }}-cargo-deny-v1
@@ -151,7 +165,11 @@ jobs:
       - name: Install cargo-deny
         run: |
           if ! command -v cargo-deny &> /dev/null; then
-            cargo install cargo-deny --locked
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm cargo-deny
           fi
 
       - name: Run cargo deny check
@@ -165,13 +183,13 @@ jobs:
       run:
         working-directory: push-proxy
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Cache cargo-deny binary
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/cargo-deny
           key: ${{ runner.os }}-cargo-deny-v1
@@ -179,7 +197,11 @@ jobs:
       - name: Install cargo-deny
         run: |
           if ! command -v cargo-deny &> /dev/null; then
-            cargo install cargo-deny --locked
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if ! command -v cargo-binstall &> /dev/null; then
+              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            fi
+            cargo binstall --locked --no-confirm cargo-deny
           fi
 
       - name: Run cargo deny check
@@ -193,10 +215,10 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           cache: 'npm'
@@ -207,8 +229,12 @@ jobs:
 
       - name: Run npm audit
         run: |
+          set +e
+          npm audit --audit-level=high --json > dependency-audit.json
+          audit_status=$?
           npm audit --audit-level=high
-          npm audit --audit-level=high --json > dependency-audit.json || true
+          set -e
+          exit "$audit_status"
 
       - name: Upload npm audit results
         if: always()
@@ -224,9 +250,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Review dependency changes
-        uses: actions/dependency-review-action@05fe4576374b728f0c523d6a13d64c25081e0803 # v4.8.3
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: high

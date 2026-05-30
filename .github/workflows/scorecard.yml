@@ -14,21 +14,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      contents: read
       security-events: write
       id-token: write
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
 
       - name: Run Scorecard
-        uses: ossf/scorecard-action@f49ab50085bc1ac11c253e99c65b5ca940b5a0d4 # v2.4.1
+        id: scorecard
+        continue-on-error: true
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
         with:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
 
+      - name: Check Scorecard result
+        if: steps.scorecard.outcome != 'success'
+        run: |
+          echo "::warning::OpenSSF Scorecard failed. This workflow is advisory and will not block the pipeline."
+
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3.28.15
+        if: hashFiles('results.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
         with:
           sarif_file: results.sarif

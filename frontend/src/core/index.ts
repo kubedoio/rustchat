@@ -4,13 +4,13 @@
 // Entities
 export type { User, UserId, UserRef, Presence } from './entities/User'
 export type { Channel, ChannelId, ChannelType } from './entities/Channel'
-export type { 
-  Message, 
-  MessageId, 
-  MessageDraft, 
+export type {
+  Message,
+  MessageId,
+  MessageDraft,
   MessageStatus,
   Reaction,
-  FileAttachment 
+  FileAttachment,
 } from './entities/Message'
 export type { CallId, CallState, CallParticipant } from './entities/Call'
 

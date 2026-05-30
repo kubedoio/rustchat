@@ -158,8 +158,7 @@ pub(super) async fn view_channel_for_user(
     let resolved_user_id = if user_id == "me" {
         auth.user_id
     } else {
-        parse_mm_or_uuid(&user_id)
-            .ok_or_else(|| crate::error::AppError::BadRequest("Invalid user_id".to_string()))?
+        parse_mm_or_uuid(&user_id).ok_or_else(|| crate::error::AppError::InvalidUserId)?
     };
 
     if resolved_user_id != auth.user_id {

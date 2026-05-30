@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Check } from 'lucide-vue-next'
-import { THEME_OPTIONS, getThemeColors, type Theme } from '../../../features/theme/stores/themeStore'
+import {
+  THEME_OPTIONS,
+  getThemeColors,
+  type Theme,
+} from '../../../features/theme/stores/themeStore'
 
 const props = defineProps<{
   modelValue: Theme
@@ -17,14 +21,14 @@ const selectedTheme = ref<Theme>(props.modelValue)
 
 watch(
   () => props.modelValue,
-  (nextTheme) => {
+  nextTheme => {
     selectedTheme.value = nextTheme
   },
   { immediate: true }
 )
 
 const themeCards = computed(() =>
-  THEME_OPTIONS.map((theme) => ({
+  THEME_OPTIONS.map(theme => ({
     ...theme,
     preview: getThemeColors(theme.id),
   }))
@@ -61,13 +65,13 @@ function handleCancel() {
         v-for="theme in themeCards"
         :key="theme.id"
         type="button"
-        @click="selectTheme(theme.id)"
         class="relative overflow-hidden rounded-r-2 border p-3 text-left transition-standard"
         :class="
           selectedTheme === theme.id
             ? 'border-brand bg-brand/8 ring-2 ring-brand/20'
             : 'border-border-1 bg-bg-surface-1 hover:border-border-2 hover:bg-bg-surface-2'
         "
+        @click="selectTheme(theme.id)"
       >
         <div class="overflow-hidden rounded-r-1 border border-border-1">
           <div class="flex h-16">
@@ -130,22 +134,23 @@ function handleCancel() {
     <div class="rounded-r-2 border border-border-1 bg-bg-surface-2 p-4">
       <p class="text-sm font-medium text-text-1">Note</p>
       <p class="mt-1 text-sm text-text-2">
-        Custom color editing is hidden for now because the app only persists the supported preset themes.
+        Custom color editing is hidden for now because the app only persists the supported preset
+        themes.
       </p>
     </div>
 
     <div class="flex items-center justify-end gap-2 pt-2">
       <button
         type="button"
-        @click="handleCancel"
         class="rounded-r-1 px-4 py-2 text-sm font-medium text-text-2 transition-standard hover:bg-bg-surface-2 hover:text-text-1"
+        @click="handleCancel"
       >
         Cancel
       </button>
       <button
         type="button"
-        @click="handleSave"
         class="rounded-r-1 bg-brand px-4 py-2 text-sm font-medium text-brand-foreground shadow-1 transition-standard hover:bg-brand-hover"
+        @click="handleSave"
       >
         Save
       </button>

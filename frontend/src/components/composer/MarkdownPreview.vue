@@ -24,10 +24,10 @@ function copyCode(event: MouseEvent) {
 </script>
 
 <template>
-  <div 
+  <div
     class="markdown-preview prose prose-xs max-w-none p-3 bg-bg-surface-2/50 rounded-lg border border-border-1 overflow-auto max-h-80"
-    v-html="renderedHtml"
     @click="copyCode"
+    v-html="renderedHtml"
   ></div>
 </template>
 
@@ -100,7 +100,8 @@ function copyCode(event: MouseEvent) {
   font-size: 0.75rem;
 }
 
-.markdown-preview :deep(ul), .markdown-preview :deep(ol) {
+.markdown-preview :deep(ul),
+.markdown-preview :deep(ol) {
   margin: 0.5rem 0;
   padding-left: 1.25rem;
   font-size: 0.75rem;

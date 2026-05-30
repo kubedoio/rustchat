@@ -66,13 +66,11 @@ const notifyOptions = [
         <Bell class="w-5 h-5 mr-2 text-primary" />
         Notifications
       </h3>
-      
+
       <div class="space-y-4">
         <!-- Desktop Notifications -->
         <div>
-          <label class="block text-sm font-medium text-text-2 mb-1">
-            Desktop notifications
-          </label>
+          <label class="block text-sm font-medium text-text-2 mb-1"> Desktop notifications </label>
           <select
             v-model="notifyDesktop"
             class="w-full px-3 py-2 border border-border-2 rounded-lg bg-bg-surface-1 text-text-1"
@@ -82,7 +80,7 @@ const notifyOptions = [
             </option>
           </select>
         </div>
-        
+
         <!-- Mobile Push -->
         <div>
           <label class="block text-sm font-medium text-text-2 mb-1">
@@ -97,14 +95,14 @@ const notifyOptions = [
             </option>
           </select>
         </div>
-        
+
         <!-- Sounds -->
         <div class="flex items-center justify-between">
           <span class="text-sm text-text-2">Notification sounds</span>
           <button
-            @click="notifySounds = !notifySounds"
             class="relative w-11 h-6 rounded-full transition-colors"
             :class="notifySounds ? 'bg-primary' : 'bg-bg-surface-3'"
+            @click="notifySounds = !notifySounds"
           >
             <span
               class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
@@ -114,21 +112,21 @@ const notifyOptions = [
         </div>
       </div>
     </div>
-    
+
     <!-- Do Not Disturb -->
     <div class="pt-4 border-t border-border-1">
       <h3 class="text-lg font-semibold text-text-1 flex items-center mb-4">
         <Moon class="w-5 h-5 mr-2 text-primary" />
         Do Not Disturb
       </h3>
-      
+
       <div class="space-y-4">
         <div class="flex items-center justify-between">
           <span class="text-sm text-text-2">Enable scheduled DND</span>
           <button
-            @click="dndEnabled = !dndEnabled"
             class="relative w-11 h-6 rounded-full transition-colors"
             :class="dndEnabled ? 'bg-primary' : 'bg-bg-surface-3'"
+            @click="dndEnabled = !dndEnabled"
           >
             <span
               class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
@@ -136,12 +134,10 @@ const notifyOptions = [
             ></span>
           </button>
         </div>
-        
+
         <div v-if="dndEnabled" class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-text-2 mb-1">
-              Start time
-            </label>
+            <label class="block text-sm font-medium text-text-2 mb-1"> Start time </label>
             <input
               v-model="dndStartTime"
               type="time"
@@ -149,9 +145,7 @@ const notifyOptions = [
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-text-2 mb-1">
-              End time
-            </label>
+            <label class="block text-sm font-medium text-text-2 mb-1"> End time </label>
             <input
               v-model="dndEndTime"
               type="time"
@@ -161,63 +155,67 @@ const notifyOptions = [
         </div>
       </div>
     </div>
-    
+
     <!-- Display Settings -->
     <div class="pt-4 border-t border-border-1">
       <h3 class="text-lg font-semibold text-text-1 flex items-center mb-4">
         <Monitor class="w-5 h-5 mr-2 text-primary" />
         Display
       </h3>
-      
+
       <div class="space-y-4">
         <!-- Message Display -->
         <div>
-          <label class="block text-sm font-medium text-text-2 mb-2">
-            Message display
-          </label>
+          <label class="block text-sm font-medium text-text-2 mb-2"> Message display </label>
           <div class="flex space-x-3">
             <button
-              @click="messageDisplay = 'standard'"
               class="flex-1 p-3 border rounded-lg transition-colors text-sm"
-              :class="messageDisplay === 'standard' 
-                ? 'border-primary bg-primary/10 text-primary' 
-                : 'border-border-2 text-text-2'"
+              :class="
+                messageDisplay === 'standard'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border-2 text-text-2'
+              "
+              @click="messageDisplay = 'standard'"
             >
               Standard
             </button>
             <button
-              @click="messageDisplay = 'compact'"
               class="flex-1 p-3 border rounded-lg transition-colors text-sm"
-              :class="messageDisplay === 'compact' 
-                ? 'border-primary bg-primary/10 text-primary' 
-                : 'border-border-2 text-text-2'"
+              :class="
+                messageDisplay === 'compact'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border-2 text-text-2'
+              "
+              @click="messageDisplay = 'compact'"
             >
               Compact
             </button>
           </div>
         </div>
-        
+
         <!-- Time Format -->
         <div>
-          <label class="block text-sm font-medium text-text-2 mb-2">
-            Time format
-          </label>
+          <label class="block text-sm font-medium text-text-2 mb-2"> Time format </label>
           <div class="flex space-x-3">
             <button
-              @click="timeFormat = '12h'"
               class="flex-1 p-3 border rounded-lg transition-colors text-sm"
-              :class="timeFormat === '12h' 
-                ? 'border-primary bg-primary/10 text-primary' 
-                : 'border-border-2 text-text-2'"
+              :class="
+                timeFormat === '12h'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border-2 text-text-2'
+              "
+              @click="timeFormat = '12h'"
             >
               12-hour (3:00 PM)
             </button>
             <button
-              @click="timeFormat = '24h'"
               class="flex-1 p-3 border rounded-lg transition-colors text-sm"
-              :class="timeFormat === '24h' 
-                ? 'border-primary bg-primary/10 text-primary' 
-                : 'border-border-2 text-text-2'"
+              :class="
+                timeFormat === '24h'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border-2 text-text-2'
+              "
+              @click="timeFormat = '24h'"
             >
               24-hour (15:00)
             </button>
@@ -225,10 +223,10 @@ const notifyOptions = [
         </div>
       </div>
     </div>
-    
+
     <!-- Save Button -->
     <div class="pt-4">
-      <BaseButton @click="handleSave" :loading="preferencesStore.loading" class="w-full">
+      <BaseButton :loading="preferencesStore.loading" class="w-full" @click="handleSave">
         Save Preferences
       </BaseButton>
     </div>

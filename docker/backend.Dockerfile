@@ -11,11 +11,24 @@ WORKDIR /app
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
 
+FROM alpine:3.23 AS ci-validate
+
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY migrations ./migrations
+RUN test -f Cargo.toml && test -f Cargo.lock && test -f src/main.rs
+
+FROM builder AS app-builder
+
 # Create dummy src for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies only
-RUN cargo build --release && rm -rf src
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --locked && \
+    rm -rf src
 
 # Copy actual source
 COPY src ./src
@@ -24,11 +37,11 @@ COPY migrations ./migrations
 
 # Build with cache mounts for faster rebuilds
 # BuildKit caches cargo registry and build artifacts between builds
-ENV SQLX_OFFLINE=false
+ENV SQLX_OFFLINE=true
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     touch src/main.rs && \
-    cargo build --release && \
+    cargo build --release --locked && \
     cp /app/target/release/rustchat /tmp/rustchat
 
 # Runtime stage
@@ -51,10 +64,10 @@ RUN apk add --no-cache ca-certificates libgcc wget
 WORKDIR /app
 
 # Copy the binary (from tmp since target is a cache mount)
-COPY --from=builder /tmp/rustchat /usr/local/bin/rustchat
+COPY --from=app-builder /tmp/rustchat /usr/local/bin/rustchat
 
 # Copy migrations for runtime
-COPY --from=builder /app/migrations ./migrations
+COPY --from=app-builder /app/migrations ./migrations
 
 # Create non-root user
 RUN adduser -D -u 1000 rustchat
@@ -63,5 +76,8 @@ USER rustchat
 EXPOSE 3000
 
 ENV RUST_LOG=info
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/v1/health/live || exit 1
 
 CMD ["rustchat"]

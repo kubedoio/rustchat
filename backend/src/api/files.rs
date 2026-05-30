@@ -266,7 +266,7 @@ async fn get_file(
     let file = file_repo
         .get_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+        .ok_or_else(|| AppError::FileNotFound)?;
 
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -283,7 +283,7 @@ async fn download_file(
     let file = file_repo
         .get_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+        .ok_or_else(|| AppError::FileNotFound)?;
 
     check_file_access(&state, &file, auth.user_id).await?;
 
@@ -309,7 +309,7 @@ async fn delete_file(
     let file = file_repo
         .get_by_id(id)
         .await?
-        .ok_or_else(|| AppError::NotFound("File not found".to_string()))?;
+        .ok_or_else(|| AppError::FileNotFound)?;
 
     // Only uploader or admin can delete
     if !auth.can_access_owned(file.uploader_id, &permissions::ADMIN_FULL) {

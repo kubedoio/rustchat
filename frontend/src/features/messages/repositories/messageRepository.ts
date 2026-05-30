@@ -41,7 +41,7 @@ export const messageRepository = {
       const params: Record<string, unknown> = {
         limit: options.limit ?? 50,
         before: options.before,
-        after: options.after
+        after: options.after,
       }
 
       const response = await postsApi.list(channelId, params)
@@ -52,23 +52,23 @@ export const messageRepository = {
 
       // Convert API ReadState to MessageReadState
       const apiReadState = response.data.read_state
-      const readState: MessageReadState | undefined = apiReadState ? {
-        lastReadMessageId: apiReadState.last_read_message_id?.toString(),
-        lastReadSeq: apiReadState.last_read_message_id ?? undefined,
-        unreadCount: 0, // Will be populated from other API calls
-        mentionCount: 0
-      } : undefined
+      const readState: MessageReadState | undefined = apiReadState
+        ? {
+            lastReadMessageId: apiReadState.last_read_message_id?.toString(),
+            lastReadSeq: apiReadState.last_read_message_id ?? undefined,
+            unreadCount: 0, // Will be populated from other API calls
+            mentionCount: 0,
+          }
+        : undefined
 
       return {
         messages,
-        readState
+        readState,
       }
     })
   },
 
-  async findThread(
-    rootMessageId: MessageId
-  ): Promise<Message[]> {
+  async findThread(rootMessageId: MessageId): Promise<Message[]> {
     return withRetry(async () => {
       const response = await postsApi.getThread(rootMessageId)
       return response.data.order
@@ -80,30 +80,30 @@ export const messageRepository = {
   },
 
   async create(draft: MessageDraft): Promise<Message> {
-    return withRetry(async () => {
-      const payload: CreatePostRequest = {
-        channel_id: draft.channelId,
-        message: draft.content,
-        root_post_id: draft.rootId,
-        file_ids: draft.fileIds,
-        client_msg_id: draft.clientId
-      }
+    return withRetry(
+      async () => {
+        const payload: CreatePostRequest = {
+          channel_id: draft.channelId,
+          message: draft.content,
+          root_post_id: draft.rootId,
+          file_ids: draft.fileIds,
+          client_msg_id: draft.clientId,
+        }
 
-      const response = await postsApi.create(payload)
-      return postToMessage(response.data)
-    }, { maxAttempts: 2 }) // Don't retry too many times for creates
+        const response = await postsApi.create(payload)
+        return postToMessage(response.data)
+      },
+      { maxAttempts: 2 }
+    ) // Don't retry too many times for creates
   },
 
-  async update(
-    id: MessageId,
-    changes: { content?: string; isPinned?: boolean }
-  ): Promise<Message> {
+  async update(id: MessageId, changes: { content?: string; isPinned?: boolean }): Promise<Message> {
     return withRetry(async () => {
       if (changes.content !== undefined) {
         const response = await postsApi.update(id, changes.content)
         return postToMessage(response.data)
       }
-      
+
       if (changes.isPinned !== undefined) {
         if (changes.isPinned) {
           await postsApi.pin(id)
@@ -111,7 +111,7 @@ export const messageRepository = {
           await postsApi.unpin(id)
         }
       }
-      
+
       // Fetch updated message
       const response = await postsApi.get(id)
       return postToMessage(response.data)
@@ -124,10 +124,7 @@ export const messageRepository = {
     })
   },
 
-  async search(
-    channelId: ChannelId,
-    query: string
-  ): Promise<Message[]> {
+  async search(channelId: ChannelId, query: string): Promise<Message[]> {
     return withRetry(async () => {
       const response = await postsApi.list(channelId, { q: query })
       return response.data.messages.map(postToMessage)
@@ -162,7 +159,7 @@ export const messageRepository = {
 
   async unsaveMessage(messageId: MessageId): Promise<void> {
     await withRetry(() => postsApi.unsave(messageId))
-  }
+  },
 }
 
 // Mapper function - converts API response to domain entity
@@ -184,9 +181,7 @@ export function postToMessage(post: Post): Message {
     content: rawPost.message,
     rootId: rootId || undefined,
     replyCount: rawPost.reply_count || 0,
-    lastReplyAt: rawPost.last_reply_at 
-      ? normalizeTimestamp(rawPost.last_reply_at) 
-      : undefined,
+    lastReplyAt: rawPost.last_reply_at ? normalizeTimestamp(rawPost.last_reply_at) : undefined,
     files: (rawPost.files || []).map(f => ({
       id: f.id,
       name: f.name,
@@ -194,14 +189,14 @@ export function postToMessage(post: Post): Message {
       size: f.size,
       mimeType: f.mime_type,
       width: (f as unknown as Record<string, unknown>).width as number | undefined,
-      height: (f as unknown as Record<string, unknown>).height as number | undefined
+      height: (f as unknown as Record<string, unknown>).height as number | undefined,
     })),
     reactions: (rawPost.reactions || []).map((r: unknown) => {
       const reaction = r as Record<string, unknown>
       return {
         emoji: reaction.emoji as string,
         count: reaction.count as number,
-        users: (reaction.users as unknown[]).map((u) => String(u))
+        users: (reaction.users as unknown[]).map(u => String(u)),
       }
     }),
     isPinned: Boolean(rawPost.is_pinned),
@@ -210,7 +205,7 @@ export function postToMessage(post: Post): Message {
     clientId: rawPost.client_msg_id ?? rawPost.pending_post_id,
     createdAt,
     type: rawPost.props?.type || '',
-    props: rawPost.props
+    props: rawPost.props,
   }
 }
 

@@ -37,14 +37,14 @@ pub(crate) async fn host_screen_off(
     Json(payload): Json<HostControlRequest>,
 ) -> ApiResult<Json<StatusResponse>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    let target_session_id = parse_mm_or_uuid(&payload.session_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid session_id".to_string()))?;
+    let target_session_id =
+        parse_mm_or_uuid(&payload.session_id).ok_or_else(|| AppError::InvalidSessionId)?;
 
     let call_manager = state.call_state_manager.as_ref();
     let mut call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
     call = normalize_call_host_if_stale(&state, call).await;
 
     if !can_manage_call(&auth, &call) {
@@ -58,7 +58,7 @@ pub(crate) async fn host_screen_off(
         .values()
         .find(|p| p.session_id == target_session_id)
         .map(|p| p.user_id)
-        .ok_or_else(|| AppError::NotFound("Participant not found in call".to_string()))?;
+        .ok_or_else(|| AppError::ParticipantNotFound)?;
 
     call_manager
         .set_screen_sharing(call.call_id, target_user_id, false)
@@ -93,14 +93,14 @@ pub(crate) async fn host_mute(
     Json(payload): Json<HostControlRequest>,
 ) -> ApiResult<Json<StatusResponse>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    let target_session_id = parse_mm_or_uuid(&payload.session_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid session_id".to_string()))?;
+    let target_session_id =
+        parse_mm_or_uuid(&payload.session_id).ok_or_else(|| AppError::InvalidSessionId)?;
 
     let call_manager = state.call_state_manager.as_ref();
     let mut call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
     call = normalize_call_host_if_stale(&state, call).await;
 
     // Authorize: Only host can mute others
@@ -116,7 +116,7 @@ pub(crate) async fn host_mute(
         .values()
         .find(|p| p.session_id == target_session_id)
         .map(|p| p.user_id)
-        .ok_or_else(|| AppError::NotFound("Participant not found in call".to_string()))?;
+        .ok_or_else(|| AppError::ParticipantNotFound)?;
 
     // Mute in state
     call_manager
@@ -168,7 +168,7 @@ pub(crate) async fn host_mute_others(
     let mut call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
     call = normalize_call_host_if_stale(&state, call).await;
 
     if !can_manage_call(&auth, &call) {
@@ -228,14 +228,14 @@ pub(crate) async fn host_remove_user(
     Json(payload): Json<HostControlRequest>,
 ) -> ApiResult<Json<StatusResponse>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    let target_session_id = parse_mm_or_uuid(&payload.session_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid session_id".to_string()))?;
+    let target_session_id =
+        parse_mm_or_uuid(&payload.session_id).ok_or_else(|| AppError::InvalidSessionId)?;
 
     let call_manager = state.call_state_manager.as_ref();
     let mut call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
     call = normalize_call_host_if_stale(&state, call).await;
 
     if !can_manage_call(&auth, &call) {
@@ -249,7 +249,7 @@ pub(crate) async fn host_remove_user(
         .values()
         .find(|p| p.session_id == target_session_id)
         .map(|p| p.user_id)
-        .ok_or_else(|| AppError::NotFound("Participant not found in call".to_string()))?;
+        .ok_or_else(|| AppError::ParticipantNotFound)?;
 
     if target_user_id == auth.user_id {
         return Err(AppError::BadRequest(
@@ -313,14 +313,14 @@ pub(crate) async fn host_lower_hand(
     Json(payload): Json<HostControlRequest>,
 ) -> ApiResult<Json<StatusResponse>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    let target_session_id = parse_mm_or_uuid(&payload.session_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid session_id".to_string()))?;
+    let target_session_id =
+        parse_mm_or_uuid(&payload.session_id).ok_or_else(|| AppError::InvalidSessionId)?;
 
     let call_manager = state.call_state_manager.as_ref();
     let mut call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
     call = normalize_call_host_if_stale(&state, call).await;
 
     if !can_manage_call(&auth, &call) {
@@ -334,7 +334,7 @@ pub(crate) async fn host_lower_hand(
         .values()
         .find(|p| p.session_id == target_session_id)
         .map(|p| p.user_id)
-        .ok_or_else(|| AppError::NotFound("Participant not found in call".to_string()))?;
+        .ok_or_else(|| AppError::ParticipantNotFound)?;
 
     // Lower hand in state
     call_manager
@@ -400,7 +400,7 @@ pub(crate) async fn host_make_moderator(
     let mut call = call_manager
         .get_call_by_channel(&channel_uuid)
         .await
-        .ok_or_else(|| AppError::NotFound("No active call in this channel".to_string()))?;
+        .ok_or_else(|| AppError::NoActiveCall)?;
     call = normalize_call_host_if_stale(&state, call).await;
 
     if !can_manage_call(&auth, &call) {

@@ -2,12 +2,7 @@
 // Maps API responses to domain entities
 
 import { channelsApi, categoriesApi } from '../../../api/channels'
-import type { 
-  Channel, 
-  ChannelId, 
-  ChannelType,
-  ChannelMember
-} from '../../../core/entities/Channel'
+import type { Channel, ChannelId, ChannelType, ChannelMember } from '../../../core/entities/Channel'
 import type { TeamId } from '../../../core/entities/Team'
 import type { UserId } from '../../../core/entities/User'
 import { withRetry } from '../../../core/services/retry'
@@ -79,17 +74,14 @@ export const channelRepository = {
         channel_type: data.type,
         header: data.header,
         purpose: data.purpose,
-        target_user_id: data.targetUserId
+        target_user_id: data.targetUserId,
       })
       return normalizeChannel(response.data)
     })
   },
 
   // Update channel
-  async update(
-    channelId: ChannelId, 
-    data: Partial<CreateChannelRequest>
-  ): Promise<Channel> {
+  async update(channelId: ChannelId, data: Partial<CreateChannelRequest>): Promise<Channel> {
     return withRetry(async () => {
       const response = await channelsApi.update(channelId, {
         team_id: data.teamId,
@@ -98,7 +90,7 @@ export const channelRepository = {
         channel_type: data.type,
         header: data.header,
         purpose: data.purpose,
-        target_user_id: data.targetUserId
+        target_user_id: data.targetUserId,
       })
       return normalizeChannel(response.data)
     })
@@ -139,7 +131,7 @@ export const channelRepository = {
       return response.data.map(item => ({
         channelId: item.channel_id as ChannelId,
         unreadCount: item.count,
-        mentionCount: 0 // API returns separate mention counts
+        mentionCount: 0, // API returns separate mention counts
       }))
     })
   },
@@ -171,8 +163,8 @@ export const channelRepository = {
 
   // Update notify props (for mute/unmute)
   async updateNotifyProps(
-    channelId: ChannelId, 
-    userId: UserId, 
+    channelId: ChannelId,
+    userId: UserId,
     props: ChannelNotifyProps
   ): Promise<void> {
     return withRetry(async () => {
@@ -198,15 +190,15 @@ export const channelRepository = {
 
   // Update sidebar categories (for moving channels)
   async updateCategories(
-    userId: UserId, 
-    teamId: TeamId, 
+    userId: UserId,
+    teamId: TeamId,
     categories: SidebarCategory[]
   ): Promise<SidebarCategory[]> {
     return withRetry(async () => {
       const response = await categoriesApi.updateCategories(userId, teamId, categories)
       return response.data
     })
-  }
+  },
 }
 
 // Normalize API Channel to domain entity
@@ -224,7 +216,7 @@ function normalizeChannel(raw: unknown): Channel {
     createdAt: new Date(r.created_at as string | number),
     updatedAt: new Date((r.updated_at || r.created_at) as string | number),
     isArchived: Boolean(r.is_archived),
-    memberCount: r.member_count as number | undefined
+    memberCount: r.member_count as number | undefined,
   }
 }
 
@@ -240,12 +232,15 @@ function normalizeChannelMember(raw: unknown): ChannelMember {
     notifyProps: {
       desktop: normalizeNotifySetting(notifyProps.desktop, 'default'),
       mobile: normalizeNotifySetting(notifyProps.mobile, 'default'),
-      markUnread: normalizeMarkUnread(notifyProps.mark_unread)
-    }
+      markUnread: normalizeMarkUnread(notifyProps.mark_unread),
+    },
   }
 }
 
-function normalizeNotifySetting(value: unknown, fallback: 'default'): 'default' | 'all' | 'mention' | 'none' {
+function normalizeNotifySetting(
+  value: unknown,
+  fallback: 'default'
+): 'default' | 'all' | 'mention' | 'none' {
   return value === 'all' || value === 'mention' || value === 'none' || value === 'default'
     ? value
     : fallback

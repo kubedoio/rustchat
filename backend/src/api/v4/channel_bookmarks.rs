@@ -149,7 +149,7 @@ async fn update_bookmark(
     let owner_id = bookmark_repo
         .get_owner_id(bookmark_uuid, channel_uuid)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
+        .ok_or_else(|| AppError::BookmarkNotFound)?;
 
     if owner_id != auth.user_id && !auth.has_role("admin") {
         return Err(AppError::Forbidden(
@@ -194,7 +194,7 @@ async fn delete_bookmark(
     let bookmark = bookmark_repo
         .get(bookmark_uuid, channel_uuid)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
+        .ok_or_else(|| AppError::BookmarkNotFound)?;
 
     if bookmark.owner_id != auth.user_id && !auth.has_role("admin") {
         return Err(AppError::Forbidden(
@@ -231,7 +231,7 @@ async fn reorder_bookmark(
     let bookmark = bookmark_repo
         .get(bookmark_uuid, channel_uuid)
         .await?
-        .ok_or_else(|| AppError::NotFound("Bookmark not found".to_string()))?;
+        .ok_or_else(|| AppError::BookmarkNotFound)?;
 
     if bookmark.owner_id != auth.user_id && !auth.has_role("admin") {
         return Err(AppError::Forbidden(

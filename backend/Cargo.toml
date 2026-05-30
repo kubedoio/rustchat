@@ -1,6 +1,6 @@
 [package]
 name = "rustchat"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 rust-version = "1.95"
 authors = ["rustchat contributors"]
@@ -41,7 +41,6 @@ prometheus = { version = "0.14", features = ["process"] }
 # Auth
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
 argon2 = "0.5"
-bcrypt = "0.15"
 
 # Utils
 aes = "0.8"
@@ -62,7 +61,7 @@ async-trait = "0.1"
 handlebars = "5.1"
 
 # S3 Storage
-aws-sdk-s3 = { version = "1.132", default-features = false, features = ["behavior-version-latest", "sigv4a", "http-1x", "default-https-client", "rt-tokio"] }
+aws-sdk-s3 = { version = "1.133", default-features = false, features = ["behavior-version-latest", "sigv4a", "http-1x", "default-https-client", "rt-tokio"] }
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 
 # File handling

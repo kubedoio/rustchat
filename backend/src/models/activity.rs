@@ -79,6 +79,16 @@ pub struct MarkReadRequest {
 }
 
 impl ActivityType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ActivityType::Mention => "mention",
+            ActivityType::Reply => "reply",
+            ActivityType::Reaction => "reaction",
+            ActivityType::Dm => "dm",
+            ActivityType::ThreadReply => "thread_reply",
+        }
+    }
+
     /// Parse activity type from string
     pub fn parse(s: &str) -> Option<Self> {
         match s {

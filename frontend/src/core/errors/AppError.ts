@@ -1,6 +1,6 @@
 // Error hierarchy for different error types
 
-export type ErrorCode = 
+export type ErrorCode =
   | 'NETWORK_ERROR'
   | 'NOT_FOUND'
   | 'VALIDATION_ERROR'
@@ -16,11 +16,7 @@ export class AppError extends Error {
   readonly recoverable: boolean
   readonly isRetryable: boolean
 
-  constructor(
-    message: string,
-    code: ErrorCode = 'UNKNOWN_ERROR',
-    recoverable: boolean = false
-  ) {
+  constructor(message: string, code: ErrorCode = 'UNKNOWN_ERROR', recoverable: boolean = false) {
     super(message)
     this.name = 'AppError'
     this.code = code

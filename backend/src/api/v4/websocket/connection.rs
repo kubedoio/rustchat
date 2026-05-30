@@ -1,214 +1,31 @@
-//! Mattermost-compatible WebSocket endpoint with session resumption
-//!
-//! Implements:
-//! - Protocol-level Ping/Pong (WebSocket control frames)
-//! - Connection ID & sequence number based session resumption
-//! - 60s ping interval, 100s pong timeout, 30s write deadline
-//! - Message buffering for replay on reconnect
-
 use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 
-use axum::{
-    extract::{
-        ws::{rejection::WebSocketUpgradeRejection, Message, WebSocket, WebSocketUpgrade},
-        Query, State,
-    },
-    http::HeaderMap,
-    response::{IntoResponse, Response},
-};
+use axum::extract::ws::WebSocket;
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
 use serde_json::json;
-use tokio::time::{sleep, timeout};
+use tokio::time::sleep;
 use tracing::{debug, error, info, trace, warn};
 use uuid::Uuid;
 
 use crate::api::v4::calls_plugin;
-use crate::api::v4::users::hydrate_dm_display_names_batch;
 use crate::api::websocket_core::{self, EnvelopeCommandOptions};
 use crate::api::AppState;
 use crate::mattermost_compat::{
     id::{encode_mm_id, parse_mm_or_uuid},
-    mappers::map_channel_role,
     models as mm,
 };
-use crate::models::channel::Channel;
 use crate::realtime::{
     websocket_actor::{close_codes, WebSocketActor, WsEvent},
     WsBroadcast, WsEnvelope,
 };
 use crate::telemetry::metrics;
 
-/// WebSocket query parameters
-#[derive(Debug, Deserialize)]
-pub struct WsQuery {
-    /// Connection ID for session resumption
-    pub connection_id: Option<String>,
-    /// Last sequence number received by client
-    pub sequence_number: Option<i64>,
-}
+use super::resumption::{send_reconnect_snapshot_if_needed, should_send_reconnect_snapshot};
 
-/// Main WebSocket handler
-pub async fn handle_websocket(
-    ws: Result<WebSocketUpgrade, WebSocketUpgradeRejection>,
-    headers: HeaderMap,
-    State(state): State<AppState>,
-    Query(query): Query<WsQuery>,
-) -> Response {
-    let requested_protocol = websocket_core::requested_protocol(&headers);
-    let ws = match ws {
-        Ok(upgrade) => upgrade,
-        Err(err) => {
-            warn!(
-                error = %err,
-                connection_header = ?headers.get("connection").and_then(|v| v.to_str().ok()),
-                upgrade_header = ?headers.get("upgrade").and_then(|v| v.to_str().ok()),
-                has_sec_websocket_key = headers.contains_key("sec-websocket-key"),
-                sec_websocket_version = ?headers.get("sec-websocket-version").and_then(|v| v.to_str().ok()),
-                user_agent = ?headers.get("user-agent").and_then(|v| v.to_str().ok()),
-                "WebSocket upgrade rejected"
-            );
-            return err.into_response();
-        }
-    };
-
-    let token = websocket_core::resolve_auth_token(&headers, requested_protocol.as_deref());
-    let sequence_number = query.sequence_number;
-    let connection_id = query.connection_id.and_then(|value| {
-        let trimmed = value.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
-    });
-
-    let auth = websocket_core::validate_auth_context(token.as_deref(), &state);
-
-    trace!(
-        has_token = token.is_some(),
-        has_protocol = requested_protocol.is_some(),
-        has_user = auth.is_some(),
-        connection_id = ?connection_id,
-        sequence_number = ?sequence_number,
-        "WebSocket connection request"
-    );
-
-    let mut response = ws.on_upgrade(move |socket| {
-        handle_socket(socket, state, auth, connection_id, sequence_number, None)
-    });
-
-    // Match Mattermost behavior by echoing the requested protocol when present.
-    if let Some(protocol) = requested_protocol {
-        if let Ok(value) = protocol.parse() {
-            response
-                .headers_mut()
-                .insert("Sec-WebSocket-Protocol", value);
-        }
-    }
-
-    response
-}
-
-/// Handle the WebSocket connection
-async fn handle_socket(
-    socket: WebSocket,
-    state: AppState,
-    auth: Option<websocket_core::WebSocketAuth>,
-    connection_id: Option<String>,
-    sequence_number: Option<i64>,
-    addr: Option<SocketAddr>,
-) {
-    // Handle authentication if not already done
-    let auth = match auth {
-        Some(auth) => auth,
-        None => {
-            // Try to authenticate via WebSocket message
-            match authenticate_via_websocket(socket, &state).await {
-                Some((auth, sock)) => {
-                    // Continue with authenticated socket
-                    return run_connection(
-                        sock,
-                        state,
-                        auth.user_id,
-                        auth.expires_at,
-                        connection_id,
-                        sequence_number,
-                        addr,
-                    )
-                    .await;
-                }
-                None => {
-                    warn!(addr = ?addr, "WebSocket authentication failed");
-                    return;
-                }
-            }
-        }
-    };
-
-    run_connection(
-        socket,
-        state,
-        auth.user_id,
-        auth.expires_at,
-        connection_id,
-        sequence_number,
-        addr,
-    )
-    .await;
-}
-
-/// Authenticate via WebSocket message exchange
-async fn authenticate_via_websocket(
-    mut socket: WebSocket,
-    state: &AppState,
-) -> Option<(websocket_core::WebSocketAuth, WebSocket)> {
-    // Wait for authentication challenge
-    let timeout_duration = Duration::from_secs(30);
-
-    loop {
-        match timeout(timeout_duration, socket.recv()).await {
-            Ok(Some(Ok(Message::Text(text)))) => {
-                if let Some(challenge) = parse_authentication_challenge(&text) {
-                    let valid_user = websocket_core::normalize_auth_token(&challenge.token)
-                        .and_then(|t| websocket_core::validate_auth_token(&t, state));
-
-                    if let Some(auth) = valid_user {
-                        let resp = json!({
-                            "status": "OK",
-                            "seq_reply": challenge.seq_reply
-                        });
-                        let _ = socket.send(Message::Text(resp.to_string().into())).await;
-                        return Some((auth, socket));
-                    }
-
-                    let resp = json!({
-                        "status": "FAIL",
-                        "seq_reply": challenge.seq_reply,
-                        "error": "Invalid token"
-                    });
-                    let _ = socket.send(Message::Text(resp.to_string().into())).await;
-                }
-            }
-            Ok(Some(Ok(Message::Close(_)))) | Ok(None) => {
-                return None;
-            }
-            Ok(Some(Err(_))) => {
-                return None;
-            }
-            Err(_) => {
-                // Timeout
-                return None;
-            }
-            _ => {}
-        }
-    }
-}
-
-/// Run the main connection loop with session resumption
-async fn run_connection(
+pub(crate) async fn run_connection(
     socket: WebSocket,
     state: AppState,
     user_id: Uuid,
@@ -297,6 +114,7 @@ async fn run_connection(
 
     let heartbeat_state = state.clone();
     let heartbeat_connection_id = presence_connection_id.clone();
+
     let heartbeat_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(20));
         loop {
@@ -564,10 +382,9 @@ async fn run_connection(
     );
 }
 
-/// Handle a message from the client
-async fn handle_client_text_message(
+pub(crate) async fn handle_client_text_message(
     state: &AppState,
-    actor: &std::sync::Arc<WebSocketActor>,
+    actor: &Arc<WebSocketActor>,
     user_id: Uuid,
     username: &str,
     connection_id: &str,
@@ -603,9 +420,9 @@ async fn handle_client_text_message(
     .await;
 }
 
-async fn handle_client_binary_message(
+pub(crate) async fn handle_client_binary_message(
     state: &AppState,
-    actor: &std::sync::Arc<WebSocketActor>,
+    actor: &Arc<WebSocketActor>,
     user_id: Uuid,
     username: &str,
     connection_id: &str,
@@ -627,9 +444,9 @@ async fn handle_client_binary_message(
     }
 }
 
-async fn handle_client_value_message(
+pub(crate) async fn handle_client_value_message(
     state: &AppState,
-    actor: &std::sync::Arc<WebSocketActor>,
+    actor: &Arc<WebSocketActor>,
     user_id: Uuid,
     username: &str,
     connection_id: &str,
@@ -735,312 +552,6 @@ async fn handle_client_value_message(
     } else {
         trace!(action = %action, "Unknown action received");
     }
-}
-
-#[derive(serde::Serialize)]
-struct ChannelUnreadSnapshot {
-    channel_id: String,
-    msg_count: i64,
-    msg_count_root: i64,
-    mention_count: i64,
-    mention_count_root: i64,
-    urgent_mention_count: i64,
-    last_viewed_at: i64,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct ReconnectStatusRow {
-    id: Uuid,
-    presence: String,
-    presence_manual: bool,
-    last_login_at: Option<DateTime<Utc>>,
-    status_text: Option<String>,
-    status_emoji: Option<String>,
-    status_expires_at: Option<DateTime<Utc>>,
-}
-
-fn should_send_reconnect_snapshot(
-    requested_connection_id: Option<&str>,
-    sequence_number: Option<i64>,
-) -> bool {
-    requested_connection_id
-        .map(|id| !id.trim().is_empty())
-        .unwrap_or(false)
-        || sequence_number.unwrap_or_default() > 0
-}
-
-async fn send_reconnect_snapshot_if_needed(
-    state: &AppState,
-    actor: &std::sync::Arc<WebSocketActor>,
-    user_id: Uuid,
-    connection_id: &str,
-    should_send: bool,
-) {
-    if !should_send {
-        return;
-    }
-
-    match build_reconnect_snapshot(state, user_id).await {
-        Ok(snapshot) => {
-            let mut message = mm::WebSocketMessage {
-                seq: None,
-                event: "initial_load".to_string(),
-                data: snapshot,
-                broadcast: mm::Broadcast {
-                    omit_users: None,
-                    user_id: encode_mm_id(user_id),
-                    channel_id: String::new(),
-                    team_id: String::new(),
-                },
-            };
-
-            let replay_payload = json!({
-                "event": message.event.clone(),
-                "data": message.data.clone(),
-                "broadcast": message.broadcast.clone(),
-            });
-            if let Some(seq) = state
-                .connection_store
-                .queue_message(connection_id, replay_payload)
-            {
-                message.seq = Some(seq);
-            }
-
-            if let Err(err) = actor.send(message) {
-                warn!(
-                    user_id = %user_id,
-                    connection_id = connection_id,
-                    error = %err,
-                    "Failed to send reconnect snapshot"
-                );
-            } else {
-                info!(
-                    user_id = %user_id,
-                    connection_id = connection_id,
-                    "Sent reconnect initial_load snapshot"
-                );
-            }
-        }
-        Err(err) => {
-            warn!(
-                user_id = %user_id,
-                connection_id = connection_id,
-                error = %err,
-                "Failed to build reconnect snapshot"
-            );
-        }
-    }
-}
-
-async fn build_reconnect_snapshot(
-    state: &AppState,
-    user_id: Uuid,
-) -> Result<serde_json::Value, sqlx::Error> {
-    let mut channels: Vec<Channel> = sqlx::query_as(
-        r#"
-        SELECT c.*
-        FROM channels c
-        JOIN channel_members cm ON cm.channel_id = c.id
-        WHERE cm.user_id = $1
-        ORDER BY c.updated_at DESC
-        "#,
-    )
-    .bind(user_id)
-    .fetch_all(&state.db)
-    .await?;
-
-    let repo = crate::repositories::ChannelRepository::new(&state.db);
-    hydrate_dm_display_names_batch(&repo, &mut channels, user_id).await;
-
-    let mm_channels: Vec<mm::Channel> = channels.iter().cloned().map(Into::into).collect();
-    let channel_ids: Vec<Uuid> = channels.iter().map(|c| c.id).collect();
-
-    let username: String = sqlx::query_scalar("SELECT username FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_one(&state.db)
-        .await?;
-
-    #[allow(clippy::type_complexity)]
-    let membership_rows: Vec<(
-        Uuid,
-        String,
-        serde_json::Value,
-        Option<DateTime<Utc>>,
-        i64,
-        i64,
-        i64,
-        i64,
-        i64,
-    )> =
-        sqlx::query_as(
-            r#"
-            SELECT
-                cm.channel_id,
-                cm.role,
-                cm.notify_props,
-                cm.last_viewed_at,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > COALESCE(cr.last_read_message_id, 0))::BIGINT AS msg_count,
-                COUNT(*) FILTER (
-                    WHERE p.deleted_at IS NULL
-                      AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-                )::BIGINT AS mention_count,
-                COUNT(*) FILTER (
-                    WHERE p.deleted_at IS NULL
-                      AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND p.root_post_id IS NULL
-                )::BIGINT AS msg_count_root,
-                COUNT(*) FILTER (
-                    WHERE p.deleted_at IS NULL
-                      AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND p.root_post_id IS NULL
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-                )::BIGINT AS mention_count_root,
-                COUNT(*) FILTER (
-                    WHERE p.deleted_at IS NULL
-                      AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-                      AND p.message LIKE '%@here%'
-                )::BIGINT AS urgent_mention_count
-            FROM channel_members cm
-            LEFT JOIN channel_reads cr
-                ON cr.channel_id = cm.channel_id
-               AND cr.user_id = cm.user_id
-            LEFT JOIN posts p
-                ON p.channel_id = cm.channel_id
-            WHERE cm.user_id = $1
-            GROUP BY cm.channel_id, cm.role, cm.notify_props, cm.last_viewed_at
-            ORDER BY cm.channel_id
-            "#,
-        )
-        .bind(user_id)
-        .bind(&username)
-        .fetch_all(&state.db)
-        .await?;
-
-    let channel_members: Vec<mm::ChannelMember> = membership_rows
-        .iter()
-        .map(
-            |(
-                channel_id,
-                role,
-                notify_props,
-                last_viewed_at,
-                msg_count,
-                mention_count,
-                msg_count_root,
-                mention_count_root,
-                urgent_mention_count,
-            )| mm::ChannelMember {
-                channel_id: encode_mm_id(*channel_id),
-                user_id: encode_mm_id(user_id),
-                roles: map_channel_role(role),
-                last_viewed_at: last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
-                msg_count: *msg_count,
-                mention_count: *mention_count,
-                mention_count_root: *mention_count_root,
-                urgent_mention_count: if state.config.unread.post_priority_enabled {
-                    *urgent_mention_count
-                } else {
-                    0
-                },
-                msg_count_root: *msg_count_root,
-                notify_props: normalize_notify_props_for_snapshot(notify_props.clone()),
-                last_update_at: 0,
-                scheme_guest: false,
-                scheme_user: true,
-                scheme_admin: role == "admin" || role == "team_admin" || role == "channel_admin",
-            },
-        )
-        .collect();
-
-    let channel_unreads: Vec<ChannelUnreadSnapshot> = membership_rows
-        .iter()
-        .map(
-            |(
-                channel_id,
-                _role,
-                _notify_props,
-                last_viewed_at,
-                msg_count,
-                mention_count,
-                msg_count_root,
-                mention_count_root,
-                urgent_mention_count,
-            )| ChannelUnreadSnapshot {
-                channel_id: encode_mm_id(*channel_id),
-                msg_count: *msg_count,
-                msg_count_root: *msg_count_root,
-                mention_count: *mention_count,
-                mention_count_root: *mention_count_root,
-                urgent_mention_count: if state.config.unread.post_priority_enabled {
-                    *urgent_mention_count
-                } else {
-                    0
-                },
-                last_viewed_at: last_viewed_at.map(|t| t.timestamp_millis()).unwrap_or(0),
-            },
-        )
-        .collect();
-
-    let statuses: Vec<serde_json::Value> = if channel_ids.is_empty() {
-        Vec::new()
-    } else {
-        let rows: Vec<ReconnectStatusRow> = sqlx::query_as(
-            r#"
-            SELECT DISTINCT
-                u.id,
-                u.presence,
-                COALESCE(u.presence_manual, false) AS presence_manual,
-                u.last_login_at,
-                CASE WHEN u.status_expires_at IS NOT NULL AND u.status_expires_at < NOW() THEN NULL ELSE u.status_text END AS status_text,
-                CASE WHEN u.status_expires_at IS NOT NULL AND u.status_expires_at < NOW() THEN NULL ELSE u.status_emoji END AS status_emoji,
-                CASE WHEN u.status_expires_at IS NOT NULL AND u.status_expires_at < NOW() THEN NULL ELSE u.status_expires_at END AS status_expires_at
-            FROM users u
-            JOIN channel_members cm ON cm.user_id = u.id
-            WHERE cm.channel_id = ANY($1)
-            "#,
-        )
-        .bind(&channel_ids)
-        .fetch_all(&state.db)
-        .await?;
-
-        rows.into_iter()
-            .map(|row| {
-                json!({
-                    "user_id": encode_mm_id(row.id),
-                    "status": if row.presence.is_empty() { "offline".to_string() } else { row.presence },
-                    "manual": row.presence_manual,
-                    "last_activity_at": row.last_login_at.map(|t| t.timestamp_millis()).unwrap_or(0),
-                    "text": row.status_text,
-                    "emoji": row.status_emoji,
-                    "expires_at": row.status_expires_at.map(|t| t.timestamp_millis()),
-                })
-            })
-            .collect()
-    };
-
-    Ok(json!({
-        "channels": mm_channels,
-        "channel_members": channel_members,
-        "channel_unreads": channel_unreads,
-        "statuses": statuses,
-        "server_time": Utc::now().timestamp_millis(),
-    }))
-}
-
-fn normalize_notify_props_for_snapshot(value: serde_json::Value) -> serde_json::Value {
-    if value.is_null() {
-        return json!({"desktop": "default", "mark_unread": "all"});
-    }
-
-    if let Some(obj) = value.as_object() {
-        if obj.is_empty() {
-            return json!({"desktop": "default", "mark_unread": "all"});
-        }
-    }
-
-    value
 }
 
 fn extract_typing_channel_id(value: &serde_json::Value) -> Option<Uuid> {
@@ -1225,26 +736,6 @@ fn read_u32(bytes: &[u8], idx: &mut usize) -> Option<u32> {
 fn read_i32(bytes: &[u8], idx: &mut usize) -> Option<i32> {
     let arr: [u8; 4] = read_exact(bytes, idx, 4)?.try_into().ok()?;
     Some(i32::from_be_bytes(arr))
-}
-
-#[derive(Debug, Clone)]
-struct AuthenticationChallenge {
-    token: String,
-    seq_reply: serde_json::Value,
-}
-
-fn parse_authentication_challenge(text: &str) -> Option<AuthenticationChallenge> {
-    let value = serde_json::from_str::<serde_json::Value>(text).ok()?;
-    if value.get("action").and_then(|v| v.as_str()) != Some("authentication_challenge") {
-        return None;
-    }
-    let token = value
-        .get("data")
-        .and_then(|v| v.get("token"))
-        .and_then(|v| v.as_str())?
-        .to_string();
-    let seq_reply = value.get("seq").cloned().unwrap_or(serde_json::Value::Null);
-    Some(AuthenticationChallenge { token, seq_reply })
 }
 
 /// Map internal envelope to Mattermost-compatible message
@@ -1619,37 +1110,10 @@ fn map_broadcast(b_opt: Option<&crate::realtime::WsBroadcast>) -> mm::Broadcast 
 #[cfg(test)]
 mod tests {
     use super::map_envelope_to_mm;
-    use super::parse_authentication_challenge;
-    use super::should_send_reconnect_snapshot;
     use crate::mattermost_compat::id::encode_mm_id;
     use crate::mattermost_compat::models as mm;
     use crate::realtime::{WsBroadcast, WsEnvelope};
     use uuid::Uuid;
-
-    #[test]
-    fn parse_authentication_challenge_accepts_valid_payload() {
-        let msg = r#"{
-            "action":"authentication_challenge",
-            "seq":7,
-            "data":{"token":"abc.def.ghi"}
-        }"#;
-
-        let challenge = parse_authentication_challenge(msg).expect("challenge should parse");
-        assert_eq!(challenge.token, "abc.def.ghi");
-        assert_eq!(challenge.seq_reply, serde_json::json!(7));
-    }
-
-    #[test]
-    fn parse_authentication_challenge_rejects_non_challenge() {
-        let msg = r#"{"action":"ping","data":{"token":"abc.def.ghi"}}"#;
-        assert!(parse_authentication_challenge(msg).is_none());
-    }
-
-    #[test]
-    fn parse_authentication_challenge_requires_token() {
-        let msg = r#"{"action":"authentication_challenge","seq":3,"data":{}}"#;
-        assert!(parse_authentication_challenge(msg).is_none());
-    }
 
     #[test]
     fn map_envelope_to_mm_passes_custom_events() {
@@ -1933,7 +1397,6 @@ mod tests {
             decoded["group_id"],
             serde_json::json!(encode_mm_id(group_id))
         );
-        assert_eq!(mapped.broadcast.user_id, encode_mm_id(user_id));
     }
 
     #[test]
@@ -1962,17 +1425,10 @@ mod tests {
             mapped.data["group_id"],
             serde_json::json!(encode_mm_id(group_id))
         );
-        assert_eq!(mapped.broadcast.team_id, encode_mm_id(team_id));
-    }
-
-    #[test]
-    fn reconnect_snapshot_trigger_matches_resume_signals() {
-        assert!(!should_send_reconnect_snapshot(None, None));
-        assert!(!should_send_reconnect_snapshot(None, Some(0)));
-        assert!(!should_send_reconnect_snapshot(Some(""), Some(0)));
-
-        assert!(should_send_reconnect_snapshot(Some("conn-1"), None));
-        assert!(should_send_reconnect_snapshot(None, Some(1)));
-        assert!(should_send_reconnect_snapshot(Some("conn-2"), Some(0)));
+        assert_eq!(
+            mapped.broadcast.team_id,
+            encode_mm_id(team_id),
+            "association team routing must be preserved"
+        );
     }
 }

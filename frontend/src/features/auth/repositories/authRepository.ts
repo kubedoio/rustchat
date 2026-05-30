@@ -38,13 +38,13 @@ export const authRepository = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     return withRetry(async () => {
       const response = await client.post('/auth/login', credentials)
-      
+
       // Normalize user data
       const user = normalizeUser(response.data.user)
-      
+
       return {
         token: response.data.token,
-        user
+        user,
       }
     })
   },
@@ -79,7 +79,7 @@ export const authRepository = {
         presence: request.presence,
         text: request.text,
         emoji: request.emoji,
-        duration_minutes: request.durationMinutes
+        duration_minutes: request.durationMinutes,
       })
       return response.data
     })
@@ -93,7 +93,7 @@ export const authRepository = {
         allowSignup: response.data.allow_signup ?? true,
         requireEmailVerification: response.data.require_email_verification ?? false,
         allowedDomains: response.data.allowed_domains,
-        minPasswordLength: response.data.min_password_length ?? 8
+        minPasswordLength: response.data.min_password_length ?? 8,
       }
     })
   },
@@ -130,7 +130,7 @@ export const authRepository = {
     } catch {
       // Ignore storage errors
     }
-  }
+  },
 }
 
 // Normalize API user response to domain entity
@@ -139,15 +139,15 @@ function normalizeUser(raw: unknown): User {
   const customStatus = (r.custom_status as Record<string, unknown> | undefined) || {
     text: r.status_text,
     emoji: r.status_emoji,
-    expires_at: r.status_expires_at
+    expires_at: r.status_expires_at,
   }
 
-  const role = r.role === 'system_admin' || r.role === 'org_admin' || r.role === 'guest'
-    ? r.role
-    : 'user'
-  const presence: PresenceStatus = r.presence === 'online' || r.presence === 'away' || r.presence === 'dnd'
-    ? r.presence
-    : 'offline'
+  const role =
+    r.role === 'system_admin' || r.role === 'org_admin' || r.role === 'guest' ? r.role : 'user'
+  const presence: PresenceStatus =
+    r.presence === 'online' || r.presence === 'away' || r.presence === 'dnd'
+      ? r.presence
+      : 'offline'
   const statusEmoji = typeof customStatus.emoji === 'string' ? customStatus.emoji : ''
   const statusText = typeof customStatus.text === 'string' ? customStatus.text : ''
 
@@ -163,12 +163,17 @@ function normalizeUser(raw: unknown): User {
     isBot: Boolean(r.is_bot),
     timezone: r.timezone as string | undefined,
     locale: r.locale as string | undefined,
-    customStatus: statusText || statusEmoji ? {
-      emoji: statusEmoji,
-      text: statusText,
-      expiresAt: customStatus.expires_at ? new Date(customStatus.expires_at as string | number) : undefined
-    } : undefined,
+    customStatus:
+      statusText || statusEmoji
+        ? {
+            emoji: statusEmoji,
+            text: statusText,
+            expiresAt: customStatus.expires_at
+              ? new Date(customStatus.expires_at as string | number)
+              : undefined,
+          }
+        : undefined,
     createdAt: new Date((r.created_at || Date.now()) as string | number),
-    updatedAt: new Date((r.updated_at || r.created_at || Date.now()) as string | number)
+    updatedAt: new Date((r.updated_at || r.created_at || Date.now()) as string | number),
   }
 }

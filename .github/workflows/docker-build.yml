@@ -1,0 +1,32 @@
+name: Docker Build
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "push-proxy/**"
+      - "docker/**"
+      - ".github/workflows/docker-build.yml"
+      - ".github/workflows/docker-build-push.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build images
+    uses: ./.github/workflows/docker-build-push.yml
+    with:
+      push: false
+      platforms: linux/amd64
+      timeout-minutes: 90
+      cache_to: ""
+      backend_target: ci-validate
+      tags: |
+        type=ref,event=pr
+        type=sha,format=long
+    permissions:
+      contents: read

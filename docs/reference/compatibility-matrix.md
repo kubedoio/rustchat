@@ -10,16 +10,16 @@ For implementation details, protected paths, and contract testing workflow:
 
 | Scope | Coverage | Last Audited |
 |---|---:|---|
-| Mobile-critical endpoints | 39/41 (95.1%) | 2026-04-21 |
+| Mobile-critical endpoints | 41/41 implemented | 2026-05-22 |
 | WebSocket event parity | 8/8 core events | 2026-04-21 |
 | Push notification deep-link payload | ✅ Implemented | 2026-04-21 |
 
-## Known Gaps
+## Current Notes
 
 | Endpoint | Status | Impact | Planned |
 |---|---|---|---|
-| `POST /api/v4/emoji` | Not implemented | Custom emoji upload unavailable | Phase 2 |
-| `POST /api/v4/posts/search` | Not implemented | Advanced post search unavailable | Phase 2 |
+| `POST /api/v4/emoji` | Implemented | Custom emoji upload available | ✅ Shipped |
+| `POST /api/v4/posts/search` | Implemented | Basic post search available; advanced Mattermost search semantics remain limited | Improve later |
 | `GET /api/v4/users/ids` | Implemented | Batch user fetch for DM surfaces | ✅ Shipped |
 
 ## Notes

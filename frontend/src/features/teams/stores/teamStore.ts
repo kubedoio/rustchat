@@ -212,6 +212,6 @@ export const useTeamStore = defineStore('teamStore', () => {
     createTeam,
     selectTeam,
     fetchMembers,
-    removeTeam
+    removeTeam,
   }
 })

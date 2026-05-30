@@ -47,6 +47,28 @@ nano .env
 docker-compose up -d
 ```
 
+### `backup-postgres.sh` - PostgreSQL Backup
+
+Creates a compressed PostgreSQL dump from the Compose-managed `postgres` service.
+
+**Usage:**
+```bash
+./tools/backup-postgres.sh
+# or choose a path
+./tools/backup-postgres.sh backups/rustchat.sql.gz
+```
+
+By default the script uses `docker-compose.prod.yml`. Override with `COMPOSE_FILE=docker-compose.yml` for local development.
+
+### `restore-postgres.sh` - PostgreSQL Restore
+
+Restores a compressed PostgreSQL dump into the Compose-managed `postgres` service. This replaces the existing database, so it requires an explicit confirmation environment variable.
+
+**Usage:**
+```bash
+RUSTCHAT_RESTORE_CONFIRM=YES ./tools/restore-postgres.sh backups/rustchat.sql.gz
+```
+
 ## Security Notes
 
 - Never commit `.env` files to version control

@@ -76,7 +76,7 @@ export const playbookRepository = {
     return withRetry(async () => {
       const response = await playbooksApi.startRun(teamId, {
         playbook_id: request.playbookId,
-        name: request.name
+        name: request.name,
       })
       return response.data
     })
@@ -85,5 +85,5 @@ export const playbookRepository = {
   // Update run task
   async updateRunTask(runId: string, taskId: string, status: string): Promise<void> {
     await withRetry(() => playbooksApi.updateRunTask(runId, taskId, { status }))
-  }
+  },
 }

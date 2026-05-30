@@ -1,0 +1,8 @@
+target/
+.git/
+.github/
+.sqlx/
+tests/
+compat/
+*.log
+Dockerfile*

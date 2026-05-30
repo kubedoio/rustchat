@@ -1,8 +1,12 @@
 // Auth Service - Business logic for authentication
 // Handles login flow, session management, and status updates
 
-import { log } from '@/utils/log';
-import { authRepository, type LoginCredentials, type UpdateStatusRequest } from '../repositories/authRepository'
+import { log } from '@/utils/log'
+import {
+  authRepository,
+  type LoginCredentials,
+  type UpdateStatusRequest,
+} from '../repositories/authRepository'
 import type { User } from '../../../core/entities/User'
 import { useAuthStore } from '../stores/authStore'
 import { AppError } from '../../../core/errors/AppError'
@@ -13,7 +17,7 @@ let globalAuthToken: string | null = null
 export function getGlobalAuthToken(): string | null {
   // First check memory
   if (globalAuthToken) return globalAuthToken
-  
+
   // Then check localStorage
   return authRepository.getStoredToken()
 }
@@ -26,14 +30,14 @@ class AuthService {
   // Initialize auth state from storage (call on app startup)
   async initialize(): Promise<boolean> {
     const token = authRepository.getStoredToken()
-    
+
     if (!token) {
       return false
     }
 
     // Set global token for API client
     globalAuthToken = token
-    
+
     // Set cookie for media access
     authRepository.setAuthCookie(token)
 
@@ -42,7 +46,7 @@ class AuthService {
       const user = await authRepository.fetchMe()
       this.store.setUser(user)
       this.store.setToken(token)
-      
+
       return true
     } catch (error) {
       // Token is invalid, clear everything
@@ -55,27 +59,25 @@ class AuthService {
   async login(credentials: LoginCredentials): Promise<User> {
     try {
       const { token, user } = await authRepository.login(credentials)
-      
+
       // Store token
       authRepository.setStoredToken(token)
       globalAuthToken = token
-      
+
       // Set cookie for media access
       authRepository.setAuthCookie(token)
-      
+
       // Update store
       this.store.setToken(token)
       this.store.setUser(user)
-      
+
       // Fetch full profile
       await this.fetchProfile()
-      
+
       return this.store.user!
     } catch (error) {
       this.store.setError(
-        error instanceof AppError 
-          ? error.message 
-          : 'Login failed. Please check your credentials.'
+        error instanceof AppError ? error.message : 'Login failed. Please check your credentials.'
       )
       throw error
     }
@@ -103,12 +105,12 @@ class AuthService {
   async logout(): Promise<void> {
     // Clear server session (optional)
     await authRepository.logout()
-    
+
     // Clear storage
     authRepository.clearStoredToken()
     authRepository.clearAuthCookie()
     globalAuthToken = null
-    
+
     // Clear store
     this.store.clear()
   }
@@ -121,20 +123,22 @@ class AuthService {
 
     try {
       const result = await authRepository.updateStatus(request)
-      
+
       // Update local user state
       const user = this.store.user
       if (user) {
         const updatedUser: User = {
           ...user,
           ...(result.presence && { presence: result.presence as any }),
-          ...(result.text !== undefined || result.emoji !== undefined ? {
-            customStatus: {
-              emoji: result.emoji || '',
-              text: result.text || '',
-              expiresAt: result.expiresAt ? new Date(result.expiresAt) : undefined
-            }
-          } : {})
+          ...(result.text !== undefined || result.emoji !== undefined
+            ? {
+                customStatus: {
+                  emoji: result.emoji || '',
+                  text: result.text || '',
+                  expiresAt: result.expiresAt ? new Date(result.expiresAt) : undefined,
+                },
+              }
+            : {}),
         }
         this.store.setUser(updatedUser)
       }

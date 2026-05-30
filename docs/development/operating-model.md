@@ -1,6 +1,6 @@
 # Target Operating Model
 
-**Last updated:** 2026-03-22
+**Last updated:** 2026-05-22
 **Reference:** LLM Development Operating Model v2.0
 
 ---
@@ -9,7 +9,7 @@
 
 rustchat aims to be a **production-ready, self-hosted team collaboration server** that:
 
-1. Is **fully Mattermost-compatible** for mobile and desktop clients (target: 41/41; currently 39/41 — see Section 3)
+1. Is compatible with Mattermost mobile and desktop clients for the documented supported surface
 2. Is **safe to develop with LLM agents** — every area has clear ownership, risk classification, and scope boundaries
 3. Has **high test confidence** — elevated and architectural changes require mandatory test coverage
 4. Supports **horizontal scaling** — stateless API servers, Redis pub/sub, connection pooling
@@ -32,13 +32,13 @@ The LLM Development Operating Model v2.0 is being applied to rustchat in phases:
 
 ## 3. Compatibility Target
 
-**Current:** 39/41 mobile-critical endpoints (95.1%)
+**Current:** 41/41 previously tracked mobile-critical endpoints implemented
 
-**Target:** 41/41 mobile endpoints + verified desktop client support
+**Target:** verified mobile and desktop client support, with documented limits for non-goal Mattermost enterprise APIs
 
-**Gap to close:**
-- `POST /api/v4/emoji` — custom emoji upload (Phase 2)
-- `POST /api/v4/posts/search` — advanced search (Phase 2)
+**Remaining compatibility work:**
+- Improve post search semantics beyond the current basic implementation.
+- Keep plugin, LDAP, SAML, and enterprise/admin compatibility stubs clearly documented until they are implemented or explicitly de-scoped.
 
 ---
 

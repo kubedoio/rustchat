@@ -1,4 +1,4 @@
-import { log } from '@/utils/log';
+import { log } from '@/utils/log'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Post } from '../../../api/posts'
@@ -156,9 +156,22 @@ export const useThreadStore = defineStore('thread', () => {
   }
 
   return {
-    isOpen, parentPostId, parentPost, replies, hasMore, cursor,
-    isLoading, isSending, draft, replyCount,
-    openThread, closeThread, loadMoreReplies, sendReply, setDraft,
-    onNewReply, onPostDeleted
+    isOpen,
+    parentPostId,
+    parentPost,
+    replies,
+    hasMore,
+    cursor,
+    isLoading,
+    isSending,
+    draft,
+    replyCount,
+    openThread,
+    closeThread,
+    loadMoreReplies,
+    sendReply,
+    setDraft,
+    onNewReply,
+    onPostDeleted,
   }
 })

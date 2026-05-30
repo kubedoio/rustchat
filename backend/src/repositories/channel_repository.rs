@@ -7,6 +7,12 @@ use uuid::Uuid;
 use crate::error::{ApiResult, AppError};
 use crate::models::{Channel, ChannelMember, ChannelType};
 
+fn escape_like_pattern(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 /// Row returned from channel list queries that join team data
 #[derive(Debug, sqlx::FromRow)]
 pub struct ChannelWithTeamDataRow {
@@ -96,6 +102,14 @@ impl<'a> ChannelRepository<'a> {
     /// Get a channel by ID (optional, not found returns None instead of error).
     pub async fn get_by_id_optional(&self, id: Uuid) -> Result<Option<Channel>, sqlx::Error> {
         sqlx::query_as::<_, Channel>("SELECT * FROM channels WHERE id = $1 AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await
+    }
+
+    /// Get a channel by ID regardless of deleted_at status (optional).
+    pub async fn get_by_id_any(&self, id: Uuid) -> Result<Option<Channel>, sqlx::Error> {
+        sqlx::query_as::<_, Channel>("SELECT * FROM channels WHERE id = $1")
             .bind(id)
             .fetch_optional(self.pool)
             .await
@@ -283,7 +297,7 @@ impl<'a> ChannelRepository<'a> {
             .bind(user_id)
             .fetch_optional(self.pool)
             .await?
-            .ok_or_else(|| AppError::Forbidden("Not a member of this channel".to_string()))
+            .ok_or_else(|| AppError::NotAMember)
     }
 
     /// Update a channel with optional fields (COALESCE pattern)
@@ -294,8 +308,8 @@ impl<'a> ChannelRepository<'a> {
         display_name: Option<&str>,
         purpose: Option<&str>,
         header: Option<&str>,
-    ) -> Result<Channel, sqlx::Error> {
-        sqlx::query_as(
+    ) -> ApiResult<Channel> {
+        let result = sqlx::query_as(
             r#"
             UPDATE channels SET
                 name = COALESCE($2, name),
@@ -313,16 +327,48 @@ impl<'a> ChannelRepository<'a> {
         .bind(purpose)
         .bind(header)
         .fetch_one(self.pool)
-        .await
+        .await;
+
+        match result {
+            Ok(channel) => Ok(channel),
+            Err(sqlx::Error::RowNotFound) => Err(AppError::ChannelNotFound),
+            Err(e) => {
+                if let Some(db_err) = e.as_database_error() {
+                    if let Some(constraint) = db_err.constraint() {
+                        if constraint.contains("channels_name_team_unique") {
+                            return Err(AppError::Conflict(
+                                "Channel name already exists in this team".to_string(),
+                            ));
+                        }
+                    }
+                }
+                Err(AppError::Database(e))
+            }
+        }
     }
 
-    /// Soft delete a channel
-    pub async fn soft_delete(&self, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE channels SET deleted_at = NOW() WHERE id = $1")
-            .bind(id)
-            .execute(self.pool)
-            .await?;
-        Ok(())
+    /// Soft delete (archive) a channel.
+    /// Returns the updated channel, or an error if the channel is already archived or does not exist.
+    pub async fn soft_delete(&self, id: Uuid) -> ApiResult<Channel> {
+        let result = sqlx::query_as(
+            r#"
+            UPDATE channels
+            SET deleted_at = NOW(),
+                is_archived = true,
+                updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+            RETURNING *
+            "#,
+        )
+        .bind(id)
+        .fetch_one(self.pool)
+        .await;
+
+        match result {
+            Ok(channel) => Ok(channel),
+            Err(sqlx::Error::RowNotFound) => Err(AppError::ChannelAlreadyArchived),
+            Err(e) => Err(AppError::Database(e)),
+        }
     }
 
     /// List channel members with user details
@@ -610,6 +656,7 @@ impl<'a> ChannelRepository<'a> {
                 c.creator_id,
                 c.created_at,
                 c.updated_at,
+                c.deleted_at,
                 t.display_name AS team_display_name,
                 t.name AS team_name,
                 t.updated_at AS team_updated_at
@@ -719,15 +766,28 @@ impl<'a> ChannelRepository<'a> {
         Ok(channel)
     }
 
-    /// Restore a soft-deleted channel
+    /// Restore an archived (soft-deleted) channel.
+    /// Returns the restored channel, or an error if the channel is not archived or does not exist.
     pub async fn restore(&self, id: Uuid) -> ApiResult<Channel> {
-        let channel: Channel = sqlx::query_as(
-            r#"UPDATE channels SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *"#,
+        let result = sqlx::query_as(
+            r#"
+            UPDATE channels
+            SET deleted_at = NULL,
+                is_archived = false,
+                updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NOT NULL
+            RETURNING *
+            "#,
         )
         .bind(id)
         .fetch_one(self.pool)
-        .await?;
-        Ok(channel)
+        .await;
+
+        match result {
+            Ok(channel) => Ok(channel),
+            Err(sqlx::Error::RowNotFound) => Err(AppError::ChannelNotArchived),
+            Err(e) => Err(AppError::Database(e)),
+        }
     }
 
     /// Move a channel to another team
@@ -806,7 +866,10 @@ impl<'a> ChannelRepository<'a> {
         .bind(channel_id)
         .bind(filter_allow_reference)
         .bind(search_term)
-        .bind(format!("%{}%", search_term))
+        .bind(format!(
+            "%{}%",
+            escape_like_pattern(&search_term.to_lowercase())
+        ))
         .fetch_all(self.pool)
         .await?;
         Ok(rows)
@@ -1179,7 +1242,7 @@ impl<'a> ChannelRepository<'a> {
         sqlx::query_as(
             r#"
             SELECT c.* FROM channels c
-            WHERE c.team_id = $1 AND c.is_archived = true
+            WHERE c.team_id = $1 AND c.deleted_at IS NOT NULL
               AND (
                 c.type != 'private'
                 OR EXISTS (
@@ -1206,5 +1269,83 @@ impl<'a> ChannelRepository<'a> {
             .bind(name)
             .fetch_optional(self.pool)
             .await
+    }
+
+    /// Get member IDs in a channel from a list of user IDs
+    pub async fn get_member_ids_by_user_ids(
+        &self,
+        channel_id: Uuid,
+        user_ids: &[Uuid],
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = ANY($2)",
+        )
+        .bind(channel_id)
+        .bind(user_ids)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Get channel info for push notifications
+    pub async fn get_channel_push_info(
+        &self,
+        channel_id: Uuid,
+    ) -> Result<Option<(String, String, String)>, sqlx::Error> {
+        sqlx::query_as::<_, (String, String, String)>(
+            "SELECT c.name, c.display_name, c.type::text as channel_type FROM channels c WHERE c.id = $1",
+        )
+        .bind(channel_id)
+        .fetch_optional(self.pool)
+        .await
+    }
+
+    /// Get the other participant in a DM channel
+    pub async fn get_other_dm_participant(
+        &self,
+        channel_id: Uuid,
+        exclude_user_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id != $2",
+        )
+        .bind(channel_id)
+        .bind(exclude_user_id)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Get member IDs by usernames in a channel
+    pub async fn get_member_ids_by_usernames(
+        &self,
+        channel_id: Uuid,
+        usernames: &[&str],
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT cm.user_id FROM channel_members cm JOIN users u ON cm.user_id = u.id WHERE cm.channel_id = $1 AND u.username = ANY($2)",
+        )
+        .bind(channel_id)
+        .bind(usernames)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Ensure a user is a member of a channel (insert if missing)
+    pub async fn ensure_membership(
+        &self,
+        channel_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            INSERT INTO channel_members (channel_id, user_id, role)
+            VALUES ($1, $2, 'member')
+            ON CONFLICT (channel_id, user_id) DO NOTHING
+            RETURNING user_id
+            "#,
+        )
+        .bind(channel_id)
+        .bind(user_id)
+        .fetch_optional(self.pool)
+        .await
     }
 }

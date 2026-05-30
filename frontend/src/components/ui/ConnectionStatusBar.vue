@@ -19,7 +19,7 @@ const config = computed(() => {
         icon: Loader2,
         iconClass: 'animate-spin',
         message: 'Reconnecting...',
-        showRetry: false
+        showRetry: false,
       }
     case 'disconnected':
       return {
@@ -27,7 +27,7 @@ const config = computed(() => {
         icon: AlertCircle,
         iconClass: '',
         message: `Connection lost. Retrying in ${props.nextRetryIn}s...`,
-        showRetry: true
+        showRetry: true,
       }
     case 'failed':
       return {
@@ -35,7 +35,7 @@ const config = computed(() => {
         icon: WifiOff,
         iconClass: '',
         message: 'Connection failed. Please reconnect.',
-        showRetry: true
+        showRetry: true,
       }
     default:
       return null
@@ -56,8 +56,8 @@ const cfg = computed(() => config.value)
       <span>{{ cfg.message }}</span>
       <button
         v-if="cfg.showRetry"
-        @click="emit('retry')"
         class="ml-2 rounded bg-white/20 px-2 py-0.5 text-xs font-semibold hover:bg-white/30 transition-colors"
+        @click="emit('retry')"
       >
         Retry now
       </button>
@@ -68,7 +68,9 @@ const cfg = computed(() => config.value)
 <style scoped>
 .slide-down-enter-active,
 .slide-down-leave-active {
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .slide-down-enter-from,

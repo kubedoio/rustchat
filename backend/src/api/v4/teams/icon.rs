@@ -16,15 +16,14 @@ pub async fn get_team_image(
     _auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let team_id = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     // Verify team exists (even though we return placeholder, ensures valid team_id)
     let _: Team = sqlx::query_as("SELECT * FROM teams WHERE id = $1")
         .bind(team_id)
         .fetch_optional(&state.db)
         .await?
-        .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+        .ok_or_else(|| AppError::TeamNotFound)?;
 
     const PNG_1X1: &[u8] = &[
         137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6,
@@ -42,8 +41,7 @@ pub async fn update_team_icon(
     Path(team_id): Path<String>,
     mut multipart: Multipart,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let team_uuid = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_uuid = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_admin_or_system_manage(&state, team_uuid, &auth).await?;
 
@@ -123,8 +121,7 @@ pub async fn delete_team_icon(
     auth: MmAuthUser,
     Path(team_id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let team_uuid = parse_mm_or_uuid(&team_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid team_id".to_string()))?;
+    let team_uuid = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
 
     ensure_team_admin_or_system_manage(&state, team_uuid, &auth).await?;
 

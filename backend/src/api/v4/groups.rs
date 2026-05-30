@@ -298,7 +298,7 @@ async fn fetch_group_for_syncable(state: &AppState, group_id: Uuid) -> ApiResult
     let group = GroupRepository::new(&state.db)
         .get_group_row_by_id(group_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+        .ok_or_else(|| AppError::GroupNotFound)?;
 
     Ok(group)
 }
@@ -396,7 +396,7 @@ async fn ensure_syncable_exists(
                 .team_exists(syncable_id)
                 .await?;
             if !exists {
-                return Err(AppError::NotFound("Team not found".to_string()));
+                return Err(AppError::TeamNotFound);
             }
         }
         SyncableKind::Channel => {
@@ -404,7 +404,7 @@ async fn ensure_syncable_exists(
                 .channel_exists(syncable_id)
                 .await?;
             if !exists {
-                return Err(AppError::NotFound("Channel not found".to_string()));
+                return Err(AppError::ChannelNotFound);
             }
         }
     }
@@ -432,7 +432,7 @@ async fn syncable_payload(
             let team = GroupRepository::new(&state.db)
                 .get_team_meta(row.syncable_id)
                 .await?
-                .ok_or_else(|| AppError::NotFound("Team not found".to_string()))?;
+                .ok_or_else(|| AppError::TeamNotFound)?;
 
             payload["team_id"] = json!(encode_mm_id(team.id));
             payload["team_display_name"] = json!(team.display_name.unwrap_or(team.name));
@@ -442,7 +442,7 @@ async fn syncable_payload(
             let channel = GroupRepository::new(&state.db)
                 .get_channel_meta(row.syncable_id)
                 .await?
-                .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+                .ok_or_else(|| AppError::ChannelNotFound)?;
 
             payload["channel_id"] = json!(encode_mm_id(channel.id));
             payload["channel_display_name"] = json!(channel.display_name.unwrap_or(channel.name));
@@ -624,7 +624,7 @@ async fn reconcile_group_syncable(
                 let channel_team_id = GroupRepository::new(&state.db)
                     .get_channel_team_id(syncable_id)
                     .await?
-                    .ok_or_else(|| AppError::NotFound("Channel not found".to_string()))?;
+                    .ok_or_else(|| AppError::ChannelNotFound)?;
 
                 for user_id in &group_user_ids {
                     desired.insert(DesiredMembership {
@@ -817,13 +817,12 @@ async fn get_group(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let group = GroupRepository::new(&state.db)
         .get_group_list_by_id(group_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+        .ok_or_else(|| AppError::GroupNotFound)?;
 
     Ok(Json(group_json(&group)))
 }
@@ -837,13 +836,12 @@ async fn patch_group(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let current = GroupRepository::new(&state.db)
         .get_group_row_by_id_unchecked(group_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+        .ok_or_else(|| AppError::GroupNotFound)?;
 
     if current.source == GROUP_SOURCE_CUSTOM && patch.allow_reference == Some(false) {
         return Err(AppError::BadRequest(
@@ -868,7 +866,7 @@ async fn patch_group(
             patch.allow_reference,
         )
         .await?
-        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+        .ok_or_else(|| AppError::GroupNotFound)?;
 
     emit_received_group_event(&state, &updated).await;
 
@@ -883,13 +881,12 @@ async fn delete_group(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let deleted_group = GroupRepository::new(&state.db)
         .soft_delete_group(group_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+        .ok_or_else(|| AppError::GroupNotFound)?;
 
     emit_received_group_event(&state, &deleted_group).await;
 
@@ -904,13 +901,12 @@ async fn restore_group(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let group = GroupRepository::new(&state.db)
         .restore_group(group_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Group not found".to_string()))?;
+        .ok_or_else(|| AppError::GroupNotFound)?;
 
     emit_received_group_event(&state, &group).await;
 
@@ -925,8 +921,7 @@ async fn link_group_syncable_by_kind(
     kind: SyncableKind,
     patch: GroupSyncablePatch,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
 
@@ -961,8 +956,7 @@ async fn unlink_group_syncable_by_kind(
     syncable_id: String,
     kind: SyncableKind,
 ) -> ApiResult<Json<Value>> {
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
     let group = fetch_group_for_syncable(&state, group_id).await?;
@@ -1006,8 +1000,7 @@ async fn get_group_syncable_by_kind(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
 
@@ -1027,8 +1020,7 @@ async fn get_group_syncables_by_kind(
 ) -> ApiResult<Json<Vec<Value>>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let rows = GroupRepository::new(&state.db)
         .list_group_syncables_by_type(group_id, kind.as_db_str())
@@ -1050,8 +1042,7 @@ async fn patch_group_syncable_by_kind(
     kind: SyncableKind,
     patch: GroupSyncablePatch,
 ) -> ApiResult<Json<Value>> {
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let syncable_id = parse_mm_or_uuid(&syncable_id)
         .ok_or_else(|| AppError::BadRequest("Invalid syncable_id".to_string()))?;
     let group = fetch_group_for_syncable(&state, group_id).await?;
@@ -1193,8 +1184,7 @@ async fn get_group_stats(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let count = GroupRepository::new(&state.db)
         .count_group_members(group_id)
@@ -1214,8 +1204,7 @@ async fn get_group_members(
 ) -> ApiResult<Json<Value>> {
     require_system_groups_read(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
 
     let rows = GroupRepository::new(&state.db)
         .list_group_members(group_id)
@@ -1241,8 +1230,7 @@ async fn add_group_members(
 ) -> ApiResult<(axum::http::StatusCode, Json<Vec<Value>>)> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let user_ids = parse_user_ids(&members.user_ids)?;
 
     fetch_group_for_syncable(&state, group_id).await?;
@@ -1274,8 +1262,7 @@ async fn delete_group_members(
 ) -> ApiResult<Json<Vec<Value>>> {
     require_system_groups_write(&auth)?;
 
-    let group_id = parse_mm_or_uuid(&group_id)
-        .ok_or_else(|| AppError::BadRequest("Invalid group_id".to_string()))?;
+    let group_id = parse_mm_or_uuid(&group_id).ok_or_else(|| AppError::InvalidGroupId)?;
     let user_ids = parse_user_ids(&members.user_ids)?;
 
     fetch_group_for_syncable(&state, group_id).await?;
