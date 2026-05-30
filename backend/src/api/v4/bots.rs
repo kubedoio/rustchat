@@ -25,7 +25,7 @@ use crate::api::AppState;
 use crate::auth::policy::permissions;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{id::encode_mm_id, models as mm};
-use crate::models::Bot;
+use crate::models::{validate_username_token, Bot};
 use axum::extract::Path;
 use uuid::Uuid;
 
@@ -58,6 +58,8 @@ pub async fn create_bot(
             "Missing permission to create bots".to_string(),
         ));
     }
+    validate_username_token(&input.username)
+        .map_err(|message| AppError::BadRequest(message.to_string()))?;
 
     // 1. Create a user for the bot
     let user_id = Uuid::new_v4();

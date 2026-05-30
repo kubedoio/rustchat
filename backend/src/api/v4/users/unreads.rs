@@ -1,5 +1,6 @@
 use axum::extract::Query;
 use axum::{extract::State, Json};
+use regex::escape as escape_regex;
 use serde::Deserialize;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -46,6 +47,17 @@ struct TeamUnreadThreadRow {
     thread_urgent_mention_count: i64,
 }
 
+fn mention_pattern(username: &str) -> String {
+    format!(
+        r"(^|[^a-z0-9_.-])@({}|all|channel)([^a-z0-9_.-]|$)",
+        escape_regex(&username.to_ascii_lowercase())
+    )
+}
+
+fn here_pattern() -> &'static str {
+    r"(^|[^a-z0-9_.-])@here([^a-z0-9_.-]|$)"
+}
+
 pub fn parse_optional_team_query(exclude_team: &Option<String>) -> ApiResult<Option<Uuid>> {
     let Some(raw_team) = exclude_team else {
         return Ok(None);
@@ -71,6 +83,7 @@ pub async fn compute_team_unreads(
         .bind(user_id)
         .fetch_one(&state.db)
         .await?;
+    let mention_pattern = mention_pattern(&username);
 
     let mut rows: Vec<TeamUnreadChannelRow> = sqlx::query_as(
         r#"
@@ -93,7 +106,7 @@ pub async fn compute_team_unreads(
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
+                      AND LOWER(p.message) ~ $2
                 ) AS mention_count,
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
@@ -104,13 +117,13 @@ pub async fn compute_team_unreads(
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
                       AND p.root_post_id IS NULL
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
+                      AND LOWER(p.message) ~ $2
                 ) AS mention_count_root,
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-                      AND p.message LIKE '%@here%'
+                      AND LOWER(p.message) ~ $2
+                      AND LOWER(p.message) ~ $5
                 ) AS urgent_mention_count
             FROM posts p
             WHERE p.channel_id = cm.channel_id
@@ -121,9 +134,10 @@ pub async fn compute_team_unreads(
         "#,
     )
     .bind(user_id)
-    .bind(&username)
+    .bind(&mention_pattern)
     .bind(exclude_team)
     .bind(only_team)
+    .bind(here_pattern())
     .fetch_all(&state.db)
     .await?;
 
@@ -178,12 +192,8 @@ pub async fn compute_team_unreads(
                     WHERE rp.root_post_id = tm.post_id
                       AND rp.deleted_at IS NULL
                       AND (tm.last_read_at IS NULL OR rp.created_at > tm.last_read_at)
-                      AND (
-                          rp.message LIKE '%@' || $4 || '%'
-                          OR rp.message LIKE '%@all%'
-                          OR rp.message LIKE '%@channel%'
-                      )
-                      AND rp.message LIKE '%@here%'
+                      AND LOWER(rp.message) ~ $4
+                      AND LOWER(rp.message) ~ $5
                 )), 0)::BIGINT AS thread_urgent_mention_count
             FROM thread_memberships tm
             JOIN posts p ON p.id = tm.post_id
@@ -200,7 +210,8 @@ pub async fn compute_team_unreads(
         .bind(user_id)
         .bind(exclude_team)
         .bind(only_team)
-        .bind(&username)
+        .bind(&mention_pattern)
+        .bind(here_pattern())
         .fetch_all(&state.db)
         .await?;
 

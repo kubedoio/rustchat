@@ -192,31 +192,19 @@ pub async fn fetch_channel_member_compat_rows(
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND (
-                          p.message LIKE '%@' || u.username || '%'
-                          OR p.message LIKE '%@all%'
-                          OR p.message LIKE '%@channel%'
-                      )
+                      AND LOWER(p.message) ~ ('(^|[^a-z0-9_.-])@(' || LOWER(u.username) || '|all|channel)([^a-z0-9_.-]|$)')
                 )::BIGINT AS mention_count,
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
                       AND p.root_post_id IS NULL
-                      AND (
-                          p.message LIKE '%@' || u.username || '%'
-                          OR p.message LIKE '%@all%'
-                          OR p.message LIKE '%@channel%'
-                      )
+                      AND LOWER(p.message) ~ ('(^|[^a-z0-9_.-])@(' || LOWER(u.username) || '|all|channel)([^a-z0-9_.-]|$)')
                 )::BIGINT AS mention_count_root,
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND (
-                          p.message LIKE '%@' || u.username || '%'
-                          OR p.message LIKE '%@all%'
-                          OR p.message LIKE '%@channel%'
-                      )
-                      AND p.message LIKE '%@here%'
+                      AND LOWER(p.message) ~ ('(^|[^a-z0-9_.-])@(' || LOWER(u.username) || '|all|channel)([^a-z0-9_.-]|$)')
+                      AND LOWER(p.message) ~ '(^|[^a-z0-9_.-])@here([^a-z0-9_.-]|$)'
                 )::BIGINT AS urgent_mention_count,
                 GREATEST(
                     COUNT(*) FILTER (
@@ -280,31 +268,19 @@ pub async fn fetch_channel_member_compat_rows(
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND (
-                      p.message LIKE '%@' || u.username || '%'
-                      OR p.message LIKE '%@all%'
-                      OR p.message LIKE '%@channel%'
-                  )
+                  AND LOWER(p.message) ~ ('(^|[^a-z0-9_.-])@(' || LOWER(u.username) || '|all|channel)([^a-z0-9_.-]|$)')
             )::BIGINT AS mention_count,
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
                   AND p.root_post_id IS NULL
-                  AND (
-                      p.message LIKE '%@' || u.username || '%'
-                      OR p.message LIKE '%@all%'
-                      OR p.message LIKE '%@channel%'
-                  )
+                  AND LOWER(p.message) ~ ('(^|[^a-z0-9_.-])@(' || LOWER(u.username) || '|all|channel)([^a-z0-9_.-]|$)')
             )::BIGINT AS mention_count_root,
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND (
-                      p.message LIKE '%@' || u.username || '%'
-                      OR p.message LIKE '%@all%'
-                      OR p.message LIKE '%@channel%'
-                  )
-                  AND p.message LIKE '%@here%'
+                  AND LOWER(p.message) ~ ('(^|[^a-z0-9_.-])@(' || LOWER(u.username) || '|all|channel)([^a-z0-9_.-]|$)')
+                  AND LOWER(p.message) ~ '(^|[^a-z0-9_.-])@here([^a-z0-9_.-]|$)'
             )::BIGINT AS urgent_mention_count,
             GREATEST(
                 COUNT(*) FILTER (

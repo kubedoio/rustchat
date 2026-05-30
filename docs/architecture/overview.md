@@ -103,8 +103,8 @@ Two WebSocket endpoints share a common core (`api/websocket_core.rs`) but presen
 
 | Endpoint | Clients | Wire format |
 |---|---|---|
-| `/api/v1/ws` | rustchat web app, internal clients | Internal envelope (`type`, `event`, `data`, `channel_id`) |
-| `/api/v4/websocket` | Mattermost mobile/desktop clients | Mattermost framing (`event`, `data`, `broadcast`, `seq`) |
+| `/api/v1/ws` | Internal clients and compatibility experiments | Internal envelope (`type`, `event`, `data`, `channel_id`) |
+| `/api/v4/websocket` | rustchat web app and Mattermost mobile/desktop clients | Mattermost framing (`event`, `data`, `broadcast`, `seq`) |
 
 **Shared core handles:**
 - Auth token normalization (header + `Sec-WebSocket-Protocol` fallback)

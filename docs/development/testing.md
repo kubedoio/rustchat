@@ -1,23 +1,39 @@
 # Testing Model
 
-**Last updated:** 2026-03-22
+**Last updated:** 2026-05-30
 
 ---
 
 ## Overview
 
-rustchat uses four test layers. There are no formal unit tests — the backend test suite is entirely integration tests that require live infrastructure. The frontend has E2E tests only (no unit/component test framework is configured).
+rustchat uses several test layers. Backend library tests can run without live infrastructure, while backend integration tests require PostgreSQL, Redis, and S3-compatible storage. The frontend has unit/component tests, E2E tests, and build-time type checking.
 
 | Layer | Location | Scope | Infrastructure required |
 |---|---|---|---|
+| Backend unit | `backend/src/` | Pure logic, mappers, auth helpers, config, realtime helpers | None |
 | Backend integration | `backend/tests/` | HTTP API, services, DB queries | PostgreSQL + Redis + S3 |
 | Compat contract | `backend/compat/tests/` | Mattermost v4 response shape validation utilities | Called from integration tests |
+| Frontend unit/component | `frontend/src/**/*.test.ts` | Stores, components, API behavior | None |
 | Frontend E2E | `frontend/e2e/` | Playwright browser automation | Running full stack |
-| Frontend build | CI only | TypeScript compilation + Vite build | None |
+| Frontend build | `frontend` | TypeScript compilation + Vite build | None |
 
 ---
 
-## 1. Backend Integration Tests
+## 1. Backend Unit Tests
+
+**Location:** `backend/src/`
+**Framework:** Rust `#[test]` and `tokio::test`
+
+These tests cover pure logic and small async units that do not need the integration stack.
+
+```bash
+cd backend
+cargo test --lib
+```
+
+---
+
+## 2. Backend Integration Tests
 
 **Location:** `backend/tests/`
 **Count:** ~170 tests (as of 2026-03-22)
@@ -57,7 +73,7 @@ cargo test -- --nocapture 2>&1 | head -100
 
 ---
 
-## 2. Compat Contract Validation
+## 3. Compat Contract Validation
 
 **Location:** `backend/compat/tests/contract_validation.rs`
 **Purpose:** Validation utility functions that check Mattermost v4 JSON response shapes
@@ -77,7 +93,19 @@ When the compat surface changes, check whether the OpenAPI diff in `compat.yml` 
 
 ---
 
-## 3. Frontend E2E Tests
+## 4. Frontend Unit and Component Tests
+
+**Location:** `frontend/src/**/*.test.ts`
+**Framework:** Vitest
+
+```bash
+cd frontend
+npm run test:unit
+```
+
+---
+
+## 5. Frontend E2E Tests
 
 **Location:** `frontend/e2e/`
 **Framework:** Playwright (snapshot-based)
@@ -100,9 +128,9 @@ After updating snapshots, commit the new baseline files in `frontend/e2e/`.
 
 ---
 
-## 4. Frontend Build Check
+## 6. Frontend Build Check
 
-The frontend CI (`ci.yml`) runs `npm run build` as a build-time type check. There is no separate unit/component test framework configured.
+The frontend CI (`ci.yml`) runs `npm run build` as a build-time type check.
 
 ```bash
 cd frontend

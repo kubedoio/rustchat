@@ -12,7 +12,9 @@ use super::AppState;
 use crate::auth::{create_token_with_policy, hash_password, verify_password, AuthUser};
 use crate::error::{ApiResult, AppError};
 use crate::middleware::rate_limit::{self, RateLimitConfig};
-use crate::models::{AuthResponse, CreateUser, LoginRequest, User, UserResponse};
+use crate::models::{
+    validate_username_token, AuthResponse, CreateUser, LoginRequest, User, UserResponse,
+};
 use crate::repositories::{SystemRepository, UserRepository};
 use crate::services::membership_policies::apply_auto_membership_for_new_user;
 use crate::services::password_reset::{
@@ -137,11 +139,8 @@ async fn register(
     }
 
     // Validate input
-    if input.username.len() < 3 {
-        return Err(AppError::Validation(
-            "Username must be at least 3 characters".to_string(),
-        ));
-    }
+    validate_username_token(&input.username)
+        .map_err(|message| AppError::Validation(message.to_string()))?;
 
     if !input.email.contains('@') {
         return Err(AppError::Validation("Invalid email format".to_string()));

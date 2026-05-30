@@ -4,11 +4,23 @@
 //! queries previously scattered across the codebase (api/posts.rs, api/v4/posts.rs, etc.)
 
 use chrono::{DateTime, Utc};
+use regex::escape as escape_regex;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::{ApiResult, AppError};
 use crate::models::{ChannelMember, FileInfo};
+
+fn mention_pattern(username: &str) -> String {
+    format!(
+        r"(^|[^a-z0-9_.-])@({}|all|channel)([^a-z0-9_.-]|$)",
+        escape_regex(&username.to_ascii_lowercase())
+    )
+}
+
+fn here_pattern() -> &'static str {
+    r"(^|[^a-z0-9_.-])@here([^a-z0-9_.-]|$)"
+}
 
 /// Post with joined user info
 ///
@@ -736,6 +748,7 @@ impl PostRepository {
         last_read_id: i64,
         username: &str,
     ) -> ApiResult<ChannelUnreadStats> {
+        let mention_pattern = mention_pattern(username);
         let stats = sqlx::query_as(
             r#"
             SELECT
@@ -756,31 +769,19 @@ impl PostRepository {
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > $2
-                      AND (
-                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
-                          OR p.message LIKE '%@all%'
-                          OR p.message LIKE '%@channel%'
-                      )
+                      AND LOWER(p.message) ~ $3
                 )::BIGINT AS mention_count,
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > $2
                       AND p.root_post_id IS NULL
-                      AND (
-                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
-                          OR p.message LIKE '%@all%'
-                          OR p.message LIKE '%@channel%'
-                      )
+                      AND LOWER(p.message) ~ $3
                 )::BIGINT AS mention_count_root,
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > $2
-                      AND (
-                          p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])')
-                          OR p.message LIKE '%@all%'
-                          OR p.message LIKE '%@channel%'
-                      )
-                      AND p.message LIKE '%@here%'
+                      AND LOWER(p.message) ~ $3
+                      AND LOWER(p.message) ~ $4
                 )::BIGINT AS urgent_mention_count
             FROM posts p
             WHERE p.channel_id = $1
@@ -788,7 +789,8 @@ impl PostRepository {
         )
         .bind(channel_id)
         .bind(last_read_id)
-        .bind(username)
+        .bind(&mention_pattern)
+        .bind(here_pattern())
         .fetch_one(&self.db)
         .await?;
 
@@ -802,17 +804,18 @@ impl PostRepository {
         username: &str,
         mark_view_at: chrono::DateTime<chrono::Utc>,
     ) -> ApiResult<(i64, i64)> {
+        let mention_pattern = mention_pattern(username);
         let counts = sqlx::query_as(
             r#"
             SELECT
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3)::BIGINT AS unread_replies_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $2 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.created_at > $3 AND LOWER(p.message) ~ $2)::BIGINT AS mention_count
             FROM posts p
             WHERE p.root_post_id = $1
             "#,
         )
         .bind(thread_root_id)
-        .bind(username)
+        .bind(&mention_pattern)
         .bind(mark_view_at)
         .fetch_one(&self.db)
         .await?;
@@ -1373,13 +1376,14 @@ impl PostRepository {
         username: &str,
         post_priority_enabled: bool,
     ) -> ApiResult<(i64, i64, i64, i64, i64)> {
+        let mention_pattern = mention_pattern(username);
         let row: (i64, i64, i64, i64, i64) = sqlx::query_as(
             r#"
             SELECT
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2)::BIGINT AS msg_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%'))::BIGINT AS mention_count_root,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND (p.message ~ ('(^|[^a-zA-Z0-9_.-])@' || $3 || '($|[^a-zA-Z0-9_.-])') OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%') AND p.message LIKE '%@here%')::BIGINT AS urgent_mention_count,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND LOWER(p.message) ~ $3)::BIGINT AS mention_count,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL AND LOWER(p.message) ~ $3)::BIGINT AS mention_count_root,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND LOWER(p.message) ~ $3 AND LOWER(p.message) ~ $4)::BIGINT AS urgent_mention_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL)::BIGINT AS msg_count_root
             FROM posts p
             WHERE p.channel_id = $1
@@ -1387,7 +1391,8 @@ impl PostRepository {
         )
         .bind(channel_id)
         .bind(last_read_message_id)
-        .bind(username)
+        .bind(&mention_pattern)
+        .bind(here_pattern())
         .fetch_one(&self.db)
         .await?;
 

@@ -131,10 +131,10 @@ This design allows horizontal scaling: add more backend instances behind a load 
 ```
 ┌─────────┐    POST /api/v1/files    ┌──────────┐    PUT      ┌─────────┐
 │  Client │ ───────────────────────▶│ Backend  │ ──────────▶│   S3    │
-│         │  multipart/form-data    │          │  presigned │ (RustFS)│
-│         │                         │          │  URL       │         │
+│         │  multipart/form-data    │          │  internal  │ (RustFS)│
+│         │                         │          │  client    │         │
 │         │◀─────────────────────── │          │◀───────────│         │
-│         │  { file_id, url }       │          │            │         │
+│         │  { file_id, api url }   │          │            │         │
 │         │                         │          │            │         │
 │         │    GET /api/v1/files/...│          │            │         │
 │         │ ───────────────────────▶│          │            │         │
@@ -145,10 +145,13 @@ This design allows horizontal scaling: add more backend instances behind a load 
 ```
 
 1. Client uploads file via multipart POST to backend
-2. Backend generates a presigned URL and uploads to S3-compatible storage
-3. Backend returns file metadata to client
-4. Client requests file download through backend (authenticated)
-5. Backend proxies the file from S3 with auth check — no presigned URL leaks to end users
+2. Backend validates channel membership before reading the upload body
+3. Backend uploads to S3-compatible storage through the server-side storage client
+4. Backend returns file metadata and an authenticated RustChat API URL to client
+5. Client requests file download through backend (authenticated)
+6. Backend proxies the file from S3 with auth check — no presigned URL leaks to end users
+
+The native presign endpoint is intentionally unsupported for end-user clients. Uploads should use multipart `POST /api/v1/files`, and reads should use the returned RustChat API URL. Mattermost-compatible file link responses and custom emoji image responses also return or stream through RustChat API URLs rather than direct S3 links.
 
 ---
 

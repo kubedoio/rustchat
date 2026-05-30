@@ -271,7 +271,7 @@ async fn mm_update_post_route_put_rejects_non_author() {
 }
 
 #[tokio::test]
-async fn mm_burn_on_read_routes_support_mattermost_verbs_with_legacy_post_shim() {
+async fn mm_burn_on_read_routes_return_explicit_not_implemented() {
     let ctx = setup_mm_user().await;
     let (_team_id, channel_id) = setup_team_channel(&ctx).await;
     let post_id = create_post(&ctx, channel_id, "burn on read route parity").await;
@@ -287,9 +287,7 @@ async fn mm_burn_on_read_routes_support_mattermost_verbs_with_legacy_post_shim()
         .send()
         .await
         .unwrap();
-    assert_eq!(200, reveal_get.status().as_u16());
-    let reveal_get_body: serde_json::Value = reveal_get.json().await.unwrap();
-    assert_eq!(reveal_get_body["status"], "OK");
+    assert_eq!(501, reveal_get.status().as_u16());
 
     let burn_delete = ctx
         .app
@@ -302,11 +300,8 @@ async fn mm_burn_on_read_routes_support_mattermost_verbs_with_legacy_post_shim()
         .send()
         .await
         .unwrap();
-    assert_eq!(200, burn_delete.status().as_u16());
-    let burn_delete_body: serde_json::Value = burn_delete.json().await.unwrap();
-    assert_eq!(burn_delete_body["status"], "OK");
+    assert_eq!(501, burn_delete.status().as_u16());
 
-    // Temporary backward compatibility shim for existing callers using POST.
     let reveal_post = ctx
         .app
         .api_client
@@ -318,7 +313,7 @@ async fn mm_burn_on_read_routes_support_mattermost_verbs_with_legacy_post_shim()
         .send()
         .await
         .unwrap();
-    assert_eq!(200, reveal_post.status().as_u16());
+    assert_eq!(501, reveal_post.status().as_u16());
 
     let burn_post = ctx
         .app
@@ -331,7 +326,7 @@ async fn mm_burn_on_read_routes_support_mattermost_verbs_with_legacy_post_shim()
         .send()
         .await
         .unwrap();
-    assert_eq!(200, burn_post.status().as_u16());
+    assert_eq!(501, burn_post.status().as_u16());
 }
 
 #[tokio::test]
@@ -399,6 +394,168 @@ async fn mm_post_files_info_returns_files() {
     assert_eq!(200, info_res.status().as_u16());
     let info_body: serde_json::Value = info_res.json().await.unwrap();
     assert_eq!(info_body.as_array().unwrap().len(), 1);
+
+    let link_res = ctx
+        .app
+        .api_client
+        .get(format!(
+            "{}/api/v4/files/{}/link",
+            &ctx.app.address, file_id
+        ))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, link_res.status().as_u16());
+    let link_body: serde_json::Value = link_res.json().await.unwrap();
+    let link = link_body["link"].as_str().unwrap();
+    assert!(link.starts_with("/api/v4/files/"));
+    assert!(!link.contains("X-Amz-"));
+    assert!(!link.starts_with("http://"));
+    assert!(!link.starts_with("https://"));
+}
+
+#[tokio::test]
+async fn native_file_upload_rejects_non_member_channel_association() {
+    let ctx = setup_mm_user().await;
+    let (_team_id, channel_id) = setup_team_channel(&ctx).await;
+
+    let intruder_data = json!({
+        "username": "nativefileintruder",
+        "email": "nativefileintruder@example.com",
+        "password": "Password123!",
+        "display_name": "Native File Intruder",
+        "org_id": ctx.org_id
+    });
+    ctx.app
+        .api_client
+        .post(format!("{}/api/v1/auth/register", &ctx.app.address))
+        .json(&intruder_data)
+        .send()
+        .await
+        .unwrap();
+
+    let login_res = ctx
+        .app
+        .api_client
+        .post(format!("{}/api/v4/users/login", &ctx.app.address))
+        .json(&json!({
+            "login_id": "nativefileintruder@example.com",
+            "password": "Password123!"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, login_res.status().as_u16());
+    let intruder_token = login_res
+        .headers()
+        .get("Token")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let part = reqwest::multipart::Part::bytes(b"hello world".to_vec())
+        .file_name("private.txt")
+        .mime_str("text/plain")
+        .unwrap();
+    let form = reqwest::multipart::Form::new().part("file", part);
+
+    let upload_res = ctx
+        .app
+        .api_client
+        .post(format!(
+            "{}/api/v1/files?channel_id={}",
+            &ctx.app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {}", intruder_token))
+        .multipart(form)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(403, upload_res.status().as_u16());
+
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE channel_id = $1 AND name = $2")
+            .bind(channel_id)
+            .bind("private.txt")
+            .fetch_one(&ctx.app.db_pool)
+            .await
+            .unwrap();
+    assert_eq!(0, count);
+}
+
+#[tokio::test]
+async fn native_file_upload_returns_authenticated_api_url() {
+    let ctx = setup_mm_user().await;
+    let (_team_id, channel_id) = setup_team_channel(&ctx).await;
+
+    let part = reqwest::multipart::Part::bytes(b"hello member".to_vec())
+        .file_name("member.txt")
+        .mime_str("text/plain")
+        .unwrap();
+    let form = reqwest::multipart::Form::new().part("file", part);
+
+    let upload_res = ctx
+        .app
+        .api_client
+        .post(format!(
+            "{}/api/v1/files?channel_id={}",
+            &ctx.app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .multipart(form)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, upload_res.status().as_u16());
+    let upload_body: serde_json::Value = upload_res.json().await.unwrap();
+    let url = upload_body["url"].as_str().unwrap();
+    assert!(url.starts_with("/api/v1/files/"));
+    assert!(url.ends_with("/content"));
+    assert!(!url.contains("X-Amz-"));
+    assert!(!url.starts_with("http://"));
+    assert!(!url.starts_with("https://"));
+
+    let file_id = upload_body["id"].as_str().unwrap();
+    let download_res = ctx
+        .app
+        .api_client
+        .get(format!(
+            "{}/api/v1/files/{}/download",
+            &ctx.app.address, file_id
+        ))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, download_res.status().as_u16());
+    let download_body: serde_json::Value = download_res.json().await.unwrap();
+    assert_eq!(url, download_body["url"].as_str().unwrap());
+}
+
+#[tokio::test]
+async fn native_presign_endpoint_is_explicitly_unsupported() {
+    let ctx = setup_mm_user().await;
+    let (_team_id, channel_id) = setup_team_channel(&ctx).await;
+
+    let presign_res = ctx
+        .app
+        .api_client
+        .post(format!("{}/api/v1/files/presign", &ctx.app.address))
+        .header("Authorization", format!("Bearer {}", ctx.token))
+        .json(&json!({
+            "filename": "direct.txt",
+            "content_type": "text/plain",
+            "channel_id": channel_id
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(501, presign_res.status().as_u16());
+    let body: serde_json::Value = presign_res.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "NOT_IMPLEMENTED");
+    assert!(body.get("upload_url").is_none());
 }
 
 #[tokio::test]

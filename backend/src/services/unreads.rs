@@ -1,6 +1,7 @@
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use deadpool_redis::redis::AsyncCommands;
+use regex::escape as escape_regex;
 use serde::Serialize;
 use sqlx::FromRow;
 use std::collections::{HashMap, HashSet};
@@ -87,6 +88,17 @@ fn parse_bool_opt(raw: Option<String>) -> Option<bool> {
     })
 }
 
+fn unread_mention_pattern(username: &str) -> String {
+    format!(
+        r"(^|[^a-z0-9_.-])@({}|all|channel)([^a-z0-9_.-]|$)",
+        escape_regex(&username.to_ascii_lowercase())
+    )
+}
+
+fn unread_here_pattern() -> &'static str {
+    r"(^|[^a-z0-9_.-])@here([^a-z0-9_.-]|$)"
+}
+
 async fn fetch_username(state: &AppState, user_id: Uuid) -> ApiResult<String> {
     let username: Option<String> = sqlx::query_scalar("SELECT username FROM users WHERE id = $1")
         .bind(user_id)
@@ -118,6 +130,9 @@ async fn compute_channel_unread_from_db(
     channel_id: Uuid,
     username: &str,
 ) -> ApiResult<ChannelUnreadV2> {
+    let mention_pattern = unread_mention_pattern(username);
+    let here_pattern = unread_here_pattern();
+
     #[allow(clippy::type_complexity)]
     let row: Option<(
         Option<chrono::DateTime<chrono::Utc>>,
@@ -144,19 +159,19 @@ async fn compute_channel_unread_from_db(
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
+                  AND LOWER(p.message) ~ $3
             )::BIGINT AS mention_count,
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
                   AND p.root_post_id IS NULL
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
+                  AND LOWER(p.message) ~ $3
             )::BIGINT AS mention_count_root,
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-                  AND p.message LIKE '%@here%'
+                  AND LOWER(p.message) ~ $3
+                  AND LOWER(p.message) ~ $4
             )::BIGINT AS urgent_mention_count
         FROM channel_members cm
         LEFT JOIN channel_reads cr
@@ -171,7 +186,8 @@ async fn compute_channel_unread_from_db(
     )
     .bind(user_id)
     .bind(channel_id)
-    .bind(username)
+    .bind(&mention_pattern)
+    .bind(here_pattern)
     .fetch_optional(&state.db)
     .await?;
 
@@ -221,6 +237,9 @@ async fn compute_team_unread_from_db(
     team_id: Uuid,
     username: &str,
 ) -> ApiResult<TeamUnreadV2> {
+    let mention_pattern = unread_mention_pattern(username);
+    let here_pattern = unread_here_pattern();
+
     let channel_rows: Vec<(serde_json::Value, i64, i64, i64, i64, i64)> = sqlx::query_as(
         r#"
         SELECT
@@ -237,19 +256,19 @@ async fn compute_team_unread_from_db(
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
+                  AND LOWER(p.message) ~ $3
             )::BIGINT AS mention_count,
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
                   AND p.root_post_id IS NULL
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
+                  AND LOWER(p.message) ~ $3
             )::BIGINT AS mention_count_root,
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND (p.message LIKE '%@' || $3 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-                  AND p.message LIKE '%@here%'
+                  AND LOWER(p.message) ~ $3
+                  AND LOWER(p.message) ~ $4
             )::BIGINT AS urgent_mention_count
         FROM channel_members cm
         JOIN channels c ON c.id = cm.channel_id
@@ -265,7 +284,8 @@ async fn compute_team_unread_from_db(
     )
     .bind(user_id)
     .bind(team_id)
-    .bind(username)
+    .bind(&mention_pattern)
+    .bind(here_pattern)
     .fetch_all(&state.db)
     .await?;
 
@@ -312,12 +332,8 @@ async fn compute_team_unread_from_db(
                 WHERE rp.root_post_id = tm.post_id
                   AND rp.deleted_at IS NULL
                   AND (tm.last_read_at IS NULL OR rp.created_at > tm.last_read_at)
-                  AND (
-                      rp.message LIKE '%@' || $3 || '%'
-                      OR rp.message LIKE '%@all%'
-                      OR rp.message LIKE '%@channel%'
-                  )
-                  AND rp.message LIKE '%@here%'
+                  AND LOWER(rp.message) ~ $3
+                  AND LOWER(rp.message) ~ $4
             )), 0)::BIGINT AS thread_urgent_mention_count
         FROM thread_memberships tm
         JOIN posts p ON p.id = tm.post_id
@@ -331,7 +347,8 @@ async fn compute_team_unread_from_db(
         )
         .bind(user_id)
         .bind(team_id)
-        .bind(username)
+        .bind(&mention_pattern)
+        .bind(here_pattern)
         .fetch_one(&state.db)
         .await
         .unwrap_or((0, 0, 0));
@@ -1059,4 +1076,39 @@ pub async fn mark_all_as_read(state: &AppState, user_id: Uuid) -> ApiResult<()> 
     let _: () = conn.del(v2_dirty_key(user_id)).await.unwrap_or(());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{unread_here_pattern, unread_mention_pattern};
+    use regex::Regex;
+
+    #[test]
+    fn unread_mention_pattern_matches_exact_tokens() {
+        let pattern = Regex::new(&unread_mention_pattern("ann")).expect("valid regex");
+
+        assert!(pattern.is_match("hello @ann"));
+        assert!(pattern.is_match("(@ann)"));
+        assert!(pattern.is_match("@channel heads up"));
+        assert!(pattern.is_match("@all heads up"));
+        assert!(!pattern.is_match("hello @anna"));
+        assert!(!pattern.is_match("email ann@example.com"));
+    }
+
+    #[test]
+    fn unread_mention_pattern_escapes_usernames() {
+        let pattern = Regex::new(&unread_mention_pattern("a.b")).expect("valid regex");
+
+        assert!(pattern.is_match("hello @a.b"));
+        assert!(!pattern.is_match("hello @axb"));
+    }
+
+    #[test]
+    fn unread_here_pattern_matches_exact_here_token() {
+        let pattern = Regex::new(unread_here_pattern()).expect("valid regex");
+
+        assert!(pattern.is_match("@here please review"));
+        assert!(pattern.is_match("ping (@here)"));
+        assert!(!pattern.is_match("@hereafter"));
+    }
 }

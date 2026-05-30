@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use regex::escape as escape_regex;
 use serde_json::json;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -42,6 +43,17 @@ pub(crate) fn should_send_reconnect_snapshot(
         .map(|id| !id.trim().is_empty())
         .unwrap_or(false)
         || sequence_number.unwrap_or_default() > 0
+}
+
+fn mention_pattern(username: &str) -> String {
+    format!(
+        r"(^|[^a-z0-9_.-])@({}|all|channel)([^a-z0-9_.-]|$)",
+        escape_regex(&username.to_ascii_lowercase())
+    )
+}
+
+fn here_pattern() -> &'static str {
+    r"(^|[^a-z0-9_.-])@here([^a-z0-9_.-]|$)"
 }
 
 pub(crate) async fn send_reconnect_snapshot_if_needed(
@@ -134,6 +146,7 @@ pub(crate) async fn build_reconnect_snapshot(
         .bind(user_id)
         .fetch_one(&state.db)
         .await?;
+    let mention_pattern = mention_pattern(&username);
 
     #[allow(clippy::type_complexity)]
     let membership_rows: Vec<(
@@ -158,7 +171,7 @@ pub(crate) async fn build_reconnect_snapshot(
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
+                      AND LOWER(p.message) ~ $2
                 )::BIGINT AS mention_count,
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
@@ -169,13 +182,13 @@ pub(crate) async fn build_reconnect_snapshot(
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
                       AND p.root_post_id IS NULL
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
+                      AND LOWER(p.message) ~ $2
                 )::BIGINT AS mention_count_root,
                 COUNT(*) FILTER (
                     WHERE p.deleted_at IS NULL
                       AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                      AND (p.message LIKE '%@' || $2 || '%' OR p.message LIKE '%@all%' OR p.message LIKE '%@channel%')
-                      AND p.message LIKE '%@here%'
+                      AND LOWER(p.message) ~ $2
+                      AND LOWER(p.message) ~ $3
                 )::BIGINT AS urgent_mention_count
             FROM channel_members cm
             LEFT JOIN channel_reads cr
@@ -189,7 +202,8 @@ pub(crate) async fn build_reconnect_snapshot(
             "#,
         )
         .bind(user_id)
-        .bind(&username)
+        .bind(&mention_pattern)
+        .bind(here_pattern())
         .fetch_all(&state.db)
         .await?;
 

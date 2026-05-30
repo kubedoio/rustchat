@@ -12,7 +12,9 @@ use crate::api::v4::status as v4_status;
 use crate::auth::policy::permissions;
 use crate::auth::{hash_password, AuthUser};
 use crate::error::{ApiResult, AppError};
-use crate::models::{normalize_avatar_url, ChangePassword, UpdateUser, User, UserResponse};
+use crate::models::{
+    normalize_avatar_url, validate_username_token, ChangePassword, UpdateUser, User, UserResponse,
+};
 use crate::repositories::UserRepository;
 
 /// User status response
@@ -189,6 +191,8 @@ async fn update_user(
     }
 
     if let Some(ref username) = input.username {
+        validate_username_token(username)
+            .map_err(|message| AppError::BadRequest(message.to_string()))?;
         repo.update_username(id, username).await?;
     }
     if let Some(ref custom_status) = input.custom_status {
