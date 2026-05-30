@@ -107,6 +107,14 @@ impl<'a> ChannelRepository<'a> {
             .await
     }
 
+    /// Get a channel by ID regardless of deleted_at status (optional).
+    pub async fn get_by_id_any(&self, id: Uuid) -> Result<Option<Channel>, sqlx::Error> {
+        sqlx::query_as::<_, Channel>("SELECT * FROM channels WHERE id = $1")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await
+    }
+
     /// Get channel creator ID
     pub async fn get_creator_id(&self, channel_id: Uuid) -> Result<Option<Uuid>, sqlx::Error> {
         sqlx::query_scalar("SELECT creator_id FROM channels WHERE id = $1")

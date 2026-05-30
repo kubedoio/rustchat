@@ -601,7 +601,9 @@ async fn v4_delete_channel_archives_and_list_deleted_includes_it() {
         .await
         .expect("list deleted channels should be JSON");
 
-    let found = channels.iter().any(|c| c["id"] == channel_id.to_string());
+    let found = channels
+        .iter()
+        .any(|c| c["id"] == rustchat::mattermost_compat::id::encode_mm_id(channel_id));
     assert!(
         found,
         "archived channel should appear in deleted channels list"
@@ -610,7 +612,7 @@ async fn v4_delete_channel_archives_and_list_deleted_includes_it() {
     // Verify delete_at is set in the MM response
     let archived = channels
         .iter()
-        .find(|c| c["id"] == channel_id.to_string())
+        .find(|c| c["id"] == rustchat::mattermost_compat::id::encode_mm_id(channel_id))
         .expect("archived channel should be present");
     assert!(
         archived["delete_at"].as_i64().unwrap_or(0) > 0,
@@ -700,7 +702,9 @@ async fn v4_restore_channel_clears_archive_state() {
         .await
         .expect("list deleted channels request should complete");
     let channels: Vec<serde_json::Value> = response.json().await.unwrap();
-    assert!(channels.iter().any(|c| c["id"] == channel_id.to_string()));
+    assert!(channels
+        .iter()
+        .any(|c| c["id"] == rustchat::mattermost_compat::id::encode_mm_id(channel_id)));
 
     // Restore the channel
     let response = app
@@ -731,7 +735,9 @@ async fn v4_restore_channel_clears_archive_state() {
         .expect("list deleted channels request should complete");
     let channels: Vec<serde_json::Value> = response.json().await.unwrap();
     assert!(
-        !channels.iter().any(|c| c["id"] == channel_id.to_string()),
+        !channels
+            .iter()
+            .any(|c| c["id"] == rustchat::mattermost_compat::id::encode_mm_id(channel_id)),
         "restored channel should not appear in deleted channels list"
     );
 }
