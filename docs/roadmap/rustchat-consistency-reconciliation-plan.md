@@ -15,7 +15,7 @@ This document reflects the current branch state after the first low-hanging-fix 
 | F-003 v4 post action endpoints acknowledge unsupported mutations | P1 | Contract mismatch; implementation missing; test missing | Implemented on this branch: unsupported actions now return explicit 501 and tests were updated. | Verify integration tests in non-QA environment; update compatibility docs/matrix if not already done before merge. |
 | F-004 Scheduled post creation lacks channel membership check | P1 | Implementation missing; test missing | Implemented on this branch for create/update membership checks and non-member create test. | Verify integration tests in non-QA environment; consider follow-up tests for update/delete/root/file mismatch. |
 | F-005 Mention and unread semantics are string-matching based | P1 | Product gap; implementation missing; test missing | Implemented on this branch for current direct unread count paths: service, repository, v4 REST, and reconnect snapshot queries use token-boundary matching. Persisted mention-target storage remains future work. | Verify targeted tests in a non-QA environment; decide whether persisted mention targets are required before public preview. |
-| F-006 Configuration docs are stale for removed security options and renamed S3 option | P1 | Documentation stale; decision conflict | Implemented on this branch in `docs/admin/configuration.md` and `docs/security-model.md`. | Add optional docs/config drift lint if desired. |
+| F-006 Configuration docs are stale for removed security options and renamed S3 option | P1 | Documentation stale; decision conflict | Implemented on this branch in `docs/admin/configuration.md`, `docs/security-model.md`, deployment docs, and deployment templates. | Docs/config drift lint added in `docs/scripts/check-config-drift.mjs` and wired into docs CI. |
 | F-007 README overstates enterprise/preview maturity | P1 | Documentation stale; product gap | Partially implemented on this branch in README for SAML/LDAP and advanced post actions. | Verify README and compatibility docs stay aligned before release. |
 
 ## 2. Completed Or Verification-Only Items
@@ -28,7 +28,7 @@ These items should not remain active implementation batches unless the branch ch
 | Native/v4 file proxy-only response contract | `backend/src/api/files.rs`, `backend/src/api/v4/files.rs`, `docs/architecture.md`, `backend/tests/api_v4_post_routes.rs` | Run targeted integration and frontend checks in non-QA environment. |
 | v4 advanced post actions return explicit unsupported responses | `backend/src/api/v4/posts.rs`, `backend/tests/api_v4_post_routes.rs`, `backend/tests/api_v4_posts_extra.rs`, README | Run targeted integration tests. Update `docs/compatibility-scope.md` and `docs/reference/compatibility-matrix.md` if they still imply success behavior. |
 | Scheduled post create/update membership checks | `backend/src/api/v4/posts.rs`, `backend/tests/api_v4_posts_extra.rs` | Run targeted integration tests. Add optional update/delete/root/file mismatch coverage if required for preview. |
-| Config/security docs drift | `docs/admin/configuration.md`, `docs/security-model.md` | Optional docs lint for removed variables. |
+| Config/security docs drift | `docs/admin/configuration.md`, `docs/security-model.md`, `docs/deployment.md`, `docs/security-deployment-guide.md`, `.env.example`, `docker-compose.prod.yml` | Guarded by `npm run docs:check-config` in docs CI; active deployment docs and templates no longer carry the retired query-token setting. |
 | README maturity wording for SAML/LDAP and advanced post actions | `README.md` | Ensure compatibility docs mirror README before release. |
 | Testing model and WebSocket active endpoint docs | `docs/development/testing.md`, `docs/architecture/overview.md` | No active implementation work; keep aligned with future WebSocket consolidation work. |
 | Token-boundary unread matching across direct SQL paths | `backend/src/services/unreads.rs`, `backend/src/repositories/post_repository.rs`, `backend/src/api/v4/channels/utils.rs`, `backend/src/api/v4/users/unreads.rs`, `backend/src/api/v4/users/channel_members.rs`, `backend/src/api/v4/users/channels_ext.rs`, `backend/src/api/v4/websocket/resumption.rs` | Run targeted unread/mention integration tests in non-QA environment. |
@@ -188,14 +188,14 @@ Implementation plan:
 
 1. Audit compatibility docs against current v4 501 behavior.
 2. Add or update a release checklist entry requiring README/compatibility review when stubs change.
-3. Add a lightweight docs/config drift check if cheap.
-4. Confirm frontend does not expose actions that now return explicit 501, or that it handles the unsupported response cleanly.
+3. Add a lightweight docs/config drift check.
+4. Confirm frontend does not expose actions that now return explicit 501, or that it handles the unsupported response cleanly. Current branch verification found no frontend calls or controls for the advanced post action endpoints.
 
 Tests to add or update:
 
-- Docs/config grep for removed variables such as `RUSTCHAT_SECURITY_WS_ALLOW_QUERY_TOKEN` and old names such as `RUSTCHAT_S3_PUBLIC_URL`.
+- Docs/config drift check for removed query-token configuration and retired S3 public URL naming.
 - Contract test for Mattermost-compatible 501 error shape on unsupported post actions.
-- Frontend unit/E2E only if unsupported controls are visible.
+- Frontend unit/E2E only if unsupported controls become visible.
 
 Migration risks:
 
@@ -218,8 +218,8 @@ Acceptance criteria:
 
 - Compatibility docs match current explicit unsupported behavior.
 - README does not overstate SAML/LDAP/plugins/advanced post actions.
-- Removed env vars and stale names do not reappear in active docs.
-- Frontend either hides unsupported controls or handles explicit unsupported responses.
+- Removed env vars and stale names do not reappear in active docs or deployment templates.
+- Frontend either hides unsupported controls or handles explicit unsupported responses. Current branch search confirms unsupported advanced post action controls are not exposed.
 
 ### Batch 4: Public Preview Product Gap Triage
 
@@ -245,6 +245,17 @@ Implementation plan:
 1. Mark each remaining P1 maturity item as preview blocker, preview caveat, or post-preview.
 2. For blockers, create implementation issues tied to existing docs/contracts.
 3. For caveats, update README/ROADMAP/compatibility docs without adding duplicate specs.
+
+Current classification:
+
+| Remaining P1 maturity item | Classification | Preview disposition | Existing doc home |
+|---|---|---|---|
+| P0/P1 file safety and authenticated delivery verification | Test missing | Preview blocker until CI integration tests pass on the self-hosted runner | This plan, `docs/development/testing.md`, `docs/architecture.md` |
+| Unsupported advanced post actions | Test missing after implementation | Preview blocker until explicit `501` contract tests pass; no frontend controls are currently exposed | `docs/compatibility-scope.md`, `docs/reference/compatibility-matrix.md`, README |
+| Config/deployment drift | Documentation stale | Preview blocker guarded by docs CI config drift check | `docs/admin/configuration.md`, `docs/deployment.md`, `docs/security-deployment-guide.md` |
+| Mention/unread semantics without persisted mention targets | Product gap | Preview caveat; post-preview hardening unless scale testing proves current token-boundary SQL matching is insufficient | `docs/compatibility-scope.md`, `docs/architecture/data-model.md` if schema changes later |
+| SAML/LDAP, plugins, advanced admin/compliance maturity | Product gap | Preview caveat; document as unsupported/stubbed/future | README, `docs/compatibility-scope.md`, `docs/reference/compatibility-matrix.md` |
+| Session revocation and audit completeness | Product gap | Post-preview hardening unless security review promotes it to preview blocker | `docs/security-model.md`, `docs/security-zero-trust-guide.md`, ROADMAP |
 
 Tests to add or update:
 

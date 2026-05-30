@@ -8,6 +8,19 @@ This roadmap describes the direction of RustChat. It is a living document and wi
 
 **Theme**: Stabilize core functionality, improve compatibility, and make the project approachable for operators and contributors.
 
+### Public Preview Gate
+
+RustChat can move to public preview only when the preview contract is explicit and the critical reliability checks pass in CI. The current gate is:
+
+| Area | Preview status | Requirement before public preview |
+|------|----------------|-----------------------------------|
+| File uploads and downloads | Blocker until verified | Unauthorized users cannot attach files to channels they cannot access; file responses use RustChat-authenticated URLs; CI covers member and non-member flows. |
+| Unsupported compatibility actions | Blocker until verified | Unsupported Mattermost-compatible mutations return explicit `501` responses and frontend surfaces do not expose controls that imply support. |
+| Configuration and deployment docs | Blocker until guarded | Public docs and deployment templates must not reintroduce removed query-token or retired S3 public URL settings; docs CI runs the config drift check. |
+| Mention and unread semantics | Preview caveat | Current unread paths use token-boundary matching; persisted mention-target storage remains a post-preview hardening item unless scale testing proves it blocks preview. |
+| SAML/LDAP, plugins, advanced admin/compliance | Preview caveat | README and compatibility docs must state these are unsupported, stubbed, or future work. |
+| Session revocation and audit completeness | Post-preview hardening | Token/session revocation and broader audit coverage require separate design and migration work before stable release. |
+
 ### Near-Term (Next 1–3 Months)
 
 - [ ] **Mattermost API v4 Parity** — Expand mobile client compatibility coverage

@@ -9,7 +9,8 @@
     "docs:build": "vitepress build .",
     "docs:preview": "vitepress preview . --host 0.0.0.0 --port 4174",
     "docs:check-links": "node ./scripts/check-internal-links.mjs",
-    "ci": "npm run docs:check-links && npm run docs:build"
+    "docs:check-config": "node ./scripts/check-config-drift.mjs",
+    "ci": "npm run docs:check-links && npm run docs:check-config && npm run docs:build"
   },
   "devDependencies": {
     "esbuild": "0.27.0",
