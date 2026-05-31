@@ -405,12 +405,20 @@ pub async fn create_post(
 
     // Link files to this post inside the transaction
     if !input.file_ids.is_empty() {
-        sqlx::query("UPDATE files SET post_id = $1, channel_id = $3 WHERE id = ANY($2)")
-            .bind(post.id)
-            .bind(&input.file_ids)
-            .bind(channel_id)
-            .execute(&mut *tx)
-            .await?;
+        let result = sqlx::query(
+            "UPDATE files SET post_id = $1, channel_id = $3 WHERE id = ANY($2) AND post_id IS NULL",
+        )
+        .bind(post.id)
+        .bind(&input.file_ids)
+        .bind(channel_id)
+        .execute(&mut *tx)
+        .await?;
+
+        if result.rows_affected() != input.file_ids.len() as u64 {
+            return Err(AppError::Validation(
+                "One or more files were already attached to another post".to_string(),
+            ));
+        }
     }
 
     // 2. Update props with mentions inside tx

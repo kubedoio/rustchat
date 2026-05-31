@@ -338,7 +338,7 @@ async fn download_file(
 /// Stream file bytes through the backend after authorization.
 async fn download_file_content(
     State(state): State<AppState>,
-    auth: AuthUser,
+    auth: super::v4::extractors::MmAuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<impl IntoResponse> {
     let file_repo = FileRepository::new(&state.db);
