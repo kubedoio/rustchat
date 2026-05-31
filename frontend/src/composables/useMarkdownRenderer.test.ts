@@ -22,7 +22,7 @@ describe('useMarkdownRenderer XSS corpus', () => {
   })
 
   it('sanitizes javascript: URLs in links', () => {
-    const html = renderMarkdown("<a href=\"javascript:alert('xss')\">click me</a>")
+    const html = renderMarkdown('<a href="javascript:alert(\'xss\')">click me</a>')
     expect(html).not.toContain('javascript:')
     expect(html).toContain('click me')
   })
