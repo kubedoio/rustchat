@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-rc.2] - 2026-06-01
+
+### Fixed
+- Backend release image builds now use a locked Cargo registry cache and architecture-specific target caches to avoid concurrent multi-platform BuildKit unpack races.
+
 ## [0.5.0-rc.1] - 2026-05-31
 
 ### Added
