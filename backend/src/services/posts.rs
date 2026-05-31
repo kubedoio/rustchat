@@ -8,7 +8,7 @@ use crate::models::{
     normalize_avatar_url, Activity, ActivityType, ChannelMember, CreatePost, FileUploadResponse, Post, PostResponse,
 };
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
-use crate::repositories::{ChannelRepository, PlaybookRepository, PostRepository, UserRepository};
+use crate::repositories::{ChannelRepository, FileRepository, PlaybookRepository, PostRepository, UserRepository};
 use crate::services::activity;
 use regex::Regex;
 
@@ -50,6 +50,24 @@ async fn validate_create_post(
         if root_post.is_none() {
             return Err(AppError::BadRequest("Invalid root post".to_string()));
         }
+    }
+
+    // Max message length
+    let max_len = state.config.messaging.max_message_length;
+    if input.message.chars().count() > max_len {
+        return Err(AppError::Validation(format!(
+            "Message exceeds maximum length of {} characters",
+            max_len
+        )));
+    }
+
+    // Max file count
+    let max_files = state.config.messaging.max_file_count;
+    if input.file_ids.len() > max_files {
+        return Err(AppError::Validation(format!(
+            "Cannot attach more than {} files",
+            max_files
+        )));
     }
 
     Ok(root_post_id)
@@ -328,6 +346,43 @@ pub async fn create_post(
         None
     };
 
+    // Validate file attachments before starting tx (read-only)
+    if !input.file_ids.is_empty() {
+        let files = FileRepository::new(&state.db)
+            .get_by_ids(&input.file_ids)
+            .await?;
+
+        // Verify all file IDs exist
+        if files.len() != input.file_ids.len() {
+            return Err(AppError::Validation(
+                "One or more attached files do not exist".to_string()
+            ));
+        }
+
+        for file in &files {
+            // Verify uploader is the post author
+            if file.uploader_id != user_id {
+                return Err(AppError::Forbidden(
+                    "Cannot attach a file uploaded by another user".to_string()
+                ));
+            }
+            // Verify file belongs to the target channel (or is unassociated)
+            if let Some(file_channel_id) = file.channel_id {
+                if file_channel_id != channel_id {
+                    return Err(AppError::Forbidden(
+                        "File does not belong to this channel".to_string()
+                    ));
+                }
+            }
+            // Verify file is not already attached to another post
+            if file.post_id.is_some() {
+                return Err(AppError::Validation(
+                    "File is already attached to another post".to_string()
+                ));
+            }
+        }
+    }
+
     // ========================================================================
     // SERVICE-LEVEL TRANSACTION: all DB side effects inside, external after.
     // ========================================================================
@@ -345,6 +400,15 @@ pub async fn create_post(
             &input.file_ids,
         )
         .await?;
+
+    // Link files to this post inside the transaction
+    if !input.file_ids.is_empty() {
+        sqlx::query("UPDATE files SET post_id = $1 WHERE id = ANY($2)")
+            .bind(post.id)
+            .bind(&input.file_ids)
+            .execute(&mut *tx)
+            .await?;
+    }
 
     // 2. Update props with mentions inside tx
     let mut props = post.props.as_object().cloned().unwrap_or_default();

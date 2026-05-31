@@ -281,6 +281,10 @@ pub struct MessagingConfig {
     pub dm_acl_enabled: bool,
     #[serde(default = "default_status_expiry_poll_interval_seconds")]
     pub status_expiry_poll_interval_seconds: u64,
+    #[serde(default = "default_max_message_length")]
+    pub max_message_length: usize,
+    #[serde(default = "default_max_file_count")]
+    pub max_file_count: usize,
 }
 
 impl Default for MessagingConfig {
@@ -288,6 +292,8 @@ impl Default for MessagingConfig {
         Self {
             dm_acl_enabled: false,
             status_expiry_poll_interval_seconds: default_status_expiry_poll_interval_seconds(),
+            max_message_length: default_max_message_length(),
+            max_file_count: default_max_file_count(),
         }
     }
 }
@@ -310,6 +316,14 @@ impl Default for CompatibilityConfig {
 
 fn default_compat_mobile_sso_code_exchange() -> bool {
     true
+}
+
+fn default_max_message_length() -> usize {
+    4000
+}
+
+fn default_max_file_count() -> usize {
+    10
 }
 
 fn default_calls_enabled() -> bool {

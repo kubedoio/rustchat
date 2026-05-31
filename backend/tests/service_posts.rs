@@ -825,3 +825,50 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
         .expect("should query reply count");
     assert_eq!(reply_count, 0, "reply_count should be rolled back");
 }
+
+#[tokio::test]
+async fn create_post_rejects_oversized_message() {
+    let ctx = setup_context().await;
+    let long_message = "a".repeat(4001);
+    let res = ctx
+        .app
+        .api_client
+        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .header("Authorization", format!("Bearer {}", ctx.sender_token))
+        .json(&json!({
+            "channel_id": ctx.channel_id.to_string(),
+            "message": long_message
+        }))
+        .send()
+        .await
+        .expect("failed to send request");
+    assert_eq!(
+        res.status(),
+        422,
+        "oversized message should be rejected"
+    );
+}
+
+#[tokio::test]
+async fn create_post_rejects_too_many_files() {
+    let ctx = setup_context().await;
+    let file_ids: Vec<String> = (0..11).map(|_| Uuid::new_v4().to_string()).collect();
+    let res = ctx
+        .app
+        .api_client
+        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .header("Authorization", format!("Bearer {}", ctx.sender_token))
+        .json(&json!({
+            "channel_id": ctx.channel_id.to_string(),
+            "message": "message with too many files",
+            "file_ids": file_ids
+        }))
+        .send()
+        .await
+        .expect("failed to send request");
+    assert_eq!(
+        res.status(),
+        422,
+        "too many files should be rejected"
+    );
+}
