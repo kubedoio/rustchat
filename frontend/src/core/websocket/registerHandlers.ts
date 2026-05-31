@@ -30,21 +30,21 @@ export function registerWebSocketHandlers(): void {
   wsManager.on('posted', (event: WebSocketEvent) => {
     handleMessageWebSocketEvent(event as unknown as WebSocketMessageEvent)
     // Also handle for thread updates
-    const data = JSON.parse(event.data)
+    const data = JSON.parse(event.data as string)
     const post: Post = JSON.parse(data.post)
     threadHandlers.handleNewPost(post)
   })
   wsManager.on('post_edited', (event: WebSocketEvent) => {
     handleMessageWebSocketEvent(event as unknown as WebSocketMessageEvent)
     // Also handle for thread updates
-    const data = JSON.parse(event.data)
+    const data = JSON.parse(event.data as string)
     const post: Post = JSON.parse(data.post)
     threadHandlers.handlePostUpdated(post)
   })
   wsManager.on('post_deleted', (event: WebSocketEvent) => {
     handleMessageWebSocketEvent(event as unknown as WebSocketMessageEvent)
     // Also handle for thread updates
-    const data = JSON.parse(event.data)
+    const data = JSON.parse(event.data as string)
     threadHandlers.handlePostDeleted(data.post_id)
   })
   wsManager.on('reaction_added', (event: WebSocketEvent) =>
@@ -132,11 +132,11 @@ export function registerWebSocketHandlers(): void {
 
   // Activity feed events
   wsManager.on('activity_created', (event: WebSocketEvent) => {
-    const data = JSON.parse(event.data)
+    const data = JSON.parse(event.data as string)
     handleActivityCreated(data)
   })
   wsManager.on('activity_read', (event: WebSocketEvent) => {
-    const data = JSON.parse(event.data)
+    const data = JSON.parse(event.data as string)
     handleActivityRead(data)
   })
 

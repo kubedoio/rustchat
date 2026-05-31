@@ -28,7 +28,7 @@ class ConfigService {
   initSync(): () => void {
     return wsManager.on('config_updated', event => {
       try {
-        const data = JSON.parse(event.data)
+        const data = JSON.parse(event.data as string)
         if (data.category === 'site') {
           const currentConfig = this.store.siteConfig
           this.store.setConfig({
