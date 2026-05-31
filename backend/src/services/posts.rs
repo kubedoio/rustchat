@@ -405,9 +405,10 @@ pub async fn create_post(
 
     // Link files to this post inside the transaction
     if !input.file_ids.is_empty() {
-        sqlx::query("UPDATE files SET post_id = $1 WHERE id = ANY($2)")
+        sqlx::query("UPDATE files SET post_id = $1, channel_id = $3 WHERE id = ANY($2)")
             .bind(post.id)
             .bind(&input.file_ids)
+            .bind(channel_id)
             .execute(&mut *tx)
             .await?;
     }
