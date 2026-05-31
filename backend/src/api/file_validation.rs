@@ -209,6 +209,7 @@ pub fn validate_file_upload_head(
     Ok((expected_mime.to_string(), ext))
 }
 
+#[allow(dead_code)]
 fn validate_svg(data: &[u8]) -> Result<(), AppError> {
     let text = std::str::from_utf8(data)
         .map_err(|_| AppError::BadRequest("SVG must be valid UTF-8".to_string()))?;
@@ -233,8 +234,12 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
     }
 
     // Reject event handlers
-    if lower.contains("onload=") || lower.contains("onerror=") || lower.contains("onclick=")
-        || lower.contains("onmouseover=") || lower.contains("onfocus=") || lower.contains("onblur=")
+    if lower.contains("onload=")
+        || lower.contains("onerror=")
+        || lower.contains("onclick=")
+        || lower.contains("onmouseover=")
+        || lower.contains("onfocus=")
+        || lower.contains("onblur=")
     {
         return Err(AppError::BadRequest(
             "SVG contains forbidden event handlers".to_string(),

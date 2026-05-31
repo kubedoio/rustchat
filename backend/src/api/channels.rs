@@ -210,17 +210,14 @@ async fn create_channel(
 
             // Post-commit WS broadcasts for re-added users
             for target_user_id in readded_users {
-                let event = WsEnvelope::event(
-                    EventType::ChannelCreated,
-                    channel.clone(),
-                    Some(channel.id),
-                )
-                .with_broadcast(WsBroadcast {
-                    user_id: Some(target_user_id),
-                    channel_id: None,
-                    team_id: None,
-                    exclude_user_id: None,
-                });
+                let event =
+                    WsEnvelope::event(EventType::ChannelCreated, channel.clone(), Some(channel.id))
+                        .with_broadcast(WsBroadcast {
+                            user_id: Some(target_user_id),
+                            channel_id: None,
+                            team_id: None,
+                            exclude_user_id: None,
+                        });
                 state.ws_hub.broadcast(event).await;
             }
 
@@ -633,7 +630,10 @@ async fn remove_member(
         .await?;
 
     // Revoke WebSocket subscription so removed user stops receiving events
-    state.ws_hub.unsubscribe_channel(target_user_id, channel_id).await;
+    state
+        .ws_hub
+        .unsubscribe_channel(target_user_id, channel_id)
+        .await;
 
     Ok(Json(serde_json::json!({"status": "removed"})))
 }

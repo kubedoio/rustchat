@@ -5,13 +5,15 @@ use uuid::Uuid;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    normalize_avatar_url, Activity, ActivityType, ChannelMember, CreatePost, FileUploadResponse, Post, PostResponse,
+    normalize_avatar_url, Activity, ActivityType, ChannelMember, CreatePost, FileUploadResponse,
+    Post, PostResponse,
 };
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
-use crate::repositories::{ChannelRepository, FileRepository, PlaybookRepository, PostRepository, UserRepository};
+use crate::repositories::{
+    ChannelRepository, FileRepository, PlaybookRepository, PostRepository, UserRepository,
+};
 use crate::services::activity;
 use regex::Regex;
-
 
 #[derive(Debug, Default)]
 pub struct PostsQuery {
@@ -355,7 +357,7 @@ pub async fn create_post(
         // Verify all file IDs exist
         if files.len() != input.file_ids.len() {
             return Err(AppError::Validation(
-                "One or more attached files do not exist".to_string()
+                "One or more attached files do not exist".to_string(),
             ));
         }
 
@@ -363,21 +365,21 @@ pub async fn create_post(
             // Verify uploader is the post author
             if file.uploader_id != user_id {
                 return Err(AppError::Forbidden(
-                    "Cannot attach a file uploaded by another user".to_string()
+                    "Cannot attach a file uploaded by another user".to_string(),
                 ));
             }
             // Verify file belongs to the target channel (or is unassociated)
             if let Some(file_channel_id) = file.channel_id {
                 if file_channel_id != channel_id {
                     return Err(AppError::Forbidden(
-                        "File does not belong to this channel".to_string()
+                        "File does not belong to this channel".to_string(),
                     ));
                 }
             }
             // Verify file is not already attached to another post
             if file.post_id.is_some() {
                 return Err(AppError::Validation(
-                    "File is already attached to another post".to_string()
+                    "File is already attached to another post".to_string(),
                 ));
             }
         }
@@ -495,8 +497,10 @@ pub async fn create_post(
     }
 
     // 6. Author's read position inside tx
-    crate::services::unreads::update_author_channel_read_in_tx(&mut tx, channel_id, user_id, post.seq)
-        .await?;
+    crate::services::unreads::update_author_channel_read_in_tx(
+        &mut tx, channel_id, user_id, post.seq,
+    )
+    .await?;
 
     // Commit
     tx.commit().await?;
@@ -525,19 +529,19 @@ pub async fn create_post(
 
     // DM membership WS broadcast
     if !dm_added_users.is_empty() {
-        if let Ok(Some(chan)) = ChannelRepository::new(&state.db).get_by_id_optional(channel_id).await {
+        if let Ok(Some(chan)) = ChannelRepository::new(&state.db)
+            .get_by_id_optional(channel_id)
+            .await
+        {
             for target_user_id in dm_added_users {
-                let event = WsEnvelope::event(
-                    EventType::ChannelCreated,
-                    chan.clone(),
-                    Some(channel_id),
-                )
-                .with_broadcast(WsBroadcast {
-                    user_id: Some(target_user_id),
-                    channel_id: None,
-                    team_id: None,
-                    exclude_user_id: None,
-                });
+                let event =
+                    WsEnvelope::event(EventType::ChannelCreated, chan.clone(), Some(channel_id))
+                        .with_broadcast(WsBroadcast {
+                            user_id: Some(target_user_id),
+                            channel_id: None,
+                            team_id: None,
+                            exclude_user_id: None,
+                        });
                 state.ws_hub.broadcast(event).await;
             }
         }
@@ -550,7 +554,12 @@ pub async fn create_post(
         .unwrap_or_default();
     if let Some(team_id) = team_id_opt {
         let _ = crate::services::unreads::increment_unreads_external(
-            state, channel_id, user_id, response.seq, team_id, members,
+            state,
+            channel_id,
+            user_id,
+            response.seq,
+            team_id,
+            members,
         )
         .await;
     }
@@ -701,8 +710,10 @@ pub async fn create_system_message(
     let post = PostRepository::new(state.db.clone())
         .create_system_message_post_in_tx(&mut tx, channel_id, bot_user, &message, final_props)
         .await?;
-    crate::services::unreads::update_author_channel_read_in_tx(&mut tx, channel_id, bot_user, post.seq)
-        .await?;
+    crate::services::unreads::update_author_channel_read_in_tx(
+        &mut tx, channel_id, bot_user, post.seq,
+    )
+    .await?;
     tx.commit().await?;
 
     // 4. Construct response
@@ -748,16 +759,16 @@ pub async fn create_system_message(
         .ok()
         .flatten();
     if let Some(team_id) = team_id {
-        let members: Vec<Uuid> = sqlx::query_scalar(
-            "SELECT user_id FROM channel_members WHERE channel_id = $1"
-        )
-        .bind(channel_id)
-        .fetch_all(&state.db)
-        .await
-        .unwrap_or_default();
+        let members: Vec<Uuid> =
+            sqlx::query_scalar("SELECT user_id FROM channel_members WHERE channel_id = $1")
+                .bind(channel_id)
+                .fetch_all(&state.db)
+                .await
+                .unwrap_or_default();
         let _ = crate::services::unreads::increment_unreads_external(
             state, channel_id, bot_user, post.seq, team_id, members,
-        ).await;
+        )
+        .await;
     }
 
     Ok(())

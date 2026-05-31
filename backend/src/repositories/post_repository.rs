@@ -1901,6 +1901,7 @@ impl PostRepository {
     }
 
     /// Create a post inside an existing transaction (insert + optional reply count increment).
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_post_in_tx(
         &self,
         tx: &mut Transaction<'_, Postgres>,

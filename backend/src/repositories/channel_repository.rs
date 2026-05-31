@@ -1383,16 +1383,11 @@ impl<'a> ChannelRepository<'a> {
     }
 
     /// Get all member IDs for a channel.
-    pub async fn get_all_member_ids(
-        &self,
-        channel_id: Uuid,
-    ) -> Result<Vec<Uuid>, sqlx::Error> {
-        sqlx::query_scalar::<_, Uuid>(
-            "SELECT user_id FROM channel_members WHERE channel_id = $1",
-        )
-        .bind(channel_id)
-        .fetch_all(self.pool)
-        .await
+    pub async fn get_all_member_ids(&self, channel_id: Uuid) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>("SELECT user_id FROM channel_members WHERE channel_id = $1")
+            .bind(channel_id)
+            .fetch_all(self.pool)
+            .await
     }
 
     /// Get member IDs by user IDs inside an existing transaction.

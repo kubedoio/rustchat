@@ -70,8 +70,13 @@ async fn websocket_deleted_user_cannot_connect() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "WS Deleted User Org").await;
-    let (token, user_id) =
-        register_and_login(&app, org_id, "ws_deleted_user", "ws_deleted_user@example.com").await;
+    let (token, user_id) = register_and_login(
+        &app,
+        org_id,
+        "ws_deleted_user",
+        "ws_deleted_user@example.com",
+    )
+    .await;
 
     // First connection should succeed
     let mut ws = app.connect_ws_v4(&token).await;
@@ -123,14 +128,19 @@ async fn websocket_non_member_cannot_subscribe_channel() {
         "channel_id": channel_id,
         "data": {}
     });
-    ws_b.send(tokio_tungstenite::tungstenite::Message::Text(subscribe_payload.to_string()))
-        .await
-        .expect("subscribe command should be sent");
+    ws_b.send(tokio_tungstenite::tungstenite::Message::Text(
+        subscribe_payload.to_string(),
+    ))
+    .await
+    .expect("subscribe command should be sent");
 
     // Non-member should receive an error event, not a subscribed ack
     let error_data = app.wait_for_event(&mut ws_b, "error", 5000).await;
     assert!(
-        error_data["message"].as_str().unwrap_or("").contains("Not a member"),
+        error_data["message"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Not a member"),
         "non-member should receive membership error, got: {:?}",
         error_data
     );
@@ -166,9 +176,11 @@ async fn websocket_non_member_cannot_send_typing() {
             "parent_id": ""
         }
     });
-    ws_b.send(tokio_tungstenite::tungstenite::Message::Text(typing_payload.to_string()))
-        .await
-        .expect("typing command should be sent");
+    ws_b.send(tokio_tungstenite::tungstenite::Message::Text(
+        typing_payload.to_string(),
+    ))
+    .await
+    .expect("typing command should be sent");
 
     // User A should NOT receive typing because B is not a member
     let received_typing = wait_for_possible_event(&mut ws_a, "typing", 800).await;
@@ -408,7 +420,6 @@ async fn wait_for_status(
     }
 }
 
-
 #[tokio::test]
 async fn websocket_removed_member_stops_receiving_channel_events() {
     let app = spawn_app().await;
@@ -467,9 +478,7 @@ async fn websocket_removed_member_stops_receiving_channel_events() {
         .api_client
         .delete(format!(
             "{}/api/v4/channels/{}/members/{}",
-            app.address,
-            channel_id,
-            user_b
+            app.address, channel_id, user_b
         ))
         .header("Authorization", format!("Bearer {token_a}"))
         .send()

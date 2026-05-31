@@ -463,14 +463,13 @@ async fn create_post_reply_increments_reply_count_and_creates_activities() {
     let reply_uuid = parse_mm_or_uuid(reply_id).expect("reply id should parse");
 
     // 3. Verify root post reply_count was incremented
-    let root_post_db: serde_json::Value = sqlx::query_as::<_, (i32,)>(
-        "SELECT reply_count FROM posts WHERE id = $1"
-    )
-    .bind(root_uuid)
-    .fetch_one(&ctx.app.db_pool)
-    .await
-    .map(|(count,)| serde_json::json!({"reply_count": count}))
-    .expect("root post should exist in db");
+    let root_post_db: serde_json::Value =
+        sqlx::query_as::<_, (i32,)>("SELECT reply_count FROM posts WHERE id = $1")
+            .bind(root_uuid)
+            .fetch_one(&ctx.app.db_pool)
+            .await
+            .map(|(count,)| serde_json::json!({"reply_count": count}))
+            .expect("root post should exist in db");
 
     assert_eq!(
         root_post_db["reply_count"].as_i64(),
@@ -482,7 +481,7 @@ async fn create_post_reply_increments_reply_count_and_creates_activities() {
     // Actually the parent author is the sender, so no reply activity for receiver.
     // Instead, verify mention activity was created.
     let mention_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM activities WHERE user_id = $1 AND type = 'mention' AND post_id = $2"
+        "SELECT COUNT(*) FROM activities WHERE user_id = $1 AND type = 'mention' AND post_id = $2",
     )
     .bind(ctx.receiver_id)
     .bind(reply_uuid)
@@ -497,7 +496,7 @@ async fn create_post_reply_increments_reply_count_and_creates_activities() {
 
     // 5. Verify channel_reads was created for author (sender)
     let author_read: Option<i64> = sqlx::query_scalar(
-        "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2"
+        "SELECT last_read_message_id FROM channel_reads WHERE user_id = $1 AND channel_id = $2",
     )
     .bind(ctx.sender_id)
     .bind(ctx.channel_id)
@@ -518,15 +517,13 @@ async fn create_post_dm_remembers_removed_user() {
     // Create a DM channel between sender and receiver
     let dm_channel_id = Uuid::new_v4();
     let dm_name = format!("{}__{}", ctx.sender_id, ctx.receiver_id);
-    sqlx::query(
-        "INSERT INTO channels (id, team_id, name, type) VALUES ($1, $2, $3, 'direct')"
-    )
-    .bind(dm_channel_id)
-    .bind(ctx.team_id)
-    .bind(&dm_name)
-    .execute(&ctx.app.db_pool)
-    .await
-    .expect("failed to create dm channel");
+    sqlx::query("INSERT INTO channels (id, team_id, name, type) VALUES ($1, $2, $3, 'direct')")
+        .bind(dm_channel_id)
+        .bind(ctx.team_id)
+        .bind(&dm_name)
+        .execute(&ctx.app.db_pool)
+        .await
+        .expect("failed to create dm channel");
 
     // Add both users as members initially
     for uid in [ctx.sender_id, ctx.receiver_id] {
@@ -548,14 +545,17 @@ async fn create_post_dm_remembers_removed_user() {
 
     // Verify receiver is not a member
     let member_before: Option<Uuid> = sqlx::query_scalar(
-        "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2"
+        "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2",
     )
     .bind(dm_channel_id)
     .bind(ctx.receiver_id)
     .fetch_optional(&ctx.app.db_pool)
     .await
     .expect("failed to check membership before");
-    assert!(member_before.is_none(), "receiver should not be a dm member before post");
+    assert!(
+        member_before.is_none(),
+        "receiver should not be a dm member before post"
+    );
 
     // Sender creates a post in the DM
     let post_res = ctx
@@ -581,7 +581,7 @@ async fn create_post_dm_remembers_removed_user() {
 
     // Verify receiver was re-added to DM
     let member_after: Option<Uuid> = sqlx::query_scalar(
-        "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2"
+        "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2",
     )
     .bind(dm_channel_id)
     .bind(ctx.receiver_id)
@@ -593,7 +593,6 @@ async fn create_post_dm_remembers_removed_user() {
         "receiver should be re-added to dm after post creation"
     );
 }
-
 
 #[tokio::test]
 async fn tx_rolls_back_all_side_effects_on_late_failure() {
@@ -681,12 +680,14 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
         .await
         .expect("failed to create channel");
 
-    sqlx::query("INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member')")
-        .bind(channel_id)
-        .bind(user_a_id)
-        .execute(&app.db_pool)
-        .await
-        .expect("failed to add member");
+    sqlx::query(
+        "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member')",
+    )
+    .bind(channel_id)
+    .bind(user_a_id)
+    .execute(&app.db_pool)
+    .await
+    .expect("failed to add member");
 
     // Create a parent post by user_a
     let parent_post = app
@@ -710,11 +711,12 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
     let parent_uuid = parse_mm_or_uuid(parent_id).expect("parent id should parse");
 
     // Verify initial reply_count is 0
-    let initial_reply_count: i32 = sqlx::query_scalar("SELECT reply_count FROM posts WHERE id = $1")
-        .bind(parent_uuid)
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("failed to get initial reply count");
+    let initial_reply_count: i32 =
+        sqlx::query_scalar("SELECT reply_count FROM posts WHERE id = $1")
+            .bind(parent_uuid)
+            .fetch_one(&app.db_pool)
+            .await
+            .expect("failed to get initial reply count");
     assert_eq!(initial_reply_count, 0);
 
     // Register user_b who will reply
@@ -771,19 +773,29 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
         .expect("user_b id should parse");
 
     // Add user_b to channel
-    sqlx::query("INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member')")
-        .bind(channel_id)
-        .bind(user_b_id)
-        .execute(&app.db_pool)
-        .await
-        .expect("failed to add user_b member");
+    sqlx::query(
+        "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member')",
+    )
+    .bind(channel_id)
+    .bind(user_b_id)
+    .execute(&app.db_pool)
+    .await
+    .expect("failed to add user_b member");
 
     // Start transaction and try to create reply post + activity
     let mut tx = app.db_pool.begin().await.expect("tx should start");
 
     let post_repo = rustchat::repositories::PostRepository::new(app.db_pool.clone());
     let post = post_repo
-        .create_post_in_tx(&mut tx, channel_id, user_b_id, Some(parent_uuid), "reply", serde_json::json!({}), &[])
+        .create_post_in_tx(
+            &mut tx,
+            channel_id,
+            user_b_id,
+            Some(parent_uuid),
+            "reply",
+            serde_json::json!({}),
+            &[],
+        )
         .await
         .expect("post insert should succeed");
 
@@ -802,9 +814,13 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
         Some(parent_uuid),
         Some("reply".to_string()),
         None,
-    ).await;
+    )
+    .await;
 
-    assert!(activity_result.is_err(), "activity should fail due to non-existent team FK");
+    assert!(
+        activity_result.is_err(),
+        "activity should fail due to non-existent team FK"
+    );
 
     // Drop tx without commit = rollback
     drop(tx);
@@ -842,11 +858,7 @@ async fn create_post_rejects_oversized_message() {
         .send()
         .await
         .expect("failed to send request");
-    assert_eq!(
-        res.status(),
-        422,
-        "oversized message should be rejected"
-    );
+    assert_eq!(res.status(), 422, "oversized message should be rejected");
 }
 
 #[tokio::test]
@@ -866,9 +878,5 @@ async fn create_post_rejects_too_many_files() {
         .send()
         .await
         .expect("failed to send request");
-    assert_eq!(
-        res.status(),
-        422,
-        "too many files should be rejected"
-    );
+    assert_eq!(res.status(), 422, "too many files should be rejected");
 }

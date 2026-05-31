@@ -841,7 +841,10 @@ async fn execute_leave_command(
             .await?;
 
         // Revoke WebSocket subscription
-        state.ws_hub.unsubscribe_channel(auth.user_id, payload.channel_id).await;
+        state
+            .ws_hub
+            .unsubscribe_channel(auth.user_id, payload.channel_id)
+            .await;
 
         let event = crate::realtime::WsEnvelope::event(
             crate::realtime::EventType::MemberRemoved,

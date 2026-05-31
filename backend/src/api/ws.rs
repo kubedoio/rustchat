@@ -58,7 +58,8 @@ async fn ws_handler(
     };
 
     // Check user is active and not deleted
-    if let Err(err) = crate::auth::middleware::ensure_user_access_active(&state, auth.user_id).await {
+    if let Err(err) = crate::auth::middleware::ensure_user_access_active(&state, auth.user_id).await
+    {
         tracing::warn!(user_id = %auth.user_id, error = %err, "WS Handshake failed: user inactive or deleted");
         return Response::builder()
             .status(401)

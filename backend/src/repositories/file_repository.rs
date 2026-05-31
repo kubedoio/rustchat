@@ -27,12 +27,10 @@ impl<'a> FileRepository<'a> {
         if file_ids.is_empty() {
             return Ok(vec![]);
         }
-        let files = sqlx::query_as::<_, FileInfo>(
-            "SELECT * FROM files WHERE id = ANY($1)"
-        )
-        .bind(file_ids)
-        .fetch_all(self.pool)
-        .await?;
+        let files = sqlx::query_as::<_, FileInfo>("SELECT * FROM files WHERE id = ANY($1)")
+            .bind(file_ids)
+            .fetch_all(self.pool)
+            .await?;
         Ok(files)
     }
 
