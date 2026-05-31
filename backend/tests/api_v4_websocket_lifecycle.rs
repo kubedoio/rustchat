@@ -371,3 +371,102 @@ async fn wait_for_status(
         tokio::time::sleep(Duration::from_millis(150)).await;
     }
 }
+
+
+#[tokio::test]
+async fn websocket_removed_member_stops_receiving_channel_events() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "WS Remove Org").await;
+    let (token_a, user_a) =
+        register_and_login(&app, org_id, "ws_remove_a", "ws_remove_a@example.com").await;
+    let (token_b, user_b) =
+        register_and_login(&app, org_id, "ws_remove_b", "ws_remove_b@example.com").await;
+
+    let channel_id = create_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    // Make user_a a channel admin so they can remove user_b
+    sqlx::query("UPDATE channel_members SET role = 'admin' WHERE channel_id = $1 AND user_id = $2")
+        .bind(channel_id)
+        .bind(user_a)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to make user_a admin");
+
+    let mut ws_a = app.connect_ws_v4(&token_a).await;
+    let mut ws_b = app.connect_ws_v4(&token_b).await;
+
+    app.wait_for_event(&mut ws_a, "hello", 5000).await;
+    app.wait_for_event(&mut ws_b, "hello", 5000).await;
+
+    // User A sends a message
+    let first_message = "First message before removal";
+    app.api_client
+        .post(format!("{}/api/v4/posts", app.address))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&json!({
+            "channel_id": channel_id.to_string(),
+            "message": first_message
+        }))
+        .send()
+        .await
+        .expect("failed to create first post")
+        .error_for_status()
+        .expect("create first post should succeed");
+
+    // User B should receive the posted event
+    let posted_event = app.wait_for_event(&mut ws_b, "posted", 5000).await;
+    let post_data_str = posted_event["post"]
+        .as_str()
+        .expect("posted event data.post should be a JSON string");
+    let post_data: serde_json::Value =
+        serde_json::from_str(post_data_str).expect("post data should parse as JSON");
+    assert_eq!(
+        post_data["message"], first_message,
+        "user B should receive first message"
+    );
+
+    // User A removes user B from the channel
+    let remove_res = app
+        .api_client
+        .delete(format!(
+            "{}/api/v4/channels/{}/members/{}",
+            app.address,
+            channel_id,
+            user_b
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .send()
+        .await
+        .expect("remove member request failed");
+    assert_eq!(
+        remove_res.status(),
+        StatusCode::OK,
+        "remove member should succeed"
+    );
+
+    // User A sends another message
+    let second_message = "Second message after removal";
+    app.api_client
+        .post(format!("{}/api/v4/posts", app.address))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&json!({
+            "channel_id": channel_id.to_string(),
+            "message": second_message
+        }))
+        .send()
+        .await
+        .expect("failed to create second post")
+        .error_for_status()
+        .expect("create second post should succeed");
+
+    // User B should NOT receive the second posted event
+    let second_posted = wait_for_possible_event(&mut ws_b, "posted", 1500).await;
+    assert!(
+        second_posted.is_none(),
+        "removed user B should not receive channel events after removal"
+    );
+
+    let _ = ws_a.close(None).await;
+    let _ = ws_b.close(None).await;
+}

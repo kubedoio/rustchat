@@ -632,6 +632,9 @@ async fn remove_member(
         .remove_member(channel_id, target_user_id)
         .await?;
 
+    // Revoke WebSocket subscription so removed user stops receiving events
+    state.ws_hub.unsubscribe_channel(target_user_id, channel_id).await;
+
     Ok(Json(serde_json::json!({"status": "removed"})))
 }
 

@@ -202,6 +202,9 @@ async fn remove_channel_member_by_id(
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
+    // Revoke WebSocket subscription so removed user stops receiving events
+    state.ws_hub.unsubscribe_channel(user_id, channel_id).await;
+
     let broadcast = crate::realtime::WsEnvelope::event(
         crate::realtime::EventType::MemberRemoved,
         serde_json::json!({
