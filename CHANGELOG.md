@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-rc.1] - 2026-05-31
+
+### Added
+- Channel archive and restore flows now emit Mattermost-compatible system messages and realtime events.
+- Frontend support for archive and restore system messages so channel lifecycle changes are visible in conversation history.
+
+### Changed
+- Reconciled product documentation and compatibility notes with current implementation gaps and release readiness.
+- Tuned dependency update policy and CI behavior for more reliable release preparation.
+
+### Fixed
+- Synchronized channel archive state between `deleted_at` and `is_archived` to keep API responses and persistence consistent.
+- Restored channels now update correctly when websocket payloads use Mattermost channel objects.
+- Channel update errors now distinguish duplicate-name and not-found responses more accurately.
+- Test notification requests now use the v4 API client path.
+- Backend integration test, DCO, Scorecard, and nightly workflow regressions that blocked reliable validation.
+
 ## [0.4.1] - 2026-05-22
 
 ### Fixed
