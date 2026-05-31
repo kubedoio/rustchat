@@ -378,7 +378,7 @@ async fn find_or_create_user(
     let username = if username.len() < 3 {
         "user".to_string()
     } else if username.len() > 64 {
-        username[..64].to_string()
+        username.chars().take(64).collect()
     } else {
         username
     };
@@ -429,8 +429,9 @@ async fn generate_unique_username(
     base_username: &str,
 ) -> Result<String, AppError> {
     let repo = OAuthRepository::new(db);
+    let truncated = base_username.chars().take(60).collect::<String>();
     let base_username = if base_username.len() > 60 {
-        &base_username[..60]
+        truncated.as_str()
     } else {
         base_username
     };

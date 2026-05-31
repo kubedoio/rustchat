@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { useMarkdownRenderer, renderMarkdown } from './useMarkdownRenderer'
+import { useMarkdownRenderer } from './useMarkdownRenderer'
 
 describe('useMarkdownRenderer XSS corpus', () => {
   const { renderMarkdown, isReady } = useMarkdownRenderer()
