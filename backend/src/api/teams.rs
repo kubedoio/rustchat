@@ -293,6 +293,9 @@ async fn remove_member(
 
     repo.remove_team_member(id, user_id).await?;
 
+    // Revoke team WebSocket subscription
+    state.ws_hub.unsubscribe_team(user_id, id).await;
+
     Ok(())
 }
 
@@ -377,6 +380,9 @@ async fn leave_team(
 
     // Remove from team
     repo.remove_team_member(id, auth.user_id).await?;
+
+    // Revoke team WebSocket subscription
+    state.ws_hub.unsubscribe_team(auth.user_id, id).await;
 
     Ok(Json(serde_json::json!({"status": "left"})))
 }

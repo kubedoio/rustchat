@@ -21,6 +21,7 @@ use crate::realtime::{
     websocket_actor::{close_codes, WebSocketActor, WsEvent},
     WsBroadcast, WsEnvelope,
 };
+use crate::repositories::ChannelRepository;
 use crate::telemetry::metrics;
 
 use super::resumption::{send_reconnect_snapshot_if_needed, should_send_reconnect_snapshot};
@@ -40,6 +41,12 @@ pub(crate) async fn run_connection(
             token_expires_at = %token_expires_at,
             "Rejecting websocket connection because token is already expired"
         );
+        return;
+    }
+
+    // Check user is active and not deleted
+    if let Err(err) = crate::auth::middleware::ensure_user_access_active(&state, user_id).await {
+        warn!(user_id = %user_id, error = %err, "Rejecting websocket connection: user inactive or deleted");
         return;
     }
 
@@ -512,6 +519,13 @@ pub(crate) async fn handle_client_value_message(
     } else if matches!(action, "user_typing" | "typing" | "typing_start") {
         let channel_id = extract_typing_channel_id(value);
         if let Some(channel_id) = channel_id {
+            let is_member = ChannelRepository::new(&state.db)
+                .is_channel_member(channel_id, user_id)
+                .await
+                .unwrap_or(false);
+            if !is_member {
+                return;
+            }
             let broadcast = WsEnvelope::event(
                 crate::realtime::EventType::UserTyping,
                 crate::realtime::TypingEvent {
@@ -532,6 +546,13 @@ pub(crate) async fn handle_client_value_message(
     } else if matches!(action, "user_typing_stop" | "stop_typing" | "typing_stop") {
         let channel_id = extract_typing_channel_id(value);
         if let Some(channel_id) = channel_id {
+            let is_member = ChannelRepository::new(&state.db)
+                .is_channel_member(channel_id, user_id)
+                .await
+                .unwrap_or(false);
+            if !is_member {
+                return;
+            }
             let broadcast = WsEnvelope::event(
                 crate::realtime::EventType::UserTypingStop,
                 crate::realtime::TypingEvent {
@@ -743,6 +764,12 @@ pub fn map_envelope_to_mm(env: &WsEnvelope) -> Option<mm::WebSocketMessage> {
     let seq = None; // Will be assigned by actor
 
     match env.event.as_str() {
+        "error" => Some(mm::WebSocketMessage {
+            seq,
+            event: "error".to_string(),
+            data: env.data.clone(),
+            broadcast: map_broadcast(env.broadcast.as_ref()),
+        }),
         "posted" | "thread_reply_created" => {
             let mm_post = if let Ok(post_resp) =
                 serde_json::from_value::<crate::models::post::PostResponse>(env.data.clone())

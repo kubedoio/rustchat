@@ -1,4 +1,9 @@
-// Config Service - Business logic for site config
+// Config Service — UNFINISHED REFACTORING, NOT WIRED INTO THE APP
+//
+// This service registers a WebSocket handler on wsManager, but wsManager.connect()
+// is never called anywhere in the app. The active config sync path is in
+// frontend/src/stores/config.ts and frontend/src/features/config/stores/configStore.ts,
+// both of which use useWebSocket() from composables/useWebSocket.ts.
 
 import { log } from '@/utils/log'
 import { configRepository } from '../repositories/configRepository'
@@ -23,7 +28,7 @@ class ConfigService {
   initSync(): () => void {
     return wsManager.on('config_updated', event => {
       try {
-        const data = JSON.parse(event.data)
+        const data = JSON.parse(event.data as string)
         if (data.category === 'site') {
           const currentConfig = this.store.siteConfig
           this.store.setConfig({
