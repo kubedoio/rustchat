@@ -5,7 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use regex::escape as escape_regex;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::error::{ApiResult, AppError};
@@ -1900,9 +1900,10 @@ impl PostRepository {
         Ok(post)
     }
 
-    /// Insert a new post and return it
-    pub async fn create_post(
+    /// Create a post inside an existing transaction (insert + optional reply count increment).
+    pub async fn create_post_in_tx(
         &self,
+        tx: &mut Transaction<'_, Postgres>,
         channel_id: Uuid,
         user_id: Uuid,
         root_post_id: Option<Uuid>,
@@ -1924,9 +1925,49 @@ impl PostRepository {
         .bind(message)
         .bind(props)
         .bind(file_ids)
-        .fetch_one(&self.db)
+        .fetch_one(&mut **tx)
         .await?;
+
+        if let Some(r_id) = root_post_id {
+            sqlx::query(
+                "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1"
+            )
+            .bind(r_id)
+            .execute(&mut **tx)
+            .await?;
+        }
+
         Ok(post)
+    }
+
+    /// Update post props inside an existing transaction.
+    pub async fn update_props_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        post_id: Uuid,
+        props: serde_json::Value,
+    ) -> ApiResult<()> {
+        sqlx::query("UPDATE posts SET props = $1 WHERE id = $2")
+            .bind(props)
+            .bind(post_id)
+            .execute(&mut **tx)
+            .await?;
+        Ok(())
+    }
+
+    /// Get user_id and root_post_id for a post inside an existing transaction.
+    pub async fn get_parent_info_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        post_id: Uuid,
+    ) -> ApiResult<Option<(Uuid, Option<Uuid>)>> {
+        let info = sqlx::query_as::<_, (Uuid, Option<Uuid>)>(
+            "SELECT user_id, root_post_id FROM posts WHERE id = $1",
+        )
+        .bind(post_id)
+        .fetch_optional(&mut **tx)
+        .await?;
+        Ok(info)
     }
 
     /// Increment reply_count and update last_reply_at for a post
@@ -2117,6 +2158,32 @@ impl PostRepository {
         .bind(message)
         .bind(props)
         .fetch_one(&self.db)
+        .await?;
+        Ok(post)
+    }
+
+    /// Insert a system message post inside an existing transaction
+    pub async fn create_system_message_post_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        channel_id: Uuid,
+        user_id: Uuid,
+        message: &str,
+        props: serde_json::Value,
+    ) -> ApiResult<crate::models::Post> {
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
+            r#"
+            INSERT INTO posts (channel_id, user_id, message, props)
+            VALUES ($1, $2, $3, $4)
+            RETURNING {}
+            "#,
+            Self::POST_COLUMNS_NO_USER
+        ))
+        .bind(channel_id)
+        .bind(user_id)
+        .bind(message)
+        .bind(props)
+        .fetch_one(&mut **tx)
         .await?;
         Ok(post)
     }

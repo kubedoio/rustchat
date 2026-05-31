@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::error::{ApiResult, AppError};
@@ -1346,6 +1346,68 @@ impl<'a> ChannelRepository<'a> {
         .bind(channel_id)
         .bind(user_id)
         .fetch_optional(self.pool)
+        .await
+    }
+
+    /// Ensure a user is a member of a channel inside an existing transaction.
+    pub async fn ensure_membership_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        channel_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            INSERT INTO channel_members (channel_id, user_id, role)
+            VALUES ($1, $2, 'member')
+            ON CONFLICT (channel_id, user_id) DO NOTHING
+            RETURNING user_id
+            "#,
+        )
+        .bind(channel_id)
+        .bind(user_id)
+        .fetch_optional(&mut **tx)
+        .await
+    }
+
+    /// Get team_id for a channel inside an existing transaction.
+    pub async fn get_team_id_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        channel_id: Uuid,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
+            .bind(channel_id)
+            .fetch_optional(&mut **tx)
+            .await
+    }
+
+    /// Get all member IDs for a channel.
+    pub async fn get_all_member_ids(
+        &self,
+        channel_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT user_id FROM channel_members WHERE channel_id = $1",
+        )
+        .bind(channel_id)
+        .fetch_all(self.pool)
+        .await
+    }
+
+    /// Get member IDs by user IDs inside an existing transaction.
+    pub async fn get_member_ids_by_user_ids_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        channel_id: Uuid,
+        user_ids: &[Uuid],
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = ANY($2)",
+        )
+        .bind(channel_id)
+        .bind(user_ids)
+        .fetch_all(&mut **tx)
         .await
     }
 }

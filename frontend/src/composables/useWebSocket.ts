@@ -57,6 +57,8 @@ const subscriptions = ref<Set<string>>(new Set())
 const listeners = ref<Record<string, Set<WsListener>>>({})
 let actionSeq = 1
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let wsConnectionId: string | null = null
+let wsLastSeq = 0
 
 // Connection state management
 const connectionStatus = ref<'connected' | 'reconnecting' | 'disconnected' | 'failed'>('connected')
@@ -449,7 +451,15 @@ export function useWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
     // Align with Mattermost mobile websocket endpoint semantics.
-    const url = `${protocol}//${host}/api/v4/websocket`
+    const params = new URLSearchParams()
+    if (reconnectAttempts.value > 0 && wsConnectionId) {
+      params.set('connection_id', wsConnectionId)
+      if (wsLastSeq > 0) {
+        params.set('sequence_number', String(wsLastSeq))
+      }
+    }
+    const query = params.toString() ? `?${params.toString()}` : ''
+    const url = `${protocol}//${host}/api/v4/websocket${query}`
 
     try {
       // Browsers can't set Authorization headers for WebSocket handshakes.
@@ -545,6 +555,10 @@ export function useWebSocket() {
         try {
           const rawEnvelope: WsEnvelope = JSON.parse(event.data)
           const envelope = normalizeWsEnvelope(rawEnvelope)
+          // Track highest sequence number for resumption
+          if (typeof envelope.seq === 'number' && envelope.seq > wsLastSeq) {
+            wsLastSeq = envelope.seq
+          }
           handleMessage(envelope)
         } catch (e) {
           log.error('Failed to parse WebSocket message:', e)
@@ -559,9 +573,14 @@ export function useWebSocket() {
     // log.debug('WS Received:', envelope.event, envelope.data)
 
     switch (envelope.event) {
-      case 'hello':
+      case 'hello': {
         log.debug('WebSocket hello received', envelope.data)
+        const data = envelope.data as Record<string, unknown> | undefined
+        if (data && typeof data.connection_id === 'string') {
+          wsConnectionId = data.connection_id
+        }
         break
+      }
 
       case 'initial_load':
         applyInitialLoadSnapshot(envelope.data)
@@ -766,6 +785,8 @@ export function useWebSocket() {
     reconnectAttempt.value = 0
     disconnectedAt.value = null
     subscriptions.value.clear()
+    wsConnectionId = null
+    wsLastSeq = 0
     updateConnectionStatus()
   }
 

@@ -1,5 +1,6 @@
 #![allow(clippy::needless_borrows_for_generic_args)]
 
+use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
 use serde_json::json;
 use std::time::Duration;
@@ -58,6 +59,86 @@ async fn websocket_typing_event_broadcast() {
     assert!(
         typing["display_name"].as_str().is_some(),
         "typing event should include display_name"
+    );
+
+    let _ = ws_a.close(None).await;
+    let _ = ws_b.close(None).await;
+}
+
+#[tokio::test]
+async fn websocket_non_member_cannot_subscribe_channel() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "WS Subscribe Org").await;
+    let (_token_a, user_a) =
+        register_and_login(&app, org_id, "ws_sub_a", "ws_sub_a@example.com").await;
+    let (token_b, _user_b) =
+        register_and_login(&app, org_id, "ws_sub_b", "ws_sub_b@example.com").await;
+
+    // Channel with only user_a as member
+    let channel_id = create_channel_with_members(&app, org_id, &[user_a]).await;
+
+    let mut ws_b = app.connect_ws_v4(&token_b).await;
+    app.wait_for_event(&mut ws_b, "hello", 5000).await;
+
+    let subscribe_payload = json!({
+        "type": "command",
+        "event": "subscribe_channel",
+        "channel_id": channel_id,
+        "data": {}
+    });
+    ws_b.send(tokio_tungstenite::tungstenite::Message::Text(subscribe_payload.to_string()))
+        .await
+        .expect("subscribe command should be sent");
+
+    // Non-member should receive an error event, not a subscribed ack
+    let error_data = app.wait_for_event(&mut ws_b, "error", 5000).await;
+    assert!(
+        error_data["message"].as_str().unwrap_or("").contains("Not a member"),
+        "non-member should receive membership error, got: {:?}",
+        error_data
+    );
+
+    let _ = ws_b.close(None).await;
+}
+
+#[tokio::test]
+async fn websocket_non_member_cannot_send_typing() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "WS Typing Org").await;
+    let (token_a, user_a) =
+        register_and_login(&app, org_id, "ws_typing_a", "ws_typing_a@example.com").await;
+    let (token_b, _user_b) =
+        register_and_login(&app, org_id, "ws_typing_b", "ws_typing_b@example.com").await;
+
+    // Channel with only user_a as member
+    let channel_id = create_channel_with_members(&app, org_id, &[user_a]).await;
+
+    let mut ws_a = app.connect_ws_v4(&token_a).await;
+    let mut ws_b = app.connect_ws_v4(&token_b).await;
+
+    app.wait_for_event(&mut ws_a, "hello", 5000).await;
+    app.wait_for_event(&mut ws_b, "hello", 5000).await;
+
+    // User B (non-member) sends typing to the channel via v4 action format
+    let typing_payload = json!({
+        "action": "user_typing",
+        "seq": 1,
+        "data": {
+            "channel_id": channel_id,
+            "parent_id": ""
+        }
+    });
+    ws_b.send(tokio_tungstenite::tungstenite::Message::Text(typing_payload.to_string()))
+        .await
+        .expect("typing command should be sent");
+
+    // User A should NOT receive typing because B is not a member
+    let received_typing = wait_for_possible_event(&mut ws_a, "typing", 800).await;
+    assert!(
+        received_typing.is_none(),
+        "typing from non-member must not be delivered to channel members"
     );
 
     let _ = ws_a.close(None).await;
@@ -212,6 +293,33 @@ async fn create_channel_with_members(app: &common::TestApp, org_id: Uuid, users:
     }
 
     channel_id
+}
+
+/// Poll ws for a given event for a short duration; return Some(data) if found, None otherwise.
+async fn wait_for_possible_event(
+    ws: &mut common::WsStream,
+    expected_event: &str,
+    timeout_ms: u64,
+) -> Option<serde_json::Value> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
+    loop {
+        let now = std::time::Instant::now();
+        if now >= deadline {
+            return None;
+        }
+        let timeout_left = deadline.saturating_duration_since(now);
+        let message = match tokio::time::timeout(timeout_left, ws.next()).await {
+            Ok(Some(Ok(msg))) => msg,
+            _ => return None,
+        };
+        if let tokio_tungstenite::tungstenite::Message::Text(text) = message {
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+                if parsed["event"] == expected_event {
+                    return Some(parsed["data"].clone());
+                }
+            }
+        }
+    }
 }
 
 async fn poll_my_status(app: &common::TestApp, token: &str, within: Duration) -> serde_json::Value {

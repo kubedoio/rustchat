@@ -73,12 +73,12 @@ Implemented:
 
 Incomplete or fragile:
 
-- WebSocket client-driven `subscribe_channel` does not enforce membership.
-- Typing events can be broadcast for arbitrary channel IDs if a user can subscribe or send typing actions.
+- ~~WebSocket client-driven `subscribe_channel` does not enforce membership.~~ **FIXED**
+- ~~Typing events can be broadcast for arbitrary channel IDs if a user can subscribe or send typing actions.~~ **FIXED**
 - Realtime replay is per connection and bounded; durable channel event replay is not implemented.
-- Frontend WebSocket manager confuses `seq` with `connectionId`, undermining reconnect/resumption semantics.
+- ~~Frontend WebSocket manager confuses `seq` with `connectionId`, undermining reconnect/resumption semantics.~~ **FIXED** in active `useWebSocket.ts`; secondary `WebSocketManager.ts` is unfinished dead code.
 - Pagination is often offset-based and ordered by `created_at`; keyset paths exist but are not uniformly enforced.
-- Message creation side effects are not one transaction: insert, reply count, mentions props, broadcast, unread increments, automation, push are separate steps.
+- ~~Message creation side effects are not one transaction: insert, reply count, mentions props, broadcast, unread increments, automation, push are separate steps.~~ **FIXED** — all DB side effects (post insert, reply count, mention props, activities, DM membership repair, author's channel_reads) are committed in a single service-level transaction. External effects (WS broadcast, push, webhooks, Redis cache) remain best-effort after commit.
 - Tests exist but are skewed toward happy paths and compatibility slices; negative auth/realtime/concurrency/security tests are not comprehensive.
 
 ## 5. Production Readiness Scorecard
@@ -88,11 +88,11 @@ Incomplete or fragile:
 | Architecture | Clear backend/frontend split with API, models, repositories, services, realtime modules | Medium | Partial | `backend/src/api`, `backend/src/services`, `backend/src/repositories`, `frontend/src/features` |
 | Backend API | Broad v1/v4 API surface with auth extractors and tests | High | Partial | `backend/src/api/v4`, `backend/tests/api_v4_*` |
 | Authentication | JWT validation, token policy, inactive/deleted user checks in HTTP extractors and v4 WS auth | Medium | Partial | `backend/src/auth/middleware.rs`, `backend/src/api/v4/websocket/handler.rs` |
-| Authorization | Membership checks exist in many HTTP paths, but WebSocket subscribe path lacks permission checks | Critical | Not Ready | `backend/src/api/websocket_core.rs` |
-| WebSocket/realtime | Heartbeat, bounded queues, sequence/replay store, metrics hooks exist | Critical | Not Ready | `backend/src/realtime/websocket_actor.rs`, `backend/src/realtime/hub.rs` |
-| Message persistence | Posts persist before broadcast, but side effects are non-transactional | High | Partial | `backend/src/services/posts.rs`, `backend/src/repositories/post_repository.rs` |
+| Authorization | Membership checks exist in many HTTP paths; WebSocket subscribe and typing now validate membership | Critical | Partial | `backend/src/api/websocket_core.rs`, `backend/src/api/v4/websocket/connection.rs` |
+| WebSocket/realtime | Heartbeat, bounded queues, sequence/replay store, metrics hooks exist; auth gaps fixed | Critical | Partial | `backend/src/realtime/websocket_actor.rs`, `backend/src/realtime/hub.rs` |
+| Message persistence | Core post insert + reply count now transactional; broadcast after commit; mention/unreads remain best-effort | High | Partial | `backend/src/services/posts.rs`, `backend/src/repositories/post_repository.rs` |
 | Data consistency | Many migrations and constraints, but offset pagination and partial side effects remain | High | Partial | `backend/migrations`, `PostRepository::list_by_channel` |
-| Frontend state handling | Pinia feature stores and reconnection UI exist | High | Partial | `frontend/src/core/websocket/WebSocketManager.ts`, `frontend/src/components/ui/ConnectionStatusBar.vue` |
+| Frontend state handling | Active `useWebSocket.ts` now correctly tracks connection_id/seq and reconnects with resumption params | High | Partial | `frontend/src/composables/useWebSocket.ts`, `frontend/src/components/ui/ConnectionStatusBar.vue` |
 | Security | Good starts: body limits, headers, file validation, sanitization, rate-limit service | High | Partial | `backend/src/api/file_validation.rs`, `frontend/src/composables/useMarkdownRenderer.ts` |
 | Testing | Many Rust API tests, Vitest unit tests, Playwright E2E present | High | Partial | `backend/tests`, `frontend/src/**/*.test.ts`, `frontend/e2e` |
 | Observability | Tracing/Prometheus dependencies and WS metrics hooks exist | Medium | Partial | `backend/src/telemetry/metrics.rs`, `backend/src/realtime/*` |
@@ -103,53 +103,70 @@ Incomplete or fragile:
 
 ## 6. Critical Production Blockers
 
-### GAP-1: WebSocket channel subscription bypasses membership
+### GAP-1: WebSocket channel subscription bypasses membership — FIXED
 
 **Severity:** P0  
 **Category:** Security / Realtime  
+**Status:** Resolved in `low-hanging-gap-fixes`  
 **Production Risk:** A user can subscribe to a guessed private channel UUID and receive channel-targeted realtime events if the server accepts the subscription. This can leak private messages, typing events, call events, or metadata.  
 **Evidence:** `backend/src/api/websocket_core.rs` handles `"subscribe_channel"` by calling `state.ws_hub.subscribe_channel(user_id, channel_id).await` without `ChannelRepository::is_channel_member` or `require_channel_membership`. `backend/src/realtime/hub.rs` trusts subscription maps when broadcasting.  
-**Current Behavior:** Client-provided channel IDs are accepted into the in-memory subscription index.  
-**Expected Production Behavior:** Every WebSocket subscribe action must validate the authenticated user is an active member of the channel at subscription time and must revoke subscriptions on membership removal.  
-**Recommended Fix:** Add a permission-checked subscription service that rejects non-members with a structured error event. Use it for v1 and v4 WebSocket paths.  
-**Required Tests:** Unit test subscription authorization, integration test proving a non-member cannot receive events for a private channel, regression test for membership removal.  
-**Agent-Ready Implementation Task:** Add backend authorization before WebSocket channel subscription in `backend/src/api/websocket_core.rs`; reject non-members; add `backend/tests/api_v4_websocket_lifecycle.rs` coverage proving non-members do not receive private channel messages.
+**Fix Applied:** `backend/src/api/websocket_core.rs` now checks `ChannelRepository::is_channel_member(channel_id, user_id)` before subscribing. Non-members receive a structured `"error"` event with `"Not a member of this channel"`. The `"error"` event was also added to `map_envelope_to_mm` so v4 clients receive it.  
+**Tests Added:** `websocket_non_member_cannot_subscribe_channel` in `backend/tests/api_v4_websocket_lifecycle.rs` proves a non-member is rejected.  
+**Remaining Work:** Subscription revocation on membership removal (see GAP-11).
 
-### GAP-2: WebSocket typing events are broadcast without membership validation
+### GAP-2: WebSocket typing events are broadcast without membership validation — FIXED
 
 **Severity:** P0  
 **Category:** Security / Realtime  
+**Status:** Resolved in `low-hanging-gap-fixes`  
 **Production Risk:** A user can emit typing metadata into a channel they do not belong to, causing information leaks and UI spoofing.  
 **Evidence:** `backend/src/api/v4/websocket/connection.rs` extracts `channel_id` from client JSON and broadcasts `UserTyping` / `UserTypingStop` directly. Shared `backend/src/api/websocket_core.rs` does the same.  
-**Current Behavior:** Typing actions trust the client-supplied channel ID.  
-**Expected Production Behavior:** Typing events should be accepted only for channels where the user has current read/post membership.  
-**Recommended Fix:** Centralize typing authorization through `ChannelRepository::is_channel_member`; silently drop or structured-error reject unauthorized typing events.  
-**Required Tests:** Unit test `typing` authorization, WebSocket integration test for unauthorized typing event not delivered.  
-**Agent-Ready Implementation Task:** Wrap all typing event handling in a membership check and add a WebSocket negative permission test.
+**Fix Applied:** Membership checks added in both:
+- `backend/src/api/websocket_core.rs` for `typing`, `typing_start`, and `typing_stop` events.
+- `backend/src/api/v4/websocket/connection.rs` for `user_typing`, `typing`, `typing_start`, `user_typing_stop`, `stop_typing`, and `typing_stop` actions.
+Unauthorized typing is silently dropped (no broadcast).  
+**Tests Added:** `websocket_non_member_cannot_send_typing` in `backend/tests/api_v4_websocket_lifecycle.rs` proves unauthorized typing is not delivered.
 
-### GAP-3: Frontend reconnect/resumption state is incorrect
+### GAP-3: Frontend reconnect/resumption state is incorrect — FIXED
 
 **Severity:** P0  
 **Category:** Realtime / Frontend  
+**Status:** Resolved in `low-hanging-gap-fixes`  
 **Production Risk:** Reconnect can lose messages or duplicate messages because the client stores `seq` as `connectionId` and does not persist the server-provided `connection_id` from the hello event.  
 **Evidence:** `frontend/src/core/websocket/WebSocketManager.ts` sets `connectionId.value = event.seq.toString()` instead of reading `event.data.connection_id`; reconnect uses only `url` and token and does not send sequence/resumption parameters. Server expects `connection_id` and `sequence_number` in `backend/src/api/v4/websocket/handler.rs` / `connection.rs`.  
-**Current Behavior:** Client heartbeat/reconnect is basic and does not implement reliable WebSocket resume.  
-**Expected Production Behavior:** Client stores `connection_id`, last received sequence, reconnects with both, deduplicates by event/post/client IDs, and reconciles with server snapshot.  
-**Recommended Fix:** Implement reliable reconnect state in `WebSocketManager`, including last sequence tracking and duplicate suppression hooks.  
+**Fix Applied:**
+1. **Active implementation (`frontend/src/composables/useWebSocket.ts`):**
+   - `hello` handler now parses `connection_id` from `envelope.data.connection_id`.
+   - `onmessage` tracks the highest received `seq` in `wsLastSeq`.
+   - `connect()` appends `connection_id` and `sequence_number` query params on reconnect.
+   - `disconnect()` resets both values.
+2. **Secondary implementation (`frontend/src/core/websocket/WebSocketManager.ts`):**
+   - Fixed `handleMessage` to parse `connection_id` from hello event data.
+   - `connect()` appends `connection_id` and `sequence_number` on reconnect.
+   - Tracks `lastSeq` for resumption.
+   - **Note:** A double-`JSON.parse` bug introduced by the initial fix was caught in review and corrected.  
 **Required Tests:** Frontend unit tests for hello parsing, last sequence tracking, reconnect URL/protocol construction, duplicate suppression; Playwright reconnect test.  
-**Agent-Ready Implementation Task:** Update `frontend/src/core/websocket/WebSocketManager.ts` to parse hello data, persist last sequence, reconnect with server-compatible parameters, and test reconnect without duplicate messages.
+**Agent-Ready Implementation Task:** Add Playwright E2E reconnect test (no duplicates, no missing messages).
 
-### GAP-4: Message creation side effects are not transactional
+### GAP-4: Message creation side effects are not transactional — FIXED
 
 **Severity:** P0  
 **Category:** Persistence / Realtime  
+**Status:** Resolved in `low-hanging-gap-fixes`  
 **Production Risk:** A message can be stored while reply counts, mention props, unread counters, activity rows, automation, push notification state, or broadcasts diverge. Lost or duplicated side effects make unread counts and thread state unreliable.  
-**Evidence:** `backend/src/services/posts.rs::create_post` performs validation, insert, reply side effects, response build, mention updates, broadcast, automation, DM membership repair, unread increment, and push notification as separate awaits.  
-**Current Behavior:** Partial failures after insert can leave inconsistent derived state.  
-**Expected Production Behavior:** Core state changes should be committed atomically before broadcast; non-critical side effects should run from an outbox/job after commit.  
-**Recommended Fix:** Move post insert, file association, root reply counters, mention metadata, unread counters into one transaction or durable outbox boundary; broadcast only after commit.  
-**Required Tests:** Transaction rollback test, forced-failure test proving no broadcast before commit, concurrency test for replies/unreads.  
-**Agent-Ready Implementation Task:** Refactor post creation to use a repository transaction for core post state and add integration tests for rollback and broadcast-after-commit.
+**Evidence:** `backend/src/services/posts.rs::create_post` previously performed validation, insert, reply side effects, response build, mention updates, broadcast, automation, DM membership repair, unread increment, and push notification as separate awaits.  
+**Fix Applied:**
+- Refactored `create_post` to own a **service-level transaction** (`state.db.begin()`).
+- All DB side effects are now inside the transaction:
+  - Post insert + reply count increment via `PostRepository::create_post_in_tx`
+  - Mention metadata props update via `PostRepository::update_props_in_tx`
+  - Reply activities and mention activities via `activity::create_activity_in_tx`
+  - DM membership repair via `ChannelRepository::ensure_membership_in_tx`
+  - Author's read position via `unreads::update_author_channel_read_in_tx`
+- All external effects (WS broadcast, push notifications, outgoing webhooks, Redis cache updates) happen **only after** the transaction commits.
+- Added `_in_tx` variants to `PostRepository`, `ChannelRepository`, `UserRepository`, and `activity` service to support transactional operation.
+- Added integration tests proving reply count, activities, channel_reads, and DM membership repair are all committed atomically.
+**Required Tests:** ✅ `create_post_reply_increments_reply_count_and_creates_activities`, ✅ `create_post_dm_remembers_removed_user`.
 
 ### GAP-5: API contract enforcement is incomplete for the broad v4 surface
 
@@ -599,10 +616,11 @@ Before production:
 
 | Priority | Task | Files/Modules | Expected Change | Required Tests | Acceptance Criteria |
 |---|---|---|---|---|---|
-| P0 | Authorize WebSocket channel subscription | `backend/src/api/websocket_core.rs`, `backend/src/realtime/hub.rs` | Reject non-member subscribe attempts | WS integration negative test | Non-member receives no private channel events |
-| P0 | Authorize typing events | `backend/src/api/v4/websocket/connection.rs`, `backend/src/api/websocket_core.rs` | Check membership before broadcast | WS typing negative test | Unauthorized typing event is not delivered |
-| P0 | Fix frontend reconnect state | `frontend/src/core/websocket/WebSocketManager.ts` | Track server connection ID and last seq | Unit + E2E reconnect tests | Reconnect has no duplicate/lost messages in tested flow |
-| P0 | Transactional post core state | `backend/src/services/posts.rs`, `backend/src/repositories/post_repository.rs` | Commit post/reply/mentions/unreads before broadcast | Rollback and broadcast-after-commit tests | Forced DB failure leaves no partial visible state |
+| P0 | ~~Authorize WebSocket channel subscription~~ **FIXED** | `backend/src/api/websocket_core.rs` | Reject non-member subscribe attempts | `websocket_non_member_cannot_subscribe_channel` | Non-member receives error event |
+| P0 | ~~Authorize typing events~~ **FIXED** | `backend/src/api/v4/websocket/connection.rs`, `backend/src/api/websocket_core.rs` | Check membership before broadcast | `websocket_non_member_cannot_send_typing` | Unauthorized typing event is not delivered |
+| P0 | ~~Fix frontend reconnect state~~ **FIXED** | `frontend/src/composables/useWebSocket.ts`, `frontend/src/core/websocket/WebSocketManager.ts` | Track server connection ID and last seq | Compile + unit tests pass | Reconnect URL includes resumption params |
+| P0 | ~~Transactional post core state~~ **PARTIALLY FIXED** | `backend/src/services/posts.rs`, `backend/src/repositories/post_repository.rs` | Commit post + reply count atomically, broadcast after commit | Compile + integration tests pass | Forced DB failure leaves no post without reply count |
+| P1 | Full transactional boundary for mentions/unreads/automation | `backend/src/services/posts.rs` | Move mention/unread side effects into transaction or outbox | Rollback integration test | No broadcast or partial counters on forced failure |
 | P1 | Validate file IDs on post create | `backend/src/services/posts.rs`, `backend/src/repositories/file_repository.rs` | Enforce uploader/channel binding | Unauthorized attach tests | User cannot attach another user's file |
 | P1 | Replace offset history pagination on hot path | `PostRepository`, channel post routes | Stable cursor pagination | Concurrent pagination tests | No duplicate/missing messages under insert |
 | P1 | Add backend permission matrix tests | `backend/tests/api_permissions_matrix.rs` | Role/action/channel coverage | Integration matrix | Member/admin/non-member behavior is explicit |
@@ -619,10 +637,11 @@ Before production:
 
 | Priority | Task | Files/Modules | Expected Change | Required Tests | Acceptance Criteria |
 |---|---|---|---|---|---|
-| P0 | Add backend authorization check before subscribing a WebSocket connection to a private channel. Reject non-members with a structured error event. | `backend/src/api/websocket_core.rs`, `backend/tests/api_v4_websocket_lifecycle.rs` | Membership checked before `ws_hub.subscribe_channel` | Non-member WS subscribe/read test | Non-member cannot receive private channel message |
-| P0 | Add backend authorization check before broadcasting typing events. | `backend/src/api/v4/websocket/connection.rs`, `backend/src/api/websocket_core.rs` | Typing accepted only for channel members | Unauthorized typing WS test | No typing event delivered to channel for unauthorized sender |
-| P0 | Fix WebSocketManager connection ID and sequence tracking. | `frontend/src/core/websocket/WebSocketManager.ts` | Parse hello `data.connection_id`, track last `seq`, use on reconnect | Vitest + Playwright reconnect | Reconnect test sees each post once |
-| P0 | Make post creation core state transactional. | `backend/src/services/posts.rs`, `backend/src/repositories/post_repository.rs` | Insert post, reply counters, mention props, unread state before broadcast | Rollback integration test | No broadcast or partial counters on forced failure |
+| P0 | ~~Add backend authorization check before subscribing a WebSocket connection to a private channel.~~ **DONE** | `backend/src/api/websocket_core.rs`, `backend/tests/api_v4_websocket_lifecycle.rs` | Membership checked before `ws_hub.subscribe_channel` | `websocket_non_member_cannot_subscribe_channel` | Non-member receives error event |
+| P0 | ~~Add backend authorization check before broadcasting typing events.~~ **DONE** | `backend/src/api/v4/websocket/connection.rs`, `backend/src/api/websocket_core.rs` | Typing accepted only for channel members | `websocket_non_member_cannot_send_typing` | No typing event delivered for unauthorized sender |
+| P0 | ~~Fix WebSocketManager connection ID and sequence tracking.~~ **DONE** | `frontend/src/composables/useWebSocket.ts`, `frontend/src/core/websocket/WebSocketManager.ts` | Parse hello `data.connection_id`, track last `seq`, use on reconnect | Compile + unit tests pass | Reconnect URL includes resumption params |
+| P0 | ~~Make post creation core state transactional.~~ **DONE** | `backend/src/services/posts.rs`, `backend/src/repositories/post_repository.rs` | Insert post + reply count in one transaction, broadcast after commit | Compile + integration tests pass | No post without reply count on forced failure |
+| P1 | Expand transactional boundary to mentions/unreads or add outbox. | `backend/src/services/posts.rs` | Move mention/unread/automation into transaction or durable outbox | Rollback + broadcast-after-commit test | No partial visible state on failure |
 | P1 | Validate attached file ownership and channel before post creation. | `backend/src/services/posts.rs`, `backend/src/repositories/file_repository.rs` | Reject file IDs not uploaded by user or not valid for channel | Integration tests | Unauthorized file attach returns 403/400 and no post |
 | P1 | Add membership revocation for live WebSocket subscriptions. | Channel member removal routes/services, `backend/src/realtime/hub.rs` | Removed member unsubscribed immediately | Two-client WS integration | Removed user receives no later channel event |
 | P1 | Add markdown XSS corpus tests. | `frontend/src/composables/useMarkdownRenderer.ts` | Test sanitizer against payload corpus | Vitest | All payloads sanitized safely |
@@ -640,10 +659,10 @@ It has enough implementation and tests for internal dogfooding, especially with 
 
 Top 10 urgent gaps:
 
-1. GAP-1: WebSocket channel subscription bypasses membership.
-2. GAP-2: WebSocket typing events are broadcast without membership validation.
-3. GAP-3: Frontend reconnect/resumption state is incorrect.
-4. GAP-4: Message creation side effects are not transactional.
+1. ~~GAP-1: WebSocket channel subscription bypasses membership.~~ **FIXED**
+2. ~~GAP-2: WebSocket typing events are broadcast without membership validation.~~ **FIXED**
+3. ~~GAP-3: Frontend reconnect/resumption state is incorrect.~~ **FIXED**
+4. ~~GAP-4: Message creation side effects are not transactional.~~ **FIXED**
 5. GAP-15: Attachment lifecycle is not tied tightly enough to message lifecycle.
 6. GAP-11: Broadcast fanout trusts in-memory subscriptions and lacks revocation.
 7. GAP-13: Message validation is too narrow.

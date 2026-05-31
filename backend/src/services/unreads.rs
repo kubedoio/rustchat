@@ -3,7 +3,7 @@ use crate::error::{ApiResult, AppError};
 use deadpool_redis::redis::AsyncCommands;
 use regex::escape as escape_regex;
 use serde::Serialize;
-use sqlx::FromRow;
+use sqlx::{FromRow, Postgres, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use tracing::{debug, warn};
@@ -880,18 +880,13 @@ pub async fn get_unread_overview(state: &AppState, user_id: Uuid) -> ApiResult<U
 }
 
 /// Increment unread counts for a new message
-pub async fn increment_unreads(
-    state: &AppState,
+/// Update the author's channel_reads row inside an existing transaction.
+pub async fn update_author_channel_read_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
     channel_id: Uuid,
     author_id: Uuid,
     message_seq: i64,
 ) -> ApiResult<()> {
-    let team_id: Uuid = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
-        .bind(channel_id)
-        .fetch_one(&state.db)
-        .await?;
-
-    // Update author's read position to self-sent message in DB.
     sqlx::query(
         r#"
         INSERT INTO channel_reads (user_id, channel_id, last_read_message_id, last_read_at)
@@ -905,19 +900,25 @@ pub async fn increment_unreads(
     .bind(author_id)
     .bind(channel_id)
     .bind(message_seq)
-    .execute(&state.db)
+    .execute(&mut **tx)
     .await?;
+    Ok(())
+}
 
-    let members: Vec<Uuid> =
-        sqlx::query_scalar("SELECT user_id FROM channel_members WHERE channel_id = $1")
-            .bind(channel_id)
-            .fetch_all(&state.db)
-            .await?;
-
+/// External (best-effort) unread increments: Redis cache + WS broadcast.
+/// Call this only after the DB transaction has committed.
+pub async fn increment_unreads_external(
+    state: &AppState,
+    channel_id: Uuid,
+    author_id: Uuid,
+    message_seq: i64,
+    team_id: Uuid,
+    members: Vec<Uuid>,
+) -> ApiResult<()> {
     let mut conn = match state.redis.get().await {
         Ok(conn) => conn,
         Err(err) => {
-            warn!(channel_id = %channel_id, error = %err, "Redis unavailable during increment_unreads; marking members dirty");
+            warn!(channel_id = %channel_id, error = %err, "Redis unavailable during increment_unreads_external; marking members dirty");
             for mid in members {
                 if mid != author_id {
                     mark_dirty_best_effort(state, mid, &format!("channel:{}", channel_id)).await;
@@ -1005,6 +1006,46 @@ pub async fn increment_unreads(
     }
 
     Ok(())
+}
+
+/// Legacy convenience wrapper that updates DB + Redis + WS in one call.
+/// Use `update_author_channel_read_in_tx` + `increment_unreads_external` when you need
+/// the DB write to be part of a larger transaction.
+pub async fn increment_unreads(
+    state: &AppState,
+    channel_id: Uuid,
+    author_id: Uuid,
+    message_seq: i64,
+) -> ApiResult<()> {
+    let team_id: Uuid = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
+        .bind(channel_id)
+        .fetch_one(&state.db)
+        .await?;
+
+    // Update author's read position directly (not in a tx).
+    sqlx::query(
+        r#"
+        INSERT INTO channel_reads (user_id, channel_id, last_read_message_id, last_read_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (user_id, channel_id)
+        DO UPDATE SET
+            last_read_message_id = EXCLUDED.last_read_message_id,
+            last_read_at = EXCLUDED.last_read_at
+        "#,
+    )
+    .bind(author_id)
+    .bind(channel_id)
+    .bind(message_seq)
+    .execute(&state.db)
+    .await?;
+
+    let members: Vec<Uuid> =
+        sqlx::query_scalar("SELECT user_id FROM channel_members WHERE channel_id = $1")
+            .bind(channel_id)
+            .fetch_all(&state.db)
+            .await?;
+
+    increment_unreads_external(state, channel_id, author_id, message_seq, team_id, members).await
 }
 
 /// Mark all channels as read for a user

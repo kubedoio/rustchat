@@ -190,7 +190,40 @@ async fn create_channel(
 
         if let Some(mut channel) = existing {
             // Re-add both users as members just in case they left (resurrect DM)
-            let _ = crate::services::posts::ensure_dm_membership(&state, channel.id).await;
+            // Do this atomically inside a transaction.
+            let mut tx = state.db.begin().await?;
+            let mut readded_users: Vec<Uuid> = Vec::new();
+
+            if let Some((u1, u2)) = crate::models::parse_direct_channel_name(&channel.name) {
+                for target_user_id in [u1, u2] {
+                    if let Ok(added) = ChannelRepository::new(&state.db)
+                        .ensure_membership_in_tx(&mut tx, channel.id, target_user_id)
+                        .await
+                    {
+                        if added.is_some() {
+                            readded_users.push(target_user_id);
+                        }
+                    }
+                }
+            }
+            tx.commit().await?;
+
+            // Post-commit WS broadcasts for re-added users
+            for target_user_id in readded_users {
+                let event = WsEnvelope::event(
+                    EventType::ChannelCreated,
+                    channel.clone(),
+                    Some(channel.id),
+                )
+                .with_broadcast(WsBroadcast {
+                    user_id: Some(target_user_id),
+                    channel_id: None,
+                    team_id: None,
+                    exclude_user_id: None,
+                });
+                state.ws_hub.broadcast(event).await;
+            }
+
             hydrate_direct_channel_display_name(&state, auth.user_id, &mut channel).await?;
             return Ok(Json(channel));
         }

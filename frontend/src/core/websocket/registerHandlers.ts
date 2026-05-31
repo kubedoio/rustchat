@@ -1,5 +1,8 @@
-// WebSocket Handler Registration
-// Central registration of all feature-specific WebSocket handlers
+// WebSocket Handler Registration — UNFINISHED REFACTORING, NOT WIRED INTO THE APP
+//
+// The active WebSocket implementation is in frontend/src/composables/useWebSocket.ts.
+// registerWebSocketHandlers() is never imported or called. Do not expect runtime
+// changes from this file until the refactoring is completed and wired into main.ts/App.vue.
 
 import { log } from '@/utils/log'
 import { wsManager, type WebSocketEvent } from './WebSocketManager'

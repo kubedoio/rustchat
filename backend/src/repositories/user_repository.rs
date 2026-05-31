@@ -1264,6 +1264,20 @@ impl<'a> UserRepository<'a> {
         .await
     }
 
+    /// Get user IDs and usernames by username list inside an existing transaction.
+    pub async fn get_ids_by_usernames_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        usernames: &[&str],
+    ) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
+        sqlx::query_as::<_, (Uuid, String)>(
+            "SELECT id, username FROM users WHERE username = ANY($1)",
+        )
+        .bind(usernames)
+        .fetch_all(&mut **tx)
+        .await
+    }
+
     /// Get a user's role by ID
     pub async fn get_role_by_id(&self, id: Uuid) -> Result<String, sqlx::Error> {
         sqlx::query_scalar("SELECT role FROM users WHERE id = $1")

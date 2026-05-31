@@ -14,6 +14,7 @@ use crate::auth::{validate_token_with_policy, Claims};
 use crate::realtime::{
     ClientEnvelope, EventType, TypingCommandData, TypingEvent, WsBroadcast, WsEnvelope,
 };
+use crate::repositories::ChannelRepository;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ConnectionLimitExceeded {
@@ -521,6 +522,19 @@ pub async fn handle_client_envelope(
         }
         "subscribe_channel" => {
             if let Some(channel_id) = envelope.channel_id {
+                let is_member = ChannelRepository::new(&state.db)
+                    .is_channel_member(channel_id, user_id)
+                    .await
+                    .unwrap_or(false);
+                if !is_member {
+                    let evt = WsEnvelope::event(
+                        EventType::Error,
+                        serde_json::json!({ "message": "Not a member of this channel" }),
+                        None,
+                    );
+                    send_direct(state, user_id, evt).await;
+                    return;
+                }
                 state.ws_hub.subscribe_channel(user_id, channel_id).await;
                 let evt = WsEnvelope::event(
                     EventType::ChannelSubscribed,
@@ -545,6 +559,13 @@ pub async fn handle_client_envelope(
         }
         "typing" | "typing_start" => {
             if let Some(channel_id) = envelope.channel_id {
+                let is_member = ChannelRepository::new(&state.db)
+                    .is_channel_member(channel_id, user_id)
+                    .await
+                    .unwrap_or(false);
+                if !is_member {
+                    return;
+                }
                 let thread_root_id = serde_json::from_value::<TypingCommandData>(envelope.data)
                     .ok()
                     .and_then(|v| v.thread_root_id);
@@ -569,6 +590,13 @@ pub async fn handle_client_envelope(
         }
         "typing_stop" => {
             if let Some(channel_id) = envelope.channel_id {
+                let is_member = ChannelRepository::new(&state.db)
+                    .is_channel_member(channel_id, user_id)
+                    .await
+                    .unwrap_or(false);
+                if !is_member {
+                    return;
+                }
                 let thread_root_id = serde_json::from_value::<TypingCommandData>(envelope.data)
                     .ok()
                     .and_then(|v| v.thread_root_id);

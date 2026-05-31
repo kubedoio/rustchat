@@ -5,12 +5,13 @@ use uuid::Uuid;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    normalize_avatar_url, ChannelMember, CreatePost, FileUploadResponse, Post, PostResponse,
+    normalize_avatar_url, Activity, ActivityType, ChannelMember, CreatePost, FileUploadResponse, Post, PostResponse,
 };
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 use crate::repositories::{ChannelRepository, PlaybookRepository, PostRepository, UserRepository};
 use crate::services::activity;
 use regex::Regex;
+
 
 #[derive(Debug, Default)]
 pub struct PostsQuery {
@@ -52,88 +53,6 @@ async fn validate_create_post(
     }
 
     Ok(root_post_id)
-}
-
-async fn insert_post(
-    state: &AppState,
-    user_id: Uuid,
-    channel_id: Uuid,
-    input: &CreatePost,
-    root_post_id: Option<Uuid>,
-) -> ApiResult<Post> {
-    let post = PostRepository::new(state.db.clone())
-        .create_post(
-            channel_id,
-            user_id,
-            root_post_id,
-            &input.message,
-            input.props.clone().unwrap_or(serde_json::json!({})),
-            &input.file_ids,
-        )
-        .await?;
-
-    Ok(post)
-}
-
-async fn handle_reply_side_effects(
-    state: &AppState,
-    user_id: Uuid,
-    channel_id: Uuid,
-    post: &Post,
-    root_post_id: Uuid,
-    message: &str,
-) -> ApiResult<()> {
-    PostRepository::new(state.db.clone())
-        .increment_reply_count(root_post_id)
-        .await?;
-
-    // Create reply/thread_reply activity for the parent post author
-    let parent_info = PostRepository::new(state.db.clone())
-        .get_parent_info(root_post_id)
-        .await
-        .ok()
-        .flatten();
-
-    if let Some((parent_user_id, parent_root_id)) = parent_info {
-        if parent_user_id != user_id {
-            let team_id_for_reply = ChannelRepository::new(&state.db)
-                .get_team_id(channel_id)
-                .await
-                .ok()
-                .flatten();
-
-            if let Some(team_id) = team_id_for_reply {
-                if parent_root_id.is_some() {
-                    // Parent is itself a reply, this is a thread reply
-                    let _ = activity::create_thread_reply_activity(
-                        state,
-                        parent_user_id,
-                        user_id,
-                        channel_id,
-                        team_id,
-                        post.id,
-                        root_post_id,
-                        message,
-                    )
-                    .await;
-                } else {
-                    // Parent is a root post, this is a direct reply
-                    let _ = activity::create_reply_activity(
-                        state,
-                        parent_user_id,
-                        user_id,
-                        channel_id,
-                        team_id,
-                        post.id,
-                        message,
-                    )
-                    .await;
-                }
-            }
-        }
-    }
-
-    Ok(())
 }
 
 async fn build_post_response(
@@ -264,80 +183,6 @@ async fn run_post_automation(
     }
 }
 
-async fn handle_mentions(
-    state: &AppState,
-    channel_id: Uuid,
-    user_id: Uuid,
-    post_id: Uuid,
-    response: &mut PostResponse,
-) -> ApiResult<Vec<String>> {
-    // Parse mentions using regex, excluding code blocks and URLs
-    let mentions = parse_mentions(&response.message);
-
-    if !mentions.is_empty() {
-        // We could store these in the DB if we wanted persistent notifications
-        // For now, we'll just include them in the broadcast if needed,
-        // but the frontend already parses them from the message string.
-        // Let's at least update the props to include mentions metadata.
-        let mut props = response.props.as_object().cloned().unwrap_or_default();
-        props.insert("mentions".to_string(), serde_json::json!(&mentions));
-
-        // Update DB with the new props
-        let _ = PostRepository::new(state.db.clone())
-            .update_props(post_id, serde_json::Value::Object(props.clone()))
-            .await
-            .ok();
-
-        response.props = serde_json::Value::Object(props);
-
-        // Create mention activities for mentioned users
-        // Get team_id for the channel
-        let team_id_opt = ChannelRepository::new(&state.db)
-            .get_team_id(channel_id)
-            .await
-            .ok()
-            .flatten();
-
-        if let Some(team_id) = team_id_opt {
-            // Batch-resolve usernames to user IDs
-            let usernames = mentions.iter().map(|m| m.as_str()).collect::<Vec<_>>();
-            let users = UserRepository::new(&state.db)
-                .get_ids_by_usernames(&usernames)
-                .await
-                .unwrap_or_default();
-
-            let mentioned_user_ids: Vec<Uuid> = users
-                .into_iter()
-                .map(|(id, _)| id)
-                .filter(|id| *id != user_id)
-                .collect();
-
-            if !mentioned_user_ids.is_empty() {
-                // Batch-check channel memberships
-                let member_ids = ChannelRepository::new(&state.db)
-                    .get_member_ids_by_user_ids(channel_id, &mentioned_user_ids)
-                    .await
-                    .unwrap_or_default();
-
-                for mentioned_user_id in member_ids {
-                    let _ = activity::create_mention_activity(
-                        state,
-                        mentioned_user_id,
-                        user_id,
-                        channel_id,
-                        team_id,
-                        post_id,
-                        &response.message,
-                    )
-                    .await;
-                }
-            }
-        }
-    }
-
-    Ok(mentions)
-}
-
 async fn send_push_notifications(
     state: &AppState,
     channel_id: Uuid,
@@ -437,7 +282,7 @@ async fn send_push_notifications(
     }
 }
 
-/// Create a new post
+/// Create a new post with all DB side effects committed atomically.
 pub async fn create_post(
     state: &AppState,
     user_id: Uuid,
@@ -446,24 +291,207 @@ pub async fn create_post(
     client_msg_id: Option<String>,
 ) -> ApiResult<PostResponse> {
     let root_post_id = validate_create_post(state, user_id, channel_id, &input).await?;
-    let post = insert_post(state, user_id, channel_id, &input, root_post_id).await?;
 
-    if let Some(r_id) = root_post_id {
-        handle_reply_side_effects(state, user_id, channel_id, &post, r_id, &input.message).await?;
+    // Pre-compute data needed before the transaction.
+    let team_id_opt = ChannelRepository::new(&state.db)
+        .get_team_id(channel_id)
+        .await
+        .ok()
+        .flatten();
+    let mentions = parse_mentions(&input.message);
+    let mention_user_ids: Vec<Uuid> = if !mentions.is_empty() && team_id_opt.is_some() {
+        UserRepository::new(&state.db)
+            .get_ids_by_usernames(&mentions.iter().map(|m| m.as_str()).collect::<Vec<_>>())
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(id, _)| id)
+            .filter(|id| *id != user_id)
+            .collect()
+    } else {
+        vec![]
+    };
+
+    // Pre-resolve DM users (if any) so we don't need channel type lookup inside tx.
+    let dm_users = if let Some(chan) = ChannelRepository::new(&state.db)
+        .get_by_id_optional(channel_id)
+        .await
+        .ok()
+        .flatten()
+    {
+        if chan.channel_type == crate::models::ChannelType::Direct {
+            crate::models::parse_direct_channel_name(&chan.name)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // ========================================================================
+    // SERVICE-LEVEL TRANSACTION: all DB side effects inside, external after.
+    // ========================================================================
+    let mut tx = state.db.begin().await?;
+
+    // 1. Insert post + reply count
+    let post = PostRepository::new(state.db.clone())
+        .create_post_in_tx(
+            &mut tx,
+            channel_id,
+            user_id,
+            root_post_id,
+            &input.message,
+            input.props.clone().unwrap_or(serde_json::json!({})),
+            &input.file_ids,
+        )
+        .await?;
+
+    // 2. Update props with mentions inside tx
+    let mut props = post.props.as_object().cloned().unwrap_or_default();
+    if !mentions.is_empty() {
+        props.insert("mentions".to_string(), serde_json::json!(&mentions));
+        PostRepository::new(state.db.clone())
+            .update_props_in_tx(&mut tx, post.id, serde_json::Value::Object(props.clone()))
+            .await?;
     }
 
+    // 3. Reply activities inside tx
+    let mut reply_activities: Vec<Activity> = Vec::new();
+    if let Some(r_id) = root_post_id {
+        if let Some((parent_user_id, parent_root_id)) = PostRepository::new(state.db.clone())
+            .get_parent_info_in_tx(&mut tx, r_id)
+            .await
+            .ok()
+            .flatten()
+        {
+            if parent_user_id != user_id {
+                if let Some(team_id) = team_id_opt {
+                    let activity_type = if parent_root_id.is_some() {
+                        ActivityType::ThreadReply
+                    } else {
+                        ActivityType::Reply
+                    };
+                    let activity = activity::create_activity_in_tx(
+                        &mut tx,
+                        parent_user_id,
+                        activity_type,
+                        user_id,
+                        channel_id,
+                        team_id,
+                        post.id,
+                        Some(r_id),
+                        Some(input.message.clone()),
+                        None,
+                    )
+                    .await?;
+                    reply_activities.push(activity);
+                }
+            }
+        }
+    }
+
+    // 4. Mention activities inside tx
+    let mut mention_activities: Vec<Activity> = Vec::new();
+    if let Some(team_id) = team_id_opt {
+        let member_ids = ChannelRepository::new(&state.db)
+            .get_member_ids_by_user_ids_in_tx(&mut tx, channel_id, &mention_user_ids)
+            .await
+            .unwrap_or_default();
+        for mentioned_user_id in member_ids {
+            let activity = activity::create_activity_in_tx(
+                &mut tx,
+                mentioned_user_id,
+                ActivityType::Mention,
+                user_id,
+                channel_id,
+                team_id,
+                post.id,
+                root_post_id,
+                Some(input.message.clone()),
+                None,
+            )
+            .await?;
+            mention_activities.push(activity);
+        }
+    }
+
+    // 5. DM membership repair inside tx
+    let mut dm_added_users: Vec<Uuid> = Vec::new();
+    if let Some((u1, u2)) = dm_users {
+        for target_user_id in [u1, u2] {
+            if let Ok(added) = ChannelRepository::new(&state.db)
+                .ensure_membership_in_tx(&mut tx, channel_id, target_user_id)
+                .await
+            {
+                if added.is_some() {
+                    dm_added_users.push(target_user_id);
+                }
+            }
+        }
+    }
+
+    // 6. Author's read position inside tx
+    crate::services::unreads::update_author_channel_read_in_tx(&mut tx, channel_id, user_id, post.seq)
+        .await?;
+
+    // Commit
+    tx.commit().await?;
+    // ========================================================================
+    // POST-COMMIT: best-effort external effects only.
+    // ========================================================================
+
     let mut response = build_post_response(state, post, user_id, client_msg_id).await?;
+    response.props = serde_json::Value::Object(props);
 
-    // MENTIONS BEFORE BROADCAST (bug fix)
-    let mentions = handle_mentions(state, channel_id, user_id, response.id, &mut response).await?;
-
+    // Broadcast post over WS
     broadcast_new_post(state, channel_id, &response, root_post_id).await;
+
+    // Broadcast reply activities over WS (full ActivityResponse shape)
+    for activity in &reply_activities {
+        activity::broadcast_activity(state, activity).await;
+    }
+
+    // Broadcast mention activities over WS (full ActivityResponse shape)
+    for activity in &mention_activities {
+        activity::broadcast_activity(state, activity).await;
+    }
+
+    // Automation (best-effort)
     run_post_automation(state, channel_id, user_id, &response, root_post_id).await;
 
-    let _ = ensure_dm_membership(state, channel_id).await;
-    let _ =
-        crate::services::unreads::increment_unreads(state, channel_id, user_id, response.seq).await;
+    // DM membership WS broadcast
+    if !dm_added_users.is_empty() {
+        if let Ok(Some(chan)) = ChannelRepository::new(&state.db).get_by_id_optional(channel_id).await {
+            for target_user_id in dm_added_users {
+                let event = WsEnvelope::event(
+                    EventType::ChannelCreated,
+                    chan.clone(),
+                    Some(channel_id),
+                )
+                .with_broadcast(WsBroadcast {
+                    user_id: Some(target_user_id),
+                    channel_id: None,
+                    team_id: None,
+                    exclude_user_id: None,
+                });
+                state.ws_hub.broadcast(event).await;
+            }
+        }
+    }
 
+    // Redis unread + WS unread broadcast
+    let members = ChannelRepository::new(&state.db)
+        .get_all_member_ids(channel_id)
+        .await
+        .unwrap_or_default();
+    if let Some(team_id) = team_id_opt {
+        let _ = crate::services::unreads::increment_unreads_external(
+            state, channel_id, user_id, response.seq, team_id, members,
+        )
+        .await;
+    }
+
+    // Push notifications
     let username_for_push = response.username.clone().unwrap_or_default();
     send_push_notifications(
         state,
@@ -502,47 +530,6 @@ async fn ensure_permission(state: &AppState, user_id: Uuid, permission: &str) ->
         return Err(AppError::InsufficientPermissions);
     }
 
-    Ok(())
-}
-
-/// Helper to ensure all participants of a DM are members (resurrects DM)
-pub async fn ensure_dm_membership(state: &AppState, channel_id: Uuid) -> ApiResult<()> {
-    // 1. Get channel info
-    let chan = match ChannelRepository::new(&state.db)
-        .get_by_id_optional(channel_id)
-        .await?
-    {
-        Some(c) => c,
-        None => return Ok(()),
-    };
-
-    if chan.channel_type == crate::models::ChannelType::Direct {
-        if let Some((u1, u2)) = crate::models::parse_direct_channel_name(&chan.name) {
-            for target_user_id in [u1, u2] {
-                // Ensure member exists
-                let added = ChannelRepository::new(&state.db)
-                    .ensure_membership(channel_id, target_user_id)
-                    .await?;
-
-                if added.is_some() {
-                    // User was missing and just re-added.
-                    // Broadcast ChannelCreated to them so their UI opens it.
-                    let event = WsEnvelope::event(
-                        EventType::ChannelCreated,
-                        chan.clone(),
-                        Some(channel_id),
-                    )
-                    .with_broadcast(WsBroadcast {
-                        user_id: Some(target_user_id),
-                        channel_id: None,
-                        team_id: None,
-                        exclude_user_id: None,
-                    });
-                    state.ws_hub.broadcast(event).await;
-                }
-            }
-        }
-    }
     Ok(())
 }
 
@@ -645,10 +632,14 @@ pub async fn create_system_message(
         }
     }
 
-    // 3. Insert post
+    // 3. Start tx, insert post, update author's reads
+    let mut tx = state.db.begin().await?;
     let post = PostRepository::new(state.db.clone())
-        .create_system_message_post(channel_id, bot_user, &message, final_props)
+        .create_system_message_post_in_tx(&mut tx, channel_id, bot_user, &message, final_props)
         .await?;
+    crate::services::unreads::update_author_channel_read_in_tx(&mut tx, channel_id, bot_user, post.seq)
+        .await?;
+    tx.commit().await?;
 
     // 4. Construct response
     let response = PostResponse {
@@ -686,9 +677,24 @@ pub async fn create_system_message(
 
     state.ws_hub.broadcast(broadcast).await;
 
-    // Increment unread counts in Redis for other members
-    let _ =
-        crate::services::unreads::increment_unreads(state, channel_id, bot_user, post.seq).await;
+    // 6. Increment unread counts for other members (post-commit)
+    let team_id = ChannelRepository::new(&state.db)
+        .get_team_id(channel_id)
+        .await
+        .ok()
+        .flatten();
+    if let Some(team_id) = team_id {
+        let members: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT user_id FROM channel_members WHERE channel_id = $1"
+        )
+        .bind(channel_id)
+        .fetch_all(&state.db)
+        .await
+        .unwrap_or_default();
+        let _ = crate::services::unreads::increment_unreads_external(
+            state, channel_id, bot_user, post.seq, team_id, members,
+        ).await;
+    }
 
     Ok(())
 }

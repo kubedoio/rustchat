@@ -1,5 +1,8 @@
-// WebSocket Manager - Minimal orchestrator that dispatches to feature handlers
-// Replaces the 668-line useWebSocket.ts god file
+// WebSocket Manager — UNFINISHED REFACTORING, NOT WIRED INTO THE APP
+//
+// The active WebSocket implementation is in frontend/src/composables/useWebSocket.ts.
+// This file is part of an in-progress refactoring that is not yet connected.
+// Do not modify this file expecting runtime changes until it is integrated.
 
 import { log } from '@/utils/log'
 import { ref, computed, markRaw } from 'vue'
@@ -8,7 +11,7 @@ export type ConnectionState = 'connecting' | 'open' | 'closed' | 'error'
 
 export interface WebSocketEvent {
   event: string
-  data: string
+  data: unknown
   broadcast: {
     channel_id: string
     user_id: string
@@ -27,6 +30,7 @@ class WebSocketManager {
   // Public state (reactive)
   state = ref<ConnectionState>('closed')
   connectionId = ref<string>('')
+  lastSeq = ref<number>(0)
 
   readonly isConnected = computed(() => this.state.value === 'open')
 
@@ -45,9 +49,19 @@ class WebSocketManager {
 
     this.state.value = 'connecting'
 
+    // On reconnect, append connection_id and last_seq for server resumption.
+    let connectUrl = url
+    if (this.connectionId.value) {
+      const sep = url.includes('?') ? '&' : '?'
+      connectUrl += `${sep}connection_id=${encodeURIComponent(this.connectionId.value)}`
+      if (this.lastSeq.value > 0) {
+        connectUrl += `&sequence_number=${this.lastSeq.value}`
+      }
+    }
+
     // Use websocket subprotocol for auth token transport.
     // Query-token transport is rejected by the backend.
-    this.ws = new WebSocket(url, [token])
+    this.ws = new WebSocket(connectUrl, [token])
 
     this.ws.onopen = () => {
       this.state.value = 'open'
@@ -77,6 +91,7 @@ class WebSocketManager {
     }
     this.ws?.close()
     this.ws = null
+    this.resetConnectionState()
   }
 
   // Register a handler for a specific event type
@@ -108,9 +123,17 @@ class WebSocketManager {
     try {
       const event: WebSocketEvent = JSON.parse(data)
 
-      // Update connection ID from sequence
-      if (event.seq) {
-        this.connectionId.value = event.seq.toString()
+      // Parse connection_id from hello event data
+      if (event.event === 'hello' && event.data) {
+        const helloData = event.data as Record<string, unknown>
+        if (typeof helloData.connection_id === 'string') {
+          this.connectionId.value = helloData.connection_id
+        }
+      }
+
+      // Track last sequence number for resumption
+      if (typeof event.seq === 'number' && event.seq > this.lastSeq.value) {
+        this.lastSeq.value = event.seq
       }
 
       // Dispatch to handlers
@@ -156,6 +179,11 @@ class WebSocketManager {
     }, 5000)
   }
 
+  private resetConnectionState() {
+    this.connectionId.value = ''
+    this.lastSeq.value = 0
+  }
+
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
   private startHeartbeat() {
@@ -182,6 +210,7 @@ export function useWebSocket() {
     state: wsManager.state,
     isConnected: wsManager.isConnected,
     connectionId: wsManager.connectionId,
+    lastSeq: wsManager.lastSeq,
     connect: wsManager.connect,
     disconnect: wsManager.disconnect,
     send: wsManager.send,
