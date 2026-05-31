@@ -66,6 +66,42 @@ async fn websocket_typing_event_broadcast() {
 }
 
 #[tokio::test]
+async fn websocket_deleted_user_cannot_connect() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "WS Deleted User Org").await;
+    let (token, user_id) =
+        register_and_login(&app, org_id, "ws_deleted_user", "ws_deleted_user@example.com").await;
+
+    // First connection should succeed
+    let mut ws = app.connect_ws_v4(&token).await;
+    let hello = app.wait_for_event(&mut ws, "hello", 5000).await;
+    assert!(!hello.is_null(), "hello event should contain data");
+    let _ = ws.close(None).await;
+
+    // Delete the user directly from the database
+    sqlx::query("DELETE FROM users WHERE id = $1")
+        .bind(user_id)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to delete user");
+
+    // Try to connect again with the same token
+    let mut ws2 = app.connect_ws_v4(&token).await;
+
+    // Since the v4 handler upgrades before running the async check, the connection
+    // will be established but immediately closed by run_connection.
+    // We should not receive a hello event.
+    let possible_hello = wait_for_possible_event(&mut ws2, "hello", 1500).await;
+    assert!(
+        possible_hello.is_none(),
+        "deleted user should not receive hello event; connection should be rejected"
+    );
+
+    let _ = ws2.close(None).await;
+}
+
+#[tokio::test]
 async fn websocket_non_member_cannot_subscribe_channel() {
     let app = spawn_app().await;
 

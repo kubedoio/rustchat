@@ -44,6 +44,12 @@ pub(crate) async fn run_connection(
         return;
     }
 
+    // Check user is active and not deleted
+    if let Err(err) = crate::auth::middleware::ensure_user_access_active(&state, user_id).await {
+        warn!(user_id = %user_id, error = %err, "Rejecting websocket connection: user inactive or deleted");
+        return;
+    }
+
     // Check connection limits
     if let Err(limit) = websocket_core::enforce_connection_limit(&state, user_id).await {
         warn!(
