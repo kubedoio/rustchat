@@ -53,16 +53,18 @@ RUSTCHAT_REDIS_URL=redis://localhost:6379/
 > **Private bucket by design**
 >
 > RustChat stores uploaded files in a **private** S3/RustFS bucket by default. Uploaded objects are not
-> accessible via direct object-store URLs — attempting to fetch them without authentication will return a
-> `403 Forbidden` response. This is intentional: all file access is proxied through the RustChat backend,
-> which validates the requester's session before serving the object. This design keeps files scoped to
-> their workspace and prevents unauthorised access.
+> accessible via unsigned direct object-store URLs — attempting to fetch them without a valid signature or
+> presigned URL should return a `403 Forbidden` response. This is intentional: access to files is mediated
+> by RustChat, either through authenticated RustChat endpoints or through time-limited presigned URLs that
+> RustChat generates after authorising the requester. This design keeps files scoped to their workspace and
+> prevents unauthorised access.
 >
 > **Do not change the bucket to public.** Making the bucket public removes this protection and exposes all
 > uploaded files — including attachments in private channels — to anyone who knows or guesses an object URL.
 >
-> If you need to serve files via a CDN or reverse-proxy, configure it to authenticate with your RustChat
-> backend rather than bypassing it by pointing directly at the object store.
+> If you need to serve files via a CDN or reverse-proxy, configure it to work with authenticated RustChat
+> endpoints or RustChat-generated presigned URLs rather than bypassing RustChat by pointing directly at the
+> object store.
 
 ### CORS
 
