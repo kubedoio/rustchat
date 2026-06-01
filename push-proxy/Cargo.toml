@@ -18,7 +18,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2.0"
 anyhow = "1.0"
 tower-http = { version = "0.6", features = ["trace"] }
-uuid = { version = "1.0", features = ["v4"] }
+uuid = { version = "1.23", features = ["v4"] }
 bytes = "1"
 hmac = "0.12"
 sha2 = "0.10"
