@@ -85,7 +85,6 @@ RUSTCHAT_JWT_SECRET=$(openssl rand -hex 32)
 RUSTCHAT_ENCRYPTION_KEY=$(openssl rand -hex 32)
 
 # Security hardening
-RUSTCHAT_SECURITY_WS_ALLOW_QUERY_TOKEN=false
 RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=cookie
 RUSTCHAT_SECURITY_RATE_LIMIT_ENABLED=true
 RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE=10
@@ -97,8 +96,7 @@ RUSTCHAT_SECURITY_RATE_LIMIT_WS_PER_MINUTE=30
 | `RUSTCHAT_ENVIRONMENT` | `development` | `production` | Enables strict validation |
 | `RUSTCHAT_SITE_URL` | `http://localhost:8080` | `https://...` | Required for OAuth callbacks |
 | `CORS_ALLOWED_ORIGINS` | Permissive | Exact HTTPS domains | Prevents cross-origin attacks |
-| `WS_ALLOW_QUERY_TOKEN` | `true` | `false` | Prevents token leakage in logs |
-| `OAUTH_TOKEN_DELIVERY` | `query` | `cookie` | Secure token exchange |
+| `OAUTH_TOKEN_DELIVERY` | `cookie` | `cookie` | Secure one-time OAuth token exchange |
 | `RATE_LIMIT_ENABLED` | `true` | `true` | Brute-force protection |
 
 ### 2. Reverse Proxy

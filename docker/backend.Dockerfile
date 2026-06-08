@@ -21,12 +21,14 @@ RUN test -f Cargo.toml && test -f Cargo.lock && test -f src/main.rs
 
 FROM builder AS app-builder
 
+ARG TARGETARCH
+
 # Create dummy src for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies only
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
+RUN --mount=type=cache,id=backend-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=backend-cargo-target-${TARGETARCH},target=/app/target \
     cargo build --release --locked && \
     rm -rf src
 
@@ -38,8 +40,8 @@ COPY migrations ./migrations
 # Build with cache mounts for faster rebuilds
 # BuildKit caches cargo registry and build artifacts between builds
 ENV SQLX_OFFLINE=true
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
+RUN --mount=type=cache,id=backend-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=backend-cargo-target-${TARGETARCH},target=/app/target \
     touch src/main.rs && \
     cargo build --release --locked && \
     cp /app/target/release/rustchat /tmp/rustchat

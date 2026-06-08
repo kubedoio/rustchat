@@ -18,6 +18,8 @@ Previously tracked gaps now implemented:
 
 Known limitations:
 - Post search is currently a basic message search implementation, not full Mattermost advanced search parity.
+- Advanced post action endpoints that RustChat does not implement return explicit Mattermost-shaped `501` responses instead of success-shaped no-ops.
+- Unread mention counting uses token-boundary matching for `@user`, `@all`, `@channel`, and `@here`; persisted mention-target storage and full Mattermost notification preference parity remain future work.
 - Plugin, LDAP, SAML, compliance, and some enterprise/admin APIs remain compatibility stubs or intentionally scoped out.
 
 ## Protected Compatibility Surface

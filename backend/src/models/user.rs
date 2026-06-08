@@ -6,6 +6,25 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+pub fn validate_username_token(username: &str) -> Result<(), &'static str> {
+    if username.is_empty() {
+        return Err("Username cannot be empty");
+    }
+    if username.len() < 3 {
+        return Err("Username must be at least 3 characters");
+    }
+    if username.len() > 64 {
+        return Err("Username cannot exceed 64 characters");
+    }
+    if !username
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err("Username can only contain letters, numbers, hyphens, and underscores");
+    }
+    Ok(())
+}
+
 /// User roles for RBAC
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[sqlx(type_name = "varchar", rename_all = "snake_case")]
@@ -298,7 +317,10 @@ pub struct AuthResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::{legacy_avatar_key_from_url, normalize_avatar_url, stable_avatar_path};
+    use super::{
+        legacy_avatar_key_from_url, normalize_avatar_url, stable_avatar_path,
+        validate_username_token,
+    };
     use uuid::Uuid;
 
     #[test]
@@ -332,5 +354,22 @@ mod tests {
             legacy_avatar_key_from_url(user_id, presigned),
             Some("files/545a19ad-35e4-4cb6-85d6-8b6fc9b09b50/9e0472c0-de97-4b1a-a2cc-b3b929f53f16.jpg".to_string())
         );
+    }
+
+    #[test]
+    fn validate_username_token_accepts_safe_tokens() {
+        assert!(validate_username_token("agent-bot").is_ok());
+        assert!(validate_username_token("service_account").is_ok());
+        assert!(validate_username_token("ci123").is_ok());
+    }
+
+    #[test]
+    fn validate_username_token_rejects_unsafe_tokens() {
+        assert!(validate_username_token("").is_err());
+        assert!(validate_username_token("ab").is_err());
+        assert!(validate_username_token(&"a".repeat(65)).is_err());
+        assert!(validate_username_token("user.name").is_err());
+        assert!(validate_username_token("user@domain").is_err());
+        assert!(validate_username_token("user name").is_err());
     }
 }

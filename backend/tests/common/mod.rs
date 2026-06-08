@@ -99,6 +99,7 @@ pub async fn spawn_app() -> TestApp {
 }
 
 pub async fn spawn_app_with_config(config: Config) -> TestApp {
+    dotenvy::dotenv().ok();
     Lazy::force(&TRACING);
 
     // Configure database using explicit test URL first, then known local fallbacks.
@@ -407,6 +408,7 @@ async fn configure_database(database_url: &str) -> Result<PgPool, String> {
 /// Create a minimal AppState for testing extractors
 #[allow(dead_code)]
 pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::AppState> {
+    dotenvy::dotenv().ok();
     let redis_pool = configure_redis_with_fallback(&collect_test_redis_urls()).await;
     let config = test_config();
     let ws_hub = WsHub::new();

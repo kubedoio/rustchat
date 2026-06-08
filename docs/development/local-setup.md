@@ -78,7 +78,7 @@ Recommended production settings:
 - Terminate TLS at the reverse proxy/load balancer (HTTPS at the edge)
 - Use encrypted SSO client secrets (stored via Admin UI/API)
 - Set TURN credentials explicitly if `TURN_SERVER_ENABLED=true`
-- Query-token compatibility is removed (`RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=query` and `RUSTCHAT_SECURITY_WS_ALLOW_QUERY_TOKEN=true` are rejected at startup)
+- Query-token compatibility is removed; URL/header OAuth token delivery and query-string WebSocket tokens are rejected at startup
 - If `RUSTCHAT_SITE_URL` is set in production, it must use `https://`; `RUSTCHAT_CORS_ALLOWED_ORIGINS` entries must also be `https://` only.
 
 ## Troubleshooting

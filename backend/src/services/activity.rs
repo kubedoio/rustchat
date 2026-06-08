@@ -8,7 +8,7 @@ use crate::models::{
 };
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 use chrono::{DateTime, Utc};
-use sqlx::Row;
+use sqlx::{Postgres, Row, Transaction};
 use uuid::Uuid;
 
 /// Helper to truncate message text
@@ -168,6 +168,139 @@ pub async fn create_activity(
     state.ws_hub.broadcast(broadcast).await;
 
     Ok(activity)
+}
+
+/// Create a new activity entry inside an existing transaction.
+/// Does NOT broadcast over WebSocket — the caller must do that after commit.
+#[allow(clippy::too_many_arguments)]
+pub async fn create_activity_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    activity_type: ActivityType,
+    actor_id: Uuid,
+    channel_id: Uuid,
+    team_id: Uuid,
+    post_id: Uuid,
+    root_id: Option<Uuid>,
+    message_text: Option<String>,
+    reaction: Option<String>,
+) -> ApiResult<Activity> {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO activities
+            (user_id, type, actor_id, channel_id, team_id, post_id, root_id, message_text, reaction)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id, user_id, type as activity_type, actor_id, channel_id, team_id,
+                  post_id, root_id, message_text, reaction, read, created_at
+        "#,
+    )
+    .bind(user_id)
+    .bind(activity_type.as_str())
+    .bind(actor_id)
+    .bind(channel_id)
+    .bind(team_id)
+    .bind(post_id)
+    .bind(root_id)
+    .bind(message_text.map(|m| truncate_text(&m, 200)))
+    .bind(reaction)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok(Activity {
+        id: row.get("id"),
+        user_id: row.get("user_id"),
+        r#type: ActivityType::parse(&row.get::<String, _>("activity_type"))
+            .expect("unknown activity type"),
+        actor_id: row.get("actor_id"),
+        channel_id: row.get("channel_id"),
+        team_id: row.get("team_id"),
+        post_id: row.get("post_id"),
+        root_id: row.get("root_id"),
+        message_text: row.get("message_text"),
+        reaction: row.get("reaction"),
+        read: row.get("read"),
+        created_at: row.get("created_at"),
+    })
+}
+
+/// Broadcast an ActivityCreated event with full joined data (actor/channel/team).
+/// Call this after the DB transaction has committed.
+pub async fn broadcast_activity(state: &AppState, activity: &Activity) {
+    let activity_response: Option<ActivityResponse> = sqlx::query(
+        r#"
+        SELECT
+            a.id,
+            a.type as activity_type,
+            a.actor_id,
+            u.username as actor_username,
+            u.avatar_url as actor_avatar_url,
+            a.channel_id,
+            c.name as channel_name,
+            a.team_id,
+            t.name as team_name,
+            a.post_id,
+            a.root_id,
+            a.message_text,
+            a.reaction,
+            a.read,
+            a.created_at
+        FROM activities a
+        JOIN users u ON a.actor_id = u.id
+        JOIN channels c ON a.channel_id = c.id
+        JOIN teams t ON a.team_id = t.id
+        WHERE a.id = $1
+        "#,
+    )
+    .bind(activity.id)
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten()
+    .map(|row: sqlx::postgres::PgRow| {
+        let actor_id: Uuid = row.get("actor_id");
+        ActivityResponse {
+            id: row.get("id"),
+            r#type: ActivityType::parse(&row.get::<String, _>("activity_type"))
+                .expect("unknown activity type"),
+            actor_id,
+            actor_username: row.get("actor_username"),
+            actor_avatar_url: normalize_avatar_url(
+                actor_id,
+                row.get::<Option<String>, _>("actor_avatar_url").as_deref(),
+            ),
+            channel_id: row.get("channel_id"),
+            channel_name: row.get("channel_name"),
+            team_id: row.get("team_id"),
+            team_name: row.get("team_name"),
+            post_id: row.get("post_id"),
+            root_id: row.get("root_id"),
+            message_text: row.get("message_text"),
+            reaction: row.get("reaction"),
+            read: row.get("read"),
+            created_at: row.get("created_at"),
+        }
+    });
+
+    let broadcast_data = activity_response
+        .as_ref()
+        .map(|r| serde_json::to_value(r).unwrap_or_default())
+        .unwrap_or_else(|| {
+            serde_json::json!({
+                "activity_id": activity.id,
+                "user_id": activity.user_id,
+                "type": activity.r#type
+            })
+        });
+
+    let broadcast = WsEnvelope::event(EventType::ActivityCreated, broadcast_data, None)
+        .with_broadcast(WsBroadcast {
+            user_id: Some(activity.user_id),
+            channel_id: None,
+            team_id: None,
+            exclude_user_id: None,
+        });
+
+    state.ws_hub.broadcast(broadcast).await;
 }
 
 /// Get activity feed for a user

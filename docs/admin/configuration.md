@@ -48,7 +48,7 @@ RUSTCHAT_REDIS_URL=redis://localhost:6379/
 | `RUSTCHAT_S3_ACCESS_KEY` | Yes | - | S3 access key |
 | `RUSTCHAT_S3_SECRET_KEY` | Yes | - | S3 secret key |
 | `RUSTCHAT_S3_REGION` | No | `us-east-1` | S3 region |
-| `RUSTCHAT_S3_PUBLIC_URL` | No | - | Public URL for file access |
+| `RUSTCHAT_S3_PUBLIC_ENDPOINT` | No | - | Public endpoint used when file URLs must be rewritten for clients |
 
 ### CORS
 
@@ -82,8 +82,7 @@ RUSTCHAT_CORS_ALLOWED_ORIGINS=https://chat.example.com,https://app.example.com
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `RUSTCHAT_SECURITY_WS_ALLOW_QUERY_TOKEN` | No | `true` | Allow WebSocket auth via query param |
-| `RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY` | No | `header` | OAuth token delivery: `header` or `cookie` |
+| `RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY` | No | `cookie` | OAuth token delivery. Only `cookie` is accepted. |
 | `RUSTCHAT_SECURITY_RATE_LIMIT_ENABLED` | No | `true` | Enable rate limiting |
 | `RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE` | No | `10` | Auth endpoint rate limit |
 | `RUSTCHAT_SECURITY_RATE_LIMIT_WS_PER_MINUTE` | No | `30` | WebSocket rate limit |
@@ -109,7 +108,6 @@ RUSTCHAT_ENCRYPTION_KEY=<32-byte-key>
 RUSTCHAT_CORS_ALLOWED_ORIGINS=https://your-domain.com
 
 # Security hardening
-RUSTCHAT_SECURITY_WS_ALLOW_QUERY_TOKEN=false
 RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=cookie
 RUSTCHAT_SECURITY_RATE_LIMIT_ENABLED=true
 ```

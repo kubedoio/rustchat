@@ -57,6 +57,17 @@ fn filename_extension(filename: &str) -> Option<&str> {
         .and_then(|(_, ext)| if ext.is_empty() { None } else { Some(ext) })
 }
 
+fn content_disposition_filename(filename: &str) -> String {
+    filename
+        .chars()
+        .map(|ch| match ch {
+            '"' | '\\' | ';' => '_',
+            ch if ch.is_control() => '_',
+            ch => ch,
+        })
+        .collect()
+}
+
 async fn upload_file(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -356,7 +367,10 @@ async fn get_file(
             (header::CONTENT_TYPE, file.mime_type.to_string()),
             (
                 header::CONTENT_DISPOSITION,
-                format!("inline; filename=\"{}\"", file.name),
+                format!(
+                    "inline; filename=\"{}\"",
+                    content_disposition_filename(&file.name)
+                ),
             ),
             (
                 header::CACHE_CONTROL,
@@ -444,7 +458,10 @@ async fn get_thumbnail(
                     (header::CONTENT_TYPE, content_type.to_string()),
                     (
                         header::CONTENT_DISPOSITION,
-                        format!("inline; filename=\"thumb_{}\"", file.name),
+                        format!(
+                            "inline; filename=\"thumb_{}\"",
+                            content_disposition_filename(&file.name)
+                        ),
                     ),
                     (
                         header::CACHE_CONTROL,
@@ -490,7 +507,10 @@ async fn get_preview(
                     (header::CONTENT_TYPE, "image/jpeg".to_string()),
                     (
                         header::CONTENT_DISPOSITION,
-                        format!("inline; filename=\"preview_{}\"", file.name),
+                        format!(
+                            "inline; filename=\"preview_{}\"",
+                            content_disposition_filename(&file.name)
+                        ),
                     ),
                     (
                         header::CACHE_CONTROL,
@@ -520,7 +540,10 @@ async fn get_preview(
                         (header::CONTENT_TYPE, content_type.to_string()),
                         (
                             header::CONTENT_DISPOSITION,
-                            format!("inline; filename=\"preview_{}\"", file.name),
+                            format!(
+                                "inline; filename=\"preview_{}\"",
+                                content_disposition_filename(&file.name)
+                            ),
                         ),
                         (
                             header::CACHE_CONTROL,
@@ -558,12 +581,9 @@ async fn get_link(
         .ok_or_else(|| AppError::FileNotFound)?;
     check_file_access(&state, &file, auth.user_id).await?;
 
-    let url = state
-        .s3_client
-        .presigned_download_url(&file.key, 3600)
-        .await?;
-
-    Ok(Json(serde_json::json!({"link": url})))
+    Ok(Json(serde_json::json!({
+        "link": format!("/api/v4/files/{}", encode_mm_id(file.id))
+    })))
 }
 
 #[derive(serde::Deserialize)]

@@ -4,7 +4,7 @@ use crate::constants::*;
 use crate::error::AppError;
 
 const ALLOWED_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "webp", "svg", "pdf", "txt", "md", "zip",
+    "png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "md", "zip",
 ];
 
 /// Validate a file upload and return the canonical MIME type and lowercase extension.
@@ -22,7 +22,7 @@ pub fn validate_file_upload(filename: &str, data: &[u8]) -> Result<(String, Stri
     }
 
     let max_size = match ext.as_str() {
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" => MAX_IMAGE_SIZE,
+        "png" | "jpg" | "jpeg" | "gif" | "webp" => MAX_IMAGE_SIZE,
         "pdf" | "txt" | "md" => MAX_DOCUMENT_SIZE,
         _ => MAX_OTHER_FILE_SIZE,
     };
@@ -54,10 +54,6 @@ pub fn validate_file_upload(filename: &str, data: &[u8]) -> Result<(String, Stri
         "zip" if actual_mime.as_deref() != Some("application/zip") => Err(AppError::BadRequest(
             "File content does not match declared ZIP extension".to_string(),
         )),
-        "svg" => {
-            validate_svg(data)?;
-            Ok(())
-        }
         "txt" | "md" => {
             if std::str::from_utf8(data).is_err() {
                 return Err(AppError::BadRequest(
@@ -175,7 +171,7 @@ pub fn validate_file_upload_head(
     }
 
     let max_size = match ext.as_str() {
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" => MAX_IMAGE_SIZE,
+        "png" | "jpg" | "jpeg" | "gif" | "webp" => MAX_IMAGE_SIZE,
         "pdf" | "txt" | "md" => MAX_DOCUMENT_SIZE,
         _ => MAX_OTHER_FILE_SIZE,
     };
@@ -213,6 +209,7 @@ pub fn validate_file_upload_head(
     Ok((expected_mime.to_string(), ext))
 }
 
+#[allow(dead_code)]
 fn validate_svg(data: &[u8]) -> Result<(), AppError> {
     let text = std::str::from_utf8(data)
         .map_err(|_| AppError::BadRequest("SVG must be valid UTF-8".to_string()))?;
@@ -228,11 +225,85 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
     }
 
     let lower = text.to_ascii_lowercase();
+
+    // Reject script tags
     if lower.contains("<script") || lower.contains("</script>") {
         return Err(AppError::BadRequest(
             "SVG contains forbidden script elements".to_string(),
         ));
     }
 
+    // Reject event handlers
+    if lower.contains("onload=")
+        || lower.contains("onerror=")
+        || lower.contains("onclick=")
+        || lower.contains("onmouseover=")
+        || lower.contains("onfocus=")
+        || lower.contains("onblur=")
+    {
+        return Err(AppError::BadRequest(
+            "SVG contains forbidden event handlers".to_string(),
+        ));
+    }
+
+    // Reject foreignObject (can embed HTML)
+    if lower.contains("<foreignobject") || lower.contains("</foreignobject>") {
+        return Err(AppError::BadRequest(
+            "SVG contains forbidden foreignObject elements".to_string(),
+        ));
+    }
+
+    // Reject external references
+    if lower.contains("xlink:href") || lower.contains("href=") {
+        return Err(AppError::BadRequest(
+            "SVG contains forbidden external references".to_string(),
+        ));
+    }
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn svg_extension_is_rejected() {
+        let result = validate_file_upload("test.svg", b"<svg></svg>");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("not allowed") || err.contains("svg"),
+            "Expected SVG rejection, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn malicious_svg_with_onload_is_rejected() {
+        let svg = b"<svg onload='alert(1)'></svg>";
+        let result = validate_svg(svg);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn malicious_svg_with_foreign_object_is_rejected() {
+        let svg = b"<svg><foreignObject><script>alert(1)</script></foreignObject></svg>";
+        let result = validate_svg(svg);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn malicious_svg_with_external_ref_is_rejected() {
+        let svg = b"<svg><use xlink:href='http://evil.com/payload.svg'/></svg>";
+        let result = validate_svg(svg);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn benign_svg_is_accepted_by_validator() {
+        let svg = b"<svg xmlns='http://www.w3.org/2000/svg'><circle r='10'/></svg>";
+        let result = validate_svg(svg);
+        assert!(result.is_ok());
+    }
 }

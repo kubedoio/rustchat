@@ -244,19 +244,13 @@ Ensure your Redis server has `tls-port` and `tls-cert-file` configured.
 
 ## WebSocket Token Transport Security
 
-**Disable query-string token transport in production:**
-
-```bash
-RUSTCHAT_SECURITY_WS_ALLOW_QUERY_TOKEN=false
-```
-
-When disabled, WebSocket connections **must** authenticate via the `Authorization` header. This prevents tokens from appearing in:
+Query-string WebSocket tokens have been removed. WebSocket connections authenticate through secure transports such as the `Authorization` header, the WebSocket subprotocol token fallback, or the authenticated v4 handshake message. This prevents tokens from appearing in:
 - Server access logs
 - Browser history
 - Referrer headers
 - CDN/proxy caches
 
-Ensure your reverse proxy forwards the `Authorization` header to WebSocket upgrade requests.
+Ensure your reverse proxy forwards authentication headers and preserves WebSocket upgrade headers.
 
 ---
 
@@ -347,7 +341,6 @@ access_log /var/log/nginx/access.log security;
 - [ ] `RUSTCHAT_ENVIRONMENT=production`
 - [ ] `RUSTCHAT_SITE_URL` uses `https://`
 - [ ] `RUSTCHAT_CORS_ALLOWED_ORIGINS` uses `https://` only
-- [ ] `RUSTCHAT_SECURITY_WS_ALLOW_QUERY_TOKEN=false`
 - [ ] `RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=cookie`
 - [ ] `RUSTCHAT_SECURITY_RATE_LIMIT_ENABLED=true`
 - [ ] All secrets are unique, random, and >= 32 characters
@@ -366,7 +359,7 @@ access_log /var/log/nginx/access.log security;
 If currently running with insecure defaults:
 
 1. **Immediate (P0):** Rotate to strong secrets
-2. **Week 1:** Update frontend to use header-based WebSocket auth
+2. **Week 1:** Update clients to use supported WebSocket authentication transports
 3. **Week 2:** Update frontend to support OAuth exchange codes
 4. **Week 3:** Deploy with `OAUTH_TOKEN_DELIVERY=cookie`
 

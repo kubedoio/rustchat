@@ -22,6 +22,18 @@ impl<'a> FileRepository<'a> {
         Ok(file)
     }
 
+    /// Get multiple files by their IDs.
+    pub async fn get_by_ids(&self, file_ids: &[Uuid]) -> ApiResult<Vec<FileInfo>> {
+        if file_ids.is_empty() {
+            return Ok(vec![]);
+        }
+        let files = sqlx::query_as::<_, FileInfo>("SELECT * FROM files WHERE id = ANY($1)")
+            .bind(file_ids)
+            .fetch_all(self.pool)
+            .await?;
+        Ok(files)
+    }
+
     /// Create a file record with full metadata (used by v4/files upload).
     #[allow(clippy::too_many_arguments)]
     pub async fn create_full(

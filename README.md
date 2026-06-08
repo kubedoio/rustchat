@@ -63,7 +63,7 @@ RustChat gives your team everything needed for productive communication:
 - **Pin messages** — Keep important information visible
 
 ### Administration
-- **Single Sign-On** — OAuth/SAML integration (GitHub, Google, OIDC)
+- **Single Sign-On** — OAuth/OIDC integration (GitHub, Google, OIDC). SAML/LDAP compatibility endpoints are present but return not implemented responses in this build.
 - **Granular permissions** — Role-based access control
 - **Audit logs** — Track user actions and system events
 - **API keys** — Programmatic access for bots and integrations
@@ -268,6 +268,8 @@ We believe in honest communication about capabilities:
 
 ### Partial Implementations
 - **Plugins** — Plugin framework exists; most plugins are stubs returning `501`
+- **SAML/LDAP** — Compatibility endpoints exist, but backend SAML/LDAP operations are not implemented
+- **Advanced post actions** — Some Mattermost compatibility actions return explicit `501` until RustChat implements matching behavior
 - **Custom Profile Attributes** — UI exists but backend is limited
 - **OAuth Apps** — Basic structure, not full marketplace
 - **Bots** — Framework present, limited bot management

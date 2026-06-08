@@ -11,6 +11,7 @@ use crate::api::admin::{insert_admin_audit_log, require_admin, require_global_ad
 use crate::api::AppState;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
+use crate::models::validate_username_token;
 use crate::repositories::AdminRepository;
 use crate::services::membership_policies::apply_auto_membership_for_new_user;
 
@@ -104,6 +105,8 @@ pub async fn create_admin_user(
     Json(input): Json<CreateUserInput>,
 ) -> ApiResult<Json<crate::models::User>> {
     require_admin(&auth)?;
+    validate_username_token(&input.username)
+        .map_err(|message| AppError::BadRequest(message.to_string()))?;
 
     let password_hash = crate::auth::hash_password(&input.password)?;
     let role = input.role.unwrap_or_else(|| "member".to_string());

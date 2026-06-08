@@ -13,6 +13,7 @@ use crate::auth::api_key::{extract_prefix, generate_api_key, hash_api_key};
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
 use crate::models::entity::{EntityType, RateLimitTier};
+use crate::models::validate_username_token;
 
 /// Build entity routes
 pub fn router() -> Router<AppState> {
@@ -265,31 +266,7 @@ async fn register_entity(
 
 /// Validate username format
 fn validate_username(username: &str) -> ApiResult<()> {
-    if username.is_empty() {
-        return Err(AppError::BadRequest("Username cannot be empty".to_string()));
-    }
-    if username.len() < 3 {
-        return Err(AppError::BadRequest(
-            "Username must be at least 3 characters".to_string(),
-        ));
-    }
-    if username.len() > 64 {
-        return Err(AppError::BadRequest(
-            "Username cannot exceed 64 characters".to_string(),
-        ));
-    }
-
-    // Username should only contain alphanumeric characters, hyphens, and underscores
-    if !username
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err(AppError::BadRequest(
-            "Username can only contain letters, numbers, hyphens, and underscores".to_string(),
-        ));
-    }
-
-    Ok(())
+    validate_username_token(username).map_err(|message| AppError::BadRequest(message.to_string()))
 }
 
 /// Validate email format (basic check)

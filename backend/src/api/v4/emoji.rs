@@ -8,7 +8,10 @@ use crate::mattermost_compat::{
 };
 use crate::repositories::EmojiRepository;
 use axum::{
+    body::Body,
     extract::{Path, State},
+    http::header,
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -128,8 +131,6 @@ pub async fn get_emoji_image(
     _auth: MmAuthUser,
     Path(emoji_id_str): Path<String>,
 ) -> ApiResult<axum::response::Response> {
-    use axum::response::IntoResponse;
-
     // Handle special "system" emoji ID - system emojis don't have server-stored images
     // The client renders them from its own emoji font/assets
     if emoji_id_str == "system" {
@@ -147,12 +148,34 @@ pub async fn get_emoji_image(
         .ok_or_else(|| AppError::EmojiNotFound)?;
 
     if !image_url.is_empty() {
-        // Generate presigned URL for S3
-        let url = state
-            .s3_client
-            .presigned_download_url(&image_url, 3600)
-            .await?;
-        return Ok(axum::response::Redirect::temporary(&url).into_response());
+        let stream = state.s3_client.download_stream(&image_url).await?;
+        return Ok((
+            [
+                (header::CONTENT_TYPE, "image/png".to_string()),
+                (
+                    header::CONTENT_DISPOSITION,
+                    "inline; filename=\"emoji.png\"".to_string(),
+                ),
+                (
+                    header::CACHE_CONTROL,
+                    "max-age=2592000, private".to_string(),
+                ),
+                (
+                    header::HeaderName::from_static("x-content-type-options"),
+                    "nosniff".to_string(),
+                ),
+                (
+                    header::HeaderName::from_static("x-frame-options"),
+                    "DENY".to_string(),
+                ),
+                (
+                    header::HeaderName::from_static("content-security-policy"),
+                    "Frame-ancestors 'none'".to_string(),
+                ),
+            ],
+            Body::new(stream.into_inner()),
+        )
+            .into_response());
     }
 
     Err(AppError::NotFound("Emoji image not found".to_string()))

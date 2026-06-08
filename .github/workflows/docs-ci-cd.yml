@@ -42,5 +42,8 @@ jobs:
       - name: Validate internal markdown links
         run: npm run docs:check-links
 
+      - name: Validate config documentation drift
+        run: npm run docs:check-config
+
       - name: Build docs site
         run: npm run docs:build

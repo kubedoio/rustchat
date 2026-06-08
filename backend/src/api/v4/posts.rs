@@ -227,6 +227,14 @@ fn status_ok() -> Json<serde_json::Value> {
     Json(serde_json::json!({"status": "OK"}))
 }
 
+fn post_action_not_implemented(action: &str) -> (axum::http::StatusCode, Json<serde_json::Value>) {
+    crate::api::v4::mm_not_implemented(
+        "api.post_action.not_implemented.app_error",
+        &format!("Post {} is not implemented.", action),
+        "This Mattermost compatibility endpoint is present, but this operation is not implemented in this build.",
+    )
+}
+
 async fn get_post(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -494,7 +502,7 @@ async fn handle_post_action(
     Path((post_id, _action_id)): Path<(String, String)>,
     headers: axum::http::HeaderMap,
     body: Bytes,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<impl IntoResponse> {
     let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let _value: serde_json::Value = parse_body(&headers, &body, "Invalid action body")?;
 
@@ -503,7 +511,7 @@ async fn handle_post_action(
     repo.require_channel_membership(channel_id, auth.user_id)
         .await?;
 
-    Ok(status_ok())
+    Ok(post_action_not_implemented("actions"))
 }
 
 #[derive(Deserialize)]
@@ -518,7 +526,7 @@ async fn move_post(
     Path(post_id): Path<String>,
     headers: axum::http::HeaderMap,
     body: Bytes,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<impl IntoResponse> {
     let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let _input: MovePostRequest = parse_body(&headers, &body, "Invalid move body")?;
 
@@ -527,60 +535,61 @@ async fn move_post(
     repo.require_channel_membership(channel_id, auth.user_id)
         .await?;
 
-    Ok(status_ok())
+    Ok(post_action_not_implemented("move"))
 }
 
 async fn restore_post(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path((post_id, _restore_version_id)): Path<(String, String)>,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<impl IntoResponse> {
     let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
     repo.require_channel_membership(channel_id, auth.user_id)
         .await?;
-    Ok(status_ok())
+    Ok(post_action_not_implemented("restore"))
 }
 
 async fn reveal_post(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(post_id): Path<String>,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<impl IntoResponse> {
     let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
     repo.require_channel_membership(channel_id, auth.user_id)
         .await?;
-    Ok(status_ok())
+    Ok(post_action_not_implemented("reveal"))
 }
 
 async fn burn_post(
     State(state): State<AppState>,
     auth: MmAuthUser,
     Path(post_id): Path<String>,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<impl IntoResponse> {
     let post_id = parse_mm_or_uuid(&post_id).ok_or_else(|| AppError::InvalidPostId)?;
     let repo = PostRepository::new(state.db.clone());
     let channel_id = repo.get_post_channel_id(post_id).await?;
     repo.require_channel_membership(channel_id, auth.user_id)
         .await?;
-    Ok(status_ok())
+    Ok(post_action_not_implemented("burn"))
 }
 
 #[derive(Deserialize)]
 struct RewriteRequest {
-    message: String,
+    #[serde(rename = "message")]
+    _message: String,
 }
 
 async fn rewrite_post(
     _auth: MmAuthUser,
     headers: axum::http::HeaderMap,
     body: Bytes,
-) -> ApiResult<Json<serde_json::Value>> {
-    let input: RewriteRequest = parse_body(&headers, &body, "Invalid rewrite body")?;
-    Ok(Json(serde_json::json!({"rewritten_text": input.message})))
+) -> ApiResult<impl IntoResponse> {
+    let _input: RewriteRequest = parse_body(&headers, &body, "Invalid rewrite body")?;
+    Ok(post_action_not_implemented("rewrite"))
 }
 
 #[derive(Deserialize)]
@@ -1025,6 +1034,9 @@ async fn create_scheduled_post(
         .ok_or_else(|| AppError::ValidationInvalidScheduledAt)?;
 
     let repo = PostRepository::new(state.db.clone());
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
+
     let row = repo
         .create_scheduled_post(
             auth.user_id,
@@ -1104,6 +1116,9 @@ async fn update_scheduled_post(
         .ok_or_else(|| AppError::ValidationInvalidScheduledAt)?;
 
     let repo = PostRepository::new(state.db.clone());
+    repo.require_channel_membership(channel_id, auth.user_id)
+        .await?;
+
     let row = repo
         .update_scheduled_post(
             scheduled_id,

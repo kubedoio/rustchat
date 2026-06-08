@@ -68,6 +68,25 @@ jobs:
         if: ${{ !contains(inputs.runner, 'self-hosted') }}
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
+      - name: Ensure Docker socket access
+        if: ${{ contains(inputs.runner, 'self-hosted') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker info >/dev/null 2>&1; then
+            exit 0
+          fi
+          if ! command -v sudo >/dev/null 2>&1; then
+            echo "Docker is installed, but the runner user cannot access /var/run/docker.sock and sudo is unavailable."
+            exit 1
+          fi
+          if command -v setfacl >/dev/null 2>&1; then
+            sudo setfacl -m "u:$(id -un):rw" /var/run/docker.sock
+          else
+            sudo chmod 666 /var/run/docker.sock
+          fi
+          docker info >/dev/null
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 

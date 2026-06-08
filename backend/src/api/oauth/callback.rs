@@ -358,9 +358,10 @@ async fn find_or_create_user(
         .clone()
         .or_else(|| {
             user_info.name.as_ref().map(|n| {
-                n.to_lowercase()
-                    .replace(' ', "_")
-                    .replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "")
+                n.to_lowercase().replace(' ', "_").replace(
+                    |c: char| !c.is_ascii_alphanumeric() && c != '_' && c != '-',
+                    "",
+                )
             })
         })
         .unwrap_or_else(|| {
@@ -369,8 +370,18 @@ async fn find_or_create_user(
                 .next()
                 .unwrap_or("user")
                 .to_lowercase()
-                .replace(|c: char| !c.is_alphanumeric() && c != '_' && c != '-', "")
+                .replace(
+                    |c: char| !c.is_ascii_alphanumeric() && c != '_' && c != '-',
+                    "",
+                )
         });
+    let username = if username.len() < 3 {
+        "user".to_string()
+    } else if username.len() > 64 {
+        username.chars().take(64).collect()
+    } else {
+        username
+    };
 
     // Ensure username is unique by appending numbers if needed
     let unique_username = generate_unique_username(&state.db, &username).await?;
@@ -418,6 +429,12 @@ async fn generate_unique_username(
     base_username: &str,
 ) -> Result<String, AppError> {
     let repo = OAuthRepository::new(db);
+    let truncated = base_username.chars().take(60).collect::<String>();
+    let base_username = if base_username.len() > 60 {
+        truncated.as_str()
+    } else {
+        base_username
+    };
 
     if !repo.username_exists(base_username).await? {
         return Ok(base_username.to_string());

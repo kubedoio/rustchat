@@ -221,7 +221,7 @@ async fn mm_posts_extra_routes() {
         .send()
         .await
         .unwrap();
-    assert_eq!(200, action_res.status().as_u16());
+    assert_eq!(501, action_res.status().as_u16());
 
     let rewrite_res = ctx
         .app
@@ -232,9 +232,7 @@ async fn mm_posts_extra_routes() {
         .send()
         .await
         .unwrap();
-    assert_eq!(200, rewrite_res.status().as_u16());
-    let rewrite_body: serde_json::Value = rewrite_res.json().await.unwrap();
-    assert_eq!(rewrite_body["rewritten_text"], "hello");
+    assert_eq!(501, rewrite_res.status().as_u16());
 
     let scheduled_res = ctx
         .app
@@ -272,4 +270,69 @@ async fn mm_posts_extra_routes() {
         .await
         .unwrap();
     assert_eq!(200, update_res.status().as_u16());
+}
+
+#[tokio::test]
+async fn scheduled_post_create_requires_channel_membership() {
+    let ctx = setup_mm_user().await;
+    let (_team_id, channel_id) = setup_team_channel(&ctx).await;
+
+    let intruder_data = json!({
+        "username": "scheduledintruder",
+        "email": "scheduledintruder@example.com",
+        "password": "Password123!",
+        "display_name": "Scheduled Intruder",
+        "org_id": ctx.org_id
+    });
+    ctx.app
+        .api_client
+        .post(format!("{}/api/v1/auth/register", &ctx.app.address))
+        .json(&intruder_data)
+        .send()
+        .await
+        .unwrap();
+
+    let login_res = ctx
+        .app
+        .api_client
+        .post(format!("{}/api/v4/users/login", &ctx.app.address))
+        .json(&json!({
+            "login_id": "scheduledintruder@example.com",
+            "password": "Password123!"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(200, login_res.status().as_u16());
+    let intruder_token = login_res
+        .headers()
+        .get("Token")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let scheduled_res = ctx
+        .app
+        .api_client
+        .post(format!("{}/api/v4/posts/schedule", &ctx.app.address))
+        .header("Authorization", format!("Bearer {}", intruder_token))
+        .json(&json!({
+            "channel_id": channel_id.to_string(),
+            "message": "unauthorized scheduled",
+            "scheduled_at": chrono::Utc::now().timestamp_millis() + 60000
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(403, scheduled_res.status().as_u16());
+
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM scheduled_posts WHERE channel_id = $1 AND message = 'unauthorized scheduled'",
+    )
+    .bind(channel_id)
+    .fetch_one(&ctx.app.db_pool)
+    .await
+    .unwrap();
+    assert_eq!(0, count);
 }

@@ -1,7 +1,10 @@
 //! Files API endpoints
 
 use axum::{
+    body::Body,
     extract::{Multipart, Path, Query, State},
+    http::{header, StatusCode},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -16,7 +19,7 @@ use super::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
-use crate::models::{FileInfo, FileUploadResponse, PresignedUploadUrl};
+use crate::models::{FileInfo, FileUploadResponse};
 use crate::repositories::{ChannelRepository, FileRepository};
 
 /// Verify the requesting user can access a file (must be member of the file's channel).
@@ -35,6 +38,42 @@ async fn check_file_access(state: &AppState, file: &FileInfo, user_id: Uuid) -> 
     Ok(())
 }
 
+/// Verify the requesting user can associate an upload with the target channel.
+async fn check_upload_channel_access(
+    state: &AppState,
+    channel_id: Option<Uuid>,
+    user_id: Uuid,
+) -> ApiResult<()> {
+    let Some(channel_id) = channel_id else {
+        return Ok(());
+    };
+
+    let repo = ChannelRepository::new(&state.db);
+    let is_member = repo.is_channel_member(channel_id, user_id).await?;
+    if !is_member {
+        return Err(AppError::Forbidden(
+            "You are not a member of this channel".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn native_file_content_url(file_id: Uuid) -> String {
+    format!("/api/v1/files/{file_id}/content")
+}
+
+fn content_disposition_filename(filename: &str) -> String {
+    filename
+        .chars()
+        .map(|ch| match ch {
+            '"' | '\\' | ';' => '_',
+            ch if ch.is_control() => '_',
+            ch => ch,
+        })
+        .collect()
+}
+
 /// Build files routes
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -42,6 +81,7 @@ pub fn router() -> Router<AppState> {
         .route("/files/presign", post(get_presigned_upload))
         .route("/files/{id}", get(get_file).delete(delete_file))
         .route("/files/{id}/download", get(download_file))
+        .route("/files/{id}/content", get(download_file_content))
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,6 +96,8 @@ async fn upload_file(
     Query(query): Query<UploadQuery>,
     mut multipart: Multipart,
 ) -> ApiResult<Json<FileUploadResponse>> {
+    check_upload_channel_access(&state, query.channel_id, auth.user_id).await?;
+
     struct TempFile(std::path::PathBuf);
     impl Drop for TempFile {
         fn drop(&mut self) {
@@ -161,9 +203,6 @@ async fn upload_file(
         )
         .await?;
 
-    // Generate download URL
-    let url = state.s3_client.presigned_download_url(&key, 3600).await?;
-
     // --- Image Processing (Background) ---
     if content_type.starts_with("image/") {
         let state_clone = state.clone();
@@ -222,7 +261,7 @@ async fn upload_file(
         size: file_info.size,
         width: file_info.width.unwrap_or(0),
         height: file_info.height.unwrap_or(0),
-        url,
+        url: native_file_content_url(file_info.id),
         thumbnail_url: None, // Will be populated when the record is fetched later
     }))
 }
@@ -231,29 +270,31 @@ async fn upload_file(
 pub struct PresignRequest {
     pub filename: String,
     pub content_type: String,
-    pub _channel_id: Option<Uuid>,
+    pub channel_id: Option<Uuid>,
 }
 
 /// Get a presigned upload URL
 async fn get_presigned_upload(
-    State(state): State<AppState>,
-    auth: AuthUser,
+    State(_state): State<AppState>,
+    _auth: AuthUser,
     Json(input): Json<PresignRequest>,
-) -> ApiResult<Json<PresignedUploadUrl>> {
-    let file_id = Uuid::new_v4();
-    let extension = input.filename.rsplit('.').next().unwrap_or("");
-    let key = format!("files/{}/{}.{}", auth.user_id, file_id, extension);
+) -> ApiResult<impl IntoResponse> {
+    let PresignRequest {
+        filename: _filename,
+        content_type: _content_type,
+        channel_id: _channel_id,
+    } = input;
 
-    let upload_url = state
-        .s3_client
-        .presigned_upload_url(&key, &input.content_type, 3600)
-        .await?;
-
-    Ok(Json(PresignedUploadUrl {
-        upload_url,
-        file_key: key,
-        expires_in: 3600,
-    }))
+    Ok((
+        StatusCode::NOT_IMPLEMENTED,
+        Json(serde_json::json!({
+            "error": {
+                "code": "NOT_IMPLEMENTED",
+                "message": "Presigned file upload URLs are not available. Use multipart POST /api/v1/files.",
+                "details": null
+            }
+        })),
+    ))
 }
 
 /// Get file info
@@ -273,7 +314,7 @@ async fn get_file(
     Ok(Json(file))
 }
 
-/// Get presigned download URL
+/// Get authenticated download URL
 async fn download_file(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -287,16 +328,58 @@ async fn download_file(
 
     check_file_access(&state, &file, auth.user_id).await?;
 
-    let url = state
-        .s3_client
-        .presigned_download_url(&file.key, 3600)
-        .await?;
-
     Ok(Json(serde_json::json!({
-        "url": url,
+        "url": native_file_content_url(file.id),
         "filename": file.name,
         "content_type": file.mime_type
     })))
+}
+
+/// Stream file bytes through the backend after authorization.
+async fn download_file_content(
+    State(state): State<AppState>,
+    auth: super::v4::extractors::MmAuthUser,
+    Path(id): Path<Uuid>,
+) -> ApiResult<impl IntoResponse> {
+    let file_repo = FileRepository::new(&state.db);
+    let file = file_repo
+        .get_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::FileNotFound)?;
+
+    check_file_access(&state, &file, auth.user_id).await?;
+
+    let stream = state.s3_client.download_stream(&file.key).await?;
+
+    Ok((
+        [
+            (header::CONTENT_TYPE, file.mime_type.to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!(
+                    "inline; filename=\"{}\"",
+                    content_disposition_filename(&file.name)
+                ),
+            ),
+            (
+                header::CACHE_CONTROL,
+                "max-age=2592000, private".to_string(),
+            ),
+            (
+                header::HeaderName::from_static("x-content-type-options"),
+                "nosniff".to_string(),
+            ),
+            (
+                header::HeaderName::from_static("x-frame-options"),
+                "DENY".to_string(),
+            ),
+            (
+                header::HeaderName::from_static("content-security-policy"),
+                "Frame-ancestors 'none'".to_string(),
+            ),
+        ],
+        Body::new(stream.into_inner()),
+    ))
 }
 
 /// Delete a file
