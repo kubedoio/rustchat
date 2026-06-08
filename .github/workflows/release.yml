@@ -84,6 +84,7 @@ jobs:
     uses: ./.github/workflows/docker-build-push.yml
     with:
       push: true
+      runner: self-hosted
       platforms: linux/amd64,linux/arm64
       tags: |
         type=semver,pattern={{version}}

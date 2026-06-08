@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-rc.3] - 2026-06-08
+
+### Fixed
+- Release image publishing now runs on the self-hosted runner fleet to avoid GitHub-hosted Docker Hub pull timeouts during Buildx setup.
+
 ## [0.5.0-rc.2] - 2026-06-01
 
 ### Fixed
