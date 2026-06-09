@@ -126,6 +126,7 @@ pub struct AgentKnowledgeBaseDetail {
     pub relevance_threshold: Option<f32>,
     pub knowledge_base_name: String,
     pub knowledge_base_description: Option<String>,
+    pub team_id: Uuid,
 }
 
 // ------------------------------------------------------------------

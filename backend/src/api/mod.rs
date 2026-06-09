@@ -87,6 +87,8 @@ use crate::middleware::reliability::ServiceCircuitBreakers;
 use crate::middleware::security_headers::{cors_compatible_config, SecurityHeadersLayer};
 use crate::realtime::{ConnectionStore, WsHub};
 use crate::services::agent_runtime::AgentRuntime;
+use crate::services::knowledge::embedder::{Embedder, OpenAiEmbedder};
+use crate::services::knowledge::vector_store::{PgVectorStore, VectorStore};
 use crate::services::llm::{OpenAiProvider, ProviderRegistry};
 use crate::storage::S3Client;
 use tokio::sync::mpsc;
@@ -178,10 +180,17 @@ pub fn router(
         }
 
         if has_provider {
+            let embedder = std::env::var("OPENAI_API_KEY").ok()
+                .filter(|k| !k.is_empty())
+                .map(|key| Arc::new(OpenAiEmbedder::new(key, None, None)) as Arc<dyn Embedder>);
+            let vector_store = Some(Arc::new(PgVectorStore::new(&db)) as Arc<dyn VectorStore>);
+
             Some(Arc::new(AgentRuntime::new(
                 db.clone(),
                 ws_hub.clone(),
                 Arc::new(provider_registry),
+                embedder,
+                vector_store,
             )))
         } else {
             tracing::info!("No LLM providers configured; agent runtime disabled");

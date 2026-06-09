@@ -458,7 +458,8 @@ impl<'a> KnowledgeRepository<'a> {
                 akb.top_k,
                 akb.relevance_threshold,
                 kb.name as knowledge_base_name,
-                kb.description as knowledge_base_description
+                kb.description as knowledge_base_description,
+                kb.team_id as team_id
             FROM agent_knowledge_bases akb
             JOIN knowledge_bases kb ON kb.id = akb.knowledge_base_id
             WHERE akb.agent_id = $1

@@ -15,12 +15,16 @@ use crate::models::{EntityType, PostResponse};
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope, WsHub};
 use crate::repositories::{AgentRepository, PostRepository, UserRepository};
 use crate::services::agent_memory::AgentMemoryService;
+use crate::services::knowledge::embedder::Embedder;
+use crate::services::knowledge::vector_store::VectorStore;
 use crate::services::llm::{ChatMessage, CompletionRequest, ProviderRegistry};
 
 pub struct AgentRuntime {
     db: sqlx::PgPool,
     ws_hub: Arc<WsHub>,
     provider_registry: Arc<ProviderRegistry>,
+    embedder: Option<Arc<dyn Embedder>>,
+    vector_store: Option<Arc<dyn VectorStore>>,
     semaphores: DashMap<Uuid, Arc<Semaphore>>,
 }
 
@@ -29,11 +33,15 @@ impl AgentRuntime {
         db: sqlx::PgPool,
         ws_hub: Arc<WsHub>,
         provider_registry: Arc<ProviderRegistry>,
+        embedder: Option<Arc<dyn Embedder>>,
+        vector_store: Option<Arc<dyn VectorStore>>,
     ) -> Self {
         Self {
             db,
             ws_hub,
             provider_registry,
+            embedder,
+            vector_store,
             semaphores: DashMap::new(),
         }
     }
@@ -94,6 +102,8 @@ impl AgentRuntime {
             let db = self.db.clone();
             let ws_hub = self.ws_hub.clone();
             let provider_registry = self.provider_registry.clone();
+            let embedder = self.embedder.clone();
+            let vector_store = self.vector_store.clone();
             let post_clone = post.clone();
 
             tokio::spawn(async move {
@@ -113,6 +123,8 @@ impl AgentRuntime {
                     db,
                     ws_hub,
                     provider_registry,
+                    embedder,
+                    vector_store,
                     agent_user_id,
                     channel_id,
                     &post_clone,
@@ -136,6 +148,8 @@ async fn run_agent_response(
     db: sqlx::PgPool,
     ws_hub: Arc<WsHub>,
     provider_registry: Arc<ProviderRegistry>,
+    embedder: Option<Arc<dyn Embedder>>,
+    vector_store: Option<Arc<dyn VectorStore>>,
     agent_user_id: Uuid,
     channel_id: Uuid,
     trigger_post: &PostResponse,
@@ -162,9 +176,17 @@ async fn run_agent_response(
 
     // Build context
     let memory_service = AgentMemoryService::new(db.clone());
+    let memory_service = if let (Some(embedder), Some(vector_store)) = (&embedder, &vector_store) {
+        memory_service.with_rag(embedder.clone(), vector_store.clone())
+    } else {
+        memory_service
+    };
+
     let max_messages = config.max_context_messages;
+    let use_rag = capabilities.use_rag;
+    let query = &trigger_post.message;
     let mut messages = memory_service
-        .build_context(agent_user_id, channel_id, max_messages)
+        .build_context(agent_user_id, channel_id, max_messages, use_rag, query)
         .await?;
 
     // Add the trigger post as the last user message

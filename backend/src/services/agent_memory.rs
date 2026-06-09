@@ -2,9 +2,14 @@
 //!
 //! Provides context building and memory storage for AI agents.
 
+use std::sync::Arc;
+
 use crate::error::{ApiResult, AppError};
 use crate::models::agent::AgentMemory;
-use crate::repositories::AgentRepository;
+use crate::models::knowledge::SearchFilter;
+use crate::repositories::{AgentRepository, KnowledgeRepository};
+use crate::services::knowledge::embedder::Embedder;
+use crate::services::knowledge::vector_store::VectorStore;
 use crate::services::llm::ChatMessage;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
@@ -12,11 +17,23 @@ use uuid::Uuid;
 
 pub struct AgentMemoryService {
     db: PgPool,
+    embedder: Option<Arc<dyn Embedder>>,
+    vector_store: Option<Arc<dyn VectorStore>>,
 }
 
 impl AgentMemoryService {
     pub fn new(db: PgPool) -> Self {
-        Self { db }
+        Self { db, embedder: None, vector_store: None }
+    }
+
+    pub fn with_rag(
+        mut self,
+        embedder: Arc<dyn Embedder>,
+        vector_store: Arc<dyn VectorStore>,
+    ) -> Self {
+        self.embedder = Some(embedder);
+        self.vector_store = Some(vector_store);
+        self
     }
 
     #[tracing::instrument(skip(self), fields(agent_id = %agent_id, channel_id = %channel_id))]
@@ -25,6 +42,8 @@ impl AgentMemoryService {
         agent_id: Uuid,
         channel_id: Uuid,
         max_messages: i32,
+        use_rag: bool,
+        query: &str,
     ) -> ApiResult<Vec<ChatMessage>> {
         let mut messages = Vec::new();
 
@@ -38,6 +57,54 @@ impl AgentMemoryService {
         if !memories.is_empty() {
             let summary = format_memories(&memories);
             messages.push(ChatMessage::system(summary));
+        }
+
+        // RAG context injection
+        if use_rag {
+            if let (Some(embedder), Some(vector_store)) = (&self.embedder, &self.vector_store) {
+                let kb_repo = KnowledgeRepository::new(&self.db);
+                let kb_assignments = kb_repo
+                    .list_agent_knowledge_bases(agent_id)
+                    .await
+                    .map_err(AppError::Database)?;
+
+                if !kb_assignments.is_empty() {
+                    let query_embedding = embedder.embed(&[query.to_string()]).await
+                        .map_err(|e| AppError::ExternalService(format!("Embedding failed: {}", e)))?;
+                    let query_vector = query_embedding.into_iter().next()
+                        .ok_or_else(|| AppError::ExternalService("Empty embedding".to_string()))?;
+
+                    let mut rag_parts = vec!["## Relevant Knowledge".to_string()];
+                    for assignment in kb_assignments {
+                        let filter = SearchFilter {
+                            team_id: assignment.team_id,
+                            knowledge_base_id: Some(assignment.knowledge_base_id),
+                            document_id: None,
+                        };
+                        let chunks = vector_store.search(
+                            &query_vector,
+                            assignment.top_k as usize,
+                            &filter,
+                        ).await.map_err(AppError::Database)?;
+
+                        for chunk in chunks {
+                            if let Some(threshold) = assignment.relevance_threshold {
+                                if chunk.similarity < threshold {
+                                    continue;
+                                }
+                            }
+                            let source = chunk.section_title.as_ref()
+                                .map(|s| format!(" [{}]", s))
+                                .unwrap_or_default();
+                            rag_parts.push(format!("- [{}]{source}\n{}", chunk.document_title, chunk.chunk_text));
+                        }
+                    }
+
+                    if rag_parts.len() > 1 {
+                        messages.push(ChatMessage::system(rag_parts.join("\n\n")));
+                    }
+                }
+            }
         }
 
         // Fetch recent channel messages
