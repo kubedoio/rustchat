@@ -5,6 +5,7 @@ pub mod auth_config;
 pub mod email_provider;
 pub mod email_service;
 pub mod email_verification;
+pub mod llm;
 
 pub mod keycloak_sync;
 pub mod membership_policies;
