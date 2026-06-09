@@ -7,9 +7,11 @@ use axum::{
     extract::{Multipart, Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
+use base64::Engine;
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -26,6 +28,7 @@ use crate::{
         indexer::IndexerService,
         vector_store::PgVectorStore,
     },
+    services::sync::rustshare::orchestrator::SyncOrchestrator,
 };
 
 // ------------------------------------------------------------------
@@ -50,6 +53,15 @@ pub fn router() -> Router<AppState> {
             get(get_document).delete(delete_document),
         )
         .route("/documents/:doc_id/download", get(download_document))
+        .route("/sync-sources", get(list_sync_sources).post(create_sync_source))
+        .route(
+            "/sync-sources/:id",
+            get(get_sync_source)
+                .put(update_sync_source)
+                .delete(delete_sync_source),
+        )
+        .route("/sync-sources/:id/sync", post(trigger_sync))
+        .route("/sync/rustshare", post(handle_rustshare_webhook))
 }
 
 // ------------------------------------------------------------------
@@ -530,4 +542,205 @@ pub async fn unassign_kb_from_agent(
         .map_err(AppError::Database)?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+
+// ------------------------------------------------------------------
+// Sync Source Handlers
+// ------------------------------------------------------------------
+
+async fn create_sync_source(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(req): Json<CreateSyncSourceRequest>,
+) -> ApiResult<(StatusCode, Json<KnowledgeSyncSource>)> {
+    require_admin(&auth)?;
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let config_json = serde_json::to_string(&req.config)
+        .map_err(|e| AppError::BadRequest(format!("Invalid config: {}", e)))?;
+    // TODO: encrypt config_json with RUSTCHAT_ENCRYPTION_KEY
+    let config_encrypted = base64::engine::general_purpose::STANDARD.encode(config_json);
+
+    let source = repo
+        .create_sync_source(
+            team_id,
+            &req.name,
+            &req.source_type,
+            &config_encrypted,
+            &req.sync_mode.unwrap_or_else(|| "push".to_string()),
+            req.sync_interval_minutes,
+        )
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok((StatusCode::CREATED, Json(source)))
+}
+
+async fn list_sync_sources(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> ApiResult<Json<Vec<KnowledgeSyncSource>>> {
+    require_admin(&auth)?;
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let sources = repo
+        .list_sync_sources(team_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(sources))
+}
+
+async fn get_sync_source(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<KnowledgeSyncSource>> {
+    require_admin(&auth)?;
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let source = repo
+        .get_sync_source(id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Sync source not found".to_string()))?;
+
+    Ok(Json(source))
+}
+
+async fn update_sync_source(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<UpdateSyncSourceRequest>,
+) -> ApiResult<Json<KnowledgeSyncSource>> {
+    require_admin(&auth)?;
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+
+    let config_encrypted = if let Some(config) = req.config {
+        let config_json = serde_json::to_string(&config)
+            .map_err(|e| AppError::BadRequest(format!("Invalid config: {}", e)))?;
+        Some(base64::engine::general_purpose::STANDARD.encode(config_json))
+    } else {
+        None
+    };
+
+    let source = repo
+        .update_sync_source(
+            id,
+            team_id,
+            req.name.as_deref(),
+            config_encrypted.as_deref(),
+            req.sync_mode.as_deref(),
+            req.sync_interval_minutes,
+            req.is_active,
+        )
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(source))
+}
+
+async fn delete_sync_source(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<StatusCode> {
+    require_admin(&auth)?;
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    repo.delete_sync_source(id, team_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn trigger_sync(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<crate::services::sync::rustshare::orchestrator::SyncReport>> {
+    require_admin(&auth)?;
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let source = repo
+        .get_sync_source(id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Sync source not found".to_string()))?;
+
+    // Parse config to get kb_id
+    let config_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&source.config_encrypted)
+        .map_err(|e| AppError::BadRequest(format!("Invalid config encoding: {}", e)))?;
+    let config_json: serde_json::Value = serde_json::from_slice(&config_bytes)
+        .map_err(|e| AppError::BadRequest(format!("Invalid config JSON: {}", e)))?;
+    let kb_id = config_json
+        .get("knowledge_base_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            AppError::BadRequest(
+                "Missing or invalid knowledge_base_id in sync source config".to_string(),
+            )
+        })?;
+
+    let orchestrator =
+        SyncOrchestrator::new(state.db.clone(), state.s3_client.clone(), state.config.s3_bucket.clone());
+    let report = orchestrator
+        .full_sync(&source, kb_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(report))
+}
+
+// ------------------------------------------------------------------
+// RustShare Webhook Handler
+// ------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct RustShareWebhookPayload {
+    pub event: String,
+    pub webhook_id: String,
+    pub timestamp: String,
+    pub folder_id: String,
+    pub file: RustShareWebhookFile,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RustShareWebhookFile {
+    pub id: String,
+    pub name: String,
+    pub mime_type: String,
+    pub size_bytes: i64,
+    pub etag: String,
+    pub modified_at: String,
+}
+
+async fn handle_rustshare_webhook(
+    State(_state): State<AppState>,
+    Json(payload): Json<RustShareWebhookPayload>,
+) -> ApiResult<StatusCode> {
+    tracing::info!(
+        event = %payload.event,
+        webhook_id = %payload.webhook_id,
+        folder_id = %payload.folder_id,
+        file_id = %payload.file.id,
+        "Received RustShare webhook"
+    );
+
+    // TODO: Implement incremental sync based on webhook events
+    // For now, just acknowledge receipt
+
+    Ok(StatusCode::OK)
 }

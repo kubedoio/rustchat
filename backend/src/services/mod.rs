@@ -24,3 +24,4 @@ pub mod template_renderer;
 pub mod turnstile;
 pub mod unreads;
 pub mod webhooks;
+pub mod sync;

@@ -161,8 +161,8 @@ pub struct UpdateKnowledgeBaseRequest {
 pub struct CreateSyncSourceRequest {
     pub name: String,
     pub source_type: String,
-    pub config_encrypted: String,
-    pub sync_mode: String,
+    pub config: serde_json::Value,
+    pub sync_mode: Option<String>,
     pub sync_interval_minutes: Option<i32>,
 }
 
@@ -170,7 +170,7 @@ pub struct CreateSyncSourceRequest {
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct UpdateSyncSourceRequest {
     pub name: Option<String>,
-    pub config_encrypted: Option<String>,
+    pub config: Option<serde_json::Value>,
     pub sync_mode: Option<String>,
     pub sync_interval_minutes: Option<i32>,
     pub is_active: Option<bool>,
