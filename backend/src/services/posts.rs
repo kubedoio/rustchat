@@ -81,7 +81,7 @@ async fn build_post_response(
     user_id: Uuid,
     client_msg_id: Option<String>,
 ) -> ApiResult<PostResponse> {
-    let (username, avatar_url, email) = UserRepository::new(&state.db)
+    let (username, avatar_url, email, is_bot) = UserRepository::new(&state.db)
         .get_username_avatar_email(user_id)
         .await?;
 
@@ -100,6 +100,7 @@ async fn build_post_response(
         username: Some(username),
         avatar_url,
         email: Some(email),
+        is_bot,
         reply_count: post.reply_count,
         last_reply_at: post.last_reply_at,
         files: vec![],
@@ -752,6 +753,7 @@ pub async fn create_system_message(
         username: Some("System".to_string()),
         avatar_url: None,
         email: None,
+        is_bot: false,
         reply_count: 0,
         last_reply_at: None,
         files: vec![],

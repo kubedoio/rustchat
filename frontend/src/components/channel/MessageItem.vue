@@ -327,6 +327,12 @@ async function toggleReaction(emoji: string) {
     <div class="flex-1 min-w-0">
       <div class="flex items-baseline gap-2 mb-1">
         <span class="font-semibold text-sm text-text-1">{{ message.username }}</span>
+        <span
+          v-if="message.isBot"
+          class="inline-flex items-center rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"
+        >
+          BOT
+        </span>
         <span class="text-[11px] text-text-3">{{
           format(new Date(message.timestamp), 'h:mm a')
         }}</span>
@@ -426,6 +432,12 @@ async function toggleReaction(emoji: string) {
           @click="openUserProfile"
         >
           {{ message.username }}
+        </span>
+        <span
+          v-if="message.isBot"
+          class="inline-flex items-center rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"
+        >
+          BOT
         </span>
         <span class="text-xs text-text-3 hover:underline cursor-pointer">
           {{ format(new Date(message.timestamp), 'h:mm a') }}

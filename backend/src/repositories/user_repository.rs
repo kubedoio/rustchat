@@ -1242,9 +1242,9 @@ impl<'a> UserRepository<'a> {
     pub async fn get_username_avatar_email(
         &self,
         id: Uuid,
-    ) -> Result<(String, Option<String>, String), sqlx::Error> {
-        sqlx::query_as::<_, (String, Option<String>, String)>(
-            "SELECT username, avatar_url, email FROM users WHERE id = $1",
+    ) -> Result<(String, Option<String>, String, bool), sqlx::Error> {
+        sqlx::query_as::<_, (String, Option<String>, String, bool)>(
+            "SELECT username, avatar_url, email, is_bot FROM users WHERE id = $1",
         )
         .bind(id)
         .fetch_one(self.pool)

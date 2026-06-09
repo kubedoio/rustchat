@@ -441,6 +441,7 @@ mod tests {
             username: Some("alice".to_string()),
             avatar_url: None,
             email: None,
+            is_bot: false,
             files: vec![FileUploadResponse {
                 id: file_id,
                 name: "photo.jpg".to_string(),

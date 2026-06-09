@@ -25,6 +25,7 @@ export interface Message {
   username: string
   avatarUrl?: string
   email?: string
+  isBot?: boolean
   content: string
   timestamp: string
   reactions: MessageReaction[]
@@ -212,6 +213,7 @@ export function postToMessage(post: Post): Message {
     username: author.username,
     avatarUrl: author.avatarUrl,
     email: author.email,
+    isBot: rawPost.is_bot,
     content: rawPost.message,
     timestamp: toIsoTimestamp(rawPost.created_at ?? rawPost.create_at),
     reactions: normalizeReactions(rawPost.reactions),

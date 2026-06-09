@@ -118,11 +118,19 @@ watch(() => props.channelId, fetchMembers)
                   class="truncate text-[14px] font-semibold text-text-1 group-hover:text-brand transition-standard"
                   >{{ member.display_name || member.username }}</span
                 >
-                <Shield
-                  v-if="member.role === 'admin'"
-                  class="h-3.5 w-3.5 text-warning"
-                  title="Admin"
-                />
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span
+                    v-if="member.is_bot"
+                    class="inline-flex items-center rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"
+                  >
+                    BOT
+                  </span>
+                  <Shield
+                    v-if="member.role === 'admin'"
+                    class="h-3.5 w-3.5 text-warning"
+                    title="Admin"
+                  />
+                </div>
               </div>
               <div class="mt-1 flex items-center gap-2 text-xs text-text-3">
                 <span class="truncate">@{{ member.username }}</span>

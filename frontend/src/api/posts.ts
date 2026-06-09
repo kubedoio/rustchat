@@ -18,6 +18,7 @@ export interface Post {
   username?: string
   avatar_url?: string
   email?: string
+  is_bot?: boolean
   reply_count?: number
   last_reply_at?: string
   files?: FileUploadResponse[]

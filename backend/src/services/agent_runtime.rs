@@ -247,6 +247,7 @@ async fn run_agent_response(
         username: Some(agent_user.username.clone()),
         avatar_url: agent_user.avatar_url.clone(),
         email: Some(agent_user.email.clone()),
+        is_bot: true,
         files: vec![],
         reactions: vec![],
         is_saved: false,

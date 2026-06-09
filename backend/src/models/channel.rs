@@ -82,6 +82,8 @@ pub struct ChannelMember {
     pub avatar_url: Option<String>,
     #[sqlx(default)]
     pub presence: Option<String>,
+    #[sqlx(default)]
+    pub is_bot: bool,
 }
 
 /// DTO for creating a channel

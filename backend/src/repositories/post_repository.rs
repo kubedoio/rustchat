@@ -48,6 +48,7 @@ pub struct PostWithUser {
     pub username: Option<String>,
     pub avatar_url: Option<String>,
     pub email: Option<String>,
+    pub is_bot: bool,
 }
 
 /// Channel unread statistics
@@ -92,12 +93,12 @@ impl PostRepository {
 
     /// Common SELECT columns for post queries with user JOIN
     const POST_COLUMNS: &'static str = r#"
-        p.id, p.channel_id, p.user_id, p.root_post_id, p.message, 
-        COALESCE(p.props, '{}'::jsonb) as props, 
+        p.id, p.channel_id, p.user_id, p.root_post_id, p.message,
+        COALESCE(p.props, '{}'::jsonb) as props,
         COALESCE(p.file_ids, '{}'::uuid[]) as file_ids,
         p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
         p.reply_count::int8 as reply_count, p.last_reply_at, p.seq,
-        u.username, u.avatar_url, u.email
+        u.username, u.avatar_url, u.email, u.is_bot
     "#;
 
     /// Common SELECT columns for post queries without user JOIN
@@ -2238,6 +2239,7 @@ struct PostWithUserRow {
     pub username: Option<String>,
     pub avatar_url: Option<String>,
     pub email: Option<String>,
+    pub is_bot: bool,
 }
 
 impl From<PostWithUserRow> for PostWithUser {
@@ -2260,6 +2262,7 @@ impl From<PostWithUserRow> for PostWithUser {
             username: row.username,
             avatar_url: row.avatar_url,
             email: row.email,
+            is_bot: row.is_bot,
         }
     }
 }
@@ -2283,6 +2286,7 @@ impl From<PostWithUser> for crate::models::post::PostResponse {
             username: p.username,
             avatar_url: p.avatar_url,
             email: p.email,
+            is_bot: p.is_bot,
             files: vec![],
             reactions: vec![],
             is_saved: false,

@@ -29,6 +29,12 @@ export interface ChannelMember {
   msg_count_root: number
   notify_props: ChannelNotifyProps
   last_update_at: number
+  // Joined user fields
+  username?: string
+  display_name?: string
+  avatar_url?: string
+  presence?: string
+  is_bot?: boolean
 }
 
 export interface ChannelNotifyProps {
