@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import agentsApi, { type AgentSummary, type AgentDetail, type CreateAgentPayload, type UpdateAgentPayload } from '@/api/agents'
+import agentsApi, {
+  type AgentSummary,
+  type AgentDetail,
+  type CreateAgentPayload,
+  type UpdateAgentPayload,
+} from '@/api/agents'
 import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 export const useAgentStore = defineStore('agentStore', () => {

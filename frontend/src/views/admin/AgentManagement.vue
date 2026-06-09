@@ -94,7 +94,6 @@ async function confirmDeleteAgent() {
     deleteSubmitting.value = false
   }
 }
-
 </script>
 
 <template>
@@ -103,7 +102,9 @@ async function confirmDeleteAgent() {
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-lg font-semibold text-text-1">AI Agents</h1>
-        <p class="text-text-3 text-xs mt-0.5">Manage AI agent configurations and channel assignments</p>
+        <p class="text-text-3 text-xs mt-0.5">
+          Manage AI agent configurations and channel assignments
+        </p>
       </div>
       <button
         class="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand/90 text-white rounded-lg text-xs font-medium transition-colors"
@@ -278,7 +279,11 @@ async function confirmDeleteAgent() {
       <div class="p-5 space-y-4">
         <div class="text-xs text-text-2">
           <p>
-            You are about to delete agent <span class="font-semibold text-text-1">{{ deletingAgent?.display_name || deletingAgent?.username }}</span>.
+            You are about to delete agent
+            <span class="font-semibold text-text-1">{{
+              deletingAgent?.display_name || deletingAgent?.username
+            }}</span
+            >.
           </p>
           <p class="mt-1">This action cannot be undone.</p>
         </div>

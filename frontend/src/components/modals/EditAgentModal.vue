@@ -331,7 +331,9 @@ async function runTest() {
               />
             </div>
 
-            <label class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors">
+            <label
+              class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors"
+            >
               <input v-model="form.is_active" type="checkbox" class="w-4 h-4 text-brand rounded" />
               <div>
                 <div class="text-xs font-medium text-text-1">Active</div>
@@ -447,40 +449,76 @@ async function runTest() {
             <div>
               <label class="block text-xs font-medium text-text-2 mb-2">Capabilities</label>
               <div class="space-y-2">
-                <label class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors">
-                  <input v-model="form.capabilities.respond_to_mentions" type="checkbox" class="w-4 h-4 text-brand rounded" />
+                <label
+                  class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors"
+                >
+                  <input
+                    v-model="form.capabilities.respond_to_mentions"
+                    type="checkbox"
+                    class="w-4 h-4 text-brand rounded"
+                  />
                   <div>
                     <div class="text-xs font-medium text-text-1">Respond to Mentions</div>
                     <div class="text-[10px] text-text-3">Reply when @mentioned in channels</div>
                   </div>
                 </label>
-                <label class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors">
-                  <input v-model="form.capabilities.respond_to_all" type="checkbox" class="w-4 h-4 text-brand rounded" />
+                <label
+                  class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors"
+                >
+                  <input
+                    v-model="form.capabilities.respond_to_all"
+                    type="checkbox"
+                    class="w-4 h-4 text-brand rounded"
+                  />
                   <div>
                     <div class="text-xs font-medium text-text-1">Respond to All Messages</div>
-                    <div class="text-[10px] text-text-3">Reply to every message in assigned channels</div>
+                    <div class="text-[10px] text-text-3">
+                      Reply to every message in assigned channels
+                    </div>
                   </div>
                 </label>
-                <label class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors">
-                  <input v-model="form.capabilities.use_memory" type="checkbox" class="w-4 h-4 text-brand rounded" />
+                <label
+                  class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors"
+                >
+                  <input
+                    v-model="form.capabilities.use_memory"
+                    type="checkbox"
+                    class="w-4 h-4 text-brand rounded"
+                  />
                   <div>
                     <div class="text-xs font-medium text-text-1">Use Memory</div>
-                    <div class="text-[10px] text-text-3">Remember past conversations with users</div>
+                    <div class="text-[10px] text-text-3">
+                      Remember past conversations with users
+                    </div>
                   </div>
                 </label>
-                <label class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors">
-                  <input v-model="form.capabilities.use_rag" type="checkbox" class="w-4 h-4 text-brand rounded" />
+                <label
+                  class="flex items-center gap-2.5 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors"
+                >
+                  <input
+                    v-model="form.capabilities.use_rag"
+                    type="checkbox"
+                    class="w-4 h-4 text-brand rounded"
+                  />
                   <div>
                     <div class="text-xs font-medium text-text-1">Use RAG</div>
-                    <div class="text-[10px] text-text-3">Retrieve relevant context from knowledge base</div>
+                    <div class="text-[10px] text-text-3">
+                      Retrieve relevant context from knowledge base
+                    </div>
                   </div>
                 </label>
               </div>
             </div>
 
             <div v-if="form.capabilities.use_rag" class="grid grid-cols-2 gap-4">
-              <label class="flex items-center gap-2 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors">
-                <input v-model="form.rag_enabled" type="checkbox" class="w-4 h-4 text-brand rounded" />
+              <label
+                class="flex items-center gap-2 p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 cursor-pointer transition-colors"
+              >
+                <input
+                  v-model="form.rag_enabled"
+                  type="checkbox"
+                  class="w-4 h-4 text-brand rounded"
+                />
                 <div>
                   <div class="text-xs font-medium text-text-1">RAG Enabled</div>
                 </div>
@@ -500,7 +538,10 @@ async function runTest() {
 
           <!-- Channels Tab -->
           <div v-if="activeTab === 'channels'" class="space-y-4">
-            <div v-if="channelsLoading || agentChannelsLoading" class="text-xs text-text-3 py-4 text-center">
+            <div
+              v-if="channelsLoading || agentChannelsLoading"
+              class="text-xs text-text-3 py-4 text-center"
+            >
               Loading channels...
             </div>
             <div v-else-if="channels.length === 0" class="text-xs text-text-3 py-4 text-center">
@@ -567,7 +608,10 @@ async function runTest() {
             >
               <div class="flex items-center justify-between">
                 <span class="text-[10px] font-medium text-success">Response</span>
-                <span class="text-[10px] text-text-3">{{ testResult.latency_ms }}ms · {{ testResult.provider }} / {{ testResult.model }}</span>
+                <span class="text-[10px] text-text-3"
+                  >{{ testResult.latency_ms }}ms · {{ testResult.provider }} /
+                  {{ testResult.model }}</span
+                >
               </div>
               <p class="text-xs text-text-1 whitespace-pre-wrap">{{ testResult.response }}</p>
             </div>

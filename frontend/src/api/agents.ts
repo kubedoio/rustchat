@@ -109,10 +109,12 @@ export const agentsApi = {
   regenerateKey: (id: string) => api.post<{ api_key: string }>(`/agents/${id}/regenerate-key`),
   listChannels: (id: string) => api.get<{ channels: any[] }>(`/agents/${id}/channels`),
   addChannel: (id: string, channelId: string) => api.post(`/agents/${id}/channels/${channelId}`),
-  removeChannel: (id: string, channelId: string) => api.delete(`/agents/${id}/channels/${channelId}`),
+  removeChannel: (id: string, channelId: string) =>
+    api.delete(`/agents/${id}/channels/${channelId}`),
   listMemories: (id: string) => api.get<{ memories: any[] }>(`/agents/${id}/memories`),
   deleteMemory: (id: string, memoryId: string) => api.delete(`/agents/${id}/memories/${memoryId}`),
-  test: (id: string, data: TestAgentPayload) => api.post<TestAgentResponse>(`/agents/${id}/test`, data),
+  test: (id: string, data: TestAgentPayload) =>
+    api.post<TestAgentResponse>(`/agents/${id}/test`, data),
 }
 
 export default agentsApi

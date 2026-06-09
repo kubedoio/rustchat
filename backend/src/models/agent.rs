@@ -10,7 +10,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 /// Capabilities bitmask for an agent, stored as JSONB in the database.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentCapabilities {
     #[serde(default = "default_true")]
     pub respond_to_mentions: bool,
@@ -20,6 +20,17 @@ pub struct AgentCapabilities {
     pub use_memory: bool,
     #[serde(default = "default_false")]
     pub use_rag: bool,
+}
+
+impl Default for AgentCapabilities {
+    fn default() -> Self {
+        Self {
+            respond_to_mentions: true,
+            respond_to_all: false,
+            use_memory: true,
+            use_rag: false,
+        }
+    }
 }
 
 fn default_true() -> bool {
