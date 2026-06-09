@@ -15,6 +15,7 @@ pub mod email;
 pub mod entity;
 pub mod file;
 pub mod integration;
+pub mod knowledge;
 
 pub mod organization;
 pub mod playbook;
@@ -41,6 +42,7 @@ pub use api_key::*;
 pub use entity::*;
 pub use file::*;
 pub use integration::*;
+pub use knowledge::*;
 
 pub use organization::*;
 pub use playbook::*;
