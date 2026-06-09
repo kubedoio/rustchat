@@ -7,15 +7,18 @@ import {
   Cpu,
   BrainCircuit,
   MessageSquare,
+  BookOpen,
   Eye,
   EyeOff,
   Play,
   Loader2,
 } from 'lucide-vue-next'
 import { useAgentStore } from '../../features/admin/stores/agentStore'
+import { useKnowledgeStore } from '../../features/knowledge/stores/knowledgeStore'
 import agentsApi from '../../api/agents'
 import adminApi, { type AdminChannel } from '../../api/admin'
 import type { AgentSummary } from '../../api/agents'
+import type { KnowledgeBaseSummary } from '../../api/knowledgeBases'
 import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const props = defineProps<{
@@ -29,6 +32,7 @@ const emit = defineEmits<{
 }>()
 
 const agentStore = useAgentStore()
+const knowledgeStore = useKnowledgeStore()
 
 const activeTab = ref('basic')
 const submitting = ref(false)
@@ -50,11 +54,17 @@ const testResult = ref<{
 } | null>(null)
 const testError = ref('')
 
+const availableKbs = ref<KnowledgeBaseSummary[]>([])
+const selectedKbId = ref('')
+const assignTopK = ref(5)
+const assignThreshold = ref<number | null>(null)
+
 const tabs = [
   { id: 'basic', label: 'Basic', icon: Type },
   { id: 'llm', label: 'LLM', icon: Cpu },
   { id: 'behavior', label: 'Behavior', icon: BrainCircuit },
   { id: 'channels', label: 'Channels', icon: MessageSquare },
+  { id: 'knowledge', label: 'Knowledge', icon: BookOpen },
 ]
 
 const form = ref({
@@ -252,6 +262,48 @@ async function runTest() {
     testError.value = getApiErrorMessage(e) || 'Test failed'
   } finally {
     testLoading.value = false
+  }
+}
+
+async function loadAgentKbs() {
+  if (!props.agent) return
+  await knowledgeStore.fetchAgentKbs(props.agent.user_id)
+  await knowledgeStore.fetchKnowledgeBases()
+  // Filter out already assigned KBs from available list
+  const assignedIds = new Set(knowledgeStore.agentKbs.map(k => k.knowledge_base_id))
+  availableKbs.value = knowledgeStore.knowledgeBases.filter(kb => !assignedIds.has(kb.id))
+}
+
+watch(() => props.open, (open) => {
+  if (open) {
+    loadAgentKbs()
+  }
+})
+
+async function handleAssignKb() {
+  if (!props.agent || !selectedKbId.value) return
+  try {
+    await knowledgeStore.assignKbToAgent(props.agent.user_id, {
+      knowledge_base_id: selectedKbId.value,
+      top_k: assignTopK.value,
+      relevance_threshold: assignThreshold.value ?? undefined,
+    })
+    selectedKbId.value = ''
+    assignTopK.value = 5
+    assignThreshold.value = null
+    await loadAgentKbs()
+  } catch (e) {
+    error.value = getApiErrorMessage(e) || 'Failed to assign knowledge base'
+  }
+}
+
+async function handleUnassignKb(kbId: string) {
+  if (!props.agent) return
+  try {
+    await knowledgeStore.unassignKbFromAgent(props.agent.user_id, kbId)
+    await loadAgentKbs()
+  } catch (e) {
+    error.value = getApiErrorMessage(e) || 'Failed to unassign knowledge base'
   }
 }
 </script>
@@ -568,6 +620,90 @@ async function runTest() {
                   </div>
                 </div>
               </label>
+            </div>
+          </div>
+
+          <!-- Knowledge Tab -->
+          <div v-if="activeTab === 'knowledge'" class="space-y-4">
+            <div
+              v-if="knowledgeStore.loading"
+              class="text-xs text-text-3 py-4 text-center"
+            >
+              Loading knowledge bases...
+            </div>
+            <div v-else-if="knowledgeStore.agentKbs.length === 0" class="text-xs text-text-3 py-4 text-center">
+              No knowledge bases assigned.
+            </div>
+            <div v-else class="space-y-2">
+              <div
+                v-for="kb in knowledgeStore.agentKbs"
+                :key="kb.knowledge_base_id"
+                class="flex items-center justify-between p-2.5 rounded-lg border border-border-1 hover:bg-bg-surface-2 transition-colors"
+              >
+                <div class="min-w-0">
+                  <div class="text-xs font-medium text-text-1 truncate">
+                    {{ kb.knowledge_base_name }}
+                  </div>
+                  <div class="text-[10px] text-text-3">
+                    top_k: {{ kb.top_k }}<span v-if="kb.relevance_threshold !== null"> · threshold: {{ kb.relevance_threshold }}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="px-2 py-1 text-[10px] font-medium text-danger hover:bg-danger/10 rounded-md transition-colors shrink-0 ml-2"
+                  @click="handleUnassignKb(kb.knowledge_base_id)"
+                >
+                  Unassign
+                </button>
+              </div>
+            </div>
+
+            <!-- Assign new KB -->
+            <div class="border-t border-border-1 pt-4 space-y-3">
+              <h4 class="text-xs font-semibold text-text-1">Assign Knowledge Base</h4>
+              <div class="space-y-2">
+                <select
+                  v-model="selectedKbId"
+                  class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
+                >
+                  <option value="">Select a knowledge base...</option>
+                  <option v-for="kb in availableKbs" :key="kb.id" :value="kb.id">
+                    {{ kb.name }}
+                  </option>
+                </select>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[10px] font-medium text-text-2 mb-1">Top K</label>
+                    <input
+                      v-model.number="assignTopK"
+                      type="number"
+                      min="1"
+                      max="20"
+                      class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-medium text-text-2 mb-1">Threshold (0-1)</label>
+                    <input
+                      v-model.number="assignThreshold"
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      placeholder="Optional"
+                      class="w-full px-3 py-2 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  :disabled="!selectedKbId"
+                  class="w-full px-3 py-2 bg-brand hover:bg-brand/90 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors"
+                  @click="handleAssignKb"
+                >
+                  Assign
+                </button>
+              </div>
             </div>
           </div>
 

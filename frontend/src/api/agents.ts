@@ -99,6 +99,28 @@ export interface TestAgentResponse {
   latency_ms: number
 }
 
+export interface AgentKnowledgeBase {
+  agent_id: string
+  knowledge_base_id: string
+  top_k: number
+  relevance_threshold: number | null
+}
+
+export interface AgentKnowledgeBaseDetail {
+  agent_id: string
+  knowledge_base_id: string
+  top_k: number
+  relevance_threshold: number | null
+  knowledge_base_name: string
+  knowledge_base_description: string | null
+}
+
+export interface AssignKnowledgeBasePayload {
+  knowledge_base_id: string
+  top_k?: number
+  relevance_threshold?: number
+}
+
 // API methods
 export const agentsApi = {
   list: () => api.get<{ agents: AgentSummary[] }>('/agents'),
@@ -115,6 +137,12 @@ export const agentsApi = {
   deleteMemory: (id: string, memoryId: string) => api.delete(`/agents/${id}/memories/${memoryId}`),
   test: (id: string, data: TestAgentPayload) =>
     api.post<TestAgentResponse>(`/agents/${id}/test`, data),
+  listKnowledgeBases: (id: string) =>
+    api.get<AgentKnowledgeBaseDetail[]>(`/agents/${id}/knowledge-bases`),
+  assignKnowledgeBase: (id: string, data: AssignKnowledgeBasePayload) =>
+    api.post<AgentKnowledgeBase>(`/agents/${id}/knowledge-bases`, data),
+  unassignKnowledgeBase: (id: string, kbId: string) =>
+    api.delete(`/agents/${id}/knowledge-bases/${kbId}`),
 }
 
 export default agentsApi
