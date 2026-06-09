@@ -5,6 +5,7 @@
 
 pub mod agents;
 pub mod entities;
+pub mod knowledge;
 
 use axum::Router;
 
@@ -15,4 +16,5 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .nest("/entities", entities::router())
         .nest("/agents", agents::router())
+        .nest("/knowledge", knowledge::router())
 }

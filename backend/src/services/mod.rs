@@ -10,6 +10,7 @@ pub mod email_verification;
 pub mod llm;
 
 pub mod keycloak_sync;
+pub mod knowledge;
 pub mod membership_policies;
 pub mod membership_reconciliation;
 pub mod oauth_token_exchange;

@@ -1,0 +1,502 @@
+//! Knowledge base REST API endpoints
+//!
+//! Provides CRUD operations for knowledge bases, document upload and management,
+//! and agent↔KB assignment.
+
+use axum::{
+    extract::{Multipart, Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
+use sha2::{Digest, Sha256};
+use uuid::Uuid;
+
+use crate::{
+    api::AppState,
+    auth::AuthUser,
+    error::{ApiResult, AppError},
+    models::knowledge::*,
+    repositories::{AgentRepository, KnowledgeRepository, TeamRepository},
+    services::knowledge::extractor::ExtractorRegistry,
+};
+
+// ------------------------------------------------------------------
+// Router
+// ------------------------------------------------------------------
+
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/bases", get(list_knowledge_bases).post(create_knowledge_base))
+        .route(
+            "/bases/:id",
+            get(get_knowledge_base)
+                .put(update_knowledge_base)
+                .delete(delete_knowledge_base),
+        )
+        .route(
+            "/bases/:id/documents",
+            get(list_documents).post(upload_document),
+        )
+        .route(
+            "/documents/:doc_id",
+            get(get_document).delete(delete_document),
+        )
+        .route("/documents/:doc_id/download", get(download_document))
+}
+
+// ------------------------------------------------------------------
+// Authorization helpers
+// ------------------------------------------------------------------
+
+async fn resolve_user_team_id(db: &sqlx::PgPool, user_id: Uuid) -> ApiResult<Uuid> {
+    TeamRepository::new(db)
+        .get_first_team_for_user(user_id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::BadRequest("User has no team".to_string()))
+}
+
+fn require_admin(auth: &AuthUser) -> ApiResult<()> {
+    if !auth.has_role("system_admin")
+        && !auth.has_role("org_admin")
+        && !auth.has_role("team_admin")
+    {
+        return Err(AppError::Forbidden("Admin access required".to_string()));
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------------
+// Knowledge Base Handlers
+// ------------------------------------------------------------------
+
+async fn create_knowledge_base(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(req): Json<CreateKnowledgeBaseRequest>,
+) -> ApiResult<(StatusCode, Json<KnowledgeBase>)> {
+    require_admin(&auth)?;
+
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let kb = repo
+        .create_knowledge_base(
+            team_id,
+            &req.name,
+            req.description.as_deref(),
+            req.embedding_model
+                .as_deref()
+                .unwrap_or("text-embedding-3-small"),
+            req.embedding_dimensions.unwrap_or(1536),
+            req.chunk_size.unwrap_or(512),
+            req.chunk_overlap.unwrap_or(50),
+            auth.user_id,
+        )
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok((StatusCode::CREATED, Json(kb)))
+}
+
+async fn list_knowledge_bases(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> ApiResult<Json<Vec<KnowledgeBaseSummary>>> {
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let kbs = repo
+        .list_knowledge_bases(team_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(kbs))
+}
+
+async fn get_knowledge_base(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<KnowledgeBase>> {
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let kb = repo
+        .get_knowledge_base(id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Knowledge base not found".to_string()))?;
+
+    Ok(Json(kb))
+}
+
+async fn update_knowledge_base(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<UpdateKnowledgeBaseRequest>,
+) -> ApiResult<Json<KnowledgeBase>> {
+    require_admin(&auth)?;
+
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let description = match req.description {
+        Some(ref d) if d.is_empty() => Some(None),
+        Some(ref d) => Some(Some(d.as_str())),
+        None => None,
+    };
+
+    let kb = repo
+        .update_knowledge_base(
+            id,
+            team_id,
+            req.name.as_deref(),
+            description,
+            req.embedding_model.as_deref(),
+            req.embedding_dimensions,
+            req.chunk_size,
+            req.chunk_overlap,
+            req.is_active,
+        )
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(kb))
+}
+
+async fn delete_knowledge_base(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<StatusCode> {
+    require_admin(&auth)?;
+
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    repo.delete_knowledge_base(id, team_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ------------------------------------------------------------------
+// Document Handlers
+// ------------------------------------------------------------------
+
+pub async fn upload_document(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(kb_id): Path<Uuid>,
+    mut multipart: Multipart,
+) -> ApiResult<impl IntoResponse> {
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let kb = repo
+        .get_knowledge_base(kb_id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Knowledge base not found".to_string()))?;
+
+    // Extract file from multipart
+    let field = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Multipart error: {}", e)))?
+        .ok_or_else(|| AppError::BadRequest("No file provided".to_string()))?;
+
+    let filename = field.file_name().unwrap_or("upload").to_string();
+    let mime_type = field
+        .content_type()
+        .unwrap_or("application/octet-stream")
+        .to_string();
+
+    let data = field
+        .bytes()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
+        .to_vec();
+
+    // Compute hash
+    let hash = Sha256::digest(&data);
+    let hash_hex = hex::encode(hash);
+
+    // Deduplication check
+    if let Some(existing) = repo
+        .get_document_by_hash(&hash_hex, team_id)
+        .await
+        .map_err(AppError::Database)?
+    {
+        return Ok((StatusCode::OK, Json(existing)));
+    }
+
+    let doc_id = Uuid::new_v4();
+    let key = format!(
+        "knowledge/{}/{}/{}/{}",
+        kb.team_id, kb.id, doc_id, filename
+    );
+
+    // Create document record
+    let doc = repo
+        .create_document(&CreateKnowledgeDocument {
+            id: Some(doc_id),
+            knowledge_base_id: kb_id,
+            team_id: kb.team_id,
+            title: filename.clone(),
+            source_url: None,
+            source_type: "upload".to_string(),
+            s3_key: key.clone(),
+            s3_bucket: state.config.s3_bucket.clone(),
+            content_hash: hash_hex.clone(),
+            mime_type: mime_type.clone(),
+            size_bytes: data.len() as i64,
+            extracted_text: None,
+            external_id: None,
+            external_etag: None,
+            external_modified_at: None,
+            sync_source_id: None,
+            created_by: auth.user_id,
+        })
+        .await
+        .map_err(AppError::Database)?;
+
+    // Upload to S3
+    state.s3_client.upload(&key, data.clone(), &mime_type).await?;
+
+    // Spawn background extraction
+    let db_pool = state.db.clone();
+    let extracted_doc_id = doc.id;
+    let extracted_mime = mime_type.clone();
+    tokio::spawn(async move {
+        let repo = KnowledgeRepository::new(&db_pool);
+        let registry = ExtractorRegistry::default_registry();
+        match registry.extract(&data, &extracted_mime) {
+            Ok(text) => {
+                if let Err(e) = repo
+                    .update_document_extracted(extracted_doc_id, team_id, &text)
+                    .await
+                {
+                    tracing::error!(
+                        error = %e,
+                        doc_id = %extracted_doc_id,
+                        "Text extraction storage failed"
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::error!(
+                    error = %e,
+                    doc_id = %extracted_doc_id,
+                    "Text extraction failed"
+                );
+            }
+        }
+    });
+
+    Ok((StatusCode::ACCEPTED, Json(doc)))
+}
+
+async fn list_documents(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(kb_id): Path<Uuid>,
+) -> ApiResult<Json<Vec<KnowledgeDocument>>> {
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    // Verify KB exists and belongs to user's team
+    repo.get_knowledge_base(kb_id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Knowledge base not found".to_string()))?;
+
+    let docs = repo
+        .list_documents(kb_id, team_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(docs))
+}
+
+async fn get_document(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(doc_id): Path<Uuid>,
+) -> ApiResult<Json<KnowledgeDocument>> {
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let doc = repo
+        .get_document(doc_id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Document not found".to_string()))?;
+
+    Ok(Json(doc))
+}
+
+async fn delete_document(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(doc_id): Path<Uuid>,
+) -> ApiResult<StatusCode> {
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let doc = repo
+        .get_document(doc_id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Document not found".to_string()))?;
+
+    // Delete from S3
+    if let Err(e) = state.s3_client.delete(&doc.s3_key).await {
+        tracing::warn!(
+            error = %e,
+            s3_key = %doc.s3_key,
+            "Failed to delete document from S3"
+        );
+    }
+
+    repo.delete_document(doc_id, team_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn download_document(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(doc_id): Path<Uuid>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    let repo = KnowledgeRepository::new(&state.db);
+    let doc = repo
+        .get_document(doc_id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Document not found".to_string()))?;
+
+    let url = state
+        .s3_client
+        .presigned_download_url(&doc.s3_key, 3600)
+        .await?;
+
+    Ok(Json(serde_json::json!({
+        "url": url,
+        "expires_in": 3600,
+    })))
+}
+
+// ------------------------------------------------------------------
+// Agent ↔ KB Handlers
+// ------------------------------------------------------------------
+
+pub async fn assign_kb_to_agent(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<AssignKnowledgeBaseRequest>,
+) -> ApiResult<Json<AgentKnowledgeBase>> {
+    require_admin(&auth)?;
+
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    // Verify agent exists
+    let agent_repo = AgentRepository::new(&state.db);
+    agent_repo
+        .get_config_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
+
+    // Verify KB exists and belongs to user's team
+    let kb_repo = KnowledgeRepository::new(&state.db);
+    kb_repo
+        .get_knowledge_base(req.knowledge_base_id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Knowledge base not found".to_string()))?;
+
+    let mapping = kb_repo
+        .assign_kb_to_agent(
+            id,
+            req.knowledge_base_id,
+            req.top_k.unwrap_or(3),
+            req.relevance_threshold,
+        )
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(mapping))
+}
+
+pub async fn list_agent_knowledge_bases(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<Vec<AgentKnowledgeBaseDetail>>> {
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    // Verify agent exists
+    let agent_repo = AgentRepository::new(&state.db);
+    agent_repo
+        .get_config_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
+
+    let kbs: Vec<AgentKnowledgeBaseDetail> = sqlx::query_as(
+        r#"
+        SELECT
+            akb.agent_id,
+            akb.knowledge_base_id,
+            akb.top_k,
+            akb.relevance_threshold,
+            kb.name as knowledge_base_name,
+            kb.description as knowledge_base_description
+        FROM agent_knowledge_bases akb
+        JOIN knowledge_bases kb ON kb.id = akb.knowledge_base_id
+        WHERE akb.agent_id = $1 AND kb.team_id = $2
+        ORDER BY akb.created_at DESC
+        "#,
+    )
+    .bind(id)
+    .bind(team_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::Database)?;
+
+    Ok(Json(kbs))
+}
+
+pub async fn unassign_kb_from_agent(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path((id, kb_id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<StatusCode> {
+    require_admin(&auth)?;
+
+    let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
+
+    // Verify KB exists and belongs to user's team
+    let kb_repo = KnowledgeRepository::new(&state.db);
+    kb_repo
+        .get_knowledge_base(kb_id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Knowledge base not found".to_string()))?;
+
+    kb_repo
+        .unassign_kb_from_agent(id, kb_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(StatusCode::NO_CONTENT)
+}

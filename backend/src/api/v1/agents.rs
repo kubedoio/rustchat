@@ -45,6 +45,15 @@ pub fn router() -> Router<AppState> {
         .route("/:id/memories", get(list_memories))
         .route("/:id/memories/:memory_id", delete(delete_memory))
         .route("/:id/test", post(test_agent))
+        .route(
+            "/:id/knowledge-bases",
+            get(super::knowledge::list_agent_knowledge_bases)
+                .post(super::knowledge::assign_kb_to_agent),
+        )
+        .route(
+            "/:id/knowledge-bases/:kb_id",
+            delete(super::knowledge::unassign_kb_from_agent),
+        )
 }
 
 // ------------------------------------------------------------------

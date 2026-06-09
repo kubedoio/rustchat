@@ -186,6 +186,7 @@ pub struct AssignKnowledgeBaseRequest {
 /// Input for creating a knowledge document.
 #[derive(Debug, Clone)]
 pub struct CreateKnowledgeDocument {
+    pub id: Option<Uuid>,
     pub knowledge_base_id: Uuid,
     pub team_id: Uuid,
     pub title: String,

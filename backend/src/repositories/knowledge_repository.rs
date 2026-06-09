@@ -185,15 +185,16 @@ impl<'a> KnowledgeRepository<'a> {
         sqlx::query_as::<_, KnowledgeDocument>(
             r#"
             INSERT INTO knowledge_documents (
-                knowledge_base_id, team_id, title, source_url, source_type,
+                id, knowledge_base_id, team_id, title, source_url, source_type,
                 s3_key, s3_bucket, content_hash, mime_type, size_bytes,
                 extracted_text, external_id, external_etag, external_modified_at,
                 sync_source_id, created_by
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            VALUES (COALESCE($1, uuid_generate_v4()), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING *
             "#,
         )
+        .bind(doc.id)
         .bind(doc.knowledge_base_id)
         .bind(doc.team_id)
         .bind(&doc.title)
