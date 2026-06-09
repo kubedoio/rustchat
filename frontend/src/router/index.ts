@@ -113,6 +113,11 @@ const router = createRouter({
           component: () => import('../views/admin/SsoSettings.vue'),
         },
         {
+          path: 'agents',
+          name: 'admin-agents',
+          component: () => import('../views/admin/AgentManagement.vue'),
+        },
+        {
           path: 'health',
           name: 'admin-health',
           component: () => import('../views/admin/SystemHealth.vue'),

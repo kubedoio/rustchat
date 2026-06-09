@@ -16,6 +16,7 @@ import {
   UserPlus,
   BarChart3,
   ScrollText,
+  Bot,
 } from 'lucide-vue-next'
 import { computed } from 'vue'
 
@@ -28,6 +29,7 @@ const configStore = useConfigStore()
 const navItems = [
   { path: '/admin', name: 'Overview', icon: LayoutDashboard, exact: true },
   { path: '/admin/users', name: 'Users', icon: Users },
+  { path: '/admin/agents', name: 'Agents', icon: Bot },
   { path: '/admin/teams', name: 'Teams & Channels', icon: Building2 },
   { path: '/admin/membership-policies', name: 'Membership Policies', icon: UserPlus },
   { path: '/admin/audit-dashboard', name: 'Audit Dashboard', icon: BarChart3 },
