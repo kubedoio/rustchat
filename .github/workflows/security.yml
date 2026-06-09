@@ -44,7 +44,7 @@ jobs:
         run: echo "DATABASE_URL=postgres://rustchat:rustchat@localhost:${{ job.services.postgres.ports[5432] }}/rustchat" >> "$GITHUB_ENV"
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
+        uses: github/codeql-action/init@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3.36.2
         with:
           languages: rust, javascript
           queries: security-extended,security-and-quality
@@ -77,7 +77,7 @@ jobs:
         run: cargo build --all-targets --all-features
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3.36.0
+        uses: github/codeql-action/analyze@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3.36.2
 
   cargo-audit-backend:
     name: Cargo Audit (Backend)
