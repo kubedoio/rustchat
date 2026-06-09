@@ -215,6 +215,46 @@ pub static CIRCUIT_BREAKER_FAILURES: LazyLock<IntCounterVec> = LazyLock::new(|| 
     .expect("metric can be created")
 });
 
+// ==================== RAG / Knowledge Base Metrics ====================
+
+/// Document indexing duration
+pub static RAG_INDEXING_DURATION: LazyLock<Histogram> = LazyLock::new(|| {
+    register_histogram!(
+        "rustchat_rag_indexing_duration_seconds",
+        "Time spent indexing a document",
+        vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0]
+    )
+    .expect("metric can be created")
+});
+
+/// Total documents indexed
+pub static RAG_INDEXING_DOCUMENTS_TOTAL: LazyLock<Counter> = LazyLock::new(|| {
+    register_counter!(
+        "rustchat_rag_indexing_documents_total",
+        "Total documents indexed"
+    )
+    .expect("metric can be created")
+});
+
+/// Total chunks indexed
+pub static RAG_INDEXING_CHUNKS_TOTAL: LazyLock<Counter> = LazyLock::new(|| {
+    register_counter!(
+        "rustchat_rag_indexing_chunks_total",
+        "Total chunks indexed"
+    )
+    .expect("metric can be created")
+});
+
+/// RAG semantic search duration
+pub static RAG_SEARCH_DURATION: LazyLock<Histogram> = LazyLock::new(|| {
+    register_histogram!(
+        "rustchat_rag_search_duration_seconds",
+        "Time spent on semantic search",
+        vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+    )
+    .expect("metric can be created")
+});
+
 // ==================== Helper Functions ====================
 
 /// Record an HTTP request metric

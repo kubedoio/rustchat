@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::models::knowledge::{KnowledgeChunk, RetrievedChunk, SearchFilter};
 use crate::repositories::KnowledgeRepository;
+use crate::telemetry::metrics;
 
 /// Abstract vector store for knowledge chunks.
 #[async_trait]
@@ -50,13 +51,17 @@ impl VectorStore for PgVectorStore {
         repo.delete_chunks_by_document(document_id).await
     }
 
+    #[tracing::instrument(skip(self), fields(top_k = %top_k, team_id = %filter.team_id))]
     async fn search(
         &self,
         embedding: &[f32],
         top_k: usize,
         filter: &SearchFilter,
     ) -> Result<Vec<RetrievedChunk>, sqlx::Error> {
+        let start = std::time::Instant::now();
         let repo = KnowledgeRepository::new(&self.pool);
-        repo.search_chunks(embedding, top_k as i32, filter).await
+        let result = repo.search_chunks(embedding, top_k as i32, filter).await;
+        metrics::RAG_SEARCH_DURATION.observe(start.elapsed().as_secs_f64());
+        result
     }
 }

@@ -207,6 +207,7 @@ async fn delete_knowledge_base(
 // Document Handlers
 // ------------------------------------------------------------------
 
+#[tracing::instrument(skip(state, multipart), fields(kb_id = %kb_id))]
 pub async fn upload_document(
     State(state): State<AppState>,
     auth: AuthUser,

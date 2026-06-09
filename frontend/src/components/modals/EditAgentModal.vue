@@ -274,11 +274,14 @@ async function loadAgentKbs() {
   availableKbs.value = knowledgeStore.knowledgeBases.filter(kb => !assignedIds.has(kb.id))
 }
 
-watch(() => props.open, (open) => {
-  if (open) {
-    loadAgentKbs()
+watch(
+  () => props.open,
+  open => {
+    if (open) {
+      loadAgentKbs()
+    }
   }
-})
+)
 
 async function handleAssignKb() {
   if (!props.agent || !selectedKbId.value) return
@@ -625,13 +628,13 @@ async function handleUnassignKb(kbId: string) {
 
           <!-- Knowledge Tab -->
           <div v-if="activeTab === 'knowledge'" class="space-y-4">
-            <div
-              v-if="knowledgeStore.loading"
-              class="text-xs text-text-3 py-4 text-center"
-            >
+            <div v-if="knowledgeStore.loading" class="text-xs text-text-3 py-4 text-center">
               Loading knowledge bases...
             </div>
-            <div v-else-if="knowledgeStore.agentKbs.length === 0" class="text-xs text-text-3 py-4 text-center">
+            <div
+              v-else-if="knowledgeStore.agentKbs.length === 0"
+              class="text-xs text-text-3 py-4 text-center"
+            >
               No knowledge bases assigned.
             </div>
             <div v-else class="space-y-2">
@@ -645,7 +648,10 @@ async function handleUnassignKb(kbId: string) {
                     {{ kb.knowledge_base_name }}
                   </div>
                   <div class="text-[10px] text-text-3">
-                    top_k: {{ kb.top_k }}<span v-if="kb.relevance_threshold !== null"> · threshold: {{ kb.relevance_threshold }}</span>
+                    top_k: {{ kb.top_k
+                    }}<span v-if="kb.relevance_threshold !== null">
+                      · threshold: {{ kb.relevance_threshold }}</span
+                    >
                   </div>
                 </div>
                 <button
@@ -683,7 +689,9 @@ async function handleUnassignKb(kbId: string) {
                     />
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium text-text-2 mb-1">Threshold (0-1)</label>
+                    <label class="block text-[10px] font-medium text-text-2 mb-1"
+                      >Threshold (0-1)</label
+                    >
                     <input
                       v-model.number="assignThreshold"
                       type="number"

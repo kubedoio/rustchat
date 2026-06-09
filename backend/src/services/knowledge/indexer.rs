@@ -3,6 +3,7 @@
 //! Orchestrates the pipeline: extracted text → chunks → embeddings → vector store.
 
 use std::sync::Arc;
+use std::time::Instant;
 use uuid::Uuid;
 
 use crate::models::knowledge::KnowledgeChunk;
@@ -10,6 +11,7 @@ use crate::repositories::KnowledgeRepository;
 use crate::services::knowledge::chunker::{select_chunker, ChunkConfig};
 use crate::services::knowledge::embedder::Embedder;
 use crate::services::knowledge::vector_store::VectorStore;
+use crate::telemetry::metrics;
 
 pub struct IndexerService {
     pool: sqlx::PgPool,
@@ -31,11 +33,13 @@ impl IndexerService {
     }
 
     /// Index a single document: chunk, embed, and store.
+    #[tracing::instrument(skip(self), fields(document_id = %document_id, team_id = %team_id))]
     pub async fn index_document(
         &self,
         document_id: Uuid,
         team_id: Uuid,
     ) -> Result<(), IndexerError> {
+        let start = Instant::now();
         let repository = KnowledgeRepository::new(&self.pool);
 
         // 1. Load document
@@ -44,6 +48,8 @@ impl IndexerService {
             .await
             .map_err(IndexerError::Database)?
             .ok_or(IndexerError::DocumentNotFound(document_id))?;
+
+        tracing::debug!(doc_title = %doc.title, "Document loaded for indexing");
 
         let text = doc
             .extracted_text
@@ -73,9 +79,13 @@ impl IndexerService {
         };
         let chunks = chunker.chunk(&text, &config);
 
+        tracing::debug!(chunk_count = chunks.len(), "Text chunked");
+
         // 5. Embed chunks in batches
         let texts: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
         let embeddings = self.embedder.embed(&texts).await?;
+
+        tracing::debug!(embedding_count = embeddings.len(), "Chunks embedded");
 
         // 6. Build KnowledgeChunk structs
         let mut knowledge_chunks = Vec::new();
@@ -108,9 +118,15 @@ impl IndexerService {
             .await
             .map_err(IndexerError::Database)?;
 
+        let duration = start.elapsed().as_secs_f64();
+        metrics::RAG_INDEXING_DURATION.observe(duration);
+        metrics::RAG_INDEXING_DOCUMENTS_TOTAL.inc();
+        metrics::RAG_INDEXING_CHUNKS_TOTAL.inc_by(knowledge_chunks.len() as f64);
+
         tracing::info!(
             document_id = %document_id,
             chunk_count = knowledge_chunks.len(),
+            duration_secs = duration,
             "Document indexed successfully"
         );
 

@@ -397,7 +397,10 @@ function formatDate(date: string | null): string {
               <Loader2 class="w-3.5 h-3.5 animate-spin" />
               Loading documents...
             </div>
-            <div v-else-if="kbStore.documents.length === 0" class="text-xs text-text-3 py-8 text-center">
+            <div
+              v-else-if="kbStore.documents.length === 0"
+              class="text-xs text-text-3 py-8 text-center"
+            >
               <FileText class="w-8 h-8 mx-auto mb-2 text-text-4" />
               <p>No documents yet.</p>
               <p class="mt-1">Upload documents to add them to this knowledge base.</p>
@@ -505,11 +508,17 @@ function formatDate(date: string | null): string {
             </div>
 
             <!-- Sync Sources List -->
-            <div v-if="syncSourcesLoading" class="text-xs text-text-3 py-4 text-center flex items-center justify-center gap-2">
+            <div
+              v-if="syncSourcesLoading"
+              class="text-xs text-text-3 py-4 text-center flex items-center justify-center gap-2"
+            >
               <Loader2 class="w-3.5 h-3.5 animate-spin" />
               Loading sync sources...
             </div>
-            <div v-else-if="kbStore.syncSources.length === 0" class="text-xs text-text-3 py-8 text-center">
+            <div
+              v-else-if="kbStore.syncSources.length === 0"
+              class="text-xs text-text-3 py-8 text-center"
+            >
               <RefreshCw class="w-8 h-8 mx-auto mb-2 text-text-4" />
               <p>No sync sources configured.</p>
             </div>
@@ -522,7 +531,9 @@ function formatDate(date: string | null): string {
                 <div class="flex items-center gap-3 min-w-0">
                   <RefreshCw class="w-4 h-4 text-text-3 shrink-0" />
                   <div class="min-w-0">
-                    <div class="text-xs font-medium text-text-1 capitalize">{{ source.source_type }}</div>
+                    <div class="text-xs font-medium text-text-1 capitalize">
+                      {{ source.source_type }}
+                    </div>
                     <div class="text-[10px] text-text-3">
                       Every {{ source.sync_interval_minutes }} min · Last sync:
                       {{ formatDate(source.last_sync_at) }}
@@ -551,7 +562,10 @@ function formatDate(date: string | null): string {
         </div>
 
         <!-- Footer Actions -->
-        <div v-if="activeTab === 'settings'" class="flex justify-end gap-2 px-5 py-4 border-t border-border-1 shrink-0">
+        <div
+          v-if="activeTab === 'settings'"
+          class="flex justify-end gap-2 px-5 py-4 border-t border-border-1 shrink-0"
+        >
           <button
             type="button"
             class="px-3 py-2 text-text-2 hover:bg-bg-surface-2 rounded-lg text-xs font-medium transition-colors"

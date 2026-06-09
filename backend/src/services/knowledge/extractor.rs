@@ -59,6 +59,7 @@ impl ExtractorRegistry {
 
 pub struct PlainTextExtractor;
 impl DocumentExtractor for PlainTextExtractor {
+    #[tracing::instrument(skip(self, data), fields(mime_type = "text/plain"))]
     fn extract(&self, data: &[u8]) -> Result<String, ExtractError> {
         Ok(String::from_utf8_lossy(data).into_owned())
     }
@@ -69,6 +70,7 @@ impl DocumentExtractor for PlainTextExtractor {
 
 pub struct MarkdownExtractor;
 impl DocumentExtractor for MarkdownExtractor {
+    #[tracing::instrument(skip(self, data), fields(mime_type = "text/markdown"))]
     fn extract(&self, data: &[u8]) -> Result<String, ExtractError> {
         Ok(String::from_utf8_lossy(data).into_owned())
     }
@@ -79,6 +81,7 @@ impl DocumentExtractor for MarkdownExtractor {
 
 pub struct PdfExtractor;
 impl DocumentExtractor for PdfExtractor {
+    #[tracing::instrument(skip(self, data), fields(mime_type = "application/pdf"))]
     fn extract(&self, data: &[u8]) -> Result<String, ExtractError> {
         pdf_extract::extract_text_from_mem(data)
             .map_err(|e| ExtractError::PdfExtractError(e.to_string()))
@@ -90,6 +93,7 @@ impl DocumentExtractor for PdfExtractor {
 
 pub struct HtmlExtractor;
 impl DocumentExtractor for HtmlExtractor {
+    #[tracing::instrument(skip(self, data), fields(mime_type = "text/html"))]
     fn extract(&self, data: &[u8]) -> Result<String, ExtractError> {
         let text = html2text::from_read(Cursor::new(data), 80)
             .map_err(|e| ExtractError::HtmlExtractError(e.to_string()))?;
@@ -102,6 +106,7 @@ impl DocumentExtractor for HtmlExtractor {
 
 pub struct DocxExtractor;
 impl DocumentExtractor for DocxExtractor {
+    #[tracing::instrument(skip(self, data), fields(mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))]
     fn extract(&self, data: &[u8]) -> Result<String, ExtractError> {
         let cursor = Cursor::new(data);
         let mut archive = zip::ZipArchive::new(cursor)
