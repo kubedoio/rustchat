@@ -4,6 +4,7 @@
 
 pub mod activity;
 pub mod admin_models;
+pub mod agent;
 pub mod api_key;
 pub mod call;
 pub mod channel;
@@ -35,6 +36,7 @@ pub use scheduled_post::*;
 
 pub use activity::*;
 pub use admin_models::*;
+pub use agent::*;
 pub use api_key::*;
 pub use entity::*;
 pub use file::*;
