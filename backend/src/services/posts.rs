@@ -536,6 +536,17 @@ pub async fn create_post(
     // Automation (best-effort)
     run_post_automation(state, channel_id, user_id, &response, root_post_id).await;
 
+    // Agent triggers (best-effort)
+    if let Some(runtime) = state.agent_runtime.clone() {
+        let post_clone = response.clone();
+        let channel_id_clone = channel_id;
+        tokio::spawn(async move {
+            if let Err(e) = runtime.handle_post_created(&post_clone, channel_id_clone).await {
+                tracing::error!(error = %e, "Agent runtime failed");
+            }
+        });
+    }
+
     // DM membership WS broadcast
     if !dm_added_users.is_empty() {
         if let Ok(Some(chan)) = ChannelRepository::new(&state.db)

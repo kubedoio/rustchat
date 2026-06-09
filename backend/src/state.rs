@@ -11,6 +11,7 @@ use crate::calls::state::CallStateManager;
 use crate::config::Config;
 use crate::middleware::reliability::ServiceCircuitBreakers;
 use crate::realtime::{ConnectionStore, WsHub};
+use crate::services::agent_runtime::AgentRuntime;
 use crate::storage::S3Client;
 
 /// Application state shared across handlers
@@ -34,4 +35,5 @@ pub struct AppState {
     pub reconciliation_tx: Option<
         async_channel::Sender<crate::services::membership_reconciliation::ReconciliationTask>,
     >,
+    pub agent_runtime: Option<Arc<AgentRuntime>>,
 }

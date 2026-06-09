@@ -86,6 +86,8 @@ use crate::config::Config;
 use crate::middleware::reliability::ServiceCircuitBreakers;
 use crate::middleware::security_headers::{cors_compatible_config, SecurityHeadersLayer};
 use crate::realtime::{ConnectionStore, WsHub};
+use crate::services::agent_runtime::AgentRuntime;
+use crate::services::llm::{OpenAiProvider, ProviderRegistry};
 use crate::storage::S3Client;
 use tokio::sync::mpsc;
 
@@ -155,6 +157,38 @@ pub fn router(
     ));
     let connection_store = ConnectionStore::new();
 
+    // Initialize LLM provider registry if env vars are present
+    let agent_runtime = {
+        let mut provider_registry = ProviderRegistry::new();
+        let mut has_provider = false;
+
+        if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+            if !api_key.is_empty() {
+                match OpenAiProvider::new(api_key) {
+                    Ok(provider) => {
+                        provider_registry.register("openai", Arc::new(provider));
+                        has_provider = true;
+                        tracing::info!("OpenAI LLM provider registered");
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Failed to initialize OpenAI provider");
+                    }
+                }
+            }
+        }
+
+        if has_provider {
+            Some(Arc::new(AgentRuntime::new(
+                db.clone(),
+                ws_hub.clone(),
+                Arc::new(provider_registry),
+            )))
+        } else {
+            tracing::info!("No LLM providers configured; agent runtime disabled");
+            None
+        }
+    };
+
     // Create a temporary state for the reconciliation worker
     let temp_state = Arc::new(AppState {
         db: db.clone(),
@@ -173,6 +207,7 @@ pub fn router(
         call_state_manager: call_state_manager.clone(),
         circuit_breakers: Arc::new(ServiceCircuitBreakers::new()),
         reconciliation_tx: None,
+        agent_runtime: agent_runtime.clone(),
     });
 
     // Spawn membership reconciliation worker
@@ -203,6 +238,7 @@ pub fn router(
         call_state_manager,
         circuit_breakers: Arc::new(ServiceCircuitBreakers::new()),
         reconciliation_tx: Some(reconciliation_tx),
+        agent_runtime,
     };
 
     let _keycloak_sync_handle = if state.config.keycloak_sync.enabled {
