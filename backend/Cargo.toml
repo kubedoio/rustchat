@@ -46,7 +46,7 @@ argon2 = "0.5"
 aes = "0.8"
 aes-gcm = "0.10"
 cbc = "0.1"
-uuid = { version = "1.11", features = ["v4", "v5", "serde"] }
+uuid = { version = "1.23", features = ["v4", "v5", "serde"] }
 hostname = "0.4"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 thiserror = "2.0"
@@ -61,7 +61,7 @@ async-trait = "0.1"
 handlebars = "5.1"
 
 # S3 Storage
-aws-sdk-s3 = { version = "1.133", default-features = false, features = ["behavior-version-latest", "sigv4a", "http-1x", "default-https-client", "rt-tokio"] }
+aws-sdk-s3 = { version = "1.134", default-features = false, features = ["behavior-version-latest", "sigv4a", "http-1x", "default-https-client", "rt-tokio"] }
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 
 # File handling
