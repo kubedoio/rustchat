@@ -11,6 +11,7 @@ use axum::{
     Json, Router,
 };
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
@@ -19,7 +20,12 @@ use crate::{
     error::{ApiResult, AppError},
     models::knowledge::*,
     repositories::{AgentRepository, KnowledgeRepository, TeamRepository},
-    services::knowledge::extractor::ExtractorRegistry,
+    services::knowledge::{
+        embedder::OpenAiEmbedder,
+        extractor::ExtractorRegistry,
+        indexer::IndexerService,
+        vector_store::PgVectorStore,
+    },
 };
 
 // ------------------------------------------------------------------
@@ -269,31 +275,56 @@ pub async fn upload_document(
     // Upload to S3
     state.s3_client.upload(&key, data.clone(), &mime_type).await?;
 
-    // Spawn background extraction
+    // Spawn background extraction + indexing pipeline
     let db_pool = state.db.clone();
-    let extracted_doc_id = doc.id;
-    let extracted_mime = mime_type.clone();
+    let doc_id_for_indexing = doc.id;
+    let team_id_for_indexing = team_id;
+    let data_for_extraction = data.clone();
+    let mime_for_extraction = mime_type.clone();
+
+    // Get OpenAI API key for embedder
+    let embedder_api_key = std::env::var("RUSTCHAT_OPENAI_API_KEY").ok();
+
     tokio::spawn(async move {
         let repo = KnowledgeRepository::new(&db_pool);
         let registry = ExtractorRegistry::default_registry();
-        match registry.extract(&data, &extracted_mime) {
+
+        // Step 1: Extract text
+        match registry.extract(&data_for_extraction, &mime_for_extraction) {
             Ok(text) => {
                 if let Err(e) = repo
-                    .update_document_extracted(extracted_doc_id, team_id, &text)
+                    .update_document_extracted(doc_id_for_indexing, team_id_for_indexing, &text)
                     .await
                 {
                     tracing::error!(
                         error = %e,
-                        doc_id = %extracted_doc_id,
+                        doc_id = %doc_id_for_indexing,
                         "Text extraction storage failed"
                     );
+                    return;
                 }
             }
             Err(e) => {
                 tracing::error!(
                     error = %e,
-                    doc_id = %extracted_doc_id,
+                    doc_id = %doc_id_for_indexing,
                     "Text extraction failed"
+                );
+                return;
+            }
+        }
+
+        // Step 2: Index (only if we have an OpenAI API key)
+        if let Some(api_key) = embedder_api_key {
+            let embedder = Arc::new(OpenAiEmbedder::new(api_key, None, None));
+            let vector_store = Arc::new(PgVectorStore::new(&db_pool));
+            let indexer = IndexerService::new(db_pool.clone(), embedder, vector_store);
+
+            if let Err(e) = indexer.index_document(doc_id_for_indexing, team_id_for_indexing).await {
+                tracing::error!(
+                    error = %e,
+                    doc_id = %doc_id_for_indexing,
+                    "Document indexing failed"
                 );
             }
         }
