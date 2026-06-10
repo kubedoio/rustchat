@@ -185,13 +185,23 @@ pub fn router(
                 .map(|key| Arc::new(OpenAiEmbedder::new(key, None, None)) as Arc<dyn Embedder>);
             let vector_store = Some(Arc::new(PgVectorStore::new(&db)) as Arc<dyn VectorStore>);
 
+            // Register tools if API keys are available
+            let tool_registry = Arc::new(crate::services::tools::registry::ToolRegistry::new());
+            if let Some(tavily_key) = std::env::var("TAVILY_API_KEY").ok().filter(|k| !k.is_empty()) {
+                tool_registry.register(Arc::new(
+                    crate::services::tools::web_search::WebSearchTool::new(tavily_key)
+                ));
+                tracing::info!("Web search tool registered");
+            }
+            let tool_registry = if tool_registry.is_empty() { None } else { Some(tool_registry) };
+
             Some(Arc::new(AgentRuntime::new(
                 db.clone(),
                 ws_hub.clone(),
                 Arc::new(provider_registry),
                 embedder,
                 vector_store,
-                None,
+                tool_registry,
             )))
         } else {
             tracing::info!("No LLM providers configured; agent runtime disabled");
