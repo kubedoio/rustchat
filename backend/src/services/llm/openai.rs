@@ -5,9 +5,10 @@
 use std::time::Instant;
 
 use async_trait::async_trait;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 
-use super::{ChatMessage, CompletionRequest, CompletionResponse, LlmError, LlmProvider, TokenUsage};
+use super::{ChatMessage, CompletionRequest, CompletionResponse, CompletionStream, LlmError, LlmProvider, TokenUsage};
 
 const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -132,6 +133,96 @@ impl LlmProvider for OpenAiProvider {
             latency_ms: start.elapsed().as_millis() as u64,
         })
     }
+
+    async fn complete_stream(&self, request: CompletionRequest) -> Result<CompletionStream, LlmError> {
+        let messages = build_openai_messages(&request.system_prompt, &request.messages);
+
+        let body = OpenAiChatRequest {
+            model: request.model,
+            messages,
+            temperature: request.temperature,
+            max_tokens: request.max_tokens,
+            stream: true,  // Enable streaming
+        };
+
+        let url = format!("{}/chat/completions", self.base_url);
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| {
+                if e.is_timeout() {
+                    LlmError::Timeout(DEFAULT_TIMEOUT_SECS)
+                } else {
+                    LlmError::Http(e)
+                }
+            })?;
+
+        let status = response.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(LlmError::AuthError);
+        }
+        if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            let retry_after = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(60);
+            return Err(LlmError::RateLimited { retry_after });
+        }
+        if !status.is_success() {
+            let body_text = response.text().await.map_err(LlmError::Http)?;
+            return Err(LlmError::ApiError {
+                status: status.as_u16(),
+                message: body_text,
+            });
+        }
+
+        // Parse SSE stream
+        let stream = response.bytes_stream();
+        let token_stream = stream.filter_map(|chunk| async move {
+            match chunk {
+                Ok(bytes) => {
+                    let text = String::from_utf8_lossy(&bytes);
+                    let mut content = String::new();
+                    for line in text.lines() {
+                        if line.starts_with("data: ") {
+                            let data = &line[6..];
+                            if data == "[DONE]" {
+                                continue;
+                            }
+                            match serde_json::from_str::<OpenAiStreamChunk>(data) {
+                                Ok(chunk) => {
+                                    if let Some(delta) = chunk.choices.first() {
+                                        if let Some(text) = &delta.delta.content {
+                                            content.push_str(text);
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!(error = %e, data = %data, "Failed to parse SSE chunk");
+                                }
+                            }
+                        }
+                    }
+                    if content.is_empty() {
+                        None
+                    } else {
+                        Some(Ok(content))
+                    }
+                }
+                Err(e) => Some(Err(LlmError::Http(e))),
+            }
+        });
+
+        Ok(Box::pin(token_stream))
+    }
 }
 
 // ------------------------------------------------------------------
@@ -174,6 +265,21 @@ struct OpenAiUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
     total_tokens: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAiStreamChunk {
+    choices: Vec<OpenAiStreamChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAiStreamChoice {
+    delta: OpenAiStreamDelta,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAiStreamDelta {
+    content: Option<String>,
 }
 
 // ------------------------------------------------------------------

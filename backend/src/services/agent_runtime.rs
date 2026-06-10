@@ -3,8 +3,10 @@
 //! Triggers agent responses when AI agents are mentioned in posts.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use dashmap::DashMap;
+use futures_util::StreamExt;
 use regex::Regex;
 use tokio::sync::Semaphore;
 use uuid::Uuid;
@@ -17,7 +19,7 @@ use crate::repositories::{AgentRepository, PostRepository, UserRepository};
 use crate::services::agent_memory::AgentMemoryService;
 use crate::services::knowledge::embedder::Embedder;
 use crate::services::knowledge::vector_store::VectorStore;
-use crate::services::llm::{ChatMessage, CompletionRequest, ProviderRegistry};
+use crate::services::llm::{ChatMessage, CompletionRequest, LlmError, ProviderRegistry};
 
 pub struct AgentRuntime {
     db: sqlx::PgPool,
@@ -210,19 +212,100 @@ async fn run_agent_response(
         max_tokens: config.max_output_tokens as u32,
     };
 
-    let response = match provider.complete(request).await {
-        Ok(resp) => resp,
-        Err(e) => {
-            tracing::error!(
-                error = %e,
-                provider = %config.provider,
-                "LLM completion failed"
-            );
-            return Ok(()); // Don't post if LLM fails
-        }
-    };
+    let stream_post_id = Uuid::new_v4();
+    let response_text;
 
-    if response.content.trim().is_empty() {
+    // Try streaming first
+    match provider.complete_stream(request.clone()).await {
+        Ok(mut stream) => {
+            let mut accumulated = String::new();
+            let mut last_broadcast = Instant::now();
+
+            while let Some(chunk_result) = stream.next().await {
+                match chunk_result {
+                    Ok(chunk) => {
+                        accumulated.push_str(&chunk);
+
+                        // Debounce: broadcast every 100ms or every 5 tokens
+                        if last_broadcast.elapsed().as_millis() > 100 {
+                            let event = WsEnvelope {
+                                msg_type: "event".to_string(),
+                                event: "agent_stream_chunk".to_string(),
+                                seq: None,
+                                channel_id: Some(channel_id),
+                                data: serde_json::json!({
+                                    "content": accumulated.clone(),
+                                    "agent_id": agent_user_id,
+                                    "post_id": stream_post_id,
+                                }),
+                                broadcast: Some(WsBroadcast {
+                                    channel_id: Some(channel_id),
+                                    team_id: None,
+                                    user_id: None,
+                                    exclude_user_id: Some(agent_user_id),
+                                }),
+                            };
+                            ws_hub.broadcast(event).await;
+                            last_broadcast = Instant::now();
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "Stream chunk error");
+                        // Send error event
+                        let event = WsEnvelope {
+                            msg_type: "event".to_string(),
+                            event: "agent_stream_error".to_string(),
+                            seq: None,
+                            channel_id: Some(channel_id),
+                            data: serde_json::json!({
+                                "message": format!("Streaming error: {}", e),
+                                "agent_id": agent_user_id,
+                                "post_id": stream_post_id,
+                            }),
+                            broadcast: Some(WsBroadcast {
+                                channel_id: Some(channel_id),
+                                team_id: None,
+                                user_id: None,
+                                exclude_user_id: Some(agent_user_id),
+                            }),
+                        };
+                        ws_hub.broadcast(event).await;
+                        return Err(e.into());
+                    }
+                }
+            }
+
+            // Stream complete — use accumulated content as the response
+            response_text = accumulated;
+
+            // Send complete event
+            let event = WsEnvelope {
+                msg_type: "event".to_string(),
+                event: "agent_stream_complete".to_string(),
+                seq: None,
+                channel_id: Some(channel_id),
+                data: serde_json::json!({
+                    "agent_id": agent_user_id,
+                    "post_id": stream_post_id,
+                }),
+                broadcast: Some(WsBroadcast {
+                    channel_id: Some(channel_id),
+                    team_id: None,
+                    user_id: None,
+                    exclude_user_id: Some(agent_user_id),
+                }),
+            };
+            ws_hub.broadcast(event).await;
+        }
+        Err(LlmError::Config(_)) => {
+            // Streaming not supported, fall back to complete
+            let completion = provider.complete(request).await?;
+            response_text = completion.content;
+        }
+        Err(e) => return Err(e.into()),
+    }
+
+    if response_text.trim().is_empty() {
         return Ok(());
     }
 
@@ -235,7 +318,7 @@ async fn run_agent_response(
             channel_id,
             agent_user_id,
             None, // root_post_id
-            &response.content,
+            &response_text,
             serde_json::json!({
                 "from_agent": true,
                 "agent_id": agent_user_id.to_string(),
@@ -292,7 +375,7 @@ async fn run_agent_response(
     // Store memory
     if capabilities.use_memory {
         if let Err(e) = memory_service
-            .store_turn(agent_user_id, channel_id, trigger_post.id, &response.content)
+            .store_turn(agent_user_id, channel_id, trigger_post.id, &response_text)
             .await
         {
             tracing::error!(error = %e, "Failed to store agent memory");

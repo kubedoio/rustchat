@@ -438,6 +438,10 @@ async function toggleReaction(emoji: string) {
           class="inline-flex items-center rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"
         >
           BOT
+          <span
+            v-if="message.isStreaming"
+            class="ml-1 inline-block h-3 w-0.5 animate-pulse bg-brand"
+          ></span>
         </span>
         <span class="text-xs text-text-3 hover:underline cursor-pointer">
           {{ format(new Date(message.timestamp), 'h:mm a') }}
@@ -452,6 +456,9 @@ async function toggleReaction(emoji: string) {
         >
         <span v-if="message.status === 'failed'" class="text-[10px] text-danger font-medium"
           >Failed</span
+        >
+        <span v-if="message.isStreaming" class="text-[10px] text-text-3 italic animate-pulse"
+          >thinking...</span
         >
 
         <!-- Pinned/Saved badges -->
