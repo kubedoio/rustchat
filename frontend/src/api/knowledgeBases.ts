@@ -79,7 +79,7 @@ export interface CreateSyncSourcePayload {
 
 // API methods
 export const knowledgeBasesApi = {
-  list: () => api.get<{ knowledge_bases: KnowledgeBaseSummary[] }>('/knowledge/bases'),
+  list: () => api.get<KnowledgeBaseSummary[]>('/knowledge/bases'),
   create: (data: CreateKnowledgeBasePayload) =>
     api.post<KnowledgeBaseDetail>('/knowledge/bases', data),
   get: (id: string) => api.get<KnowledgeBaseDetail>(`/knowledge/bases/${id}`),
@@ -89,7 +89,7 @@ export const knowledgeBasesApi = {
 
   // Documents
   listDocuments: (id: string) =>
-    api.get<{ documents: KnowledgeBaseDocument[] }>(`/knowledge/bases/${id}/documents`),
+    api.get<KnowledgeBaseDocument[]>(`/knowledge/bases/${id}/documents`),
   uploadDocument: (id: string, file: File) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -100,7 +100,7 @@ export const knowledgeBasesApi = {
   deleteDocument: (_kbId: string, docId: string) => api.delete(`/knowledge/documents/${docId}`),
 
   // Sync Sources
-  listSyncSources: () => api.get<{ sync_sources: SyncSource[] }>('/knowledge/sync-sources'),
+  listSyncSources: () => api.get<SyncSource[]>('/knowledge/sync-sources'),
   createSyncSource: (data: CreateSyncSourcePayload) =>
     api.post<SyncSource>('/knowledge/sync-sources', data),
   deleteSyncSource: (sourceId: string) => api.delete(`/knowledge/sync-sources/${sourceId}`),

@@ -26,7 +26,7 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBaseStore', () => {
     error.value = null
     try {
       const response = await knowledgeBasesApi.list()
-      knowledgeBases.value = response.data.knowledge_bases
+      knowledgeBases.value = response.data
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e) || 'Failed to load knowledge bases'
     } finally {
@@ -108,7 +108,7 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBaseStore', () => {
     error.value = null
     try {
       const response = await knowledgeBasesApi.listDocuments(id)
-      documents.value = response.data.documents
+      documents.value = response.data
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e) || 'Failed to load documents'
     } finally {
@@ -161,7 +161,7 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBaseStore', () => {
     error.value = null
     try {
       const response = await knowledgeBasesApi.listSyncSources()
-      syncSources.value = response.data.sync_sources
+      syncSources.value = response.data
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e) || 'Failed to load sync sources'
     } finally {
