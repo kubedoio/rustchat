@@ -29,6 +29,7 @@ use crate::models::validate_username_token;
 use crate::repositories::agent_feedback_repository::AgentFeedbackRepository;
 use crate::repositories::agent_repository::AgentRepository;
 use crate::repositories::agent_usage_repository::AgentUsageRepository;
+use crate::repositories::PostRepository;
 use crate::services::llm::{ChatMessage, CompletionRequest, LlmProvider, OpenAiProvider};
 
 // ------------------------------------------------------------------
@@ -550,6 +551,26 @@ async fn submit_feedback(
         ));
     }
 
+    // Load post and verify membership + agent origin
+    let post_repo = PostRepository::new(state.db.clone());
+    let post = post_repo
+        .get_post_by_id(post_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    post_repo
+        .require_channel_membership(post.channel_id, auth.user_id)
+        .await?;
+    let is_agent_post = post
+        .props
+        .get("from_agent")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !is_agent_post {
+        return Err(AppError::BadRequest(
+            "Feedback is only allowed on agent posts".to_string(),
+        ));
+    }
+
     let repo = AgentFeedbackRepository::new(&state.db);
     let feedback = repo
         .create_feedback(
@@ -565,10 +586,20 @@ async fn submit_feedback(
 }
 
 async fn get_feedback_summary(
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(post_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> ApiResult<Json<FeedbackSummary>> {
+    // Load post and verify membership
+    let post_repo = PostRepository::new(state.db.clone());
+    let post = post_repo
+        .get_post_by_id(post_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+    post_repo
+        .require_channel_membership(post.channel_id, auth.user_id)
+        .await?;
+
     let repo = AgentFeedbackRepository::new(&state.db);
     let summary = repo
         .get_feedback_summary(post_id)
