@@ -163,7 +163,7 @@ export interface AgentAnalyticsResponse {
 
 // API methods
 export const agentsApi = {
-  list: () => api.get<{ agents: AgentSummary[] }>('/agents'),
+  list: () => api.get<AgentSummary[]>('/agents'),
   create: (data: CreateAgentPayload) => api.post<AgentDetail>('/agents', data),
   get: (id: string) => api.get<AgentDetail>(`/agents/${id}`),
   update: (id: string, data: UpdateAgentPayload) => api.put<AgentDetail>(`/agents/${id}`, data),

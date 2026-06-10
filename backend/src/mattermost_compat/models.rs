@@ -82,6 +82,8 @@ pub struct Post {
     pub pending_post_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
+    #[serde(default)]
+    pub is_bot: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

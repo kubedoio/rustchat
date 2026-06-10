@@ -79,34 +79,31 @@ export interface CreateSyncSourcePayload {
 
 // API methods
 export const knowledgeBasesApi = {
-  list: () => api.get<{ knowledge_bases: KnowledgeBaseSummary[] }>('/knowledge-bases'),
+  list: () => api.get<{ knowledge_bases: KnowledgeBaseSummary[] }>('/knowledge/bases'),
   create: (data: CreateKnowledgeBasePayload) =>
-    api.post<KnowledgeBaseDetail>('/knowledge-bases', data),
-  get: (id: string) => api.get<KnowledgeBaseDetail>(`/knowledge-bases/${id}`),
+    api.post<KnowledgeBaseDetail>('/knowledge/bases', data),
+  get: (id: string) => api.get<KnowledgeBaseDetail>(`/knowledge/bases/${id}`),
   update: (id: string, data: UpdateKnowledgeBasePayload) =>
-    api.put<KnowledgeBaseDetail>(`/knowledge-bases/${id}`, data),
-  delete: (id: string) => api.delete(`/knowledge-bases/${id}`),
+    api.put<KnowledgeBaseDetail>(`/knowledge/bases/${id}`, data),
+  delete: (id: string) => api.delete(`/knowledge/bases/${id}`),
 
   // Documents
   listDocuments: (id: string) =>
-    api.get<{ documents: KnowledgeBaseDocument[] }>(`/knowledge-bases/${id}/documents`),
+    api.get<{ documents: KnowledgeBaseDocument[] }>(`/knowledge/bases/${id}/documents`),
   uploadDocument: (id: string, file: File) => {
     const formData = new FormData()
     formData.append('file', file)
-    return api.post<KnowledgeBaseDocument>(`/knowledge-bases/${id}/documents`, formData, {
+    return api.post<KnowledgeBaseDocument>(`/knowledge/bases/${id}/documents`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
-  deleteDocument: (kbId: string, docId: string) =>
-    api.delete(`/knowledge-bases/${kbId}/documents/${docId}`),
+  deleteDocument: (kbId: string, docId: string) => api.delete(`/knowledge/documents/${docId}`),
 
   // Sync Sources
-  listSyncSources: (id: string) =>
-    api.get<{ sync_sources: SyncSource[] }>(`/knowledge-bases/${id}/sync-sources`),
-  createSyncSource: (id: string, data: CreateSyncSourcePayload) =>
-    api.post<SyncSource>(`/knowledge-bases/${id}/sync-sources`, data),
-  deleteSyncSource: (kbId: string, sourceId: string) =>
-    api.delete(`/knowledge-bases/${kbId}/sync-sources/${sourceId}`),
+  listSyncSources: () => api.get<{ sync_sources: SyncSource[] }>('/knowledge/sync-sources'),
+  createSyncSource: (data: CreateSyncSourcePayload) =>
+    api.post<SyncSource>('/knowledge/sync-sources', data),
+  deleteSyncSource: (sourceId: string) => api.delete(`/knowledge/sync-sources/${sourceId}`),
 }
 
 export default knowledgeBasesApi

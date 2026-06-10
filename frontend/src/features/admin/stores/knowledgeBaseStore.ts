@@ -156,11 +156,11 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBaseStore', () => {
     }
   }
 
-  async function fetchSyncSources(id: string) {
+  async function fetchSyncSources() {
     loading.value = true
     error.value = null
     try {
-      const response = await knowledgeBasesApi.listSyncSources(id)
+      const response = await knowledgeBasesApi.listSyncSources()
       syncSources.value = response.data.sync_sources
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e) || 'Failed to load sync sources'
@@ -169,11 +169,11 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBaseStore', () => {
     }
   }
 
-  async function createSyncSource(id: string, data: CreateSyncSourcePayload) {
+  async function createSyncSource(data: CreateSyncSourcePayload) {
     loading.value = true
     error.value = null
     try {
-      const response = await knowledgeBasesApi.createSyncSource(id, data)
+      const response = await knowledgeBasesApi.createSyncSource(data)
       syncSources.value.push(response.data)
       return response.data
     } catch (e: unknown) {
@@ -184,11 +184,11 @@ export const useKnowledgeBaseStore = defineStore('knowledgeBaseStore', () => {
     }
   }
 
-  async function deleteSyncSource(kbId: string, sourceId: string) {
+  async function deleteSyncSource(sourceId: string) {
     loading.value = true
     error.value = null
     try {
-      await knowledgeBasesApi.deleteSyncSource(kbId, sourceId)
+      await knowledgeBasesApi.deleteSyncSource(sourceId)
       syncSources.value = syncSources.value.filter(s => s.id !== sourceId)
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e) || 'Failed to delete sync source'

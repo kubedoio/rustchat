@@ -91,7 +91,7 @@ watch(
         await Promise.all([
           kbStore.fetchKnowledgeBase(newKb.id),
           kbStore.fetchDocuments(newKb.id),
-          kbStore.fetchSyncSources(newKb.id),
+          kbStore.fetchSyncSources(),
         ])
         if (kbStore.currentKnowledgeBase) {
           const detail = kbStore.currentKnowledgeBase
@@ -193,7 +193,7 @@ async function handleCreateSyncSource() {
       syncSourceSubmitting.value = false
       return
     }
-    await kbStore.createSyncSource(props.knowledgeBase.id, {
+    await kbStore.createSyncSource({
       source_type: syncSourceForm.value.source_type,
       config,
       sync_interval_minutes: syncSourceForm.value.sync_interval_minutes,
@@ -214,7 +214,7 @@ async function handleDeleteSyncSource(sourceId: string) {
   if (!props.knowledgeBase) return
   if (!confirm('Are you sure you want to delete this sync source?')) return
   try {
-    await kbStore.deleteSyncSource(props.knowledgeBase.id, sourceId)
+    await kbStore.deleteSyncSource(sourceId)
   } catch (e: unknown) {
     syncSourceError.value = getApiErrorMessage(e) || 'Failed to delete sync source'
   }

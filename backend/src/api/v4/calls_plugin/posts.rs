@@ -61,6 +61,7 @@ async fn create_call_thread_post(
         file_ids: Vec::new(),
         pending_post_id: String::new(),
         metadata: None,
+        is_bot: false,
     };
 
     let broadcast = WsEnvelope::event(EventType::MessageCreated, mm_post, Some(channel_id))
