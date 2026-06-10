@@ -1944,6 +1944,7 @@ impl PostRepository {
 
     /// Create a post with an explicit pre-generated ID inside an existing transaction.
     /// Used when the caller needs to know the post ID before insertion (e.g. agent streaming).
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_post_in_tx_with_id(
         &self,
         tx: &mut Transaction<'_, Postgres>,

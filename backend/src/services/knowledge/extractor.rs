@@ -34,13 +34,15 @@ pub struct ExtractorRegistry {
 
 impl ExtractorRegistry {
     pub fn default_registry() -> Self {
-        let mut extractors: Vec<Box<dyn DocumentExtractor>> = Vec::new();
-        extractors.push(Box::new(PlainTextExtractor));
-        extractors.push(Box::new(MarkdownExtractor));
-        extractors.push(Box::new(PdfExtractor));
-        extractors.push(Box::new(HtmlExtractor));
-        extractors.push(Box::new(DocxExtractor));
-        Self { extractors }
+        Self {
+            extractors: vec![
+                Box::new(PlainTextExtractor),
+                Box::new(MarkdownExtractor),
+                Box::new(PdfExtractor),
+                Box::new(HtmlExtractor),
+                Box::new(DocxExtractor),
+            ],
+        }
     }
 
     pub fn extract(&self, data: &[u8], mime_type: &str) -> Result<String, ExtractError> {

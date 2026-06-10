@@ -13,6 +13,7 @@ impl<'a> AgentUsageRepository<'a> {
         Self { pool }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_usage(
         &self,
         agent_id: Uuid,

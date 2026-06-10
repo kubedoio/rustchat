@@ -25,6 +25,7 @@ impl<'a> AgentRepository<'a> {
     // ------------------------------------------------------------------
 
     /// Create a new agent configuration.
+    #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip(self, api_token_encrypted, capabilities), fields(user_id = %user_id))]
     pub async fn create_config(
         &self,
@@ -177,6 +178,7 @@ impl<'a> AgentRepository<'a> {
     }
 
     /// Update agent config. Only updates fields that are Some.
+    #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip(self), fields(id = %id))]
     pub async fn update_config(
         &self,
@@ -285,6 +287,7 @@ impl<'a> AgentRepository<'a> {
     // ------------------------------------------------------------------
 
     /// Store a new memory entry.
+    #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip(self), fields(agent_id = %agent_id, channel_id = %channel_id))]
     pub async fn create_memory(
         &self,

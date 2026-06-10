@@ -23,6 +23,7 @@ impl<'a> KnowledgeRepository<'a> {
     // ------------------------------------------------------------------
 
     /// Create a new knowledge base.
+    #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip(self), fields(team_id = %team_id, name = %name))]
     pub async fn create_knowledge_base(
         &self,
@@ -102,6 +103,7 @@ impl<'a> KnowledgeRepository<'a> {
     }
 
     /// Update a knowledge base. Only updates fields that are Some.
+    #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip(self), fields(id = %id))]
     pub async fn update_knowledge_base(
         &self,
@@ -596,6 +598,7 @@ impl<'a> KnowledgeRepository<'a> {
     }
 
     /// Update a sync source. Only updates fields that are Some.
+    #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip(self), fields(id = %id))]
     pub async fn update_sync_source(
         &self,

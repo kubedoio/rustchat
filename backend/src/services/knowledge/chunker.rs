@@ -278,16 +278,14 @@ mod tests {
     #[test]
     fn test_select_chunker() {
         assert!(
-            select_chunker("text/markdown")
+            !select_chunker("text/markdown")
                 .chunk("# Test", &ChunkConfig::default())
-                .len()
-                > 0
+                .is_empty()
         );
         assert!(
-            select_chunker("text/plain")
+            !select_chunker("text/plain")
                 .chunk("Hello", &ChunkConfig::default())
-                .len()
-                > 0
+                .is_empty()
         );
     }
 }

@@ -191,6 +191,7 @@ impl AgentRuntime {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_agent_response(
     db: sqlx::PgPool,
     ws_hub: Arc<WsHub>,
