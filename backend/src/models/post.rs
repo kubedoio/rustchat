@@ -92,6 +92,7 @@ pub struct PostResponse {
     pub avatar_url: Option<String>,
     #[serde(skip)] // Email is sensitive PII - do not expose in API responses
     pub email: Option<String>,
+    pub is_bot: bool,
     // reply_count: Option<i64> - Removed, using direct field
     #[sqlx(skip)]
     pub files: Vec<crate::models::FileUploadResponse>,

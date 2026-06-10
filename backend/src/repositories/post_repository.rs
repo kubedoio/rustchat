@@ -48,6 +48,7 @@ pub struct PostWithUser {
     pub username: Option<String>,
     pub avatar_url: Option<String>,
     pub email: Option<String>,
+    pub is_bot: bool,
 }
 
 /// Channel unread statistics
@@ -92,12 +93,12 @@ impl PostRepository {
 
     /// Common SELECT columns for post queries with user JOIN
     const POST_COLUMNS: &'static str = r#"
-        p.id, p.channel_id, p.user_id, p.root_post_id, p.message, 
-        COALESCE(p.props, '{}'::jsonb) as props, 
+        p.id, p.channel_id, p.user_id, p.root_post_id, p.message,
+        COALESCE(p.props, '{}'::jsonb) as props,
         COALESCE(p.file_ids, '{}'::uuid[]) as file_ids,
         p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
         p.reply_count::int8 as reply_count, p.last_reply_at, p.seq,
-        u.username, u.avatar_url, u.email
+        u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
     "#;
 
     /// Common SELECT columns for post queries without user JOIN
@@ -378,7 +379,7 @@ impl PostRepository {
                    p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                    p.reply_count::int8 as reply_count,
                    p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
+                   u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
             FROM updated_post p
             LEFT JOIN users u ON p.user_id = u.id
             "#,
@@ -407,7 +408,7 @@ impl PostRepository {
                    p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                    p.reply_count::int8 as reply_count,
                    p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
+                   u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
             FROM updated_post p
             LEFT JOIN users u ON p.user_id = u.id
             "#,
@@ -1790,7 +1791,7 @@ impl PostRepository {
                        p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                        p.reply_count::int8 as reply_count,
                        p.last_reply_at, p.seq,
-                       u.username, u.avatar_url, u.email
+                       u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
                 WHERE p.channel_id = $1 AND p.seq <= $2 AND p.deleted_at IS NULL
@@ -1803,7 +1804,7 @@ impl PostRepository {
                        p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                        p.reply_count::int8 as reply_count,
                        p.last_reply_at, p.seq,
-                       u.username, u.avatar_url, u.email
+                       u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
                 WHERE p.channel_id = $1 AND p.seq > $2 AND p.deleted_at IS NULL
@@ -1920,6 +1921,50 @@ impl PostRepository {
             "#,
             Self::POST_COLUMNS_NO_USER
         ))
+        .bind(channel_id)
+        .bind(user_id)
+        .bind(root_post_id)
+        .bind(message)
+        .bind(props)
+        .bind(file_ids)
+        .fetch_one(&mut **tx)
+        .await?;
+
+        if let Some(r_id) = root_post_id {
+            sqlx::query(
+                "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1"
+            )
+            .bind(r_id)
+            .execute(&mut **tx)
+            .await?;
+        }
+
+        Ok(post)
+    }
+
+    /// Create a post with an explicit pre-generated ID inside an existing transaction.
+    /// Used when the caller needs to know the post ID before insertion (e.g. agent streaming).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_post_in_tx_with_id(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        post_id: Uuid,
+        channel_id: Uuid,
+        user_id: Uuid,
+        root_post_id: Option<Uuid>,
+        message: &str,
+        props: serde_json::Value,
+        file_ids: &[Uuid],
+    ) -> ApiResult<crate::models::Post> {
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
+            r#"
+            INSERT INTO posts (id, channel_id, user_id, root_post_id, message, props, file_ids)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING {}
+            "#,
+            Self::POST_COLUMNS_NO_USER
+        ))
+        .bind(post_id)
         .bind(channel_id)
         .bind(user_id)
         .bind(root_post_id)
@@ -2238,6 +2283,7 @@ struct PostWithUserRow {
     pub username: Option<String>,
     pub avatar_url: Option<String>,
     pub email: Option<String>,
+    pub is_bot: bool,
 }
 
 impl From<PostWithUserRow> for PostWithUser {
@@ -2260,6 +2306,7 @@ impl From<PostWithUserRow> for PostWithUser {
             username: row.username,
             avatar_url: row.avatar_url,
             email: row.email,
+            is_bot: row.is_bot,
         }
     }
 }
@@ -2283,6 +2330,7 @@ impl From<PostWithUser> for crate::models::post::PostResponse {
             username: p.username,
             avatar_url: p.avatar_url,
             email: p.email,
+            is_bot: p.is_bot,
             files: vec![],
             reactions: vec![],
             is_saved: false,

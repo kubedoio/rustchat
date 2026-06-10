@@ -25,6 +25,9 @@ export interface Message {
   username: string
   avatarUrl?: string
   email?: string
+  isBot?: boolean
+  isStreaming?: boolean
+  isError?: boolean
   content: string
   timestamp: string
   reactions: MessageReaction[]
@@ -212,6 +215,7 @@ export function postToMessage(post: Post): Message {
     username: author.username,
     avatarUrl: author.avatarUrl,
     email: author.email,
+    isBot: rawPost.is_bot,
     content: rawPost.message,
     timestamp: toIsoTimestamp(rawPost.created_at ?? rawPost.create_at),
     reactions: normalizeReactions(rawPost.reactions),
@@ -405,6 +409,90 @@ export const useMessageStore = defineStore('messageStore', () => {
     }
   }
 
+  function handleAgentStreamChunk(
+    postId: string,
+    channelId: string,
+    content: string,
+    agentId: string
+  ) {
+    const channelMessages = messagesByChannel.value[channelId]
+    if (channelMessages) {
+      const index = channelMessages.findIndex(m => m.id === postId)
+      if (index !== -1) {
+        const msg = channelMessages[index]
+        if (msg) {
+          msg.content = content
+          msg.isStreaming = true
+        }
+        return
+      }
+    }
+    // Create a temporary streaming message
+    const tempMsg: Message = {
+      id: postId,
+      channelId,
+      userId: agentId,
+      username: 'Agent',
+      content,
+      timestamp: new Date().toISOString(),
+      reactions: [],
+      isPinned: false,
+      isSaved: false,
+      isBot: true,
+      isStreaming: true,
+      status: 'delivered',
+      seq: 0,
+    }
+    if (!messagesByChannel.value[channelId]) {
+      messagesByChannel.value[channelId] = []
+    }
+    messagesByChannel.value[channelId]?.push(tempMsg)
+  }
+
+  function handleAgentStreamComplete(postId: string, channelId: string) {
+    const channelMessages = messagesByChannel.value[channelId]
+    if (channelMessages) {
+      const msg = channelMessages.find(m => m.id === postId)
+      if (msg) {
+        msg.isStreaming = false
+      }
+    }
+    // The final persisted message will arrive via 'posted' event
+  }
+
+  function handleAgentError(channelId: string, errorMessage: string, agentId: string) {
+    const errorMsg: Message = {
+      id: `error-${Date.now()}`,
+      channelId,
+      userId: agentId,
+      username: 'Agent',
+      content: errorMessage,
+      timestamp: new Date().toISOString(),
+      reactions: [],
+      isPinned: false,
+      isSaved: false,
+      isBot: true,
+      isError: true,
+      status: 'delivered',
+      seq: 0,
+    }
+    if (!messagesByChannel.value[channelId]) {
+      messagesByChannel.value[channelId] = []
+    }
+    messagesByChannel.value[channelId]?.push(errorMsg)
+  }
+
+  function handleAgentStreamError(postId: string, channelId: string, errorMessage: string) {
+    const channelMessages = messagesByChannel.value[channelId]
+    if (channelMessages) {
+      const msg = channelMessages.find(m => m.id === postId)
+      if (msg) {
+        msg.isStreaming = false
+        msg.content = `Error: ${errorMessage}`
+      }
+    }
+  }
+
   function handleNewMessage(post: Post) {
     if (!post) {
       return
@@ -423,7 +511,12 @@ export const useMessageStore = defineStore('messageStore', () => {
           m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId)
         )
         if (index !== -1) {
-          threadReplies[index] = message
+          // If replacing a streaming message, clear the streaming flag
+          if (threadReplies[index]?.isStreaming) {
+            threadReplies[index] = { ...message, isStreaming: false }
+          } else {
+            threadReplies[index] = message
+          }
         } else {
           threadReplies.push(message)
         }
@@ -450,7 +543,12 @@ export const useMessageStore = defineStore('messageStore', () => {
           m => m.id === message.id || (m.clientMsgId && m.clientMsgId === message.clientMsgId)
         )
         if (index !== -1) {
-          channelMessages[index] = message
+          // If replacing a streaming message, clear the streaming flag
+          if (channelMessages[index]?.isStreaming) {
+            channelMessages[index] = { ...message, isStreaming: false }
+          } else {
+            channelMessages[index] = message
+          }
         } else {
           channelMessages.push(message)
         }
@@ -915,6 +1013,10 @@ export const useMessageStore = defineStore('messageStore', () => {
     addOptimisticMessage,
     updateOptimisticMessage,
     handleNewMessage,
+    handleAgentStreamChunk,
+    handleAgentStreamComplete,
+    handleAgentStreamError,
+    handleAgentError,
     handleMessageUpdate,
     handleMessageDelete,
     handleReactionAdded,

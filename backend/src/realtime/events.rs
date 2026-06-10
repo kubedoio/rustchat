@@ -79,6 +79,11 @@ pub enum EventType {
     GroupMemberAdd,
     GroupMemberDeleted,
 
+    AgentStreamChunk,
+    AgentStreamComplete,
+    AgentStreamError,
+    AgentError,
+
     Error,
     Hello,
 }
@@ -123,6 +128,10 @@ impl EventType {
             Self::CallSignal => "call_signal",
             Self::ConfigUpdated => "config_updated",
             Self::UnreadCountsUpdated => "unread_counts_updated",
+            Self::AgentStreamChunk => "agent_stream_chunk",
+            Self::AgentStreamComplete => "agent_stream_complete",
+            Self::AgentStreamError => "agent_stream_error",
+            Self::AgentError => "agent_error",
             Self::Error => "error",
             Self::Hello => "hello",
         }

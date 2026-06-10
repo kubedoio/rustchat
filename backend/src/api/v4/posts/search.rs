@@ -65,7 +65,7 @@ pub(super) async fn search_team_posts(
                p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                p.reply_count::int8 as reply_count,
                p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
+               u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         JOIN channels c ON p.channel_id = c.id
@@ -123,7 +123,7 @@ pub(super) async fn search_posts_all_teams(
                p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                p.reply_count::int8 as reply_count,
                p.last_reply_at, p.seq,
-               u.username, u.avatar_url, u.email
+               u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         JOIN channel_members cm ON cm.channel_id = p.channel_id AND cm.user_id = $2

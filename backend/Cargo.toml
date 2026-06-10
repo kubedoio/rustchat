@@ -22,6 +22,7 @@ tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "comp
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
 redis = { version = "0.28", features = ["tokio-comp", "json"] }
 deadpool-redis = "0.19"
+pgvector = { version = "0.4", features = ["sqlx"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -71,8 +72,14 @@ sha2 = "0.10"
 hex = "0.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 
+# Document text extraction
+pdf-extract = "0.10"
+html2text = "0.17"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+quick-xml = "0.37"
+
 # HTTP client for OAuth (rustls for musl compatibility)
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 urlencoding = "2.1"
 
 # Email

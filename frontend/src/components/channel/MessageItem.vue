@@ -16,6 +16,8 @@ import {
   Video,
   Phone,
   PhoneOff,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-vue-next'
 import type { Message } from '@/features/messages/stores/messageStore'
 import { useMessageStore } from '@/features/messages/stores/messageStore'
@@ -24,6 +26,7 @@ import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
 import { useUIStore } from '../../features/ui/stores/uiStore'
 import { useConfigStore } from '../../features/config/stores/configStore'
 import { postsApi } from '../../api/posts'
+import { agentsApi } from '../../api/agents'
 import EmojiPicker from '../atomic/EmojiPicker.vue'
 import FilePreview from '../atomic/FilePreview.vue'
 import RcAvatar from '../ui/RcAvatar.vue'
@@ -70,6 +73,65 @@ const editInputRef = ref<HTMLTextAreaElement | null>(null)
 const emojiButtonRef = ref<HTMLElement | null>(null)
 const saving = ref(false)
 const { renderMarkdown } = useMarkdownRenderer()
+
+// Feedback state for bot messages
+const feedbackLoading = ref(false)
+const userFeedback = ref<'positive' | 'negative' | null>(null)
+const feedbackSummary = ref<{ positive_count: number; negative_count: number }>({
+  positive_count: 0,
+  negative_count: 0,
+})
+
+async function loadFeedback() {
+  if (!props.message.isBot) return
+  try {
+    const { data } = await agentsApi.getFeedbackSummary(props.message.id)
+    feedbackSummary.value = data
+  } catch (e) {
+    // silently ignore - feedback may not exist yet
+  }
+}
+
+async function submitFeedback(type: 'positive' | 'negative') {
+  if (feedbackLoading.value) return
+  feedbackLoading.value = true
+  try {
+    await agentsApi.submitFeedback(props.message.id, { feedback_type: type })
+    userFeedback.value = type
+    await loadFeedback()
+  } catch (e) {
+    log.error('Failed to submit feedback', e)
+  } finally {
+    feedbackLoading.value = false
+  }
+}
+
+async function removeFeedback() {
+  if (feedbackLoading.value) return
+  feedbackLoading.value = true
+  try {
+    await agentsApi.deleteFeedback(props.message.id)
+    userFeedback.value = null
+    await loadFeedback()
+  } catch (e) {
+    log.error('Failed to remove feedback', e)
+  } finally {
+    feedbackLoading.value = false
+  }
+}
+
+function handleFeedback(type: 'positive' | 'negative') {
+  if (userFeedback.value === type) {
+    removeFeedback()
+  } else {
+    submitFeedback(type)
+  }
+}
+
+// Load feedback on mount for bot messages
+if (props.message.isBot) {
+  loadFeedback()
+}
 
 const isOwnMessage = computed(() => authStore.user?.id === props.message.userId)
 const isEdited = computed(() => Boolean(props.message.editedAt))
@@ -327,6 +389,12 @@ async function toggleReaction(emoji: string) {
     <div class="flex-1 min-w-0">
       <div class="flex items-baseline gap-2 mb-1">
         <span class="font-semibold text-sm text-text-1">{{ message.username }}</span>
+        <span
+          v-if="message.isBot"
+          class="inline-flex items-center rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"
+        >
+          BOT
+        </span>
         <span class="text-[11px] text-text-3">{{
           format(new Date(message.timestamp), 'h:mm a')
         }}</span>
@@ -398,6 +466,7 @@ async function toggleReaction(emoji: string) {
       {
         'opacity-70': message.status === 'sending',
         'bg-danger/5': message.status === 'failed',
+        'border-l-2 border-danger': message.isError,
       },
     ]"
     @mouseenter="showActions = true"
@@ -427,6 +496,16 @@ async function toggleReaction(emoji: string) {
         >
           {{ message.username }}
         </span>
+        <span
+          v-if="message.isBot"
+          class="inline-flex items-center rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"
+        >
+          BOT
+          <span
+            v-if="message.isStreaming"
+            class="ml-1 inline-block h-3 w-0.5 animate-pulse bg-brand"
+          ></span>
+        </span>
         <span class="text-xs text-text-3 hover:underline cursor-pointer">
           {{ format(new Date(message.timestamp), 'h:mm a') }}
         </span>
@@ -440,6 +519,9 @@ async function toggleReaction(emoji: string) {
         >
         <span v-if="message.status === 'failed'" class="text-[10px] text-danger font-medium"
           >Failed</span
+        >
+        <span v-if="message.isStreaming" class="text-[10px] text-text-3 italic animate-pulse"
+          >thinking...</span
         >
 
         <!-- Pinned/Saved badges -->
@@ -498,6 +580,42 @@ async function toggleReaction(emoji: string) {
           :class="{ 'bg-brand/5 -mx-2 px-2 py-1 rounded': isMentioned }"
           v-html="formattedContent"
         ></div>
+      </div>
+
+      <!-- Bot Message Feedback -->
+      <div v-if="message.isBot && !isEditing" class="flex items-center gap-1 mt-1.5">
+        <button
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border transition-all hover:scale-105"
+          :class="
+            userFeedback === 'positive'
+              ? 'bg-success/10 border-success/30 text-success'
+              : 'bg-bg-surface-2 border-border-1 text-text-2 hover:border-border-2'
+          "
+          :disabled="feedbackLoading"
+          title="Helpful"
+          @click="handleFeedback('positive')"
+        >
+          <ThumbsUp class="w-3 h-3" />
+          <span v-if="feedbackSummary.positive_count > 0" class="font-medium">{{
+            feedbackSummary.positive_count
+          }}</span>
+        </button>
+        <button
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border transition-all hover:scale-105"
+          :class="
+            userFeedback === 'negative'
+              ? 'bg-danger/10 border-danger/30 text-danger'
+              : 'bg-bg-surface-2 border-border-1 text-text-2 hover:border-border-2'
+          "
+          :disabled="feedbackLoading"
+          title="Not helpful"
+          @click="handleFeedback('negative')"
+        >
+          <ThumbsDown class="w-3 h-3" />
+          <span v-if="feedbackSummary.negative_count > 0" class="font-medium">{{
+            feedbackSummary.negative_count
+          }}</span>
+        </button>
       </div>
 
       <!-- Files -->

@@ -192,6 +192,7 @@ impl From<Post> for mm::Post {
             file_ids: post.file_ids.iter().map(|id| encode_mm_id(*id)).collect(),
             pending_post_id: "".to_string(),
             metadata: None,
+            is_bot: false,
         }
     }
 }
@@ -266,6 +267,7 @@ impl From<PostResponse> for mm::Post {
             file_ids: post.file_ids.iter().map(|id| encode_mm_id(*id)).collect(),
             pending_post_id: post.client_msg_id.unwrap_or_default(),
             metadata,
+            is_bot: post.is_bot,
         }
     }
 }
@@ -441,6 +443,7 @@ mod tests {
             username: Some("alice".to_string()),
             avatar_url: None,
             email: None,
+            is_bot: false,
             files: vec![FileUploadResponse {
                 id: file_id,
                 name: "photo.jpg".to_string(),

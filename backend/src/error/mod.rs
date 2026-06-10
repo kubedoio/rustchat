@@ -554,5 +554,11 @@ impl From<serde_json::Error> for AppError {
     }
 }
 
+impl From<crate::services::llm::LlmError> for AppError {
+    fn from(err: crate::services::llm::LlmError) -> Self {
+        AppError::ExternalService(err.to_string())
+    }
+}
+
 /// Result type alias for API handlers
 pub type ApiResult<T> = Result<T, AppError>;

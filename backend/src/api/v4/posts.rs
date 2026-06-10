@@ -480,6 +480,7 @@ async fn get_post_thread(
                 file_ids: post.file_ids.into_iter().map(encode_mm_id).collect(),
                 pending_post_id: post.client_msg_id.unwrap_or_default(),
                 metadata: None,
+                is_bot: false,
             };
             (mm_id, mm_post)
         })
@@ -1218,6 +1219,7 @@ async fn create_ephemeral_post(
         file_ids: input.post.file_ids,
         pending_post_id: input.post.pending_post_id,
         metadata: None,
+        is_bot: false,
     };
 
     let broadcast = WsEnvelope::event(

@@ -86,6 +86,10 @@ use crate::config::Config;
 use crate::middleware::reliability::ServiceCircuitBreakers;
 use crate::middleware::security_headers::{cors_compatible_config, SecurityHeadersLayer};
 use crate::realtime::{ConnectionStore, WsHub};
+use crate::services::agent_runtime::AgentRuntime;
+use crate::services::knowledge::embedder::{Embedder, OpenAiEmbedder};
+use crate::services::knowledge::vector_store::{PgVectorStore, VectorStore};
+use crate::services::llm::{OpenAiProvider, ProviderRegistry};
 use crate::storage::S3Client;
 use tokio::sync::mpsc;
 
@@ -155,6 +159,70 @@ pub fn router(
     ));
     let connection_store = ConnectionStore::new();
 
+    // Initialize LLM provider registry if env vars are present
+    let agent_runtime = {
+        let mut provider_registry = ProviderRegistry::new();
+        let mut has_provider = false;
+
+        // Prefer RUSTCHAT_OPENAI_API_KEY, fall back to OPENAI_API_KEY for backward compatibility
+        let openai_api_key = std::env::var("RUSTCHAT_OPENAI_API_KEY")
+            .ok()
+            .filter(|k| !k.is_empty())
+            .or_else(|| {
+                std::env::var("OPENAI_API_KEY")
+                    .ok()
+                    .filter(|k| !k.is_empty())
+            });
+
+        if let Some(api_key) = openai_api_key.clone() {
+            match OpenAiProvider::new(api_key) {
+                Ok(provider) => {
+                    provider_registry.register("openai", Arc::new(provider));
+                    has_provider = true;
+                    tracing::info!("OpenAI LLM provider registered");
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to initialize OpenAI provider");
+                }
+            }
+        }
+
+        if has_provider {
+            let embedder = openai_api_key
+                .map(|key| Arc::new(OpenAiEmbedder::new(key, None, None)) as Arc<dyn Embedder>);
+            let vector_store = Some(Arc::new(PgVectorStore::new(&db)) as Arc<dyn VectorStore>);
+
+            // Register tools if API keys are available
+            let tool_registry = Arc::new(crate::services::tools::registry::ToolRegistry::new());
+            if let Some(tavily_key) = std::env::var("TAVILY_API_KEY")
+                .ok()
+                .filter(|k| !k.is_empty())
+            {
+                tool_registry.register(Arc::new(
+                    crate::services::tools::web_search::WebSearchTool::new(tavily_key),
+                ));
+                tracing::info!("Web search tool registered");
+            }
+            let tool_registry = if tool_registry.is_empty() {
+                None
+            } else {
+                Some(tool_registry)
+            };
+
+            Some(Arc::new(AgentRuntime::new(
+                db.clone(),
+                ws_hub.clone(),
+                Arc::new(provider_registry),
+                embedder,
+                vector_store,
+                tool_registry,
+            )))
+        } else {
+            tracing::info!("No LLM providers configured; agent runtime disabled");
+            None
+        }
+    };
+
     // Create a temporary state for the reconciliation worker
     let temp_state = Arc::new(AppState {
         db: db.clone(),
@@ -173,6 +241,7 @@ pub fn router(
         call_state_manager: call_state_manager.clone(),
         circuit_breakers: Arc::new(ServiceCircuitBreakers::new()),
         reconciliation_tx: None,
+        agent_runtime: agent_runtime.clone(),
     });
 
     // Spawn membership reconciliation worker
@@ -203,6 +272,7 @@ pub fn router(
         call_state_manager,
         circuit_breakers: Arc::new(ServiceCircuitBreakers::new()),
         reconciliation_tx: Some(reconciliation_tx),
+        agent_runtime,
     };
 
     let _keycloak_sync_handle = if state.config.keycloak_sync.enabled {

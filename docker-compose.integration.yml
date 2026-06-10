@@ -1,6 +1,6 @@
 services:
   test-postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: rustchat-test-postgres
     environment:
       POSTGRES_USER: rustchat

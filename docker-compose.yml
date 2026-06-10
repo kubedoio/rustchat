@@ -79,7 +79,7 @@ services:
         condition: service_healthy
 
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: rustchat-postgres
     environment:
       POSTGRES_USER: rustchat

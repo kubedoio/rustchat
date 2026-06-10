@@ -4,6 +4,9 @@
 
 pub mod activity;
 pub mod admin_models;
+pub mod agent;
+pub mod agent_feedback;
+pub mod agent_usage;
 pub mod api_key;
 pub mod call;
 pub mod channel;
@@ -14,6 +17,7 @@ pub mod email;
 pub mod entity;
 pub mod file;
 pub mod integration;
+pub mod knowledge;
 
 pub mod organization;
 pub mod playbook;
@@ -35,10 +39,12 @@ pub use scheduled_post::*;
 
 pub use activity::*;
 pub use admin_models::*;
+pub use agent::*;
 pub use api_key::*;
 pub use entity::*;
 pub use file::*;
 pub use integration::*;
+pub use knowledge::*;
 
 pub use organization::*;
 pub use playbook::*;

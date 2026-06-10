@@ -664,6 +664,66 @@ export function useWebSocket() {
         }
         break
 
+      case 'agent_stream_chunk': {
+        if (envelope.data && typeof envelope.data === 'object') {
+          const dataObj = envelope.data as Record<string, unknown>
+          const postId = String(dataObj.post_id || '')
+          const channelId = String(
+            dataObj.channel_id || envelope.channel_id || envelope.broadcast?.channel_id || ''
+          )
+          const content = String(dataObj.content || '')
+          const agentId = String(dataObj.agent_id || '')
+          if (postId && channelId) {
+            messageStore.handleAgentStreamChunk(postId, channelId, content, agentId)
+          }
+        }
+        break
+      }
+
+      case 'agent_stream_complete': {
+        if (envelope.data && typeof envelope.data === 'object') {
+          const dataObj = envelope.data as Record<string, unknown>
+          const postId = String(dataObj.post_id || '')
+          const channelId = String(
+            dataObj.channel_id || envelope.channel_id || envelope.broadcast?.channel_id || ''
+          )
+          if (postId && channelId) {
+            messageStore.handleAgentStreamComplete(postId, channelId)
+          }
+        }
+        break
+      }
+
+      case 'agent_stream_error': {
+        if (envelope.data && typeof envelope.data === 'object') {
+          const dataObj = envelope.data as Record<string, unknown>
+          const postId = String(dataObj.post_id || '')
+          const channelId = String(
+            dataObj.channel_id || envelope.channel_id || envelope.broadcast?.channel_id || ''
+          )
+          const errorMessage = String(dataObj.message || 'Unknown error')
+          if (postId && channelId) {
+            messageStore.handleAgentStreamError(postId, channelId, errorMessage)
+          }
+        }
+        break
+      }
+
+      case 'agent_error': {
+        if (envelope.data && typeof envelope.data === 'object') {
+          const dataObj = envelope.data as Record<string, unknown>
+          const channelId = String(
+            dataObj.channel_id || envelope.channel_id || envelope.broadcast?.channel_id || ''
+          )
+          const errorMessage = String(dataObj.message || 'Agent error')
+          const agentId = String(dataObj.agent_id || '')
+          if (channelId) {
+            messageStore.handleAgentError(channelId, errorMessage, agentId)
+          }
+        }
+        break
+      }
+
       case 'user_typing':
       case 'typing': // Compatibility with some mobile clients
         if (envelope.data && typeof envelope.data === 'object') {

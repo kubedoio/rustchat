@@ -81,7 +81,7 @@ async fn build_post_response(
     user_id: Uuid,
     client_msg_id: Option<String>,
 ) -> ApiResult<PostResponse> {
-    let (username, avatar_url, email) = UserRepository::new(&state.db)
+    let (username, avatar_url, email, is_bot) = UserRepository::new(&state.db)
         .get_username_avatar_email(user_id)
         .await?;
 
@@ -100,6 +100,7 @@ async fn build_post_response(
         username: Some(username),
         avatar_url,
         email: Some(email),
+        is_bot,
         reply_count: post.reply_count,
         last_reply_at: post.last_reply_at,
         files: vec![],
@@ -536,6 +537,20 @@ pub async fn create_post(
     // Automation (best-effort)
     run_post_automation(state, channel_id, user_id, &response, root_post_id).await;
 
+    // Agent triggers (best-effort)
+    if let Some(runtime) = state.agent_runtime.clone() {
+        let post_clone = response.clone();
+        let channel_id_clone = channel_id;
+        tokio::spawn(async move {
+            if let Err(e) = runtime
+                .handle_post_created(&post_clone, channel_id_clone)
+                .await
+            {
+                tracing::error!(error = %e, "Agent runtime failed");
+            }
+        });
+    }
+
     // DM membership WS broadcast
     if !dm_added_users.is_empty() {
         if let Ok(Some(chan)) = ChannelRepository::new(&state.db)
@@ -741,6 +756,7 @@ pub async fn create_system_message(
         username: Some("System".to_string()),
         avatar_url: None,
         email: None,
+        is_bot: false,
         reply_count: 0,
         last_reply_at: None,
         files: vec![],

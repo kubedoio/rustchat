@@ -375,7 +375,7 @@ impl<'a> ChannelRepository<'a> {
     pub async fn list_members(&self, channel_id: Uuid) -> Result<Vec<ChannelMember>, sqlx::Error> {
         sqlx::query_as(
             r#"
-            SELECT cm.*, u.username, u.display_name, u.avatar_url, u.presence
+            SELECT cm.*, u.username, u.display_name, u.avatar_url, u.presence, u.is_bot
             FROM channel_members cm
             INNER JOIN users u ON cm.user_id = u.id
             WHERE cm.channel_id = $1
