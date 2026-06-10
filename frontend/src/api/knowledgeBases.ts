@@ -97,7 +97,7 @@ export const knowledgeBasesApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
-  deleteDocument: (kbId: string, docId: string) => api.delete(`/knowledge/documents/${docId}`),
+  deleteDocument: (_kbId: string, docId: string) => api.delete(`/knowledge/documents/${docId}`),
 
   // Sync Sources
   listSyncSources: () => api.get<{ sync_sources: SyncSource[] }>('/knowledge/sync-sources'),

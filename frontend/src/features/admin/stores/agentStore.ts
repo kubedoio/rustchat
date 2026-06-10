@@ -23,7 +23,7 @@ export const useAgentStore = defineStore('agentStore', () => {
     error.value = null
     try {
       const response = await agentsApi.list()
-      agents.value = response.data.agents
+      agents.value = response.data
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e) || 'Failed to load agents'
     } finally {
