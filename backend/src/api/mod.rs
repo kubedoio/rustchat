@@ -164,24 +164,27 @@ pub fn router(
         let mut provider_registry = ProviderRegistry::new();
         let mut has_provider = false;
 
-        if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
-            if !api_key.is_empty() {
-                match OpenAiProvider::new(api_key) {
-                    Ok(provider) => {
-                        provider_registry.register("openai", Arc::new(provider));
-                        has_provider = true;
-                        tracing::info!("OpenAI LLM provider registered");
-                    }
-                    Err(e) => {
-                        tracing::warn!(error = %e, "Failed to initialize OpenAI provider");
-                    }
+        // Prefer RUSTCHAT_OPENAI_API_KEY, fall back to OPENAI_API_KEY for backward compatibility
+        let openai_api_key = std::env::var("RUSTCHAT_OPENAI_API_KEY")
+            .ok()
+            .filter(|k| !k.is_empty())
+            .or_else(|| std::env::var("OPENAI_API_KEY").ok().filter(|k| !k.is_empty()));
+
+        if let Some(api_key) = openai_api_key.clone() {
+            match OpenAiProvider::new(api_key) {
+                Ok(provider) => {
+                    provider_registry.register("openai", Arc::new(provider));
+                    has_provider = true;
+                    tracing::info!("OpenAI LLM provider registered");
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to initialize OpenAI provider");
                 }
             }
         }
 
         if has_provider {
-            let embedder = std::env::var("OPENAI_API_KEY").ok()
-                .filter(|k| !k.is_empty())
+            let embedder = openai_api_key
                 .map(|key| Arc::new(OpenAiEmbedder::new(key, None, None)) as Arc<dyn Embedder>);
             let vector_store = Some(Arc::new(PgVectorStore::new(&db)) as Arc<dyn VectorStore>);
 

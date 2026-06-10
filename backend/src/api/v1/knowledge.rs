@@ -481,9 +481,9 @@ pub async fn assign_kb_to_agent(
 
     let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
 
-    // Verify agent exists
+    // Verify agent exists and extract its user_id (agent_id FK target)
     let agent_repo = AgentRepository::new(&state.db);
-    agent_repo
+    let agent = agent_repo
         .get_config_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
@@ -498,7 +498,7 @@ pub async fn assign_kb_to_agent(
 
     let mapping = kb_repo
         .assign_kb_to_agent(
-            id,
+            agent.user_id,
             req.knowledge_base_id,
             req.top_k.unwrap_or(3),
             req.relevance_threshold,

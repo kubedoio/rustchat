@@ -425,12 +425,14 @@ async fn run_agent_response(
         return Ok(());
     }
 
-    // Create post as agent user
+    // Create post as agent user, reusing the stream placeholder ID so the
+    // frontend can replace the temporary streaming message with the real one.
     let post_repo = PostRepository::new(db.clone());
     let mut tx = db.begin().await.map_err(AppError::Database)?;
     let created_post = post_repo
-        .create_post_in_tx(
+        .create_post_in_tx_with_id(
             &mut tx,
+            stream_post_id,
             channel_id,
             agent_user_id,
             None, // root_post_id

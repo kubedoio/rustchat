@@ -1942,6 +1942,49 @@ impl PostRepository {
         Ok(post)
     }
 
+    /// Create a post with an explicit pre-generated ID inside an existing transaction.
+    /// Used when the caller needs to know the post ID before insertion (e.g. agent streaming).
+    pub async fn create_post_in_tx_with_id(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        post_id: Uuid,
+        channel_id: Uuid,
+        user_id: Uuid,
+        root_post_id: Option<Uuid>,
+        message: &str,
+        props: serde_json::Value,
+        file_ids: &[Uuid],
+    ) -> ApiResult<crate::models::Post> {
+        let post = sqlx::query_as::<_, crate::models::Post>(&format!(
+            r#"
+            INSERT INTO posts (id, channel_id, user_id, root_post_id, message, props, file_ids)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING {}
+            "#,
+            Self::POST_COLUMNS_NO_USER
+        ))
+        .bind(post_id)
+        .bind(channel_id)
+        .bind(user_id)
+        .bind(root_post_id)
+        .bind(message)
+        .bind(props)
+        .bind(file_ids)
+        .fetch_one(&mut **tx)
+        .await?;
+
+        if let Some(r_id) = root_post_id {
+            sqlx::query(
+                "UPDATE posts SET reply_count = reply_count + 1, last_reply_at = NOW() WHERE id = $1"
+            )
+            .bind(r_id)
+            .execute(&mut **tx)
+            .await?;
+        }
+
+        Ok(post)
+    }
+
     /// Update post props inside an existing transaction.
     pub async fn update_props_in_tx(
         &self,
