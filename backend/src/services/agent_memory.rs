@@ -61,7 +61,7 @@ impl AgentMemoryService {
 
         // RAG context injection
         if use_rag {
-            if let (Some(embedder), Some(vector_store)) = (&self.embedder, &self.vector_store) {
+            if let (Some(embedder), Some(_vector_store)) = (&self.embedder, &self.vector_store) {
                 let kb_repo = KnowledgeRepository::new(&self.db);
                 let kb_assignments = kb_repo
                     .list_agent_knowledge_bases(agent_id)
@@ -81,11 +81,10 @@ impl AgentMemoryService {
                             knowledge_base_id: Some(assignment.knowledge_base_id),
                             document_id: None,
                         };
-                        let chunks = vector_store.search(
-                            &query_vector,
-                            assignment.top_k as usize,
-                            &filter,
-                        ).await.map_err(AppError::Database)?;
+                        let chunks = kb_repo
+                            .search_chunks_hybrid(query, &query_vector, assignment.top_k, &filter)
+                            .await
+                            .map_err(AppError::Database)?;
 
                         for chunk in chunks {
                             if let Some(threshold) = assignment.relevance_threshold {

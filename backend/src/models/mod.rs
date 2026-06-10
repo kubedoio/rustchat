@@ -14,6 +14,7 @@ pub mod custom_profile_attribute;
 pub mod email;
 pub mod entity;
 pub mod file;
+pub mod agent_feedback;
 pub mod integration;
 pub mod knowledge;
 

@@ -399,6 +399,50 @@ impl<'a> KnowledgeRepository<'a> {
         .await
     }
 
+    /// Hybrid search: semantic + full-text with RRF fusion.
+    pub async fn search_chunks_hybrid(
+        &self,
+        query_text: &str,
+        query_embedding: &[f32],
+        top_k: i32,
+        filter: &SearchFilter,
+    ) -> Result<Vec<RetrievedChunk>, sqlx::Error> {
+        use crate::services::knowledge::hybrid_search::{rrf_fuse, RRF_K};
+
+        // Semantic search (top 10)
+        let semantic_results = self.search_chunks(query_embedding, 10, filter).await?;
+
+        // Full-text search via placeholder ILIKE query
+        // (Meilisearch integration can be wired here later)
+        let text_results = sqlx::query_as::<_, RetrievedChunk>(
+            r#"
+            SELECT
+                kc.chunk_text,
+                kd.title as document_title,
+                kd.source_url as document_source_url,
+                kc.section_title,
+                0.0 as similarity
+            FROM knowledge_chunks kc
+            JOIN knowledge_documents kd ON kd.id = kc.document_id
+            WHERE kc.team_id = $1
+              AND ($2::uuid IS NULL OR kc.knowledge_base_id = $2)
+              AND kc.chunk_text ILIKE $3
+            LIMIT 10
+            "#,
+        )
+        .bind(filter.team_id)
+        .bind(filter.knowledge_base_id)
+        .bind(format!("%{}%", query_text))
+        .fetch_all(self.pool)
+        .await?;
+
+        // Fuse results
+        let fused = rrf_fuse(semantic_results, text_results, RRF_K);
+
+        // Return top_k
+        Ok(fused.into_iter().take(top_k as usize).map(|h| h.chunk).collect())
+    }
+
     /// Delete all chunks belonging to a document.
     #[tracing::instrument(skip(self), fields(document_id = %document_id))]
     pub async fn delete_chunks_by_document(

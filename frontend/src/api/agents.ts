@@ -121,6 +121,25 @@ export interface AssignKnowledgeBasePayload {
   relevance_threshold?: number
 }
 
+export interface SubmitFeedbackPayload {
+  feedback_type: 'positive' | 'negative'
+  comment?: string
+}
+
+export interface FeedbackSummary {
+  post_id: string
+  positive_count: number
+  negative_count: number
+}
+
+export interface AgentFeedbackStats {
+  agent_id: string
+  total_positive: number
+  total_negative: number
+  total_feedback: number
+  feedback_ratio: number
+}
+
 // API methods
 export const agentsApi = {
   list: () => api.get<{ agents: AgentSummary[] }>('/agents'),
@@ -143,6 +162,14 @@ export const agentsApi = {
     api.post<AgentKnowledgeBase>(`/agents/${id}/knowledge-bases`, data),
   unassignKnowledgeBase: (id: string, kbId: string) =>
     api.delete(`/agents/${id}/knowledge-bases/${kbId}`),
+  submitFeedback: (postId: string, data: SubmitFeedbackPayload) =>
+    api.post<{ id: string; post_id: string; user_id: string; feedback_type: string; comment?: string; created_at: string }>(`/agents/posts/${postId}/feedback`, data),
+  getFeedbackSummary: (postId: string) =>
+    api.get<FeedbackSummary>(`/agents/posts/${postId}/feedback`),
+  deleteFeedback: (postId: string) =>
+    api.delete(`/agents/posts/${postId}/feedback`),
+  getAgentFeedbackStats: (agentId: string) =>
+    api.get<AgentFeedbackStats>(`/agents/${agentId}/feedback-stats`),
 }
 
 export default agentsApi

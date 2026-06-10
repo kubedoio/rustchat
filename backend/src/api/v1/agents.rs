@@ -5,6 +5,7 @@
 
 use axum::{
     extract::{Path, State},
+    http::StatusCode,
     routing::{delete, get, post},
     Json, Router,
 };
@@ -21,7 +22,9 @@ use crate::models::agent::{
     AgentChannelSettings, AgentConfigResponse, AgentMemory, AgentSummary, CreateAgentRequest,
     TestAgentRequest, TestAgentResponse, UpdateAgentRequest,
 };
+use crate::models::agent_feedback::*;
 use crate::models::validate_username_token;
+use crate::repositories::agent_feedback_repository::AgentFeedbackRepository;
 use crate::repositories::agent_repository::AgentRepository;
 use crate::services::llm::{ChatMessage, CompletionRequest, LlmProvider, OpenAiProvider};
 
@@ -45,6 +48,13 @@ pub fn router() -> Router<AppState> {
         .route("/:id/memories", get(list_memories))
         .route("/:id/memories/:memory_id", delete(delete_memory))
         .route("/:id/test", post(test_agent))
+        .route(
+            "/posts/:post_id/feedback",
+            post(submit_feedback)
+                .get(get_feedback_summary)
+                .delete(delete_own_feedback),
+        )
+        .route("/:id/feedback-stats", get(get_agent_feedback_stats))
         .route(
             "/:id/knowledge-bases",
             get(super::knowledge::list_agent_knowledge_bases)
@@ -525,6 +535,74 @@ async fn test_agent(
         model: response.model,
         latency_ms: response.latency_ms,
     }))
+}
+
+async fn submit_feedback(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(post_id): Path<Uuid>,
+    Json(req): Json<CreateFeedbackRequest>,
+) -> ApiResult<(StatusCode, Json<AgentMessageFeedback>)> {
+    if req.feedback_type != "positive" && req.feedback_type != "negative" {
+        return Err(AppError::BadRequest(
+            "feedback_type must be 'positive' or 'negative'".to_string(),
+        ));
+    }
+
+    let repo = AgentFeedbackRepository::new(&state.db);
+    let feedback = repo
+        .create_feedback(
+            post_id,
+            auth.user_id,
+            &req.feedback_type,
+            req.comment.as_deref(),
+        )
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok((StatusCode::CREATED, Json(feedback)))
+}
+
+async fn get_feedback_summary(
+    Path(post_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<FeedbackSummary>> {
+    let repo = AgentFeedbackRepository::new(&state.db);
+    let summary = repo
+        .get_feedback_summary(post_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(summary))
+}
+
+async fn delete_own_feedback(
+    auth: AuthUser,
+    Path(post_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> ApiResult<StatusCode> {
+    let repo = AgentFeedbackRepository::new(&state.db);
+    repo.delete_feedback(post_id, auth.user_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_agent_feedback_stats(
+    auth: AuthUser,
+    Path(agent_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<AgentFeedbackStats>> {
+    require_admin(&auth)?;
+
+    let repo = AgentFeedbackRepository::new(&state.db);
+    let stats = repo
+        .get_agent_feedback_stats(agent_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(stats))
 }
 
 // ------------------------------------------------------------------
