@@ -242,6 +242,33 @@ pub async fn upload_document(
         .map_err(|e| AppError::BadRequest(format!("Read error: {}", e)))?
         .to_vec();
 
+    // Validate file size (max 50MB)
+    const MAX_FILE_SIZE: usize = 50 * 1024 * 1024;
+    if data.len() > MAX_FILE_SIZE {
+        return Err(AppError::BadRequest(format!(
+            "File too large: {} bytes (max {}MB)",
+            data.len(),
+            MAX_FILE_SIZE / 1024 / 1024
+        )));
+    }
+
+    // Validate MIME type
+    let allowed_mime_types = [
+        "text/plain",
+        "text/markdown",
+        "text/html",
+        "text/x-rust",
+        "text/x-python",
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    if !allowed_mime_types.contains(&mime_type.as_str()) {
+        return Err(AppError::BadRequest(format!(
+            "Unsupported file type: {}. Allowed: {:?}",
+            mime_type, allowed_mime_types
+        )));
+    }
+
     // Compute hash
     let hash = Sha256::digest(&data);
     let hash_hex = hex::encode(hash);

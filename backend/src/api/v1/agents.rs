@@ -521,12 +521,15 @@ async fn test_agent(
         AppError::Internal(format!("Failed to initialize LLM provider: {}", e))
     })?;
 
+    // Cap test calls to prevent runaway token spend
+    let test_max_tokens = std::cmp::min(config.max_output_tokens as u32, 500);
+
     let completion_req = CompletionRequest {
         system_prompt: config.system_prompt,
         messages: vec![ChatMessage::user(req.message, None)],
         model: config.model,
         temperature: config.temperature as f32,
-        max_tokens: config.max_output_tokens as u32,
+        max_tokens: test_max_tokens,
     };
 
     let response = provider.complete(completion_req).await.map_err(|e| {

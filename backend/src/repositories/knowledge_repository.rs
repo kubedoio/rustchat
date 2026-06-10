@@ -332,32 +332,34 @@ impl<'a> KnowledgeRepository<'a> {
         &self,
         chunks: &[KnowledgeChunk],
     ) -> Result<(), sqlx::Error> {
+        if chunks.is_empty() {
+            return Ok(());
+        }
+
         let mut tx = self.pool.begin().await?;
 
-        for chunk in chunks {
-            sqlx::query(
-                r#"
-                INSERT INTO knowledge_chunks (
-                    document_id, knowledge_base_id, team_id, chunk_index,
-                    chunk_text, token_count, embedding, section_title,
-                    start_byte, end_byte
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                "#,
-            )
-            .bind(chunk.document_id)
-            .bind(chunk.knowledge_base_id)
-            .bind(chunk.team_id)
-            .bind(chunk.chunk_index)
-            .bind(&chunk.chunk_text)
-            .bind(chunk.token_count)
-            .bind(&chunk.embedding)
-            .bind(&chunk.section_title)
-            .bind(chunk.start_byte)
-            .bind(chunk.end_byte)
-            .execute(&mut *tx)
-            .await?;
-        }
+        let mut query_builder = sqlx::QueryBuilder::new(
+            "INSERT INTO knowledge_chunks (
+                document_id, knowledge_base_id, team_id, chunk_index,
+                chunk_text, token_count, embedding, section_title,
+                start_byte, end_byte
+            )"
+        );
+
+        query_builder.push_values(chunks, |mut b, chunk| {
+            b.push_bind(chunk.document_id)
+                .push_bind(chunk.knowledge_base_id)
+                .push_bind(chunk.team_id)
+                .push_bind(chunk.chunk_index)
+                .push_bind(&chunk.chunk_text)
+                .push_bind(chunk.token_count)
+                .push_bind(&chunk.embedding)
+                .push_bind(&chunk.section_title)
+                .push_bind(chunk.start_byte)
+                .push_bind(chunk.end_byte);
+        });
+
+        query_builder.build().execute(&mut *tx).await?;
 
         tx.commit().await
     }
