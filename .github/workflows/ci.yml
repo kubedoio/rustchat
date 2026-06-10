@@ -95,7 +95,7 @@ jobs:
             --health-interval 10s \
             --health-timeout 5s \
             --health-retries 5 \
-            postgres:16
+            pgvector/pgvector:pg16
           docker run -d --name rustchat-ci-redis \
             -p 6380:6379 \
             --health-cmd "redis-cli ping" \

@@ -144,7 +144,7 @@ Test your backups regularly:
 
 ```bash
 # Test restore to temporary database
-docker run --rm -d --name test-postgres -e POSTGRES_PASSWORD=test postgres:16
+docker run --rm -d --name test-postgres -e POSTGRES_PASSWORD=test pgvector/pgvector:pg16
 sleep 5
 docker exec -i test-postgres psql -U postgres -c "CREATE DATABASE rustchat_test;"
 docker exec -i test-postgres psql -U postgres rustchat_test < backup.sql
