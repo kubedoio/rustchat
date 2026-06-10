@@ -568,6 +568,7 @@ async fn submit_feedback(
 }
 
 async fn get_feedback_summary(
+    _auth: AuthUser,
     Path(post_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> ApiResult<Json<FeedbackSummary>> {

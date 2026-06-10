@@ -184,14 +184,20 @@ impl LlmProvider for OpenAiProvider {
             });
         }
 
-        // Parse SSE stream
+        // Parse SSE stream with line buffering to handle split chunks
         let stream = response.bytes_stream();
-        let token_stream = stream.filter_map(|chunk| async move {
+        let mut buf = String::new();
+        let token_stream = stream.filter_map(move |chunk| {
+            let mut content = String::new();
             match chunk {
                 Ok(bytes) => {
                     let text = String::from_utf8_lossy(&bytes);
-                    let mut content = String::new();
-                    for line in text.lines() {
+                    buf.push_str(&text);
+
+                    // Process all complete lines in the buffer
+                    while let Some(pos) = buf.find('\n') {
+                        let line = buf.drain(..=pos).collect::<String>();
+                        let line = line.trim_end();
                         if line.starts_with("data: ") {
                             let data = &line[6..];
                             if data == "[DONE]" {
@@ -211,13 +217,14 @@ impl LlmProvider for OpenAiProvider {
                             }
                         }
                     }
-                    if content.is_empty() {
+
+                    std::future::ready(if content.is_empty() {
                         None
                     } else {
                         Some(Ok(content))
-                    }
+                    })
                 }
-                Err(e) => Some(Err(LlmError::Http(e))),
+                Err(e) => std::future::ready(Some(Err(LlmError::Http(e)))),
             }
         });
 

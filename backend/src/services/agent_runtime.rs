@@ -89,6 +89,12 @@ impl AgentRuntime {
         let agent_repo = AgentRepository::new(&self.db);
 
         for agent_user_id in agent_user_ids {
+            // Prevent agent from triggering itself (infinite loop)
+            if post.user_id == agent_user_id {
+                tracing::debug!(agent_id = %agent_user_id, "Skipping self-triggered agent response");
+                continue;
+            }
+
             // Check channel settings
             let settings = agent_repo
                 .get_channel_settings(agent_user_id, channel_id)
@@ -111,7 +117,19 @@ impl AgentRuntime {
                     tracing::warn!(
                         agent_id = %agent_user_id,
                         retry_after = retry_after_secs,
-                        "Agent rate limited"
+                        "Agent rate limited (requests)"
+                    );
+                    continue;
+                }
+            }
+
+            match self.rate_limiter.check_tokens(agent_user_id) {
+                RateLimitResult::Allowed => {}
+                RateLimitResult::Throttled { retry_after_secs } => {
+                    tracing::warn!(
+                        agent_id = %agent_user_id,
+                        retry_after = retry_after_secs,
+                        "Agent rate limited (tokens)"
                     );
                     continue;
                 }
@@ -221,13 +239,19 @@ async fn run_agent_response(
         .build_context(agent_user_id, channel_id, max_messages, use_rag, query)
         .await?;
 
-    // Add the trigger post as the last user message
-    let trigger_content = format!(
-        "{}: {}",
-        trigger_post.username.as_deref().unwrap_or("unknown"),
-        trigger_post.message
-    );
-    messages.push(ChatMessage::user(trigger_content, trigger_post.username.clone()));
+    // Add the trigger post as the last user message (if not already present)
+    let trigger_already_last = messages.last().map(|m| {
+        m.role == crate::services::llm::MessageRole::User && m.content.contains(&trigger_post.message)
+    }).unwrap_or(false);
+
+    if !trigger_already_last {
+        let trigger_content = format!(
+            "{}: {}",
+            trigger_post.username.as_deref().unwrap_or("unknown"),
+            trigger_post.message
+        );
+        messages.push(ChatMessage::user(trigger_content, trigger_post.username.clone()));
+    }
 
     // Estimate input tokens before messages are consumed
     let tokens_input = estimate_tokens(&messages) as i32;
@@ -321,7 +345,28 @@ async fn run_agent_response(
                     }
                 }
 
-                // Stream complete — use accumulated content as the response
+                // Stream complete — broadcast final accumulated content before complete event
+                if !accumulated.is_empty() {
+                    let event = WsEnvelope {
+                        msg_type: "event".to_string(),
+                        event: "agent_stream_chunk".to_string(),
+                        seq: None,
+                        channel_id: Some(channel_id),
+                        data: serde_json::json!({
+                            "content": accumulated.clone(),
+                            "agent_id": agent_user_id,
+                            "post_id": stream_post_id,
+                        }),
+                        broadcast: Some(WsBroadcast {
+                            channel_id: Some(channel_id),
+                            team_id: None,
+                            user_id: None,
+                            exclude_user_id: Some(agent_user_id),
+                        }),
+                    };
+                    ws_hub.broadcast(event).await;
+                }
+
                 response_text = accumulated;
 
                 // Send complete event
