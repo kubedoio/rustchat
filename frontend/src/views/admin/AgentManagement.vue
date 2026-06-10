@@ -11,6 +11,7 @@ import {
   CheckCircle,
   XCircle,
   MessageSquare,
+  BarChart3,
 } from 'lucide-vue-next'
 import { useAgentStore } from '../../features/admin/stores/agentStore'
 import { type AgentSummary } from '../../api/agents'
@@ -58,6 +59,11 @@ const filteredAgents = computed(() => {
 })
 
 function handleEdit(agent: AgentSummary) {
+  editingAgent.value = agent
+  showEditModal.value = true
+}
+
+function handleAnalytics(agent: AgentSummary) {
   editingAgent.value = agent
   showEditModal.value = true
 }
@@ -219,6 +225,13 @@ async function confirmDeleteAgent() {
                 @click="handleEdit(agent)"
               >
                 <Edit2 class="w-3.5 h-3.5" />
+              </button>
+              <button
+                class="text-text-3 hover:text-brand mr-2 p-1 hover:bg-brand/10 rounded transition-colors"
+                title="Analytics"
+                @click="handleAnalytics(agent)"
+              >
+                <BarChart3 class="w-3.5 h-3.5" />
               </button>
               <button
                 class="text-danger hover:text-danger/80 p-1 hover:bg-danger/10 rounded transition-colors"

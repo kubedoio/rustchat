@@ -466,6 +466,7 @@ async function toggleReaction(emoji: string) {
       {
         'opacity-70': message.status === 'sending',
         'bg-danger/5': message.status === 'failed',
+        'border-l-2 border-danger': message.isError,
       },
     ]"
     @mouseenter="showActions = true"

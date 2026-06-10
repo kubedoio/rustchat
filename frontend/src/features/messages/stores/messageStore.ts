@@ -27,6 +27,7 @@ export interface Message {
   email?: string
   isBot?: boolean
   isStreaming?: boolean
+  isError?: boolean
   content: string
   timestamp: string
   reactions: MessageReaction[]
@@ -452,6 +453,28 @@ export const useMessageStore = defineStore('messageStore', () => {
       }
     }
     // The final persisted message will arrive via 'posted' event
+  }
+
+  function handleAgentError(channelId: string, errorMessage: string, agentId: string) {
+    const errorMsg: Message = {
+      id: `error-${Date.now()}`,
+      channelId,
+      userId: agentId,
+      username: 'Agent',
+      content: errorMessage,
+      timestamp: new Date().toISOString(),
+      reactions: [],
+      isPinned: false,
+      isSaved: false,
+      isBot: true,
+      isError: true,
+      status: 'delivered',
+      seq: 0,
+    }
+    if (!messagesByChannel.value[channelId]) {
+      messagesByChannel.value[channelId] = []
+    }
+    messagesByChannel.value[channelId]?.push(errorMsg)
   }
 
   function handleAgentStreamError(postId: string, channelId: string, errorMessage: string) {
@@ -988,6 +1011,7 @@ export const useMessageStore = defineStore('messageStore', () => {
     handleAgentStreamChunk,
     handleAgentStreamComplete,
     handleAgentStreamError,
+    handleAgentError,
     handleMessageUpdate,
     handleMessageDelete,
     handleReactionAdded,

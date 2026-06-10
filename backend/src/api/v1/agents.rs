@@ -4,12 +4,13 @@
 //! memory management, and testing.
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
     Json, Router,
 };
-use serde::Serialize;
+use chrono::{Duration, Utc};
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -23,9 +24,11 @@ use crate::models::agent::{
     TestAgentRequest, TestAgentResponse, UpdateAgentRequest,
 };
 use crate::models::agent_feedback::*;
+use crate::models::agent_usage::{AgentDailyUsage, AgentUsageSummary};
 use crate::models::validate_username_token;
 use crate::repositories::agent_feedback_repository::AgentFeedbackRepository;
 use crate::repositories::agent_repository::AgentRepository;
+use crate::repositories::agent_usage_repository::AgentUsageRepository;
 use crate::services::llm::{ChatMessage, CompletionRequest, LlmProvider, OpenAiProvider};
 
 // ------------------------------------------------------------------
@@ -55,6 +58,7 @@ pub fn router() -> Router<AppState> {
                 .delete(delete_own_feedback),
         )
         .route("/:id/feedback-stats", get(get_agent_feedback_stats))
+        .route("/:id/analytics", get(get_agent_analytics))
         .route(
             "/:id/knowledge-bases",
             get(super::knowledge::list_agent_knowledge_bases)
@@ -603,6 +607,52 @@ async fn get_agent_feedback_stats(
         .map_err(AppError::Database)?;
 
     Ok(Json(stats))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AnalyticsQuery {
+    pub days: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AgentAnalyticsResponse {
+    pub summary: AgentUsageSummary,
+    pub daily_usage: Vec<AgentDailyUsage>,
+    pub feedback_stats: AgentFeedbackStats,
+}
+
+async fn get_agent_analytics(
+    auth: AuthUser,
+    Path(agent_id): Path<Uuid>,
+    Query(params): Query<AnalyticsQuery>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<AgentAnalyticsResponse>> {
+    require_admin(&auth)?;
+
+    let days = params.days.unwrap_or(7);
+    let since = Utc::now() - Duration::days(days);
+
+    let usage_repo = AgentUsageRepository::new(&state.db);
+    let feedback_repo = AgentFeedbackRepository::new(&state.db);
+
+    let summary = usage_repo
+        .get_summary(agent_id, since)
+        .await
+        .map_err(AppError::Database)?;
+    let daily = usage_repo
+        .get_daily_usage(agent_id, since)
+        .await
+        .map_err(AppError::Database)?;
+    let feedback = feedback_repo
+        .get_agent_feedback_stats(agent_id)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(Json(AgentAnalyticsResponse {
+        summary,
+        daily_usage: daily,
+        feedback_stats: feedback,
+    }))
 }
 
 // ------------------------------------------------------------------

@@ -15,7 +15,9 @@ use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::models as mm;
 use crate::models::{EntityType, PostResponse};
 use crate::realtime::{EventType, WsBroadcast, WsEnvelope, WsHub};
+use crate::repositories::agent_usage_repository::AgentUsageRepository;
 use crate::repositories::{AgentRepository, PostRepository, UserRepository};
+use crate::services::agent_rate_limiter::{AgentRateLimiter, RateLimitResult};
 use crate::services::agent_memory::AgentMemoryService;
 use crate::services::knowledge::embedder::Embedder;
 use crate::services::knowledge::vector_store::VectorStore;
@@ -30,6 +32,7 @@ pub struct AgentRuntime {
     embedder: Option<Arc<dyn Embedder>>,
     vector_store: Option<Arc<dyn VectorStore>>,
     tool_registry: Option<Arc<ToolRegistry>>,
+    rate_limiter: Arc<AgentRateLimiter>,
     semaphores: DashMap<Uuid, Arc<Semaphore>>,
 }
 
@@ -42,6 +45,7 @@ impl AgentRuntime {
         vector_store: Option<Arc<dyn VectorStore>>,
         tool_registry: Option<Arc<ToolRegistry>>,
     ) -> Self {
+        let rate_limiter = Arc::new(AgentRateLimiter::new(10, 100_000));
         Self {
             db,
             ws_hub,
@@ -49,6 +53,7 @@ impl AgentRuntime {
             embedder,
             vector_store,
             tool_registry,
+            rate_limiter,
             semaphores: DashMap::new(),
         }
     }
@@ -99,6 +104,19 @@ impl AgentRuntime {
                 continue;
             }
 
+            // Check rate limits
+            match self.rate_limiter.check_request(agent_user_id) {
+                RateLimitResult::Allowed => {}
+                RateLimitResult::Throttled { retry_after_secs } => {
+                    tracing::warn!(
+                        agent_id = %agent_user_id,
+                        retry_after = retry_after_secs,
+                        "Agent rate limited"
+                    );
+                    continue;
+                }
+            }
+
             // Get or create per-agent semaphore
             let semaphore = self
                 .semaphores
@@ -112,6 +130,7 @@ impl AgentRuntime {
             let embedder = self.embedder.clone();
             let vector_store = self.vector_store.clone();
             let tool_registry = self.tool_registry.clone();
+            let rate_limiter = self.rate_limiter.clone();
             let post_clone = post.clone();
 
             tokio::spawn(async move {
@@ -134,6 +153,7 @@ impl AgentRuntime {
                     embedder,
                     vector_store,
                     tool_registry,
+                    rate_limiter,
                     agent_user_id,
                     channel_id,
                     &post_clone,
@@ -160,10 +180,12 @@ async fn run_agent_response(
     embedder: Option<Arc<dyn Embedder>>,
     vector_store: Option<Arc<dyn VectorStore>>,
     tool_registry: Option<Arc<ToolRegistry>>,
+    rate_limiter: Arc<AgentRateLimiter>,
     agent_user_id: Uuid,
     channel_id: Uuid,
     trigger_post: &PostResponse,
 ) -> ApiResult<()> {
+    let result = async {
     let agent_repo = AgentRepository::new(&db);
 
     // Fetch agent config
@@ -207,7 +229,11 @@ async fn run_agent_response(
     );
     messages.push(ChatMessage::user(trigger_content, trigger_post.username.clone()));
 
+    // Estimate input tokens before messages are consumed
+    let tokens_input = estimate_tokens(&messages) as i32;
+
     // Call LLM
+    let start_time = Instant::now();
     let provider = provider_registry
         .get(&config.provider)
         .map_err(|e| AppError::ExternalService(e.to_string()))?;
@@ -326,6 +352,30 @@ async fn run_agent_response(
         }
     }
 
+    // Log usage
+    let latency_ms = start_time.elapsed().as_millis() as i32;
+    let tokens_output = estimate_tokens(&[ChatMessage::assistant(response_text.clone())]) as i32;
+
+    let usage_repo = AgentUsageRepository::new(&db);
+    if let Err(e) = usage_repo
+        .log_usage(
+            agent_user_id,
+            channel_id,
+            "mention",
+            tokens_input,
+            tokens_output,
+            latency_ms,
+            &config.model,
+        )
+        .await
+    {
+        tracing::error!(error = %e, "Failed to log agent usage");
+    }
+
+    // Record token usage for rate limiting
+    let total_tokens = (tokens_input + tokens_output) as u32;
+    rate_limiter.record_tokens(agent_user_id, total_tokens);
+
     if response_text.trim().is_empty() {
         return Ok(());
     }
@@ -404,6 +454,35 @@ async fn run_agent_response(
     }
 
     Ok(())
+    }.await;
+
+    if let Err(ref e) = result {
+        tracing::error!(error = %e, agent_id = %agent_user_id, "Agent response failed");
+        let event = WsEnvelope {
+            msg_type: "event".to_string(),
+            event: "agent_error".to_string(),
+            seq: None,
+            channel_id: Some(channel_id),
+            data: serde_json::json!({
+                "message": "Agent is temporarily unavailable. Please try again later.",
+                "agent_id": agent_user_id,
+            }),
+            broadcast: Some(WsBroadcast {
+                channel_id: Some(channel_id),
+                team_id: None,
+                user_id: None,
+                exclude_user_id: Some(agent_user_id),
+            }),
+        };
+        ws_hub.broadcast(event).await;
+    }
+
+    result
+}
+
+fn estimate_tokens(messages: &[ChatMessage]) -> usize {
+    // Naive estimate: ~4 chars per token
+    messages.iter().map(|m| m.content.len() / 4).sum()
 }
 
 /// Parse @mentions from a message, excluding code blocks and URLs.

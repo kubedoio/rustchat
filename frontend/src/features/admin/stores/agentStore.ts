@@ -5,12 +5,14 @@ import agentsApi, {
   type AgentDetail,
   type CreateAgentPayload,
   type UpdateAgentPayload,
+  type AgentAnalyticsResponse,
 } from '@/api/agents'
 import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 export const useAgentStore = defineStore('agentStore', () => {
   const agents = ref<AgentSummary[]>([])
   const currentAgent = ref<AgentDetail | null>(null)
+  const agentAnalytics = ref<AgentAnalyticsResponse | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -95,9 +97,23 @@ export const useAgentStore = defineStore('agentStore', () => {
     }
   }
 
+  async function fetchAgentAnalytics(agentId: string, days = 7) {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await agentsApi.getAgentAnalytics(agentId, days)
+      agentAnalytics.value = response.data
+    } catch (e: unknown) {
+      error.value = getApiErrorMessage(e) || 'Failed to load agent analytics'
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     agents,
     currentAgent,
+    agentAnalytics,
     loading,
     error,
     activeAgents,
@@ -106,5 +122,6 @@ export const useAgentStore = defineStore('agentStore', () => {
     createAgent,
     updateAgent,
     deleteAgent,
+    fetchAgentAnalytics,
   }
 })

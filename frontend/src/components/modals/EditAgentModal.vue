@@ -12,6 +12,7 @@ import {
   EyeOff,
   Play,
   Loader2,
+  BarChart3,
 } from 'lucide-vue-next'
 import { useAgentStore } from '../../features/admin/stores/agentStore'
 import { useKnowledgeStore } from '../../features/knowledge/stores/knowledgeStore'
@@ -65,7 +66,10 @@ const tabs = [
   { id: 'behavior', label: 'Behavior', icon: BrainCircuit },
   { id: 'channels', label: 'Channels', icon: MessageSquare },
   { id: 'knowledge', label: 'Knowledge', icon: BookOpen },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
 ]
+
+const analyticsDays = ref(7)
 
 const form = ref({
   title: '',
@@ -93,6 +97,15 @@ const providers = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'ollama', label: 'Ollama' },
 ]
+
+watch(
+  () => activeTab.value,
+  async tab => {
+    if (tab === 'analytics' && props.agent) {
+      await agentStore.fetchAgentAnalytics(props.agent.id, analyticsDays.value)
+    }
+  }
+)
 
 watch(
   () => props.agent,
@@ -711,6 +724,95 @@ async function handleUnassignKb(kbId: string) {
                 >
                   Assign
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Analytics Tab -->
+          <div v-if="activeTab === 'analytics'" class="space-y-4">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-medium text-text-2">Time Range</label>
+              <select
+                v-model.number="analyticsDays"
+                class="px-2 py-1.5 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
+                @change="props.agent && agentStore.fetchAgentAnalytics(props.agent.id, analyticsDays)"
+              >
+                <option :value="7">Last 7 days</option>
+                <option :value="30">Last 30 days</option>
+                <option :value="90">Last 90 days</option>
+              </select>
+            </div>
+
+            <div v-if="agentStore.loading" class="text-xs text-text-3 py-8 text-center">
+              Loading analytics...
+            </div>
+            <div v-else-if="!agentStore.agentAnalytics" class="text-xs text-text-3 py-8 text-center">
+              No analytics data available.
+            </div>
+            <div v-else class="space-y-4">
+              <!-- Summary Cards -->
+              <div class="grid grid-cols-3 gap-3">
+                <div class="p-3 rounded-lg border border-border-1 bg-bg-surface-2 space-y-1">
+                  <div class="text-[10px] text-text-3 uppercase tracking-wider">Invocations</div>
+                  <div class="text-sm font-semibold text-text-1">
+                    {{ agentStore.agentAnalytics.summary.total_invocations }}
+                  </div>
+                </div>
+                <div class="p-3 rounded-lg border border-border-1 bg-bg-surface-2 space-y-1">
+                  <div class="text-[10px] text-text-3 uppercase tracking-wider">Tokens</div>
+                  <div class="text-sm font-semibold text-text-1">
+                    {{ agentStore.agentAnalytics.summary.total_tokens_input + agentStore.agentAnalytics.summary.total_tokens_output }}
+                  </div>
+                </div>
+                <div class="p-3 rounded-lg border border-border-1 bg-bg-surface-2 space-y-1">
+                  <div class="text-[10px] text-text-3 uppercase tracking-wider">Avg Latency</div>
+                  <div class="text-sm font-semibold text-text-1">
+                    {{ agentStore.agentAnalytics.summary.avg_latency_ms }}ms
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feedback -->
+              <div
+                v-if="agentStore.agentAnalytics.feedback_stats.total_feedback > 0"
+                class="p-3 rounded-lg border border-border-1 bg-bg-surface-2 space-y-1"
+              >
+                <div class="text-[10px] text-text-3 uppercase tracking-wider">Feedback Ratio</div>
+                <div class="flex items-center gap-2">
+                  <div class="text-sm font-semibold text-text-1">
+                    {{ Math.round(agentStore.agentAnalytics.feedback_stats.feedback_ratio * 100) }}%
+                  </div>
+                  <div class="text-[10px] text-text-3">
+                    ({{ agentStore.agentAnalytics.feedback_stats.total_positive }} positive / {{ agentStore.agentAnalytics.feedback_stats.total_feedback }} total)
+                  </div>
+                </div>
+              </div>
+
+              <!-- Daily Usage Table -->
+              <div class="border border-border-1 rounded-lg overflow-hidden">
+                <table class="min-w-full divide-y divide-border-1">
+                  <thead class="bg-bg-surface-2">
+                    <tr>
+                      <th class="px-3 py-2 text-left text-[10px] font-semibold text-text-3 uppercase tracking-wider">Date</th>
+                      <th class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider">Calls</th>
+                      <th class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider">Tokens In</th>
+                      <th class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider">Tokens Out</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border-1">
+                    <tr v-for="day in agentStore.agentAnalytics.daily_usage" :key="day.date">
+                      <td class="px-3 py-2 text-xs text-text-2">{{ day.date }}</td>
+                      <td class="px-3 py-2 text-xs text-text-2 text-right">{{ day.invocations }}</td>
+                      <td class="px-3 py-2 text-xs text-text-2 text-right">{{ day.tokens_input }}</td>
+                      <td class="px-3 py-2 text-xs text-text-2 text-right">{{ day.tokens_output }}</td>
+                    </tr>
+                    <tr v-if="agentStore.agentAnalytics.daily_usage.length === 0">
+                      <td colspan="4" class="px-3 py-4 text-center text-xs text-text-3">
+                        No daily usage data
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

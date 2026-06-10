@@ -15,6 +15,7 @@ pub mod email;
 pub mod entity;
 pub mod file;
 pub mod agent_feedback;
+pub mod agent_usage;
 pub mod integration;
 pub mod knowledge;
 

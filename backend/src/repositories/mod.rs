@@ -5,6 +5,7 @@
 pub mod admin_repository;
 pub mod agent_feedback_repository;
 pub mod agent_repository;
+pub mod agent_usage_repository;
 pub mod bookmark_repository;
 pub mod category_repository;
 pub mod channel_repository;

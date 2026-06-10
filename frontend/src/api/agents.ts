@@ -140,6 +140,27 @@ export interface AgentFeedbackStats {
   feedback_ratio: number
 }
 
+export interface AgentUsageSummary {
+  agent_id: string
+  total_invocations: number
+  total_tokens_input: number
+  total_tokens_output: number
+  avg_latency_ms: number
+}
+
+export interface AgentDailyUsage {
+  date: string
+  invocations: number
+  tokens_input: number
+  tokens_output: number
+}
+
+export interface AgentAnalyticsResponse {
+  summary: AgentUsageSummary
+  daily_usage: AgentDailyUsage[]
+  feedback_stats: AgentFeedbackStats
+}
+
 // API methods
 export const agentsApi = {
   list: () => api.get<{ agents: AgentSummary[] }>('/agents'),
@@ -170,6 +191,8 @@ export const agentsApi = {
     api.delete(`/agents/posts/${postId}/feedback`),
   getAgentFeedbackStats: (agentId: string) =>
     api.get<AgentFeedbackStats>(`/agents/${agentId}/feedback-stats`),
+  getAgentAnalytics: (agentId: string, days?: number) =>
+    api.get<AgentAnalyticsResponse>(`/agents/${agentId}/analytics`, { params: { days } }),
 }
 
 export default agentsApi
