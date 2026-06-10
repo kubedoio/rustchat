@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS knowledge_sync_sources (
 CREATE INDEX IF NOT EXISTS idx_knowledge_sync_sources_team_id ON knowledge_sync_sources(team_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_sync_sources_is_active ON knowledge_sync_sources(is_active);
 
+-- Add sync_source_id FK to knowledge_documents (must happen after both tables exist)
+ALTER TABLE knowledge_documents
+    ADD COLUMN IF NOT EXISTS sync_source_id UUID REFERENCES knowledge_sync_sources(id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_documents_source ON knowledge_documents(sync_source_id);
+
 -- Auto-update updated_at timestamp
 DROP TRIGGER IF EXISTS trg_knowledge_sync_sources_updated_at ON knowledge_sync_sources;
 CREATE TRIGGER trg_knowledge_sync_sources_updated_at

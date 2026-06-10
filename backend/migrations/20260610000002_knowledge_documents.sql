@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS knowledge_documents (
     external_id TEXT,
     external_etag TEXT,
     external_modified_at TIMESTAMPTZ,
-    sync_source_id UUID REFERENCES knowledge_sync_sources(id),
 
     is_indexed BOOLEAN NOT NULL DEFAULT FALSE,
     chunk_count INT NOT NULL DEFAULT 0,
@@ -34,7 +33,7 @@ CREATE TABLE IF NOT EXISTS knowledge_documents (
 CREATE INDEX IF NOT EXISTS idx_knowledge_documents_kb ON knowledge_documents(knowledge_base_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_documents_team ON knowledge_documents(team_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_documents_hash ON knowledge_documents(content_hash);
-CREATE INDEX IF NOT EXISTS idx_knowledge_documents_source ON knowledge_documents(sync_source_id);
+
 
 -- Auto-update updated_at timestamp
 DROP TRIGGER IF EXISTS trg_knowledge_documents_updated_at ON knowledge_documents;
