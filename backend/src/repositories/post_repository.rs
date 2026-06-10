@@ -98,7 +98,7 @@ impl PostRepository {
         COALESCE(p.file_ids, '{}'::uuid[]) as file_ids,
         p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
         p.reply_count::int8 as reply_count, p.last_reply_at, p.seq,
-        u.username, u.avatar_url, u.email, u.is_bot
+        u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
     "#;
 
     /// Common SELECT columns for post queries without user JOIN
@@ -379,7 +379,7 @@ impl PostRepository {
                    p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                    p.reply_count::int8 as reply_count,
                    p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
+                   u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
             FROM updated_post p
             LEFT JOIN users u ON p.user_id = u.id
             "#,
@@ -408,7 +408,7 @@ impl PostRepository {
                    p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                    p.reply_count::int8 as reply_count,
                    p.last_reply_at, p.seq,
-                   u.username, u.avatar_url, u.email
+                   u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
             FROM updated_post p
             LEFT JOIN users u ON p.user_id = u.id
             "#,
@@ -1791,7 +1791,7 @@ impl PostRepository {
                        p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                        p.reply_count::int8 as reply_count,
                        p.last_reply_at, p.seq,
-                       u.username, u.avatar_url, u.email
+                       u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
                 WHERE p.channel_id = $1 AND p.seq <= $2 AND p.deleted_at IS NULL
@@ -1804,7 +1804,7 @@ impl PostRepository {
                        p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                        p.reply_count::int8 as reply_count,
                        p.last_reply_at, p.seq,
-                       u.username, u.avatar_url, u.email
+                       u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
                 WHERE p.channel_id = $1 AND p.seq > $2 AND p.deleted_at IS NULL

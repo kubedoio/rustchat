@@ -146,7 +146,8 @@ async fn list_posts(
                p.last_reply_at as last_reply_at, p.seq as seq,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'Deleted user' ELSE u.username END as username,
                u.avatar_url as avatar_url,
-               CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email
+               CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email,
+               COALESCE(u.is_bot, false) as is_bot
         FROM posts p
         JOIN channels c ON p.channel_id = c.id
         LEFT JOIN users u ON p.user_id = u.id
@@ -594,7 +595,8 @@ async fn get_saved_posts(
                p.last_reply_at as last_reply_at, p.seq as seq,
                CASE WHEN u.deleted_at IS NOT NULL THEN 'Deleted user' ELSE u.username END as username,
                u.avatar_url as avatar_url,
-               CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email
+               CASE WHEN u.deleted_at IS NOT NULL THEN 'deleted-user@local' ELSE u.email END as email,
+               COALESCE(u.is_bot, false) as is_bot
         FROM saved_posts s
         JOIN posts p ON s.post_id = p.id
         LEFT JOIN users u ON p.user_id = u.id
