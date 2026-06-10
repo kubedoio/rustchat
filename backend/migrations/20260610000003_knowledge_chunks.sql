@@ -1,6 +1,8 @@
 -- Knowledge chunks table
 -- Stores text chunks and their vector embeddings for semantic search.
 
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE IF NOT EXISTS knowledge_chunks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     document_id UUID NOT NULL REFERENCES knowledge_documents(id) ON DELETE CASCADE,
