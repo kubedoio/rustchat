@@ -287,7 +287,13 @@ pub async fn upload_document(
     let doc_id = Uuid::new_v4();
     let key = format!("knowledge/{}/{}/{}/{}", kb.team_id, kb.id, doc_id, filename);
 
-    // Create document record
+    // Upload to S3 first so that if it fails, no orphaned DB row is left behind
+    state
+        .s3_client
+        .upload(&key, data.clone(), &mime_type)
+        .await?;
+
+    // Create document record only after successful upload
     let doc = repo
         .create_document(&CreateKnowledgeDocument {
             id: Some(doc_id),
@@ -310,12 +316,6 @@ pub async fn upload_document(
         })
         .await
         .map_err(AppError::Database)?;
-
-    // Upload to S3
-    state
-        .s3_client
-        .upload(&key, data.clone(), &mime_type)
-        .await?;
 
     // Spawn background extraction + indexing pipeline
     let db_pool = state.db.clone();
@@ -739,7 +739,7 @@ async fn trigger_sync(
         state.config.s3_bucket.clone(),
     );
     let report = orchestrator
-        .full_sync(&source, kb_id)
+        .full_sync(&source, kb_id, auth.user_id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 

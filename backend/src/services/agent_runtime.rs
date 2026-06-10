@@ -65,7 +65,8 @@ impl AgentRuntime {
         channel_id: Uuid,
     ) -> ApiResult<()> {
         let agent_repo = AgentRepository::new(&self.db);
-        let mut agent_user_ids: Vec<Uuid> = Vec::new();
+        let mut triggers: std::collections::HashMap<Uuid, AgentTriggerType> =
+            std::collections::HashMap::new();
 
         // 1. Respond to mentions
         let mentions = parse_mentions(&post.message);
@@ -76,14 +77,11 @@ impl AgentRuntime {
                 .await
                 .map_err(AppError::Database)?;
 
-            agent_user_ids.extend(
-                users
-                    .into_iter()
-                    .filter(|u| {
-                        u.entity_type == EntityType::Agent && u.is_active && u.deleted_at.is_none()
-                    })
-                    .map(|u| u.id),
-            );
+            for u in users.into_iter().filter(|u| {
+                u.entity_type == EntityType::Agent && u.is_active && u.deleted_at.is_none()
+            }) {
+                triggers.insert(u.id, AgentTriggerType::Mention);
+            }
         }
 
         // 2. Respond to all messages (agents with respond_to_all in this channel)
@@ -95,19 +93,17 @@ impl AgentRuntime {
             let caps: crate::models::agent::AgentCapabilities =
                 serde_json::from_value(config.capabilities).unwrap_or_default();
             if caps.respond_to_all {
-                agent_user_ids.push(config.user_id);
+                triggers
+                    .entry(config.user_id)
+                    .or_insert(AgentTriggerType::RespondToAll);
             }
         }
 
-        // Deduplicate
-        agent_user_ids.sort_unstable();
-        agent_user_ids.dedup();
-
-        if agent_user_ids.is_empty() {
+        if triggers.is_empty() {
             return Ok(());
         }
 
-        for agent_user_id in agent_user_ids {
+        for (agent_user_id, trigger_type) in triggers {
             // Prevent agent from triggering itself (infinite loop)
             if post.user_id == agent_user_id {
                 tracing::debug!(agent_id = %agent_user_id, "Skipping self-triggered agent response");
@@ -194,6 +190,7 @@ impl AgentRuntime {
                     agent_user_id,
                     channel_id,
                     &post_clone,
+                    trigger_type,
                 )
                 .await
                 {
@@ -210,6 +207,12 @@ impl AgentRuntime {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum AgentTriggerType {
+    Mention,
+    RespondToAll,
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_agent_response(
     db: sqlx::PgPool,
@@ -222,6 +225,7 @@ async fn run_agent_response(
     agent_user_id: Uuid,
     channel_id: Uuid,
     trigger_post: &PostResponse,
+    trigger_type: AgentTriggerType,
 ) -> ApiResult<()> {
     let result = async {
         let agent_repo = AgentRepository::new(&db);
@@ -240,8 +244,11 @@ async fn run_agent_response(
         let capabilities: crate::models::agent::AgentCapabilities =
             serde_json::from_value(config.capabilities.clone()).unwrap_or_default();
 
-        if !capabilities.respond_to_mentions {
-            return Ok(());
+        // Honor the trigger-type-specific capability
+        match trigger_type {
+            AgentTriggerType::Mention if !capabilities.respond_to_mentions => return Ok(()),
+            AgentTriggerType::RespondToAll if !capabilities.respond_to_all => return Ok(()),
+            _ => {}
         }
 
         // Build context
@@ -254,7 +261,7 @@ async fn run_agent_response(
             };
 
         let max_messages = config.max_context_messages;
-        let use_rag = capabilities.use_rag;
+        let use_rag = config.rag_enabled && capabilities.use_rag;
         let query = &trigger_post.message;
         let mut messages = memory_service
             .build_context(agent_user_id, channel_id, max_messages, use_rag, query)

@@ -33,6 +33,7 @@ impl SyncOrchestrator {
         &self,
         sync_source: &KnowledgeSyncSource,
         kb_id: Uuid,
+        created_by: Uuid,
     ) -> Result<SyncReport, SyncError> {
         let config: RustShareSyncConfig = decrypt_config(&sync_source.config_encrypted)?;
         let client = RustShareClient::new(config.base_url, config.auth_token);
@@ -49,7 +50,14 @@ impl SyncOrchestrator {
 
             for file in list.files {
                 match self
-                    .sync_file(&client, &file, kb_id, sync_source.team_id, sync_source.id)
+                    .sync_file(
+                        &client,
+                        &file,
+                        kb_id,
+                        sync_source.team_id,
+                        sync_source.id,
+                        created_by,
+                    )
                     .await
                 {
                     Ok(action) => match action {
@@ -97,6 +105,7 @@ impl SyncOrchestrator {
         kb_id: Uuid,
         team_id: Uuid,
         sync_source_id: Uuid,
+        created_by: Uuid,
     ) -> Result<SyncAction, SyncError> {
         let repo = KnowledgeRepository::new(&self.db);
 
@@ -165,7 +174,7 @@ impl SyncOrchestrator {
                         .with_timezone(&chrono::Utc),
                 ),
                 sync_source_id: Some(sync_source_id),
-                created_by: sync_source_id,
+                created_by,
             })
             .await
             .map_err(SyncError::Database)?;
