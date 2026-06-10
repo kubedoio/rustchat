@@ -542,7 +542,10 @@ pub async fn create_post(
         let post_clone = response.clone();
         let channel_id_clone = channel_id;
         tokio::spawn(async move {
-            if let Err(e) = runtime.handle_post_created(&post_clone, channel_id_clone).await {
+            if let Err(e) = runtime
+                .handle_post_created(&post_clone, channel_id_clone)
+                .await
+            {
                 tracing::error!(error = %e, "Agent runtime failed");
             }
         });

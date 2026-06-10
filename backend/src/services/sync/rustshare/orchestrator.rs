@@ -1,10 +1,10 @@
 //! RustShare sync orchestrator
 
 use base64::Engine;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use uuid::Uuid;
-use chrono::Utc;
 
 use crate::models::knowledge::{CreateKnowledgeDocument, KnowledgeSyncSource, SyncStateUpdate};
 use crate::repositories::KnowledgeRepository;
@@ -136,7 +136,7 @@ impl SyncOrchestrator {
 
         // Upload to S3
         let doc_id = Uuid::new_v4();
-        let key = format!("knowledge/{}/{}/{}/{}" , team_id, kb_id, doc_id, file.name);
+        let key = format!("knowledge/{}/{}/{}/{}", team_id, kb_id, doc_id, file.name);
         self.s3_client
             .upload(&key, data.clone(), &file.mime_type)
             .await
@@ -226,8 +226,7 @@ fn decrypt_config(encrypted: &str) -> Result<RustShareSyncConfig, SyncError> {
         .map_err(|e| SyncError::Config(format!("Base64 decode failed: {}", e)))?;
     let json = String::from_utf8(decoded)
         .map_err(|e| SyncError::Config(format!("UTF-8 decode failed: {}", e)))?;
-    serde_json::from_str(&json)
-        .map_err(|e| SyncError::Config(format!("JSON parse failed: {}", e)))
+    serde_json::from_str(&json).map_err(|e| SyncError::Config(format!("JSON parse failed: {}", e)))
 }
 
 #[derive(Debug, Default, Serialize)]

@@ -76,18 +76,13 @@ pub fn router() -> Router<AppState> {
 
 fn require_admin(auth: &AuthUser) -> ApiResult<()> {
     if !auth.has_role("system_admin") && !auth.has_role("org_admin") {
-        return Err(AppError::Forbidden(
-            "Admin access required".to_string(),
-        ));
+        return Err(AppError::Forbidden("Admin access required".to_string()));
     }
     Ok(())
 }
 
 fn require_admin_or_creator(auth: &AuthUser, created_by: Uuid) -> ApiResult<()> {
-    if auth.has_role("system_admin")
-        || auth.has_role("org_admin")
-        || auth.user_id == created_by
-    {
+    if auth.has_role("system_admin") || auth.has_role("org_admin") || auth.user_id == created_by {
         return Ok(());
     }
     Err(AppError::Forbidden(
@@ -118,7 +113,10 @@ pub struct RegenerateKeyResponse {
 // ------------------------------------------------------------------
 
 /// List all agents (admin only)
-async fn list_agents(auth: AuthUser, State(state): State<AppState>) -> ApiResult<Json<Vec<AgentSummary>>> {
+async fn list_agents(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> ApiResult<Json<Vec<AgentSummary>>> {
     require_admin(&auth)?;
 
     let repo = AgentRepository::new(&state.db);
@@ -251,7 +249,7 @@ async fn get_agent(
 
     // Join with users table for details
     let row: (String, Option<String>, Option<String>) = sqlx::query_as(
-        "SELECT username, display_name, avatar_url FROM users WHERE id = $1 AND deleted_at IS NULL"
+        "SELECT username, display_name, avatar_url FROM users WHERE id = $1 AND deleted_at IS NULL",
     )
     .bind(config.user_id)
     .fetch_one(&state.db)
@@ -360,7 +358,7 @@ async fn regenerate_api_key(
     })?;
 
     sqlx::query(
-        "UPDATE users SET api_key_hash = $1, api_key_prefix = $2, updated_at = NOW() WHERE id = $3"
+        "UPDATE users SET api_key_hash = $1, api_key_prefix = $2, updated_at = NOW() WHERE id = $3",
     )
     .bind(&api_key_hash)
     .bind(&api_key_prefix)
@@ -430,13 +428,11 @@ async fn remove_agent_from_channel(
     repo.remove_agent_from_channel(config.user_id, channel_id)
         .await?;
 
-    sqlx::query(
-        "DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2"
-    )
-    .bind(channel_id)
-    .bind(config.user_id)
-    .execute(&state.db)
-    .await?;
+    sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+        .bind(channel_id)
+        .bind(config.user_id)
+        .execute(&state.db)
+        .await?;
 
     Ok(Json(serde_json::json!({ "success": true })))
 }
@@ -506,9 +502,7 @@ async fn test_agent(
 
     // Decrypt API token
     let api_token = match config.api_token_encrypted {
-        Some(ref encrypted) => {
-            crypto::decrypt(encrypted, &state.config.encryption_key)?
-        }
+        Some(ref encrypted) => crypto::decrypt(encrypted, &state.config.encryption_key)?,
         None => {
             return Err(AppError::BadRequest(
                 "Agent does not have an API token configured".to_string(),
@@ -517,9 +511,8 @@ async fn test_agent(
     };
 
     // Build LLM provider (OpenAI-compatible)
-    let provider = OpenAiProvider::new(&api_token).map_err(|e| {
-        AppError::Internal(format!("Failed to initialize LLM provider: {}", e))
-    })?;
+    let provider = OpenAiProvider::new(&api_token)
+        .map_err(|e| AppError::Internal(format!("Failed to initialize LLM provider: {}", e)))?;
 
     // Cap test calls to prevent runaway token spend
     let test_max_tokens = std::cmp::min(config.max_output_tokens as u32, 500);
@@ -532,9 +525,10 @@ async fn test_agent(
         max_tokens: test_max_tokens,
     };
 
-    let response = provider.complete(completion_req).await.map_err(|e| {
-        AppError::ExternalService(format!("LLM request failed: {}", e))
-    })?;
+    let response = provider
+        .complete(completion_req)
+        .await
+        .map_err(|e| AppError::ExternalService(format!("LLM request failed: {}", e)))?;
 
     Ok(Json(TestAgentResponse {
         response: response.content,
@@ -675,8 +669,7 @@ async fn add_to_channel_members(db: &PgPool, channel_id: Uuid, user_id: Uuid) ->
 }
 
 fn validate_username(username: &str) -> ApiResult<()> {
-    validate_username_token(username)
-        .map_err(|message| AppError::BadRequest(message.to_string()))
+    validate_username_token(username).map_err(|message| AppError::BadRequest(message.to_string()))
 }
 
 fn validate_email(email: &str) -> ApiResult<()> {

@@ -23,7 +23,11 @@ pub struct AgentMemoryService {
 
 impl AgentMemoryService {
     pub fn new(db: PgPool) -> Self {
-        Self { db, embedder: None, vector_store: None }
+        Self {
+            db,
+            embedder: None,
+            vector_store: None,
+        }
     }
 
     pub fn with_rag(
@@ -69,9 +73,13 @@ impl AgentMemoryService {
                     .map_err(AppError::Database)?;
 
                 if !kb_assignments.is_empty() {
-                    let query_embedding = embedder.embed(&[query.to_string()]).await
-                        .map_err(|e| AppError::ExternalService(format!("Embedding failed: {}", e)))?;
-                    let query_vector = query_embedding.into_iter().next()
+                    let query_embedding =
+                        embedder.embed(&[query.to_string()]).await.map_err(|e| {
+                            AppError::ExternalService(format!("Embedding failed: {}", e))
+                        })?;
+                    let query_vector = query_embedding
+                        .into_iter()
+                        .next()
                         .ok_or_else(|| AppError::ExternalService("Empty embedding".to_string()))?;
 
                     let mut rag_parts = vec!["## Relevant Knowledge".to_string()];
@@ -92,10 +100,15 @@ impl AgentMemoryService {
                                     continue;
                                 }
                             }
-                            let source = chunk.section_title.as_ref()
+                            let source = chunk
+                                .section_title
+                                .as_ref()
                                 .map(|s| format!(" [{}]", s))
                                 .unwrap_or_default();
-                            rag_parts.push(format!("- [{}]{source}\n{}", chunk.document_title, chunk.chunk_text));
+                            rag_parts.push(format!(
+                                "- [{}]{source}\n{}",
+                                chunk.document_title, chunk.chunk_text
+                            ));
                         }
                     }
 
@@ -158,7 +171,10 @@ impl AgentMemoryService {
         response_content: &str,
     ) -> ApiResult<()> {
         let repo = AgentRepository::new(&self.db);
-        let content = format!("Responded to post {}: {}", trigger_post_id, response_content);
+        let content = format!(
+            "Responded to post {}: {}",
+            trigger_post_id, response_content
+        );
 
         repo.create_memory(
             agent_id,

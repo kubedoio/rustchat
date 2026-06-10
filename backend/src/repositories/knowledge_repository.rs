@@ -162,14 +162,12 @@ impl<'a> KnowledgeRepository<'a> {
     /// Delete a knowledge base by ID and team.
     #[tracing::instrument(skip(self), fields(id = %id))]
     pub async fn delete_knowledge_base(&self, id: Uuid, team_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "DELETE FROM knowledge_bases WHERE id = $1 AND team_id = $2",
-        )
-        .bind(id)
-        .bind(team_id)
-        .execute(self.pool)
-        .await
-        .map(|_| ())
+        sqlx::query("DELETE FROM knowledge_bases WHERE id = $1 AND team_id = $2")
+            .bind(id)
+            .bind(team_id)
+            .execute(self.pool)
+            .await
+            .map(|_| ())
     }
 
     // ------------------------------------------------------------------
@@ -313,14 +311,12 @@ impl<'a> KnowledgeRepository<'a> {
     /// Delete a document by ID and team.
     #[tracing::instrument(skip(self), fields(id = %id))]
     pub async fn delete_document(&self, id: Uuid, team_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "DELETE FROM knowledge_documents WHERE id = $1 AND team_id = $2",
-        )
-        .bind(id)
-        .bind(team_id)
-        .execute(self.pool)
-        .await
-        .map(|_| ())
+        sqlx::query("DELETE FROM knowledge_documents WHERE id = $1 AND team_id = $2")
+            .bind(id)
+            .bind(team_id)
+            .execute(self.pool)
+            .await
+            .map(|_| ())
     }
 
     // ------------------------------------------------------------------
@@ -328,10 +324,7 @@ impl<'a> KnowledgeRepository<'a> {
     // ------------------------------------------------------------------
 
     /// Insert multiple chunks within a transaction.
-    pub async fn insert_chunks(
-        &self,
-        chunks: &[KnowledgeChunk],
-    ) -> Result<(), sqlx::Error> {
+    pub async fn insert_chunks(&self, chunks: &[KnowledgeChunk]) -> Result<(), sqlx::Error> {
         if chunks.is_empty() {
             return Ok(());
         }
@@ -343,7 +336,7 @@ impl<'a> KnowledgeRepository<'a> {
                 document_id, knowledge_base_id, team_id, chunk_index,
                 chunk_text, token_count, embedding, section_title,
                 start_byte, end_byte
-            )"
+            )",
         );
 
         query_builder.push_values(chunks, |mut b, chunk| {
@@ -442,15 +435,16 @@ impl<'a> KnowledgeRepository<'a> {
         let fused = rrf_fuse(semantic_results, text_results, RRF_K);
 
         // Return top_k
-        Ok(fused.into_iter().take(top_k as usize).map(|h| h.chunk).collect())
+        Ok(fused
+            .into_iter()
+            .take(top_k as usize)
+            .map(|h| h.chunk)
+            .collect())
     }
 
     /// Delete all chunks belonging to a document.
     #[tracing::instrument(skip(self), fields(document_id = %document_id))]
-    pub async fn delete_chunks_by_document(
-        &self,
-        document_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn delete_chunks_by_document(&self, document_id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query("DELETE FROM knowledge_chunks WHERE document_id = $1")
             .bind(document_id)
             .execute(self.pool)
@@ -686,13 +680,11 @@ impl<'a> KnowledgeRepository<'a> {
     /// Delete a sync source by ID and team.
     #[tracing::instrument(skip(self), fields(id = %id))]
     pub async fn delete_sync_source(&self, id: Uuid, team_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "DELETE FROM knowledge_sync_sources WHERE id = $1 AND team_id = $2",
-        )
-        .bind(id)
-        .bind(team_id)
-        .execute(self.pool)
-        .await
-        .map(|_| ())
+        sqlx::query("DELETE FROM knowledge_sync_sources WHERE id = $1 AND team_id = $2")
+            .bind(id)
+            .bind(team_id)
+            .execute(self.pool)
+            .await
+            .map(|_| ())
     }
 }

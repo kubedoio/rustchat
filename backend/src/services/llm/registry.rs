@@ -64,8 +64,8 @@ impl Default for ProviderRegistry {
 mod tests {
     use async_trait::async_trait;
 
-    use super::*;
     use super::super::{CompletionRequest, CompletionResponse, LlmError};
+    use super::*;
 
     struct MockProvider {
         name: &'static str,
@@ -77,7 +77,10 @@ mod tests {
             self.name
         }
 
-        async fn complete(&self, _request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+        async fn complete(
+            &self,
+            _request: CompletionRequest,
+        ) -> Result<CompletionResponse, LlmError> {
             Ok(CompletionResponse {
                 content: "mock response".to_string(),
                 usage: None,

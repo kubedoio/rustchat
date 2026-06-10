@@ -735,7 +735,9 @@ async function handleUnassignKb(kbId: string) {
               <select
                 v-model.number="analyticsDays"
                 class="px-2 py-1.5 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
-                @change="props.agent && agentStore.fetchAgentAnalytics(props.agent.id, analyticsDays)"
+                @change="
+                  props.agent && agentStore.fetchAgentAnalytics(props.agent.id, analyticsDays)
+                "
               >
                 <option :value="7">Last 7 days</option>
                 <option :value="30">Last 30 days</option>
@@ -746,7 +748,10 @@ async function handleUnassignKb(kbId: string) {
             <div v-if="agentStore.loading" class="text-xs text-text-3 py-8 text-center">
               Loading analytics...
             </div>
-            <div v-else-if="!agentStore.agentAnalytics" class="text-xs text-text-3 py-8 text-center">
+            <div
+              v-else-if="!agentStore.agentAnalytics"
+              class="text-xs text-text-3 py-8 text-center"
+            >
               No analytics data available.
             </div>
             <div v-else class="space-y-4">
@@ -761,7 +766,10 @@ async function handleUnassignKb(kbId: string) {
                 <div class="p-3 rounded-lg border border-border-1 bg-bg-surface-2 space-y-1">
                   <div class="text-[10px] text-text-3 uppercase tracking-wider">Tokens</div>
                   <div class="text-sm font-semibold text-text-1">
-                    {{ agentStore.agentAnalytics.summary.total_tokens_input + agentStore.agentAnalytics.summary.total_tokens_output }}
+                    {{
+                      agentStore.agentAnalytics.summary.total_tokens_input +
+                      agentStore.agentAnalytics.summary.total_tokens_output
+                    }}
                   </div>
                 </div>
                 <div class="p-3 rounded-lg border border-border-1 bg-bg-surface-2 space-y-1">
@@ -783,7 +791,8 @@ async function handleUnassignKb(kbId: string) {
                     {{ Math.round(agentStore.agentAnalytics.feedback_stats.feedback_ratio * 100) }}%
                   </div>
                   <div class="text-[10px] text-text-3">
-                    ({{ agentStore.agentAnalytics.feedback_stats.total_positive }} positive / {{ agentStore.agentAnalytics.feedback_stats.total_feedback }} total)
+                    ({{ agentStore.agentAnalytics.feedback_stats.total_positive }} positive /
+                    {{ agentStore.agentAnalytics.feedback_stats.total_feedback }} total)
                   </div>
                 </div>
               </div>
@@ -793,18 +802,40 @@ async function handleUnassignKb(kbId: string) {
                 <table class="min-w-full divide-y divide-border-1">
                   <thead class="bg-bg-surface-2">
                     <tr>
-                      <th class="px-3 py-2 text-left text-[10px] font-semibold text-text-3 uppercase tracking-wider">Date</th>
-                      <th class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider">Calls</th>
-                      <th class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider">Tokens In</th>
-                      <th class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider">Tokens Out</th>
+                      <th
+                        class="px-3 py-2 text-left text-[10px] font-semibold text-text-3 uppercase tracking-wider"
+                      >
+                        Date
+                      </th>
+                      <th
+                        class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider"
+                      >
+                        Calls
+                      </th>
+                      <th
+                        class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider"
+                      >
+                        Tokens In
+                      </th>
+                      <th
+                        class="px-3 py-2 text-right text-[10px] font-semibold text-text-3 uppercase tracking-wider"
+                      >
+                        Tokens Out
+                      </th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-border-1">
                     <tr v-for="day in agentStore.agentAnalytics.daily_usage" :key="day.date">
                       <td class="px-3 py-2 text-xs text-text-2">{{ day.date }}</td>
-                      <td class="px-3 py-2 text-xs text-text-2 text-right">{{ day.invocations }}</td>
-                      <td class="px-3 py-2 text-xs text-text-2 text-right">{{ day.tokens_input }}</td>
-                      <td class="px-3 py-2 text-xs text-text-2 text-right">{{ day.tokens_output }}</td>
+                      <td class="px-3 py-2 text-xs text-text-2 text-right">
+                        {{ day.invocations }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-text-2 text-right">
+                        {{ day.tokens_input }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-text-2 text-right">
+                        {{ day.tokens_output }}
+                      </td>
                     </tr>
                     <tr v-if="agentStore.agentAnalytics.daily_usage.length === 0">
                       <td colspan="4" class="px-3 py-4 text-center text-xs text-text-3">

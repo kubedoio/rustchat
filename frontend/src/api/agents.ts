@@ -184,11 +184,17 @@ export const agentsApi = {
   unassignKnowledgeBase: (id: string, kbId: string) =>
     api.delete(`/agents/${id}/knowledge-bases/${kbId}`),
   submitFeedback: (postId: string, data: SubmitFeedbackPayload) =>
-    api.post<{ id: string; post_id: string; user_id: string; feedback_type: string; comment?: string; created_at: string }>(`/agents/posts/${postId}/feedback`, data),
+    api.post<{
+      id: string
+      post_id: string
+      user_id: string
+      feedback_type: string
+      comment?: string
+      created_at: string
+    }>(`/agents/posts/${postId}/feedback`, data),
   getFeedbackSummary: (postId: string) =>
     api.get<FeedbackSummary>(`/agents/posts/${postId}/feedback`),
-  deleteFeedback: (postId: string) =>
-    api.delete(`/agents/posts/${postId}/feedback`),
+  deleteFeedback: (postId: string) => api.delete(`/agents/posts/${postId}/feedback`),
   getAgentFeedbackStats: (agentId: string) =>
     api.get<AgentFeedbackStats>(`/agents/${agentId}/feedback-stats`),
   getAgentAnalytics: (agentId: string, days?: number) =>

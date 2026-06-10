@@ -1,7 +1,7 @@
 //! Per-agent rate limiter using in-memory sliding window.
 
-use std::time::{Duration, Instant};
 use dashmap::DashMap;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 /// Rate limit check result.
@@ -42,7 +42,9 @@ impl AgentRateLimiter {
             RateLimitResult::Allowed
         } else if count >= self.max_requests_per_minute {
             let retry_after = window.as_secs() - now.duration_since(start).as_secs();
-            RateLimitResult::Throttled { retry_after_secs: retry_after }
+            RateLimitResult::Throttled {
+                retry_after_secs: retry_after,
+            }
         } else {
             entry.value_mut().1 += 1;
             RateLimitResult::Allowed
@@ -71,7 +73,9 @@ impl AgentRateLimiter {
             let (start, count) = *entry.value();
             if now.duration_since(start) <= window && count >= self.max_tokens_per_hour {
                 let retry_after = window.as_secs() - now.duration_since(start).as_secs();
-                return RateLimitResult::Throttled { retry_after_secs: retry_after };
+                return RateLimitResult::Throttled {
+                    retry_after_secs: retry_after,
+                };
             }
         }
         RateLimitResult::Allowed

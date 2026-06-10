@@ -60,11 +60,7 @@ impl Chunker for SlidingWindowChunker {
         while start < char_count {
             let end = (start + config.chunk_size).min(char_count);
 
-            let start_byte = text
-                .char_indices()
-                .nth(start)
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+            let start_byte = text.char_indices().nth(start).map(|(i, _)| i).unwrap_or(0);
             let end_byte = text
                 .char_indices()
                 .nth(end.saturating_sub(1))
@@ -196,7 +192,10 @@ mod tests {
     #[test]
     fn test_sliding_window_empty_text() {
         let chunker = SlidingWindowChunker;
-        let config = ChunkConfig { chunk_size: 10, chunk_overlap: 2 };
+        let config = ChunkConfig {
+            chunk_size: 10,
+            chunk_overlap: 2,
+        };
         let chunks = chunker.chunk("", &config);
         assert!(chunks.is_empty());
     }
@@ -204,7 +203,10 @@ mod tests {
     #[test]
     fn test_sliding_window_short_text() {
         let chunker = SlidingWindowChunker;
-        let config = ChunkConfig { chunk_size: 100, chunk_overlap: 10 };
+        let config = ChunkConfig {
+            chunk_size: 100,
+            chunk_overlap: 10,
+        };
         let chunks = chunker.chunk("Hello world", &config);
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].text, "Hello world");
@@ -213,7 +215,10 @@ mod tests {
     #[test]
     fn test_sliding_window_multiple_chunks() {
         let chunker = SlidingWindowChunker;
-        let config = ChunkConfig { chunk_size: 5, chunk_overlap: 1 };
+        let config = ChunkConfig {
+            chunk_size: 5,
+            chunk_overlap: 1,
+        };
         let text = "one two three four five six seven eight nine ten";
         let chunks = chunker.chunk(text, &config);
         assert!(chunks.len() > 1);
@@ -222,23 +227,34 @@ mod tests {
             let first = &window[0];
             let second = &window[1];
             // The second chunk should start before the first chunk ends
-            assert!(second.start_byte < first.end_byte || second.start_byte == first.start_byte,
-                "Chunks should overlap or be contiguous");
+            assert!(
+                second.start_byte < first.end_byte || second.start_byte == first.start_byte,
+                "Chunks should overlap or be contiguous"
+            );
         }
     }
 
     #[test]
     fn test_markdown_chunker_with_headers() {
         let chunker = MarkdownChunker;
-        let config = ChunkConfig { chunk_size: 100, chunk_overlap: 10 };
+        let config = ChunkConfig {
+            chunk_size: 100,
+            chunk_overlap: 10,
+        };
         let text = "# Introduction\nThis is the intro.\n\n## Details\nThese are the details.\n\n## Conclusion\nThe end.";
         let chunks = chunker.chunk(text, &config);
-        
+
         // Should have at least 3 chunks (one per section)
-        assert!(chunks.len() >= 3, "Markdown chunker should split on headers");
-        
+        assert!(
+            chunks.len() >= 3,
+            "Markdown chunker should split on headers"
+        );
+
         // Verify section titles are captured
-        let titles: Vec<_> = chunks.iter().filter_map(|c| c.section_title.as_ref()).collect();
+        let titles: Vec<_> = chunks
+            .iter()
+            .filter_map(|c| c.section_title.as_ref())
+            .collect();
         assert!(titles.contains(&&"Introduction".to_string()));
         assert!(titles.contains(&&"Details".to_string()));
         assert!(titles.contains(&&"Conclusion".to_string()));
@@ -247,15 +263,31 @@ mod tests {
     #[test]
     fn test_markdown_chunker_fallback() {
         let chunker = MarkdownChunker;
-        let config = ChunkConfig { chunk_size: 5, chunk_overlap: 1 };
+        let config = ChunkConfig {
+            chunk_size: 5,
+            chunk_overlap: 1,
+        };
         let text = "This is a long paragraph without any headers at all it just keeps going";
         let chunks = chunker.chunk(text, &config);
-        assert!(chunks.len() > 1, "Should fall back to sliding window when no headers");
+        assert!(
+            chunks.len() > 1,
+            "Should fall back to sliding window when no headers"
+        );
     }
 
     #[test]
     fn test_select_chunker() {
-        assert!(select_chunker("text/markdown").chunk("# Test", &ChunkConfig::default()).len() > 0);
-        assert!(select_chunker("text/plain").chunk("Hello", &ChunkConfig::default()).len() > 0);
+        assert!(
+            select_chunker("text/markdown")
+                .chunk("# Test", &ChunkConfig::default())
+                .len()
+                > 0
+        );
+        assert!(
+            select_chunker("text/plain")
+                .chunk("Hello", &ChunkConfig::default())
+                .len()
+                > 0
+        );
     }
 }

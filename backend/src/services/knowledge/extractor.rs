@@ -106,7 +106,12 @@ impl DocumentExtractor for HtmlExtractor {
 
 pub struct DocxExtractor;
 impl DocumentExtractor for DocxExtractor {
-    #[tracing::instrument(skip(self, data), fields(mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))]
+    #[tracing::instrument(
+        skip(self, data),
+        fields(
+            mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    )]
     fn extract(&self, data: &[u8]) -> Result<String, ExtractError> {
         let cursor = Cursor::new(data);
         let mut archive = zip::ZipArchive::new(cursor)

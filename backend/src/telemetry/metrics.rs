@@ -238,11 +238,8 @@ pub static RAG_INDEXING_DOCUMENTS_TOTAL: LazyLock<Counter> = LazyLock::new(|| {
 
 /// Total chunks indexed
 pub static RAG_INDEXING_CHUNKS_TOTAL: LazyLock<Counter> = LazyLock::new(|| {
-    register_counter!(
-        "rustchat_rag_indexing_chunks_total",
-        "Total chunks indexed"
-    )
-    .expect("metric can be created")
+    register_counter!("rustchat_rag_indexing_chunks_total", "Total chunks indexed")
+        .expect("metric can be created")
 });
 
 /// RAG semantic search duration

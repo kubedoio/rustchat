@@ -115,7 +115,8 @@ pub enum LlmError {
 }
 
 /// A stream of completion tokens.
-pub type CompletionStream = Pin<Box<dyn futures_util::Stream<Item = Result<String, LlmError>> + Send>>;
+pub type CompletionStream =
+    Pin<Box<dyn futures_util::Stream<Item = Result<String, LlmError>> + Send>>;
 
 /// Trait for LLM providers.
 ///
@@ -131,7 +132,12 @@ pub trait LlmProvider: Send + Sync {
     /// (Phase 2) Stream tokens from the LLM as they are generated.
     ///
     /// Default implementation returns an error indicating streaming is not supported.
-    async fn complete_stream(&self, _request: CompletionRequest) -> Result<CompletionStream, LlmError> {
-        Err(LlmError::Config("Streaming not implemented for this provider".to_string()))
+    async fn complete_stream(
+        &self,
+        _request: CompletionRequest,
+    ) -> Result<CompletionStream, LlmError> {
+        Err(LlmError::Config(
+            "Streaming not implemented for this provider".to_string(),
+        ))
     }
 }

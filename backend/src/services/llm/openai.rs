@@ -8,7 +8,10 @@ use async_trait::async_trait;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 
-use super::{ChatMessage, CompletionRequest, CompletionResponse, CompletionStream, LlmError, LlmProvider, TokenUsage};
+use super::{
+    ChatMessage, CompletionRequest, CompletionResponse, CompletionStream, LlmError, LlmProvider,
+    TokenUsage,
+};
 
 const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -30,7 +33,10 @@ impl OpenAiProvider {
     }
 
     /// Create a provider with a custom base URL (for Azure, proxies, etc.).
-    pub fn with_base_url(api_key: impl Into<String>, base_url: impl Into<String>) -> anyhow::Result<Self> {
+    pub fn with_base_url(
+        api_key: impl Into<String>,
+        base_url: impl Into<String>,
+    ) -> anyhow::Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECS))
             .build()?;
@@ -105,7 +111,10 @@ impl LlmProvider for OpenAiProvider {
         let completion: OpenAiChatResponse =
             serde_json::from_str(&body_text).map_err(|e| LlmError::ApiError {
                 status: 200,
-                message: format!("Failed to parse OpenAI response: {}. Body: {}", e, body_text),
+                message: format!(
+                    "Failed to parse OpenAI response: {}. Body: {}",
+                    e, body_text
+                ),
             })?;
 
         let choice = completion
@@ -134,7 +143,10 @@ impl LlmProvider for OpenAiProvider {
         })
     }
 
-    async fn complete_stream(&self, request: CompletionRequest) -> Result<CompletionStream, LlmError> {
+    async fn complete_stream(
+        &self,
+        request: CompletionRequest,
+    ) -> Result<CompletionStream, LlmError> {
         let messages = build_openai_messages(&request.system_prompt, &request.messages);
 
         let body = OpenAiChatRequest {
@@ -142,7 +154,7 @@ impl LlmProvider for OpenAiProvider {
             messages,
             temperature: request.temperature,
             max_tokens: request.max_tokens,
-            stream: true,  // Enable streaming
+            stream: true, // Enable streaming
         };
 
         let url = format!("{}/chat/completions", self.base_url);

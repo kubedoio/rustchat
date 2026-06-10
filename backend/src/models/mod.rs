@@ -5,6 +5,8 @@
 pub mod activity;
 pub mod admin_models;
 pub mod agent;
+pub mod agent_feedback;
+pub mod agent_usage;
 pub mod api_key;
 pub mod call;
 pub mod channel;
@@ -14,8 +16,6 @@ pub mod custom_profile_attribute;
 pub mod email;
 pub mod entity;
 pub mod file;
-pub mod agent_feedback;
-pub mod agent_usage;
 pub mod integration;
 pub mod knowledge;
 

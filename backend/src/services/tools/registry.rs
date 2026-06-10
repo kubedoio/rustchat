@@ -1,9 +1,9 @@
 //! Tool registry
 
-use std::sync::Arc;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use serde_json::json;
+use std::sync::Arc;
 
 /// Error type for tool execution.
 #[derive(Debug, thiserror::Error)]

@@ -41,7 +41,7 @@ impl<'a> AgentFeedbackRepository<'a> {
         post_id: Uuid,
     ) -> Result<Vec<AgentMessageFeedback>, sqlx::Error> {
         sqlx::query_as::<_, AgentMessageFeedback>(
-            "SELECT * FROM agent_message_feedback WHERE post_id = $1 ORDER BY created_at DESC"
+            "SELECT * FROM agent_message_feedback WHERE post_id = $1 ORDER BY created_at DESC",
         )
         .bind(post_id)
         .fetch_all(self.pool)
@@ -67,19 +67,13 @@ impl<'a> AgentFeedbackRepository<'a> {
         .await
     }
 
-    pub async fn delete_feedback(
-        &self,
-        post_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "DELETE FROM agent_message_feedback WHERE post_id = $1 AND user_id = $2"
-        )
-        .bind(post_id)
-        .bind(user_id)
-        .execute(self.pool)
-        .await
-        .map(|_| ())
+    pub async fn delete_feedback(&self, post_id: Uuid, user_id: Uuid) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM agent_message_feedback WHERE post_id = $1 AND user_id = $2")
+            .bind(post_id)
+            .bind(user_id)
+            .execute(self.pool)
+            .await
+            .map(|_| ())
     }
 
     pub async fn get_agent_feedback_stats(

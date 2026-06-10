@@ -80,10 +80,7 @@ impl Tool for WebSearchTool {
             .as_str()
             .ok_or_else(|| ToolError::InvalidArguments("Missing 'query' parameter".to_string()))?;
 
-        let max_results = args["max_results"]
-            .as_i64()
-            .unwrap_or(5)
-            .clamp(1, 10) as i32;
+        let max_results = args["max_results"].as_i64().unwrap_or(5).clamp(1, 10) as i32;
 
         let request = TavilySearchRequest {
             query: query.to_string(),

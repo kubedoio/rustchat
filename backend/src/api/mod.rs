@@ -168,7 +168,11 @@ pub fn router(
         let openai_api_key = std::env::var("RUSTCHAT_OPENAI_API_KEY")
             .ok()
             .filter(|k| !k.is_empty())
-            .or_else(|| std::env::var("OPENAI_API_KEY").ok().filter(|k| !k.is_empty()));
+            .or_else(|| {
+                std::env::var("OPENAI_API_KEY")
+                    .ok()
+                    .filter(|k| !k.is_empty())
+            });
 
         if let Some(api_key) = openai_api_key.clone() {
             match OpenAiProvider::new(api_key) {
@@ -190,13 +194,20 @@ pub fn router(
 
             // Register tools if API keys are available
             let tool_registry = Arc::new(crate::services::tools::registry::ToolRegistry::new());
-            if let Some(tavily_key) = std::env::var("TAVILY_API_KEY").ok().filter(|k| !k.is_empty()) {
+            if let Some(tavily_key) = std::env::var("TAVILY_API_KEY")
+                .ok()
+                .filter(|k| !k.is_empty())
+            {
                 tool_registry.register(Arc::new(
-                    crate::services::tools::web_search::WebSearchTool::new(tavily_key)
+                    crate::services::tools::web_search::WebSearchTool::new(tavily_key),
                 ));
                 tracing::info!("Web search tool registered");
             }
-            let tool_registry = if tool_registry.is_empty() { None } else { Some(tool_registry) };
+            let tool_registry = if tool_registry.is_empty() {
+                None
+            } else {
+                Some(tool_registry)
+            };
 
             Some(Arc::new(AgentRuntime::new(
                 db.clone(),

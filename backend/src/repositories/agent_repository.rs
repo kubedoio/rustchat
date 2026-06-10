@@ -77,12 +77,10 @@ impl<'a> AgentRepository<'a> {
 
     /// Get agent config by its own ID.
     pub async fn get_config_by_id(&self, id: Uuid) -> Result<Option<AgentConfig>, sqlx::Error> {
-        sqlx::query_as::<_, AgentConfig>(
-            "SELECT * FROM agent_configs WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_optional(self.pool)
-        .await
+        sqlx::query_as::<_, AgentConfig>("SELECT * FROM agent_configs WHERE id = $1")
+            .bind(id)
+            .fetch_optional(self.pool)
+            .await
     }
 
     /// Get agent config by linked user ID.
@@ -90,12 +88,10 @@ impl<'a> AgentRepository<'a> {
         &self,
         user_id: Uuid,
     ) -> Result<Option<AgentConfig>, sqlx::Error> {
-        sqlx::query_as::<_, AgentConfig>(
-            "SELECT * FROM agent_configs WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_optional(self.pool)
-        .await
+        sqlx::query_as::<_, AgentConfig>("SELECT * FROM agent_configs WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_optional(self.pool)
+            .await
     }
 
     /// List all agent configs with optional filters.
@@ -111,11 +107,9 @@ impl<'a> AgentRepository<'a> {
             .fetch_all(self.pool)
             .await?
         } else {
-            sqlx::query_as::<_, AgentConfig>(
-                "SELECT * FROM agent_configs ORDER BY created_at DESC",
-            )
-            .fetch_all(self.pool)
-            .await?
+            sqlx::query_as::<_, AgentConfig>("SELECT * FROM agent_configs ORDER BY created_at DESC")
+                .fetch_all(self.pool)
+                .await?
         };
         Ok(rows)
     }
@@ -413,14 +407,12 @@ impl<'a> AgentRepository<'a> {
         agent_id: Uuid,
         channel_id: Uuid,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "DELETE FROM agent_channel_settings WHERE agent_id = $1 AND channel_id = $2",
-        )
-        .bind(agent_id)
-        .bind(channel_id)
-        .execute(self.pool)
-        .await
-        .map(|_| ())
+        sqlx::query("DELETE FROM agent_channel_settings WHERE agent_id = $1 AND channel_id = $2")
+            .bind(agent_id)
+            .bind(channel_id)
+            .execute(self.pool)
+            .await
+            .map(|_| ())
     }
 
     /// Get channel settings for an agent.

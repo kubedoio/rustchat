@@ -1,7 +1,7 @@
 //! Tool executor — runs the LLM ↔ tool loop
 
-use std::sync::Arc;
 use regex::Regex;
+use std::sync::Arc;
 
 use crate::services::llm::{ChatMessage, CompletionRequest, LlmError, LlmProvider};
 
@@ -46,28 +46,28 @@ impl ToolExecutor {
             }
 
             // Append the assistant's message (with tool calls) to the conversation
-            request.messages.push(ChatMessage::assistant(content.clone()));
+            request
+                .messages
+                .push(ChatMessage::assistant(content.clone()));
 
             // Execute tools in parallel
             let mut tool_results = Vec::new();
             for call in tool_calls {
                 match self.registry.get(&call.name) {
-                    Some(tool) => {
-                        match tool.execute(call.arguments).await {
-                            Ok(result) => {
-                                tool_results.push(format!(
-                                    "<tool_result name=\"{}\">\n{}\n</tool_result>",
-                                    call.name, result
-                                ));
-                            }
-                            Err(e) => {
-                                tool_results.push(format!(
-                                    "<tool_result name=\"{}\" error=\"true\">\n{}\n</tool_result>",
-                                    call.name, e
-                                ));
-                            }
+                    Some(tool) => match tool.execute(call.arguments).await {
+                        Ok(result) => {
+                            tool_results.push(format!(
+                                "<tool_result name=\"{}\">\n{}\n</tool_result>",
+                                call.name, result
+                            ));
                         }
-                    }
+                        Err(e) => {
+                            tool_results.push(format!(
+                                "<tool_result name=\"{}\" error=\"true\">\n{}\n</tool_result>",
+                                call.name, e
+                            ));
+                        }
+                    },
                     None => {
                         tool_results.push(format!(
                             "<tool_result name=\"{}\" error=\"true\">\nTool not found\n</tool_result>",

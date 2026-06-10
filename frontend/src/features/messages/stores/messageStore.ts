@@ -409,7 +409,12 @@ export const useMessageStore = defineStore('messageStore', () => {
     }
   }
 
-  function handleAgentStreamChunk(postId: string, channelId: string, content: string, agentId: string) {
+  function handleAgentStreamChunk(
+    postId: string,
+    channelId: string,
+    content: string,
+    agentId: string
+  ) {
     const channelMessages = messagesByChannel.value[channelId]
     if (channelMessages) {
       const index = channelMessages.findIndex(m => m.id === postId)

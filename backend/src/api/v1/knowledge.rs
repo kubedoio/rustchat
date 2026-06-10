@@ -23,9 +23,7 @@ use crate::{
     models::knowledge::*,
     repositories::{AgentRepository, KnowledgeRepository, TeamRepository},
     services::knowledge::{
-        embedder::OpenAiEmbedder,
-        extractor::ExtractorRegistry,
-        indexer::IndexerService,
+        embedder::OpenAiEmbedder, extractor::ExtractorRegistry, indexer::IndexerService,
         vector_store::PgVectorStore,
     },
     services::sync::rustshare::orchestrator::SyncOrchestrator,
@@ -37,7 +35,10 @@ use crate::{
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/bases", get(list_knowledge_bases).post(create_knowledge_base))
+        .route(
+            "/bases",
+            get(list_knowledge_bases).post(create_knowledge_base),
+        )
         .route(
             "/bases/:id",
             get(get_knowledge_base)
@@ -53,7 +54,10 @@ pub fn router() -> Router<AppState> {
             get(get_document).delete(delete_document),
         )
         .route("/documents/:doc_id/download", get(download_document))
-        .route("/sync-sources", get(list_sync_sources).post(create_sync_source))
+        .route(
+            "/sync-sources",
+            get(list_sync_sources).post(create_sync_source),
+        )
         .route(
             "/sync-sources/:id",
             get(get_sync_source)
@@ -77,9 +81,7 @@ async fn resolve_user_team_id(db: &sqlx::PgPool, user_id: Uuid) -> ApiResult<Uui
 }
 
 fn require_admin(auth: &AuthUser) -> ApiResult<()> {
-    if !auth.has_role("system_admin")
-        && !auth.has_role("org_admin")
-        && !auth.has_role("team_admin")
+    if !auth.has_role("system_admin") && !auth.has_role("org_admin") && !auth.has_role("team_admin")
     {
         return Err(AppError::Forbidden("Admin access required".to_string()));
     }
@@ -283,10 +285,7 @@ pub async fn upload_document(
     }
 
     let doc_id = Uuid::new_v4();
-    let key = format!(
-        "knowledge/{}/{}/{}/{}",
-        kb.team_id, kb.id, doc_id, filename
-    );
+    let key = format!("knowledge/{}/{}/{}/{}", kb.team_id, kb.id, doc_id, filename);
 
     // Create document record
     let doc = repo
@@ -313,7 +312,10 @@ pub async fn upload_document(
         .map_err(AppError::Database)?;
 
     // Upload to S3
-    state.s3_client.upload(&key, data.clone(), &mime_type).await?;
+    state
+        .s3_client
+        .upload(&key, data.clone(), &mime_type)
+        .await?;
 
     // Spawn background extraction + indexing pipeline
     let db_pool = state.db.clone();
@@ -360,7 +362,10 @@ pub async fn upload_document(
             let vector_store = Arc::new(PgVectorStore::new(&db_pool));
             let indexer = IndexerService::new(db_pool.clone(), embedder, vector_store);
 
-            if let Err(e) = indexer.index_document(doc_id_for_indexing, team_id_for_indexing).await {
+            if let Err(e) = indexer
+                .index_document(doc_id_for_indexing, team_id_for_indexing)
+                .await
+            {
                 tracing::error!(
                     error = %e,
                     doc_id = %doc_id_for_indexing,
@@ -572,7 +577,6 @@ pub async fn unassign_kb_from_agent(
     Ok(StatusCode::NO_CONTENT)
 }
 
-
 // ------------------------------------------------------------------
 // Sync Source Handlers
 // ------------------------------------------------------------------
@@ -722,8 +726,11 @@ async fn trigger_sync(
             )
         })?;
 
-    let orchestrator =
-        SyncOrchestrator::new(state.db.clone(), state.s3_client.clone(), state.config.s3_bucket.clone());
+    let orchestrator = SyncOrchestrator::new(
+        state.db.clone(),
+        state.s3_client.clone(),
+        state.config.s3_bucket.clone(),
+    );
     let report = orchestrator
         .full_sync(&source, kb_id)
         .await

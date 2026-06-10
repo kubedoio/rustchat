@@ -583,10 +583,7 @@ async function toggleReaction(emoji: string) {
       </div>
 
       <!-- Bot Message Feedback -->
-      <div
-        v-if="message.isBot && !isEditing"
-        class="flex items-center gap-1 mt-1.5"
-      >
+      <div v-if="message.isBot && !isEditing" class="flex items-center gap-1 mt-1.5">
         <button
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border transition-all hover:scale-105"
           :class="
@@ -599,7 +596,9 @@ async function toggleReaction(emoji: string) {
           @click="handleFeedback('positive')"
         >
           <ThumbsUp class="w-3 h-3" />
-          <span v-if="feedbackSummary.positive_count > 0" class="font-medium">{{ feedbackSummary.positive_count }}</span>
+          <span v-if="feedbackSummary.positive_count > 0" class="font-medium">{{
+            feedbackSummary.positive_count
+          }}</span>
         </button>
         <button
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border transition-all hover:scale-105"
@@ -613,7 +612,9 @@ async function toggleReaction(emoji: string) {
           @click="handleFeedback('negative')"
         >
           <ThumbsDown class="w-3 h-3" />
-          <span v-if="feedbackSummary.negative_count > 0" class="font-medium">{{ feedbackSummary.negative_count }}</span>
+          <span v-if="feedbackSummary.negative_count > 0" class="font-medium">{{
+            feedbackSummary.negative_count
+          }}</span>
         </button>
       </div>
 
