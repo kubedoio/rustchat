@@ -254,6 +254,7 @@ struct OpenAiMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAiChatResponse {
     id: String,
     model: String,
@@ -262,6 +263,7 @@ struct OpenAiChatResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAiChoice {
     message: OpenAiMessage,
     finish_reason: Option<String>,

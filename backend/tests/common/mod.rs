@@ -471,5 +471,6 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
             rustchat::middleware::reliability::ServiceCircuitBreakers::new(),
         ),
         reconciliation_tx: None,
+        agent_runtime: None,
     })
 }
