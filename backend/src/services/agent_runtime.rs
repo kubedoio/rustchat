@@ -64,29 +64,48 @@ impl AgentRuntime {
         post: &PostResponse,
         channel_id: Uuid,
     ) -> ApiResult<()> {
+        let agent_repo = AgentRepository::new(&self.db);
+        let mut agent_user_ids: Vec<Uuid> = Vec::new();
+
+        // 1. Respond to mentions
         let mentions = parse_mentions(&post.message);
-        if mentions.is_empty() {
-            return Ok(());
+        if !mentions.is_empty() {
+            let user_repo = UserRepository::new(&self.db);
+            let users = user_repo
+                .get_by_usernames(&mentions)
+                .await
+                .map_err(AppError::Database)?;
+
+            agent_user_ids.extend(
+                users
+                    .into_iter()
+                    .filter(|u| {
+                        u.entity_type == EntityType::Agent && u.is_active && u.deleted_at.is_none()
+                    })
+                    .map(|u| u.id),
+            );
         }
 
-        // Find which mentioned users are active agents
-        let user_repo = UserRepository::new(&self.db);
-        let users = user_repo
-            .get_by_usernames(&mentions)
+        // 2. Respond to all messages (agents with respond_to_all in this channel)
+        let channel_agents = agent_repo
+            .list_channel_agents(channel_id)
             .await
             .map_err(AppError::Database)?;
+        for config in channel_agents {
+            let caps: crate::models::agent::AgentCapabilities =
+                serde_json::from_value(config.capabilities).unwrap_or_default();
+            if caps.respond_to_all {
+                agent_user_ids.push(config.user_id);
+            }
+        }
 
-        let agent_user_ids: Vec<Uuid> = users
-            .into_iter()
-            .filter(|u| u.entity_type == EntityType::Agent && u.is_active && u.deleted_at.is_none())
-            .map(|u| u.id)
-            .collect();
+        // Deduplicate
+        agent_user_ids.sort_unstable();
+        agent_user_ids.dedup();
 
         if agent_user_ids.is_empty() {
             return Ok(());
         }
-
-        let agent_repo = AgentRepository::new(&self.db);
 
         for agent_user_id in agent_user_ids {
             // Prevent agent from triggering itself (infinite loop)

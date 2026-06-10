@@ -521,9 +521,9 @@ pub async fn list_agent_knowledge_bases(
 ) -> ApiResult<Json<Vec<AgentKnowledgeBaseDetail>>> {
     let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
 
-    // Verify agent exists
+    // Verify agent exists and extract its user_id (agent_id FK target)
     let agent_repo = AgentRepository::new(&state.db);
-    agent_repo
+    let agent = agent_repo
         .get_config_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
@@ -543,7 +543,7 @@ pub async fn list_agent_knowledge_bases(
         ORDER BY akb.created_at DESC
         "#,
     )
-    .bind(id)
+    .bind(agent.user_id)
     .bind(team_id)
     .fetch_all(&state.db)
     .await
@@ -561,6 +561,13 @@ pub async fn unassign_kb_from_agent(
 
     let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
 
+    // Verify agent exists and extract its user_id (agent_id FK target)
+    let agent_repo = AgentRepository::new(&state.db);
+    let agent = agent_repo
+        .get_config_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
+
     // Verify KB exists and belongs to user's team
     let kb_repo = KnowledgeRepository::new(&state.db);
     kb_repo
@@ -570,7 +577,7 @@ pub async fn unassign_kb_from_agent(
         .ok_or_else(|| AppError::NotFound("Knowledge base not found".to_string()))?;
 
     kb_repo
-        .unassign_kb_from_agent(id, kb_id)
+        .unassign_kb_from_agent(agent.user_id, kb_id)
         .await
         .map_err(AppError::Database)?;
 
