@@ -20,6 +20,8 @@ use crate::services::agent_memory::AgentMemoryService;
 use crate::services::knowledge::embedder::Embedder;
 use crate::services::knowledge::vector_store::VectorStore;
 use crate::services::llm::{ChatMessage, CompletionRequest, LlmError, ProviderRegistry};
+use crate::services::tools::executor::ToolExecutor;
+use crate::services::tools::registry::ToolRegistry;
 
 pub struct AgentRuntime {
     db: sqlx::PgPool,
@@ -27,6 +29,7 @@ pub struct AgentRuntime {
     provider_registry: Arc<ProviderRegistry>,
     embedder: Option<Arc<dyn Embedder>>,
     vector_store: Option<Arc<dyn VectorStore>>,
+    tool_registry: Option<Arc<ToolRegistry>>,
     semaphores: DashMap<Uuid, Arc<Semaphore>>,
 }
 
@@ -37,6 +40,7 @@ impl AgentRuntime {
         provider_registry: Arc<ProviderRegistry>,
         embedder: Option<Arc<dyn Embedder>>,
         vector_store: Option<Arc<dyn VectorStore>>,
+        tool_registry: Option<Arc<ToolRegistry>>,
     ) -> Self {
         Self {
             db,
@@ -44,6 +48,7 @@ impl AgentRuntime {
             provider_registry,
             embedder,
             vector_store,
+            tool_registry,
             semaphores: DashMap::new(),
         }
     }
@@ -106,6 +111,7 @@ impl AgentRuntime {
             let provider_registry = self.provider_registry.clone();
             let embedder = self.embedder.clone();
             let vector_store = self.vector_store.clone();
+            let tool_registry = self.tool_registry.clone();
             let post_clone = post.clone();
 
             tokio::spawn(async move {
@@ -127,6 +133,7 @@ impl AgentRuntime {
                     provider_registry,
                     embedder,
                     vector_store,
+                    tool_registry,
                     agent_user_id,
                     channel_id,
                     &post_clone,
@@ -152,6 +159,7 @@ async fn run_agent_response(
     provider_registry: Arc<ProviderRegistry>,
     embedder: Option<Arc<dyn Embedder>>,
     vector_store: Option<Arc<dyn VectorStore>>,
+    tool_registry: Option<Arc<ToolRegistry>>,
     agent_user_id: Uuid,
     channel_id: Uuid,
     trigger_post: &PostResponse,
@@ -215,26 +223,62 @@ async fn run_agent_response(
     let stream_post_id = Uuid::new_v4();
     let response_text;
 
-    // Try streaming first
-    match provider.complete_stream(request.clone()).await {
-        Ok(mut stream) => {
-            let mut accumulated = String::new();
-            let mut last_broadcast = Instant::now();
+    // Determine whether to use tool calling
+    let has_tools = tool_registry.as_ref().map(|r| !r.is_empty()).unwrap_or(false);
 
-            while let Some(chunk_result) = stream.next().await {
-                match chunk_result {
-                    Ok(chunk) => {
-                        accumulated.push_str(&chunk);
+    if has_tools {
+        // Tool calling requires the full response to parse <tool_call> blocks,
+        // so we use the non-streaming complete() path.
+        let executor = ToolExecutor::new(tool_registry.clone().unwrap());
+        response_text = executor
+            .execute_with_tools(provider.as_ref(), request)
+            .await
+            .map_err(|e| AppError::ExternalService(e.to_string()))?;
+    } else {
+        // Try streaming first
+        match provider.complete_stream(request.clone()).await {
+            Ok(mut stream) => {
+                let mut accumulated = String::new();
+                let mut last_broadcast = Instant::now();
 
-                        // Debounce: broadcast every 100ms or every 5 tokens
-                        if last_broadcast.elapsed().as_millis() > 100 {
+                while let Some(chunk_result) = stream.next().await {
+                    match chunk_result {
+                        Ok(chunk) => {
+                            accumulated.push_str(&chunk);
+
+                            // Debounce: broadcast every 100ms or every 5 tokens
+                            if last_broadcast.elapsed().as_millis() > 100 {
+                                let event = WsEnvelope {
+                                    msg_type: "event".to_string(),
+                                    event: "agent_stream_chunk".to_string(),
+                                    seq: None,
+                                    channel_id: Some(channel_id),
+                                    data: serde_json::json!({
+                                        "content": accumulated.clone(),
+                                        "agent_id": agent_user_id,
+                                        "post_id": stream_post_id,
+                                    }),
+                                    broadcast: Some(WsBroadcast {
+                                        channel_id: Some(channel_id),
+                                        team_id: None,
+                                        user_id: None,
+                                        exclude_user_id: Some(agent_user_id),
+                                    }),
+                                };
+                                ws_hub.broadcast(event).await;
+                                last_broadcast = Instant::now();
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(error = %e, "Stream chunk error");
+                            // Send error event
                             let event = WsEnvelope {
                                 msg_type: "event".to_string(),
-                                event: "agent_stream_chunk".to_string(),
+                                event: "agent_stream_error".to_string(),
                                 seq: None,
                                 channel_id: Some(channel_id),
                                 data: serde_json::json!({
-                                    "content": accumulated.clone(),
+                                    "message": format!("Streaming error: {}", e),
                                     "agent_id": agent_user_id,
                                     "post_id": stream_post_id,
                                 }),
@@ -246,63 +290,40 @@ async fn run_agent_response(
                                 }),
                             };
                             ws_hub.broadcast(event).await;
-                            last_broadcast = Instant::now();
+                            return Err(e.into());
                         }
                     }
-                    Err(e) => {
-                        tracing::error!(error = %e, "Stream chunk error");
-                        // Send error event
-                        let event = WsEnvelope {
-                            msg_type: "event".to_string(),
-                            event: "agent_stream_error".to_string(),
-                            seq: None,
-                            channel_id: Some(channel_id),
-                            data: serde_json::json!({
-                                "message": format!("Streaming error: {}", e),
-                                "agent_id": agent_user_id,
-                                "post_id": stream_post_id,
-                            }),
-                            broadcast: Some(WsBroadcast {
-                                channel_id: Some(channel_id),
-                                team_id: None,
-                                user_id: None,
-                                exclude_user_id: Some(agent_user_id),
-                            }),
-                        };
-                        ws_hub.broadcast(event).await;
-                        return Err(e.into());
-                    }
                 }
-            }
 
-            // Stream complete — use accumulated content as the response
-            response_text = accumulated;
+                // Stream complete — use accumulated content as the response
+                response_text = accumulated;
 
-            // Send complete event
-            let event = WsEnvelope {
-                msg_type: "event".to_string(),
-                event: "agent_stream_complete".to_string(),
-                seq: None,
-                channel_id: Some(channel_id),
-                data: serde_json::json!({
-                    "agent_id": agent_user_id,
-                    "post_id": stream_post_id,
-                }),
-                broadcast: Some(WsBroadcast {
+                // Send complete event
+                let event = WsEnvelope {
+                    msg_type: "event".to_string(),
+                    event: "agent_stream_complete".to_string(),
+                    seq: None,
                     channel_id: Some(channel_id),
-                    team_id: None,
-                    user_id: None,
-                    exclude_user_id: Some(agent_user_id),
-                }),
-            };
-            ws_hub.broadcast(event).await;
+                    data: serde_json::json!({
+                        "agent_id": agent_user_id,
+                        "post_id": stream_post_id,
+                    }),
+                    broadcast: Some(WsBroadcast {
+                        channel_id: Some(channel_id),
+                        team_id: None,
+                        user_id: None,
+                        exclude_user_id: Some(agent_user_id),
+                    }),
+                };
+                ws_hub.broadcast(event).await;
+            }
+            Err(LlmError::Config(_)) => {
+                // Streaming not supported, fall back to complete
+                let completion = provider.complete(request).await?;
+                response_text = completion.content;
+            }
+            Err(e) => return Err(e.into()),
         }
-        Err(LlmError::Config(_)) => {
-            // Streaming not supported, fall back to complete
-            let completion = provider.complete(request).await?;
-            response_text = completion.content;
-        }
-        Err(e) => return Err(e.into()),
     }
 
     if response_text.trim().is_empty() {

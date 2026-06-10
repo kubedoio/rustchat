@@ -191,6 +191,7 @@ pub fn router(
                 Arc::new(provider_registry),
                 embedder,
                 vector_store,
+                None,
             )))
         } else {
             tracing::info!("No LLM providers configured; agent runtime disabled");
