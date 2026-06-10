@@ -40,33 +40,33 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_agents).post(create_agent))
         .route(
-            "/:id",
+            "/{id}",
             get(get_agent).put(update_agent).delete(delete_agent),
         )
-        .route("/:id/regenerate-key", post(regenerate_api_key))
-        .route("/:id/channels", get(list_agent_channels))
+        .route("/{id}/regenerate-key", post(regenerate_api_key))
+        .route("/{id}/channels", get(list_agent_channels))
         .route(
-            "/:id/channels/:channel_id",
+            "/{id}/channels/{channel_id}",
             post(add_agent_to_channel).delete(remove_agent_from_channel),
         )
-        .route("/:id/memories", get(list_memories))
-        .route("/:id/memories/:memory_id", delete(delete_memory))
-        .route("/:id/test", post(test_agent))
+        .route("/{id}/memories", get(list_memories))
+        .route("/{id}/memories/{memory_id}", delete(delete_memory))
+        .route("/{id}/test", post(test_agent))
         .route(
-            "/posts/:post_id/feedback",
+            "/posts/{post_id}/feedback",
             post(submit_feedback)
                 .get(get_feedback_summary)
                 .delete(delete_own_feedback),
         )
-        .route("/:id/feedback-stats", get(get_agent_feedback_stats))
-        .route("/:id/analytics", get(get_agent_analytics))
+        .route("/{id}/feedback-stats", get(get_agent_feedback_stats))
+        .route("/{id}/analytics", get(get_agent_analytics))
         .route(
-            "/:id/knowledge-bases",
+            "/{id}/knowledge-bases",
             get(super::knowledge::list_agent_knowledge_bases)
                 .post(super::knowledge::assign_kb_to_agent),
         )
         .route(
-            "/:id/knowledge-bases/:kb_id",
+            "/{id}/knowledge-bases/{kb_id}",
             delete(super::knowledge::unassign_kb_from_agent),
         )
 }
@@ -735,4 +735,12 @@ async fn check_duplicates(db: &PgPool, username: &str, email: &str) -> ApiResult
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn router_builds_with_axum_v08_route_syntax() {
+        let _ = super::router();
+    }
 }

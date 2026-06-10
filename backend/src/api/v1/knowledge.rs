@@ -40,31 +40,31 @@ pub fn router() -> Router<AppState> {
             get(list_knowledge_bases).post(create_knowledge_base),
         )
         .route(
-            "/bases/:id",
+            "/bases/{id}",
             get(get_knowledge_base)
                 .put(update_knowledge_base)
                 .delete(delete_knowledge_base),
         )
         .route(
-            "/bases/:id/documents",
+            "/bases/{id}/documents",
             get(list_documents).post(upload_document),
         )
         .route(
-            "/documents/:doc_id",
+            "/documents/{doc_id}",
             get(get_document).delete(delete_document),
         )
-        .route("/documents/:doc_id/download", get(download_document))
+        .route("/documents/{doc_id}/download", get(download_document))
         .route(
             "/sync-sources",
             get(list_sync_sources).post(create_sync_source),
         )
         .route(
-            "/sync-sources/:id",
+            "/sync-sources/{id}",
             get(get_sync_source)
                 .put(update_sync_source)
                 .delete(delete_sync_source),
         )
-        .route("/sync-sources/:id/sync", post(trigger_sync))
+        .route("/sync-sources/{id}/sync", post(trigger_sync))
         .route("/sync/rustshare", post(handle_rustshare_webhook))
 }
 
@@ -785,4 +785,12 @@ async fn handle_rustshare_webhook(
     // For now, just acknowledge receipt
 
     Ok(StatusCode::OK)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn router_builds_with_axum_v08_route_syntax() {
+        let _ = super::router();
+    }
 }
