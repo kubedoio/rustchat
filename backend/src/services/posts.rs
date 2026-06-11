@@ -1004,7 +1004,7 @@ pub async fn get_thread(
 }
 
 /// Parse @mentions from a message, excluding code blocks and URLs.
-fn parse_mentions(message: &str) -> Vec<String> {
+pub(crate) fn parse_mentions(message: &str) -> Vec<String> {
     let mention_re = Regex::new(r"@([a-zA-Z0-9_\-\.]+)").expect("valid regex");
     let mut mentions = Vec::new();
     let mut in_code_block = false;

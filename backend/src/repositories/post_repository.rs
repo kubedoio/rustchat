@@ -351,6 +351,37 @@ impl PostRepository {
         Ok(result)
     }
 
+    /// Get unread post messages for a user in a channel.
+    ///
+    /// Returns tuples of `(message, is_root)` for posts the user has not yet read.
+    /// Used by unread mention counting to apply parser-backed mention detection
+    /// that excludes code blocks and URLs.
+    pub async fn get_unread_posts_messages(
+        &self,
+        channel_id: Uuid,
+        user_id: Uuid,
+    ) -> ApiResult<Vec<(String, bool)>> {
+        let rows: Vec<(String, bool)> = sqlx::query_as(
+            r#"
+            SELECT p.message, p.root_post_id IS NULL as is_root
+            FROM posts p
+            LEFT JOIN channel_reads cr
+                   ON cr.channel_id = p.channel_id
+                  AND cr.user_id = $2
+            WHERE p.channel_id = $1
+              AND p.deleted_at IS NULL
+              AND p.seq > COALESCE(cr.last_read_message_id, 0)
+            ORDER BY p.seq ASC
+            "#,
+        )
+        .bind(channel_id)
+        .bind(user_id)
+        .fetch_all(&self.db)
+        .await?;
+
+        Ok(rows)
+    }
+
     /// Pin a post
     pub async fn pin_post(&self, post_id: Uuid) -> ApiResult<()> {
         sqlx::query("UPDATE posts SET is_pinned = true WHERE id = $1")

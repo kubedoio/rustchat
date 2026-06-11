@@ -108,6 +108,40 @@ async fn fetch_username(state: &AppState, user_id: Uuid) -> ApiResult<String> {
     Ok(username.unwrap_or_default())
 }
 
+/// Count mentions in a list of messages using the parser-backed `parse_mentions`.
+///
+/// Returns `(mention_count, mention_count_root, urgent_mention_count)` where:
+/// - `mention_count` includes messages mentioning the user, `@all`, or `@channel`
+/// - `mention_count_root` is the subset of `mention_count` from root posts only
+/// - `urgent_mention_count` includes messages that also contain `@here`
+fn count_mentions_in_messages(messages: &[(String, bool)], username: &str) -> (i64, i64, i64) {
+    let mut mention_count = 0i64;
+    let mut mention_count_root = 0i64;
+    let mut urgent_mention_count = 0i64;
+
+    for (message, is_root) in messages {
+        let mentions = crate::services::posts::parse_mentions(message);
+        let has_user_mention = mentions.iter().any(|m| {
+            m.eq_ignore_ascii_case(username)
+                || m.eq_ignore_ascii_case("all")
+                || m.eq_ignore_ascii_case("channel")
+        });
+        let has_here = mentions.iter().any(|m| m.eq_ignore_ascii_case("here"));
+
+        if has_user_mention {
+            mention_count += 1;
+            if *is_root {
+                mention_count_root += 1;
+            }
+            if has_here {
+                urgent_mention_count += 1;
+            }
+        }
+    }
+
+    (mention_count, mention_count_root, urgent_mention_count)
+}
+
 async fn fetch_user_channels(state: &AppState, user_id: Uuid) -> ApiResult<Vec<(Uuid, Uuid)>> {
     let channels: Vec<(Uuid, Uuid)> = sqlx::query_as(
         r#"
@@ -196,8 +230,8 @@ async fn compute_channel_unread_from_db(
         manually_unread,
         msg_count,
         msg_count_root,
-        mention_count,
-        mention_count_root,
+        mut mention_count,
+        mut mention_count_root,
         mut urgent_mention_count,
     )) = row
     else {
@@ -213,6 +247,27 @@ async fn compute_channel_unread_from_db(
             version: V2_SCHEMA_VERSION,
         });
     };
+
+    // Use parser-backed mention counting when unread volume is low enough.
+    if msg_count > 0 && msg_count < 500 {
+        let repo = crate::repositories::PostRepository::new(state.db.clone());
+        match repo.get_unread_posts_messages(channel_id, user_id).await {
+            Ok(messages) => {
+                let (mc, mcr, uc) = count_mentions_in_messages(&messages, username);
+                mention_count = mc;
+                mention_count_root = mcr;
+                urgent_mention_count = uc;
+            }
+            Err(err) => {
+                warn!(
+                    user_id = %user_id,
+                    channel_id = %channel_id,
+                    error = %err,
+                    "Failed to fetch unread messages for mention parsing; falling back to SQL regex"
+                );
+            }
+        }
+    }
 
     if !state.config.unread.post_priority_enabled {
         urgent_mention_count = 0;
@@ -293,6 +348,7 @@ async fn compute_team_unread_from_db(
     let mut msg_count_root = 0i64;
     let mut mention_count = 0i64;
     let mut mention_count_root = 0i64;
+    let mut total_unread_count = 0i64;
     for (
         notify_props,
         channel_msg_count,
@@ -307,6 +363,8 @@ async fn compute_team_unread_from_db(
             .and_then(|v| v.as_str())
             .unwrap_or("all");
 
+        total_unread_count += channel_msg_count;
+
         if mark_unread != "mention" {
             msg_count += channel_msg_count;
             msg_count_root += channel_msg_count_root;
@@ -315,6 +373,41 @@ async fn compute_team_unread_from_db(
         mention_count += channel_mention_count;
         mention_count_root += channel_mention_count_root;
         let _ = channel_urgent_mention_count;
+    }
+
+    // Use parser-backed mention counting when total unread volume is low enough.
+    if total_unread_count > 0 && total_unread_count < 500 {
+        match sqlx::query_as::<_, (String, bool)>(
+            r#"
+            SELECT p.message, p.root_post_id IS NULL as is_root
+            FROM posts p
+            JOIN channel_members cm ON cm.channel_id = p.channel_id AND cm.user_id = $1
+            JOIN channels c ON c.id = cm.channel_id
+            LEFT JOIN channel_reads cr ON cr.channel_id = p.channel_id AND cr.user_id = $1
+            WHERE c.team_id = $2
+              AND p.deleted_at IS NULL
+              AND p.seq > COALESCE(cr.last_read_message_id, 0)
+            "#,
+        )
+        .bind(user_id)
+        .bind(team_id)
+        .fetch_all(&state.db)
+        .await
+        {
+            Ok(messages) => {
+                let (mc, mcr, _) = count_mentions_in_messages(&messages, username);
+                mention_count = mc;
+                mention_count_root = mcr;
+            }
+            Err(err) => {
+                warn!(
+                    user_id = %user_id,
+                    team_id = %team_id,
+                    error = %err,
+                    "Failed to fetch unread messages for team mention parsing; falling back to SQL regex"
+                );
+            }
+        }
     }
 
     let (thread_count, thread_mention_count, thread_urgent_mention_count): (i64, i64, i64) =
