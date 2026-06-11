@@ -301,7 +301,7 @@ async fn run_agent_response(
             system_prompt: config.system_prompt.clone(),
             messages,
             model: config.model.clone(),
-            temperature: config.temperature as f32,
+            temperature: config.temperature,
             max_tokens: config.max_output_tokens as u32,
         };
 

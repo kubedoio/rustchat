@@ -193,9 +193,15 @@ async function handleCreateSyncSource() {
       syncSourceSubmitting.value = false
       return
     }
+    const sourceName = `${props.knowledgeBase.name} ${syncSourceForm.value.source_type}`
     await kbStore.createSyncSource({
+      name: sourceName,
       source_type: syncSourceForm.value.source_type,
-      config,
+      config: {
+        ...config,
+        knowledge_base_id: props.knowledgeBase.id,
+      },
+      sync_mode: 'pull',
       sync_interval_minutes: syncSourceForm.value.sync_interval_minutes,
     })
     syncSourceForm.value = {
@@ -229,6 +235,12 @@ function formatFileSize(bytes: number): string {
 function formatDate(date: string | null): string {
   if (!date) return 'Never'
   return new Date(date).toLocaleDateString()
+}
+
+function documentStatus(doc: { is_indexed: boolean; extracted_at: string | null }): string {
+  if (doc.is_indexed) return 'completed'
+  if (doc.extracted_at) return 'processing'
+  return 'pending'
 }
 </script>
 
@@ -414,19 +426,19 @@ function formatDate(date: string | null): string {
                 <div class="flex items-center gap-3 min-w-0">
                   <FileText class="w-4 h-4 text-text-3 shrink-0" />
                   <div class="min-w-0">
-                    <div class="text-xs font-medium text-text-1 truncate">{{ doc.filename }}</div>
+                    <div class="text-xs font-medium text-text-1 truncate">{{ doc.title }}</div>
                     <div class="text-[10px] text-text-3">
-                      {{ formatFileSize(doc.file_size) }} · {{ doc.chunk_count }} chunks ·
+                      {{ formatFileSize(doc.size_bytes) }} · {{ doc.chunk_count }} chunks ·
                       <span
                         :class="
-                          doc.status === 'completed'
+                          documentStatus(doc) === 'completed'
                             ? 'text-success'
-                            : doc.status === 'failed'
+                            : documentStatus(doc) === 'failed'
                               ? 'text-danger'
                               : 'text-text-3'
                         "
                       >
-                        {{ doc.status }}
+                        {{ documentStatus(doc) }}
                       </span>
                     </div>
                   </div>
@@ -532,10 +544,11 @@ function formatDate(date: string | null): string {
                   <RefreshCw class="w-4 h-4 text-text-3 shrink-0" />
                   <div class="min-w-0">
                     <div class="text-xs font-medium text-text-1 capitalize">
-                      {{ source.source_type }}
+                      {{ source.name }}
                     </div>
                     <div class="text-[10px] text-text-3">
-                      Every {{ source.sync_interval_minutes }} min · Last sync:
+                      {{ source.source_type }} · Every
+                      {{ source.sync_interval_minutes ?? 'manual' }} min · Last sync:
                       {{ formatDate(source.last_sync_at) }}
                       <span
                         v-if="source.is_active"

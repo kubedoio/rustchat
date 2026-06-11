@@ -59,13 +59,26 @@ function buildDocument(overrides: Partial<KnowledgeBaseDocument> = {}): Knowledg
   return {
     id: 'doc-1',
     knowledge_base_id: 'kb-1',
-    filename: 'guide.md',
-    file_type: 'text/markdown',
-    file_size: 1024,
+    team_id: 'team-1',
+    title: 'guide.md',
+    source_url: null,
+    source_type: 'upload',
+    s3_key: 'knowledge/team-1/kb-1/doc-1/guide.md',
+    s3_bucket: 'test-bucket',
+    content_hash: 'hash-1',
+    mime_type: 'text/markdown',
+    size_bytes: 1024,
+    extracted_text: null,
+    extracted_at: '2026-06-10T00:00:00Z',
+    external_id: null,
+    external_etag: null,
+    external_modified_at: null,
+    sync_source_id: null,
+    is_indexed: true,
     chunk_count: 4,
-    status: 'completed',
     created_at: '2026-06-10T00:00:00Z',
     updated_at: '2026-06-10T00:00:00Z',
+    created_by: 'admin-1',
     ...overrides,
   }
 }
@@ -73,14 +86,19 @@ function buildDocument(overrides: Partial<KnowledgeBaseDocument> = {}): Knowledg
 function buildSyncSource(overrides: Partial<SyncSource> = {}): SyncSource {
   return {
     id: 'source-1',
-    knowledge_base_id: 'kb-1',
+    team_id: 'team-1',
+    name: 'GitHub Docs',
     source_type: 'github',
-    config: { repository: 'kubedoio/rustchat' },
+    sync_mode: 'pull',
     sync_interval_minutes: 60,
-    last_sync_at: null,
-    next_sync_at: null,
     is_active: true,
+    last_sync_at: null,
+    last_sync_status: null,
+    last_sync_error: null,
+    next_sync_at: null,
+    document_count: 0,
     created_at: '2026-06-10T00:00:00Z',
+    updated_at: '2026-06-10T00:00:00Z',
     ...overrides,
   }
 }
@@ -137,7 +155,7 @@ describe('knowledgeBaseStore', () => {
     const file = new File(['hello'], 'guide.md', { type: 'text/markdown' })
     mockedKnowledgeBasesApi.listDocuments.mockResolvedValue({ data: [buildDocument()] } as any)
     mockedKnowledgeBasesApi.uploadDocument.mockResolvedValue({
-      data: buildDocument({ id: 'doc-2', filename: 'faq.md' }),
+      data: buildDocument({ id: 'doc-2', title: 'faq.md' }),
     } as any)
     mockedKnowledgeBasesApi.deleteDocument.mockResolvedValue({ data: undefined } as any)
 
@@ -167,8 +185,9 @@ describe('knowledgeBaseStore', () => {
     const store = useKnowledgeBaseStore()
     await store.fetchSyncSources()
     await store.createSyncSource({
+      name: 'GitHub Docs',
       source_type: 'github',
-      config: { repository: 'kubedoio/rustchat' },
+      config: { knowledge_base_id: 'kb-1', repository: 'kubedoio/rustchat' },
     })
     await store.deleteSyncSource('source-1')
 

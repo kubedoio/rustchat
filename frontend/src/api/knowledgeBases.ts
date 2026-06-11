@@ -31,25 +31,43 @@ export interface KnowledgeBaseDetail {
 export interface KnowledgeBaseDocument {
   id: string
   knowledge_base_id: string
-  filename: string
-  file_type: string
-  file_size: number
+  team_id: string
+  title: string
+  source_url: string | null
+  source_type: string
+  s3_key: string
+  s3_bucket: string
+  content_hash: string
+  mime_type: string
+  size_bytes: number
+  extracted_text: string | null
+  extracted_at: string | null
+  external_id: string | null
+  external_etag: string | null
+  external_modified_at: string | null
+  sync_source_id: string | null
+  is_indexed: boolean
   chunk_count: number
-  status: 'pending' | 'processing' | 'completed' | 'failed'
   created_at: string
   updated_at: string
+  created_by: string
 }
 
 export interface SyncSource {
   id: string
-  knowledge_base_id: string
-  source_type: 'github' | 'confluence' | 'notion' | 'web' | 'api'
-  config: Record<string, any>
-  sync_interval_minutes: number
-  last_sync_at: string | null
-  next_sync_at: string | null
+  team_id: string
+  name: string
+  source_type: string
+  sync_mode: string
+  sync_interval_minutes: number | null
   is_active: boolean
+  last_sync_at: string | null
+  last_sync_status: string | null
+  last_sync_error: string | null
+  next_sync_at: string | null
+  document_count: number
   created_at: string
+  updated_at: string
 }
 
 export interface CreateKnowledgeBasePayload {
@@ -72,8 +90,10 @@ export interface UpdateKnowledgeBasePayload {
 }
 
 export interface CreateSyncSourcePayload {
-  source_type: 'github' | 'confluence' | 'notion' | 'web' | 'api'
+  name: string
+  source_type: string
   config: Record<string, any>
+  sync_mode?: string
   sync_interval_minutes?: number
 }
 

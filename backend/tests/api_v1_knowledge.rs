@@ -382,6 +382,20 @@ async fn api_v1_knowledge_sync_sources_agent_assignment_and_webhook() {
         .expect("sync source should be JSON");
     let source_id = Uuid::parse_str(source["id"].as_str().expect("source id should exist"))
         .expect("source id should be UUID");
+    assert!(source.get("config_encrypted").is_none());
+
+    let stored_config: (String,) =
+        sqlx::query_as("SELECT config_encrypted FROM knowledge_sync_sources WHERE id = $1")
+            .bind(source_id)
+            .fetch_one(&app.db_pool)
+            .await
+            .expect("sync source config should be stored");
+    assert!(stored_config.0.starts_with("enc:v1:"));
+    let decrypted_config = rustchat::crypto::decrypt(&stored_config.0, "test-encryption-key")
+        .expect("sync source config should decrypt");
+    let decrypted_config: Value =
+        serde_json::from_str(&decrypted_config).expect("sync source config should be JSON");
+    assert_eq!(decrypted_config["knowledge_base_id"], kb_id.to_string());
 
     let list_sources_response = app
         .api_client

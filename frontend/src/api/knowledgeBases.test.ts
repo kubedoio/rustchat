@@ -67,8 +67,10 @@ describe('knowledgeBasesApi', () => {
 
   it('maps sync source methods to sync-source endpoints', () => {
     const payload: CreateSyncSourcePayload = {
+      name: 'GitHub Docs',
       source_type: 'github',
-      config: { repository: 'kubedoio/rustchat' },
+      config: { knowledge_base_id: 'kb-1', repository: 'kubedoio/rustchat' },
+      sync_mode: 'pull',
       sync_interval_minutes: 60,
     }
 
