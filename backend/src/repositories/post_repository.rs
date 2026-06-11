@@ -411,7 +411,7 @@ impl PostRepository {
             SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
                    p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                    p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
+                   p.last_reply_at, p.seq, p.client_msg_id,
                    u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
             FROM updated_post p
             LEFT JOIN users u ON p.user_id = u.id
@@ -440,7 +440,7 @@ impl PostRepository {
             SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
                    p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                    p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
+                   p.last_reply_at, p.seq, p.client_msg_id,
                    u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
             FROM updated_post p
             LEFT JOIN users u ON p.user_id = u.id
@@ -1855,7 +1855,7 @@ impl PostRepository {
                 SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
                        p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                        p.reply_count::int8 as reply_count,
-                       p.last_reply_at, p.seq,
+                       p.last_reply_at, p.seq, p.client_msg_id,
                        u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
@@ -1868,7 +1868,7 @@ impl PostRepository {
                 SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
                        p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                        p.reply_count::int8 as reply_count,
-                       p.last_reply_at, p.seq,
+                       p.last_reply_at, p.seq, p.client_msg_id,
                        u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
