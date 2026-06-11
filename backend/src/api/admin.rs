@@ -65,7 +65,7 @@ pub fn require_global_admin(auth: &AuthUser) -> ApiResult<()> {
 
 pub async fn insert_admin_audit_log(
     db: &sqlx::PgPool,
-    actor_user_id: uuid::Uuid,
+    actor_user_id: Option<uuid::Uuid>,
     action: &str,
     target_type: &str,
     target_id: Option<uuid::Uuid>,
@@ -139,7 +139,7 @@ async fn update_config(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::ConfigUpdate,
             "config",
             None,

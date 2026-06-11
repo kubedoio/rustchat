@@ -48,9 +48,16 @@ pub fn router(state: AppState) -> Router<AppState> {
             crate::middleware::rate_limit::search_ip_rate_limit,
         ));
 
+    let upload_route = Router::new()
+        .route("/files", post(upload_file))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit::upload_ip_rate_limit,
+        ));
+
     Router::new()
         .merge(search_routes)
-        .route("/files", post(upload_file))
+        .merge(upload_route)
         .route("/files/{file_id}", get(get_file))
         .route("/files/{file_id}/info", get(get_file_info))
         .route("/files/{file_id}/thumbnail", get(get_thumbnail))

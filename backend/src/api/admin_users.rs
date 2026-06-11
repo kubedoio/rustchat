@@ -250,7 +250,7 @@ pub async fn delete_admin_user(
 
     insert_admin_audit_log(
         &state.db,
-        auth.user_id,
+        Some(auth.user_id),
         "user.soft_delete",
         "user",
         Some(id),
@@ -313,7 +313,7 @@ pub async fn wipe_user(
     // Log the wipe action
     insert_admin_audit_log(
         &state.db,
-        auth.user_id,
+        Some(auth.user_id),
         "user.wipe",
         "user",
         Some(id),

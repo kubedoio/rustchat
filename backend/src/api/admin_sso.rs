@@ -192,7 +192,7 @@ pub async fn create_sso_config(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::SsoConfigCreate,
             "sso_config",
             Some(config_id),
@@ -253,7 +253,7 @@ pub async fn update_sso_config(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::SsoConfigUpdate,
             "sso_config",
             Some(config_id),
@@ -289,7 +289,7 @@ pub async fn delete_sso_config(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::SsoConfigDelete,
             "sso_config",
             Some(config_id),

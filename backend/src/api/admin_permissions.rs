@@ -82,7 +82,7 @@ pub async fn update_role_permissions(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::RolePermissionUpdate,
             "role",
             None,

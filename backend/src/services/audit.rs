@@ -68,7 +68,7 @@ impl AuditAction {
 /// hard-code string constants.
 pub async fn audit(
     db: &sqlx::PgPool,
-    actor_user_id: Uuid,
+    actor_user_id: Option<Uuid>,
     action: AuditAction,
     target_type: &str,
     target_id: Option<Uuid>,

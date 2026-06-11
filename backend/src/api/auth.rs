@@ -339,7 +339,7 @@ async fn login(
         Ok(response) => {
             let _ = crate::services::audit::audit(
                 &state.db,
-                response.user.id,
+                Some(response.user.id),
                 crate::services::audit::AuditAction::LoginSuccess,
                 "user",
                 Some(response.user.id),
@@ -349,11 +349,9 @@ async fn login(
             Ok(response)
         }
         Err(err) => {
-            // nil UUID indicates an unauthenticated actor for failed logins.
-            let actor_id = uuid::Uuid::nil();
             let _ = crate::services::audit::audit(
                 &state.db,
-                actor_id,
+                None,
                 crate::services::audit::AuditAction::LoginFailed,
                 "user",
                 None,

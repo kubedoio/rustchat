@@ -10,7 +10,7 @@ use crate::config::DbPoolConfig;
 
 /// Expected maximum migration version that should be present in the database.
 /// Update this value whenever a new migration file is added.
-pub const EXPECTED_SCHEMA_VERSION: i64 = 20260611000002;
+pub const EXPECTED_SCHEMA_VERSION: i64 = 20260611000003;
 
 /// Create a database connection pool and run migrations
 pub async fn connect(database_url: &str) -> anyhow::Result<PgPool> {

@@ -104,11 +104,7 @@ pub fn router_with_body_limits(
         // Files - large limit for uploads
         .merge(
             files::router(state.clone())
-                .layer(DefaultBodyLimit::max(large_limit))
-                .layer(axum::middleware::from_fn_with_state(
-                    state.clone(),
-                    crate::middleware::rate_limit::upload_ip_rate_limit,
-                )),
+                .layer(DefaultBodyLimit::max(large_limit)),
         )
         // System - small limit
         .merge(system::router().layer(DefaultBodyLimit::max(small_limit)))

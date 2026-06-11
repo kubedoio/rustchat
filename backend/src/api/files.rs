@@ -351,7 +351,7 @@ async fn download_file_content(
         if matches!(e, AppError::Forbidden(_)) {
             let _ = crate::services::audit::audit(
                 &state.db,
-                auth.user_id,
+                Some(auth.user_id),
                 crate::services::audit::AuditAction::FileDownloadDenied,
                 "file",
                 Some(id),
@@ -370,7 +370,7 @@ async fn download_file_content(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::FileDownload,
             "file",
             Some(id),

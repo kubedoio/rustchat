@@ -262,7 +262,7 @@ async fn create_provider(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::EmailProviderCreate,
             "email_provider",
             Some(provider_id),
@@ -340,7 +340,7 @@ async fn update_provider(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::EmailProviderUpdate,
             "email_provider",
             Some(provider_id),
@@ -374,7 +374,7 @@ async fn delete_provider(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::EmailProviderDelete,
             "email_provider",
             Some(provider_id),

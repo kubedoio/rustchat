@@ -228,12 +228,15 @@ pub(crate) async fn run_connection(
                         "event": "resync_required",
                         "data": { "reason": "hub_lagged" }
                     });
-                    if let Err(e) = actor_clone.send_raw(resync_msg) {
-                        warn!(
-                            connection_id = %replay_connection_id,
-                            error = %e,
-                            "Failed to send resync_required after hub lag"
-                        );
+                    match actor_clone.send_raw(resync_msg) {
+                        Ok(()) => {}
+                        Err(err) => {
+                            warn!(
+                                connection_id = %replay_connection_id,
+                                error = %err,
+                                "Failed to send resync_required after hub lag"
+                            );
+                        }
                     }
                     continue;
                 }

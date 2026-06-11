@@ -141,7 +141,7 @@ pub async fn delete_admin_team(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::TeamDelete,
             "team",
             Some(team_id),
@@ -201,7 +201,7 @@ pub async fn add_team_member(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::TeamMemberAdd,
             "team",
             Some(team_id),
@@ -239,7 +239,7 @@ pub async fn remove_team_member(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::TeamMemberRemove,
             "team",
             Some(team_id),
@@ -379,7 +379,7 @@ pub async fn delete_admin_channel(
     tokio::spawn(async move {
         let _ = crate::services::audit::audit(
             &db,
-            actor,
+            Some(actor),
             crate::services::audit::AuditAction::ChannelDelete,
             "channel",
             Some(channel_id),
