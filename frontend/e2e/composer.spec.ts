@@ -281,8 +281,7 @@ async function mockComposerApi(page: Page) {
 async function bootstrapComposerSession(page: Page) {
   await page.goto('/login')
   await page.evaluate(() => {
-    localStorage.setItem('auth_token', 'composer-test-token')
-    document.cookie = 'MMAUTHTOKEN=composer-test-token; path=/; SameSite=Strict'
+    sessionStorage.setItem('auth_token', 'composer-test-token')
   })
   await page.goto('/')
   await page.waitForSelector('[aria-label="Message composer"]')

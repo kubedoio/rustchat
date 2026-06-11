@@ -183,14 +183,9 @@ jobs:
           key: ${{ runner.os }}-sqlx-cli-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Install SQLx CLI
-        run: |
-          if ! command -v sqlx &> /dev/null; then
-            export PATH="$HOME/.cargo/bin:$PATH"
-            if ! command -v cargo-binstall &> /dev/null; then
-              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-            fi
-            cargo binstall --locked --no-confirm sqlx-cli
-          fi
+        uses: brndnmtthws/rust-action-cargo-binstall@2c46d38e56ef5653e953c62f9fce2125d568a15c # v1.1.0
+        with:
+          packages: sqlx-cli
 
       - name: Run migrations
         working-directory: ./backend
@@ -338,6 +333,7 @@ jobs:
           echo "RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key" >> .env
           echo "RUSTFS_ACCESS_KEY=dummy-rustfs-access-key" >> .env
           echo "RUSTFS_SECRET_KEY=dummy-rustfs-secret-key" >> .env
+          echo "PUSH_PROXY_AUTH_KEY=$(openssl rand -hex 32)" >> .env
 
       - name: Validate docker-compose.yml
         run: docker compose config

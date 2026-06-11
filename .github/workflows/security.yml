@@ -10,14 +10,15 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  pull-requests: write  # for dependency-review
 
 jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
 
     services:
       postgres:
@@ -82,14 +83,9 @@ jobs:
           key: ${{ runner.os }}-sqlx-cli-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Install SQLx CLI
-        run: |
-          if ! command -v sqlx &> /dev/null; then
-            export PATH="$HOME/.cargo/bin:$PATH"
-            if ! command -v cargo-binstall &> /dev/null; then
-              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-            fi
-            cargo binstall --locked --no-confirm sqlx-cli
-          fi
+        uses: brndnmtthws/rust-action-cargo-binstall@2c46d38e56ef5653e953c62f9fce2125d568a15c # v1.1.0
+        with:
+          packages: sqlx-cli
 
       - name: Run migrations
         working-directory: ./backend
@@ -130,14 +126,9 @@ jobs:
           key: ${{ runner.os }}-cargo-audit-v1
 
       - name: Install cargo-audit
-        run: |
-          if ! command -v cargo-audit &> /dev/null; then
-            export PATH="$HOME/.cargo/bin:$PATH"
-            if ! command -v cargo-binstall &> /dev/null; then
-              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-            fi
-            cargo binstall --locked --no-confirm cargo-audit
-          fi
+        uses: brndnmtthws/rust-action-cargo-binstall@2c46d38e56ef5653e953c62f9fce2125d568a15c # v1.1.0
+        with:
+          packages: cargo-audit
 
       - name: Run cargo audit
         run: cargo audit
@@ -162,14 +153,9 @@ jobs:
           key: ${{ runner.os }}-cargo-audit-v1
 
       - name: Install cargo-audit
-        run: |
-          if ! command -v cargo-audit &> /dev/null; then
-            export PATH="$HOME/.cargo/bin:$PATH"
-            if ! command -v cargo-binstall &> /dev/null; then
-              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-            fi
-            cargo binstall --locked --no-confirm cargo-audit
-          fi
+        uses: brndnmtthws/rust-action-cargo-binstall@2c46d38e56ef5653e953c62f9fce2125d568a15c # v1.1.0
+        with:
+          packages: cargo-audit
 
       - name: Run cargo audit
         run: cargo audit
@@ -194,14 +180,9 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-v1
 
       - name: Install cargo-deny
-        run: |
-          if ! command -v cargo-deny &> /dev/null; then
-            export PATH="$HOME/.cargo/bin:$PATH"
-            if ! command -v cargo-binstall &> /dev/null; then
-              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-            fi
-            cargo binstall --locked --no-confirm cargo-deny
-          fi
+        uses: brndnmtthws/rust-action-cargo-binstall@2c46d38e56ef5653e953c62f9fce2125d568a15c # v1.1.0
+        with:
+          packages: cargo-deny
 
       - name: Run cargo deny check
         run: cargo deny check
@@ -226,14 +207,9 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-v1
 
       - name: Install cargo-deny
-        run: |
-          if ! command -v cargo-deny &> /dev/null; then
-            export PATH="$HOME/.cargo/bin:$PATH"
-            if ! command -v cargo-binstall &> /dev/null; then
-              curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-            fi
-            cargo binstall --locked --no-confirm cargo-deny
-          fi
+        uses: brndnmtthws/rust-action-cargo-binstall@2c46d38e56ef5653e953c62f9fce2125d568a15c # v1.1.0
+        with:
+          packages: cargo-deny
 
       - name: Run cargo deny check
         run: cargo deny check
@@ -280,6 +256,9 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 

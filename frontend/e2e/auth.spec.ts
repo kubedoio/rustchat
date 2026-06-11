@@ -141,8 +141,7 @@ async function mockAuthenticatedSessionApi(page: import('@playwright/test').Page
 async function seedAuthenticatedSession(page: import('@playwright/test').Page, token: string) {
   await page.goto('/login')
   await page.evaluate(tokenValue => {
-    localStorage.setItem('auth_token', tokenValue)
-    document.cookie = `MMAUTHTOKEN=${tokenValue}; path=/; SameSite=Strict`
+    sessionStorage.setItem('auth_token', tokenValue)
   }, token)
 }
 
@@ -225,11 +224,8 @@ test('logs out and redirects to /login when JWT expires during active session', 
   await expect(page).toHaveURL('/login', { timeout: 12000 })
   await expect(page.locator('#email')).toBeVisible()
 
-  const storedToken = await page.evaluate(() => localStorage.getItem('auth_token'))
+  const storedToken = await page.evaluate(() => sessionStorage.getItem('auth_token'))
   expect(storedToken ?? '').toBe('')
-
-  const cookieState = await page.evaluate(() => document.cookie)
-  expect(cookieState).not.toContain('MMAUTHTOKEN=')
 })
 
 test('logs out on websocket auth-expiry close and does not reconnect', async ({ page }) => {
@@ -289,7 +285,7 @@ test('logs out on websocket auth-expiry close and does not reconnect', async ({ 
 
   await expect(page).toHaveURL('/login', { timeout: 12000 })
 
-  const storedToken = await page.evaluate(() => localStorage.getItem('auth_token'))
+  const storedToken = await page.evaluate(() => sessionStorage.getItem('auth_token'))
   expect(storedToken ?? '').toBe('')
 
   await page.waitForTimeout(1000)

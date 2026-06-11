@@ -23,7 +23,7 @@ jobs:
           
       - name: Install dependencies
         run: |
-          pip install PyYAML requests
+          pip install --require-hashes --no-deps -r tools/mm-compat/requirements.txt
           
       - name: Extract OpenAPI Paths
         run: |

@@ -180,8 +180,7 @@ async function mockApi(page: Page) {
 
 async function bootstrapAuthenticatedSession(page: Page) {
   await page.addInitScript(() => {
-    localStorage.setItem('auth_token', 'settings-parity-token')
-    document.cookie = 'MMAUTHTOKEN=settings-parity-token; path=/; SameSite=Strict'
+    sessionStorage.setItem('auth_token', 'settings-parity-token')
   })
 
   await page.goto('/')

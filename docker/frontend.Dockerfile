@@ -1,5 +1,5 @@
 # Build stage
-FROM node:24-alpine AS builder
+FROM node:24-alpine@sha256:fb71d01345f11b708a3553c66e7c74074f2d506400ea81973343d915cb64eef0 AS builder
 RUN apk add --no-cache git
 WORKDIR /app
 COPY package.json package-lock.json .npmrc dependency-policy.json dependency-patches.json ./
@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM openresty/openresty:alpine
+FROM openresty/openresty:alpine@sha256:0fa1fcd37f275fe91554b1934c0b23404d937bdee4d3aa55321023f8865dc77b
 
 # Create required directories
 RUN mkdir -p /var/log/nginx /var/run/openresty

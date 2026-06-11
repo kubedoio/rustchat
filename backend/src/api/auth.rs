@@ -2,6 +2,7 @@
 
 use axum::{
     extract::{ConnectInfo, State},
+    http::HeaderMap,
     middleware,
     routing::{get, post},
     Json, Router,
@@ -333,16 +334,17 @@ async fn register(
 async fn login(
     State(state): State<AppState>,
     Json(input): Json<LoginRequest>,
-) -> ApiResult<Json<AuthResponse>> {
+) -> ApiResult<(HeaderMap, Json<AuthResponse>)> {
     let email = input.email.clone();
     match login_inner(State(state.clone()), Json(input)).await {
         Ok(response) => {
+            let user_id = response.1.user.id;
             let _ = crate::services::audit::audit(
                 &state.db,
-                Some(response.user.id),
+                Some(user_id),
                 crate::services::audit::AuditAction::LoginSuccess,
                 "user",
-                Some(response.user.id),
+                Some(user_id),
                 serde_json::json!({ "email": email }),
             )
             .await;
@@ -366,7 +368,7 @@ async fn login(
 async fn login_inner(
     State(state): State<AppState>,
     Json(input): Json<LoginRequest>,
-) -> ApiResult<Json<AuthResponse>> {
+) -> ApiResult<(HeaderMap, Json<AuthResponse>)> {
     // Find user by email
     let user = UserRepository::new(&state.db)
         .get_active_by_email(&input.email)
@@ -427,12 +429,31 @@ async fn login_inner(
         state.jwt_expiry_hours,
     )?;
 
-    Ok(Json(AuthResponse {
+    let max_age = state.jwt_expiry_hours.saturating_mul(3600);
+    let mut headers = HeaderMap::new();
+    let cookie_value = format!(
+        "MMAUTHTOKEN={}; Path=/; Max-Age={}; HttpOnly{}; SameSite=Lax",
         token,
-        token_type: "Bearer".to_string(),
-        expires_in: state.jwt_expiry_hours * 3600,
-        user: UserResponse::from(user),
-    }))
+        max_age,
+        if state.config.is_production() {
+            "; Secure"
+        } else {
+            ""
+        }
+    );
+    let cookie_header = axum::http::HeaderValue::from_str(&cookie_value)
+        .map_err(|_| AppError::Internal("Invalid cookie characters".into()))?;
+    headers.insert(axum::http::header::SET_COOKIE, cookie_header);
+
+    Ok((
+        headers,
+        Json(AuthResponse {
+            token,
+            token_type: "Bearer".to_string(),
+            expires_in: state.jwt_expiry_hours * 3600,
+            user: UserResponse::from(user),
+        }),
+    ))
 }
 
 async fn enforce_password_login_allowed(state: &AppState, user_email: &str) -> ApiResult<()> {

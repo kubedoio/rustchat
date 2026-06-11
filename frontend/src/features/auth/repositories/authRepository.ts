@@ -29,10 +29,6 @@ export interface UpdateStatusRequest {
   durationMinutes?: number
 }
 
-// Cookie management helpers
-const AUTH_COOKIE_NAME = 'MMAUTHTOKEN'
-const AUTH_COOKIE_OPTIONS = 'path=/; SameSite=Strict'
-
 export const authRepository = {
   // Login with credentials
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
@@ -98,19 +94,10 @@ export const authRepository = {
     })
   },
 
-  // Cookie management
-  setAuthCookie(token: string): void {
-    document.cookie = `${AUTH_COOKIE_NAME}=${token}; ${AUTH_COOKIE_OPTIONS}`
-  },
-
-  clearAuthCookie(): void {
-    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-  },
-
-  // Token storage (localStorage)
+  // Token storage (sessionStorage)
   getStoredToken(): string | null {
     try {
-      return localStorage.getItem('auth_token')
+      return sessionStorage.getItem('auth_token')
     } catch {
       return null
     }
@@ -118,7 +105,7 @@ export const authRepository = {
 
   setStoredToken(token: string): void {
     try {
-      localStorage.setItem('auth_token', token)
+      sessionStorage.setItem('auth_token', token)
     } catch {
       // Ignore storage errors
     }
@@ -126,7 +113,7 @@ export const authRepository = {
 
   clearStoredToken(): void {
     try {
-      localStorage.removeItem('auth_token')
+      sessionStorage.removeItem('auth_token')
     } catch {
       // Ignore storage errors
     }
