@@ -39,15 +39,22 @@ async fn validate_create_post(
 
     // Idempotency check for client_msg_id
     if let Some(ref client_msg_id) = input.client_msg_id {
-        if !client_msg_id.is_empty()
-            && PostRepository::new(state.db.clone())
-                .find_post_by_client_msg_id(user_id, client_msg_id)
+        let trimmed = client_msg_id.trim();
+        if !trimmed.is_empty() {
+            if trimmed.len() > 64 {
+                return Err(AppError::Validation(
+                    "client_msg_id must be at most 64 characters".to_string(),
+                ));
+            }
+            if PostRepository::new(state.db.clone())
+                .find_post_by_client_msg_id(user_id, trimmed)
                 .await?
                 .is_some()
-        {
-            return Err(AppError::Conflict(
-                "Duplicate client message id".to_string(),
-            ));
+            {
+                return Err(AppError::Conflict(
+                    "Duplicate client message id".to_string(),
+                ));
+            }
         }
     }
 
@@ -415,7 +422,10 @@ pub async fn create_post(
             &input.message,
             input.props.clone().unwrap_or(serde_json::json!({})),
             &input.file_ids,
-            client_msg_id.as_deref(),
+            client_msg_id
+                .as_ref()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty()),
         )
         .await?;
 

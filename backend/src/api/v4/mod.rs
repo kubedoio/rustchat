@@ -102,10 +102,7 @@ pub fn router_with_body_limits(
         // Bookmarks - small limit
         .merge(channel_bookmarks::router().layer(DefaultBodyLimit::max(small_limit)))
         // Files - large limit for uploads
-        .merge(
-            files::router(state.clone())
-                .layer(DefaultBodyLimit::max(large_limit)),
-        )
+        .merge(files::router(state.clone()).layer(DefaultBodyLimit::max(large_limit)))
         // System - small limit
         .merge(system::router().layer(DefaultBodyLimit::max(small_limit)))
         // Config - small limit
