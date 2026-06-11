@@ -6,6 +6,7 @@ Complete guide to RustChat features.
 
 - [Messaging](#messaging)
 - [Channels](#channels)
+- [AI Agents](#ai-agents)
 - [Search](#search)
 - [Notifications](#notifications)
 - [Settings](#settings)
@@ -95,6 +96,34 @@ Group DMs with multiple people:
 1. Click **+** next to "Direct Messages"
 2. Select multiple people
 3. Start the conversation
+
+---
+
+## AI Agents
+
+AI agents are assistant accounts your administrator can add to channels. They appear like other channel members and can answer messages when mentioned.
+
+### Asking an Agent
+
+Use the agent's username in a message:
+
+```text
+@support-agent summarize the deployment steps from the runbook
+```
+
+If an administrator enabled always-on responses for a channel, the agent may respond without a mention.
+
+### Agent Responses
+
+Agent replies appear in the channel history as regular messages from the agent account. Depending on the agent's configuration, responses may use:
+- recent channel context
+- saved agent memory
+- assigned knowledge bases
+- enabled tools such as web search
+
+### Feedback
+
+When feedback controls are available on an agent response, mark whether the answer was helpful. Feedback helps administrators review prompt quality, knowledge base coverage, and agent behavior.
 
 ---
 

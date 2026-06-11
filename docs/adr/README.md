@@ -32,4 +32,10 @@ Per `.governance/risk-tiers.yml`, an ADR is required for `architectural` tier ch
 
 ## Index
 
+- [ADR-001: AI Agents as Channel Participants](./ADR-001-ai-agents-architecture.md) - Agent identity, configuration, runtime, channel assignment, memory, LLM provider, and admin surface for first-class AI agents.
+- [Spec: AI Agents Implementation](./ADR-001-ai-agents-implementation-spec.md) - Implementation plan and endpoint contract for the initial AI agents slice.
+- [ADR-002: RAG Knowledge Base with External Sync](./ADR-002-rag-knowledge-base.md) - pgvector-backed knowledge bases, document ingestion, RustShare sync, and grounded agent retrieval.
+- [ADR-002 Implementation Spec: RAG Knowledge Base](./ADR-002-rag-knowledge-base-implementation-spec.md) - Implementation details for knowledge base storage, chunking, embedding, sync sources, and agent assignments.
+- [ADR-003: Agents Phase 3 - Streaming, Tools, and Feedback](./ADR-003-agents-phase3.md) - Streaming responses, tool calling, feedback, analytics, and hybrid retrieval direction.
+- [ADR-003 Implementation Spec: Agents Phase 3](./ADR-003-agents-phase3-implementation-spec.md) - Implementation details for streaming, tools, message feedback, analytics, and frontend behavior.
 - [ADR: Frontend Supply-Chain Security Model](./ADR-frontend-supply-chain-security.md) - npm normalization, hardened CI installs, dependency governance, and override/patch policy for the Vue frontend.

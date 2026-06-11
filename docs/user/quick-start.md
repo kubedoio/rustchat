@@ -41,6 +41,15 @@ Click your avatar to set your status:
 2. Type in the message box at the bottom
 3. Press **Enter** to send
 
+### Ask an AI Agent
+If your administrator has added an AI agent to a channel, mention it like a teammate:
+
+```text
+@support-agent what changed in the latest release?
+```
+
+Agents can use channel context and administrator-assigned knowledge bases. If no agent responds, it may not be assigned to the channel or the AI runtime may not be enabled for your workspace.
+
 ### Format Your Messages
 Use Markdown for formatting:
 ```
@@ -53,6 +62,7 @@ Use Markdown for formatting:
 ## Next Steps
 
 - Learn about [Channels and DMs](./features.md#channels)
+- Learn about [AI Agents](./features.md#ai-agents)
 - Set up [Notifications](./features.md#notifications)
 - Customize your [Settings](./features.md#settings)
 

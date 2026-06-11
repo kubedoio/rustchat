@@ -14,7 +14,7 @@
     "check:dependency-policy": "node scripts/check-dependency-policy.mjs",
     "apply:dependency-patches": "node scripts/apply-dependency-patches.mjs",
     "deps:inventory": "npm ls --all --json",
-    "test:unit": "vitest run src/utils/emoji.test.ts src/utils/directMessage.test.ts src/features/auth/stores/authStore.test.ts src/stores/messages.test.ts src/composables/useUserSummary.test.ts src/features/presence/statusExpiry.test.ts src/features/permissions/capabilities.test.ts src/features/permissions/permissionsUi.test.ts src/components/layout/GlobalHeader.test.ts src/components/channel/ChannelHeader.test.ts src/components/modals/CreateChannelModal.test.ts src/components/atomic/BaseButton.test.ts src/components/atomic/BaseInput.test.ts src/components/ui/ConnectionStatusBar.test.ts src/components/ui/ToastManager.test.ts src/components/ui/RcAvatar.test.ts src/components/atomic/FilePreview.test.ts src/components/atomic/EmojiPicker.test.ts src/components/atomic/ImageGallery.test.ts",
+    "test:unit": "vitest run src/",
     "test:e2e": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test",
     "test:e2e:settings-parity": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test e2e/settings_parity.spec.ts --project=chromium",
     "test:e2e:settings-parity:update": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 PLAYWRIGHT_WEB_SERVER=1 playwright test e2e/settings_parity.spec.ts --project=chromium --update-snapshots",

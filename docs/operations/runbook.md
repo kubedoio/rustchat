@@ -84,6 +84,8 @@ done
 | DB Pool Saturation | `rustchat_db_pool_saturation_ratio` | > 0.8 |
 | WS Connections | `rustchat_websocket_active_connections` | Per-node limit |
 | Circuit Breaker | `rustchat_circuit_breaker_state_changes_total` | Any state change |
+| RAG Indexing Duration | `rustchat_rag_indexing_duration_seconds` | Sustained increase |
+| RAG Search Duration | `rustchat_rag_search_duration_seconds` | p99 > 500ms |
 
 ### Health Checks
 
@@ -119,6 +121,12 @@ kubectl logs -l app=rustchat | jq 'select(.message | contains("Unauthorized"))'
 
 # WebSocket events
 kubectl logs -l app=rustchat | jq 'select(.span.name=="ws_handler")'
+
+# Agent runtime events
+kubectl logs -l app=rustchat | jq 'select(.target | contains("agent"))'
+
+# RAG indexing/search events
+kubectl logs -l app=rustchat | jq 'select(.target | contains("knowledge"))'
 ```
 
 ---
@@ -250,6 +258,71 @@ systemctl restart rustchat
 kubectl logs -l app=rustchat | grep "Rate limit exceeded" | jq '.ip' | sort | uniq -c | sort -rn | head -10
 ```
 
+### P7: AI Agents Not Responding
+
+**Symptoms**: Users mention an agent but no response appears
+
+```bash
+# 1. Confirm the runtime registered a provider
+kubectl logs -l app=rustchat | grep -E "OpenAI LLM provider registered|agent runtime disabled"
+
+# 2. Check provider and tool environment
+kubectl exec deploy/rustchat -- printenv | grep -E 'RUSTCHAT_OPENAI_API_KEY|OPENAI_API_KEY|TAVILY_API_KEY'
+
+# 3. Check for LLM errors or rate limits
+kubectl logs -l app=rustchat | grep -Ei "agent|llm|rate limit|provider"
+
+# 4. Verify the agent is assigned to the channel in the admin UI
+# Admin Console > AI Agents > Agent detail > Channels
+
+# 5. Restart after adding provider keys
+kubectl rollout restart deployment/rustchat
+```
+
+If the backend logs `No LLM providers configured; agent runtime disabled`, configure `RUSTCHAT_OPENAI_API_KEY` or `OPENAI_API_KEY` and restart the backend.
+
+### P8: Knowledge Base Indexing Failure
+
+**Symptoms**: Agent answers ignore uploaded documents, or knowledge base status remains unindexed
+
+```bash
+# 1. Check pgvector availability
+psql $RUSTCHAT_DATABASE_URL -c "SELECT extname FROM pg_extension WHERE extname = 'vector';"
+
+# 2. Check RAG metrics
+curl http://localhost:3000/api/v1/health/metrics | grep rag
+
+# 3. Check backend logs for ingestion failures
+kubectl logs -l app=rustchat | grep -Ei "knowledge|embedding|vector|sync source"
+
+# 4. Verify S3 access from backend configuration
+kubectl logs -l app=rustchat | grep -Ei "s3|storage"
+
+# 5. Retry sync from Admin Console > Knowledge Bases
+```
+
+Large RustShare folders can take seconds to minutes to index. If indexing repeatedly fails, verify S3 credentials, provider key validity, outbound network access, and the `pgvector` extension.
+
+### P9: Agent Cost or Usage Spike
+
+**Symptoms**: Provider usage increases suddenly, responses appear too often, or channels receive too many agent posts
+
+```bash
+# 1. Check agent-related logs
+kubectl logs -l app=rustchat --since=1h | grep -Ei "agent|tokens|usage"
+
+# 2. Temporarily reduce agent limits
+export RUSTCHAT_AGENT_MAX_REQUESTS_PER_MINUTE=5
+export RUSTCHAT_AGENT_MAX_TOKENS_PER_HOUR=25000
+systemctl restart rustchat
+
+# 3. Disable optional web search tool if needed
+unset TAVILY_API_KEY
+systemctl restart rustchat
+```
+
+Review agents with `respond_to_all` enabled, broad channel assignments, and large knowledge base assignments. Disable or narrow the agent in the admin UI before increasing provider limits.
+
 ---
 
 ## Maintenance
@@ -313,6 +386,25 @@ redis-cli BGSAVE
 # Configuration backup
 cp .env .env.backup_$(date +%Y%m%d)
 ```
+
+### AI Agent Maintenance
+
+```bash
+# Confirm optional runtime configuration
+grep -E 'RUSTCHAT_OPENAI_API_KEY|OPENAI_API_KEY|TAVILY_API_KEY|RUSTCHAT_AGENT_' .env
+
+# Confirm pgvector for RAG
+psql $RUSTCHAT_DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+# Review recent agent runtime errors
+kubectl logs -l app=rustchat --since=24h | grep -Ei "agent|llm|knowledge|embedding|tool"
+```
+
+Maintenance checklist:
+- Rotate LLM provider and tool keys with the regular secret rotation schedule.
+- Review agent channel assignments after team or permission changes.
+- Review knowledge base assignments after new sensitive documents are added.
+- Confirm backups include both PostgreSQL and the S3 bucket that stores knowledge documents.
 
 ---
 

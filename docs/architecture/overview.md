@@ -124,6 +124,52 @@ Service writes event → realtime::hub → broadcast to subscribed connections
                                     → Redis pub/sub → other backend instances → their hubs
 ```
 
+### AI Agent Runtime
+
+AI agents are first-class channel participants backed by normal `users` rows with `entity_type = 'agent'`. Agent configuration lives in `agent_configs`, channel overrides live in `agent_channel_settings`, and conversation memory lives in `agent_memories`.
+
+The runtime is optional. At startup the backend initializes `AgentRuntime` only when an LLM provider is configured. If no provider key is present, the application still starts and logs that agent runtime is disabled; admin CRUD for stored agent configuration can still exist, but agents will not generate responses.
+
+**Agent response flow:**
+```
+User posts message
+  → post service persists and broadcasts message
+  → AgentRuntime checks channel assignments and trigger rules
+  → runtime builds prompt from system prompt, recent channel context, memory, and RAG
+  → LLM provider generates or streams a response
+  → agent post is persisted and broadcast through the WebSocket hub
+```
+
+Triggering is channel-scoped. Agents can respond when mentioned with the normal `@username` syntax, and agents configured with `respond_to_all` can answer every message in assigned channels. Agents must be channel members before they can read or respond in a channel.
+
+### LLM Provider Layer
+
+LLM calls are isolated behind a provider registry in `services/llm/`. The runtime currently registers the OpenAI provider when `RUSTCHAT_OPENAI_API_KEY` or `OPENAI_API_KEY` is set. Agent configs store provider, model, temperature, max tokens, and prompt settings; sensitive provider tokens are encrypted before storage.
+
+The provider layer keeps the runtime independent from a single vendor. Additional providers can be added behind the same trait without changing the API handlers or frontend management views.
+
+### RAG Pipeline
+
+Knowledge bases provide retrieval-augmented generation for agents. Documents are stored in S3-compatible storage, metadata and chunks are stored in PostgreSQL, and embeddings use `pgvector` for semantic search. A knowledge base can contain uploaded documents or documents synced from an external source such as RustShare.
+
+**Retrieval flow:**
+```
+Document upload or sync
+  → extract text
+  → split into chunks
+  → generate embeddings
+  → store chunk metadata and vectors in PostgreSQL
+  → retrieve top matches when an assigned agent is prompted
+```
+
+RAG requires PostgreSQL with the `pgvector` extension. OpenAI embeddings are used when an OpenAI key is available; deployments can use the documented local embedding fallback for air-gapped environments.
+
+### Tool Calling
+
+The tool framework lets agents use registered server-side tools during generation. Tools are available only when their backing credentials are configured. For example, the web search tool is registered when `TAVILY_API_KEY` is present.
+
+Tool execution is mediated by the backend, not by the browser. The runtime exposes tool schemas to the LLM provider, validates requested tool calls, executes registered tools, and feeds tool results back into the response context. This keeps external credentials out of the frontend and allows operators to disable tools by removing their environment variables.
+
 ---
 
 ## 3. Frontend

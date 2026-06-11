@@ -242,6 +242,44 @@ Ensure your Redis server has `tls-port` and `tls-cert-file` configured.
 
 ---
 
+## AI Agents and Knowledge Base Security
+
+AI Agents are optional and should be enabled only after provider credentials, data access, and operational ownership are defined.
+
+### Provider and Tool Secrets
+
+- Store `RUSTCHAT_OPENAI_API_KEY`, `OPENAI_API_KEY`, and `TAVILY_API_KEY` in the same secret manager as other production secrets.
+- Do not place provider keys in agent prompts, knowledge documents, or channel messages.
+- Rotate provider keys when an administrator with access leaves the organization.
+- Disable optional tools by removing their environment variables and restarting the backend.
+
+### Prompt and Data Boundaries
+
+- Treat system prompts, recent channel context, memories, retrieved knowledge chunks, and tool results as data that may be sent to an external LLM provider.
+- Assign agents only to channels they must read.
+- Assign knowledge bases only to agents that need that content.
+- Keep highly sensitive document sets in separate knowledge bases so they can be reviewed and assigned independently.
+- Review RustShare sync source scope before enabling recursive folder sync.
+
+### RAG Storage
+
+Knowledge base document blobs use S3-compatible storage. Metadata, chunks, and embeddings live in PostgreSQL with `pgvector`.
+
+- Protect the S3 bucket used for knowledge documents with TLS and narrowly scoped credentials.
+- Back up PostgreSQL and object storage together so document metadata and blobs remain consistent.
+- Remember that embeddings may reveal semantic information about source documents; protect database backups accordingly.
+
+### Monitoring
+
+Monitor:
+- agent response volume and token usage spikes
+- negative feedback rates
+- tool invocation errors
+- knowledge indexing failures
+- unexpected agent activity in sensitive channels
+
+---
+
 ## WebSocket Token Transport Security
 
 Query-string WebSocket tokens have been removed. WebSocket connections authenticate through secure transports such as the `Authorization` header, the WebSocket subprotocol token fallback, or the authenticated v4 handshake message. This prevents tokens from appearing in:
@@ -280,6 +318,7 @@ RustChat emits structured logs via `RUSTCHAT_LOG_LEVEL`. For security auditing:
    - Permission denied errors (privilege escalation attempts)
    - Admin actions (user deletions, role changes)
    - File upload/download anomalies
+   - Agent configuration changes, tool registration, feedback spikes, and knowledge indexing failures
 
 ### Sample Promtail/Loki Labels
 
@@ -307,6 +346,8 @@ RustChat emits structured logs via `RUSTCHAT_LOG_LEVEL`. For security auditing:
 | Weak secret detected | Critical | Rotate immediately |
 | WebSocket auth failure | Info | Normal for expired tokens |
 | Exchange code reuse | Warning | Possible token theft |
+| Agent token or usage spike | Warning | Check prompt, channel assignment, and provider key usage |
+| Knowledge indexing failure | Warning | Check S3, pgvector, embedding provider, and sync source credentials |
 
 ### Log Redaction
 
@@ -348,6 +389,9 @@ access_log /var/log/nginx/access.log security;
 - [ ] PostgreSQL uses SSL/TLS and dedicated user
 - [ ] Redis uses AUTH and TLS (if networked)
 - [ ] S3-compatible storage uses unique credentials and TLS
+- [ ] AI provider and tool keys are stored as production secrets if agents are enabled
+- [ ] Agent channel assignments and knowledge base assignments have been reviewed
+- [ ] PostgreSQL `pgvector` is enabled before RAG knowledge bases are used
 - [ ] `.env` file permissions are `0600`
 - [ ] Backups are encrypted and tested
 - [ ] Logs are forwarded to a central aggregator
