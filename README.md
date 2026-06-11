@@ -1,8 +1,33 @@
 # RustChat
+> Self-hosted live communication infrastructure for technical teams and AI-centric companies.
 
-> **Self-hosted team collaboration that just works.**
-> 
-> RustChat is a self-hosted collaboration platform with a Rust backend and Vue web client. It is under active development and moving toward a supported self-hosted product.
+RustChat is an open-source communication system with a Rust backend and a Vue web client. It is designed for teams that want self-hosted control over live company signals, operational discussions, files, threads, calls, and integrations.
+
+RustChat is part of the broader **Kubedo.io Company Memory Infrastructure** direction, together with RustShare and future permission-aware Company RAG.
+
+**Status:** Public Preview / Active Development
+**License:** Apache-2.0 core
+**Website:** [rustchat.io](https://rustchat.io)
+
+## What this is
+
+RustChat is a self-hosted communication layer for technical teams that need control over their communication data, deployment model, and operational integrations.
+
+It focuses on:
+
+* live team communication
+* channels, threads, files, calls, and search
+* self-hosted deployment
+* API-driven integrations
+* Mattermost-compatible API surfaces where useful
+* operational ownership of company communication signals
+
+## What this is not
+
+RustChat is not positioned as a Slack clone or a generic chat app.
+
+It is not presented as a fully mature enterprise communication suite yet. It is a public-preview infrastructure product for teams that are comfortable evaluating and operating self-hosted software.
+
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.95%2B-orange.svg)](https://www.rust-lang.org/)
