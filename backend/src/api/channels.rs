@@ -225,6 +225,14 @@ async fn create_channel(
             return Ok(Json(channel));
         }
 
+        // Verify requester is a member of the team
+        if !ChannelRepository::new(&state.db)
+            .is_team_member(input.team_id, auth.user_id)
+            .await?
+        {
+            return Err(AppError::NotOnTeam);
+        }
+
         // Validate target user exists in the team
         if !ChannelRepository::new(&state.db)
             .is_team_member(input.team_id, target_id)
@@ -536,6 +544,14 @@ async fn add_member(
     if auth.user_id == target_user_id {
         // User joining themselves
         let channel: Channel = ChannelRepository::new(&state.db).get_by_id(id).await?;
+
+        // Verify requester is a member of the channel's team
+        if !ChannelRepository::new(&state.db)
+            .is_team_member(channel.team_id, auth.user_id)
+            .await?
+        {
+            return Err(AppError::NotOnTeam);
+        }
 
         if channel.channel_type != crate::models::ChannelType::Public {
             let member = ChannelRepository::new(&state.db)
