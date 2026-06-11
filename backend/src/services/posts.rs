@@ -24,6 +24,17 @@ pub struct PostsQuery {
     pub after: Option<Uuid>,
 }
 
+/// Returns true when the database error is the unique violation on the
+/// partial unique index for client_msg_id.
+fn is_client_msg_id_conflict(err: &sqlx::Error) -> bool {
+    if let Some(db_err) = err.as_database_error() {
+        db_err.code().as_deref() == Some("23505")
+            && db_err.constraint() == Some("idx_posts_client_msg_id_unique")
+    } else {
+        false
+    }
+}
+
 async fn validate_create_post(
     state: &AppState,
     user_id: Uuid,
@@ -324,22 +335,6 @@ pub async fn create_post(
                 "client_msg_id must be at most 64 characters".to_string(),
             ));
         }
-        if let Some(existing_id) = PostRepository::new(state.db.clone())
-            .find_post_by_client_msg_id(user_id, id)
-            .await?
-        {
-            let existing_post = PostRepository::new(state.db.clone())
-                .get_post_by_id(existing_id)
-                .await?
-                .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
-            return build_post_response(
-                state,
-                existing_post,
-                user_id,
-                client_msg_id.map(|s| s.to_string()),
-            )
-            .await;
-        }
     }
 
     // Pre-compute data needed before the transaction.
@@ -420,8 +415,9 @@ pub async fn create_post(
     // ========================================================================
     let mut tx = state.db.begin().await?;
 
-    // 1. Insert post + reply count
-    let post = PostRepository::new(state.db.clone())
+    // 1. Insert post + reply count. If a concurrent request already inserted
+    // the same client_msg_id, the unique index raises 23505; return that post.
+    let post = match PostRepository::new(state.db.clone())
         .create_post_in_tx(
             &mut tx,
             channel_id,
@@ -432,7 +428,36 @@ pub async fn create_post(
             &input.file_ids,
             client_msg_id,
         )
-        .await?;
+        .await
+    {
+        Ok(post) => post,
+        Err(err) => {
+            if let AppError::Database(ref sqlx_err) = err {
+                if is_client_msg_id_conflict(sqlx_err) {
+                    drop(tx);
+                    if let Some(id) = client_msg_id {
+                        if let Some(existing_id) = PostRepository::new(state.db.clone())
+                            .find_post_by_client_msg_id(user_id, id)
+                            .await?
+                        {
+                            let existing_post = PostRepository::new(state.db.clone())
+                                .get_post_by_id(existing_id)
+                                .await?
+                                .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+                            return build_post_response(
+                                state,
+                                existing_post,
+                                user_id,
+                                client_msg_id.map(|s| s.to_string()),
+                            )
+                            .await;
+                        }
+                    }
+                }
+            }
+            return Err(err);
+        }
+    };
 
     // Link files to this post inside the transaction (with ownership re-validation)
     if !input.file_ids.is_empty() {

@@ -105,7 +105,7 @@ async fn readiness(State(state): State<AppState>) -> Result<Json<ReadinessRespon
             .fetch_optional(&state.db)
             .await
         {
-            Ok(Some(max_version)) => max_version == EXPECTED_SCHEMA_VERSION,
+            Ok(Some(max_version)) => max_version >= EXPECTED_SCHEMA_VERSION,
             Ok(None) => false,
             Err(err) => {
                 tracing::warn!(error = %err, "Failed to query migration state");
