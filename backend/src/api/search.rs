@@ -14,8 +14,13 @@ use crate::error::{ApiResult, AppError};
 use crate::models::Post;
 
 /// Build search routes
-pub fn router() -> Router<AppState> {
-    Router::new().route("/search", get(search_messages))
+pub fn router(state: AppState) -> Router<AppState> {
+    Router::new().route("/search", get(search_messages)).layer(
+        axum::middleware::from_fn_with_state(
+            state,
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ),
+    )
 }
 
 #[derive(Debug, Deserialize)]

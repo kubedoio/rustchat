@@ -334,6 +334,41 @@ async fn login(
     State(state): State<AppState>,
     Json(input): Json<LoginRequest>,
 ) -> ApiResult<Json<AuthResponse>> {
+    let email = input.email.clone();
+    match login_inner(State(state.clone()), Json(input)).await {
+        Ok(response) => {
+            let _ = crate::services::audit::audit(
+                &state.db,
+                response.user.id,
+                crate::services::audit::AuditAction::LoginSuccess,
+                "user",
+                Some(response.user.id),
+                serde_json::json!({ "email": email }),
+            )
+            .await;
+            Ok(response)
+        }
+        Err(err) => {
+            // nil UUID indicates an unauthenticated actor for failed logins.
+            let actor_id = uuid::Uuid::nil();
+            let _ = crate::services::audit::audit(
+                &state.db,
+                actor_id,
+                crate::services::audit::AuditAction::LoginFailed,
+                "user",
+                None,
+                serde_json::json!({ "email": email }),
+            )
+            .await;
+            Err(err)
+        }
+    }
+}
+
+async fn login_inner(
+    State(state): State<AppState>,
+    Json(input): Json<LoginRequest>,
+) -> ApiResult<Json<AuthResponse>> {
     // Find user by email
     let user = UserRepository::new(&state.db)
         .get_active_by_email(&input.email)
@@ -353,6 +388,7 @@ async fn login(
             tracing::warn!(user_id = %user.id, "Rate limit exceeded for user login");
             return Err(AppError::TooManyRequests(
                 "Too many login attempts. Please try again later.".to_string(),
+                Some(config.window_secs),
             ));
         }
     }
@@ -642,6 +678,7 @@ async fn reset_password_handler(
         Err(PasswordResetError::InvalidPassword(msg)) => Err(AppError::Validation(msg)),
         Err(PasswordResetError::RateLimitExceeded) => Err(AppError::TooManyRequests(
             "Too many attempts. Please try again later.".to_string(),
+            None,
         )),
         Err(e) => {
             tracing::error!("Password reset error: {}", e);

@@ -4,6 +4,7 @@ pub mod activity;
 pub mod agent_memory;
 pub mod agent_rate_limiter;
 pub mod agent_runtime;
+pub mod audit;
 pub mod auth_config;
 pub mod email_provider;
 pub mod email_service;

@@ -100,6 +100,7 @@ pub async fn login(
             );
             return Err(AppError::TooManyRequests(
                 "Too many login attempts. Please try again later.".to_string(),
+                Some(config.window_secs),
             ));
         }
     }

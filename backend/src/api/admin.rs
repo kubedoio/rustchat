@@ -133,6 +133,21 @@ async fn update_config(
     );
     state.ws_hub.broadcast(event).await;
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let category_clone = category.clone();
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::ConfigUpdate,
+            "config",
+            None,
+            serde_json::json!({ "category": category_clone }),
+        )
+        .await;
+    });
+
     Ok(Json(result.0 .0))
 }
 

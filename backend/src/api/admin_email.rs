@@ -255,6 +255,22 @@ async fn create_provider(
         "Created mail provider: id={}, host={}",
         provider.id, provider.host
     );
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let provider_id = provider.id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::EmailProviderCreate,
+            "email_provider",
+            Some(provider_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
+
     Ok(Json(provider.into()))
 }
 
@@ -317,6 +333,22 @@ async fn update_provider(
         .await?;
 
     info!("Updated mail provider: id={}", id);
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let provider_id = id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::EmailProviderUpdate,
+            "email_provider",
+            Some(provider_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
+
     Ok(Json(provider.into()))
 }
 
@@ -335,6 +367,22 @@ async fn delete_provider(
     }
 
     info!("Deleted mail provider: id={}", id);
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let provider_id = id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::EmailProviderDelete,
+            "email_provider",
+            Some(provider_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
+
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }
 

@@ -35,8 +35,16 @@ use view::{view_channel, view_channel_for_user};
 
 pub use direct::{create_direct_channel_internal, create_group_channel_internal};
 
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
+        .route("/channels/search", post(search::search_channels_compat))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
     Router::new()
+        .merge(search_routes)
         .route("/channels/{channel_id}/posts", get(posts::get_posts))
         .route(
             "/channels/{channel_id}",
@@ -126,7 +134,6 @@ pub fn router() -> Router<AppState> {
             "/channels",
             get(crud::get_all_channels).post(crud::create_channel),
         )
-        .route("/channels/search", post(search::search_channels_compat))
         .route("/channels/group/search", post(search_group_channels))
         .route("/channels/{channel_id}/scheme", put(update_channel_scheme))
         .route(

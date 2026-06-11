@@ -113,7 +113,10 @@ pub(crate) async fn run_connection(
     // Presence tracking must use a per-socket unique id instead of the resumable
     // actor connection id, otherwise reconnect races can unregister an active
     // socket that reused the same actor connection id.
-    let (hub_conn_id, mut hub_rx) = state.ws_hub.add_connection(user_id, username.clone()).await;
+    let (hub_conn_id, mut hub_rx) = state
+        .ws_hub
+        .add_connection(user_id, username.clone(), actor.cmd_tx())
+        .await;
     let presence_connection_id = hub_conn_id.to_string();
     websocket_core::register_presence_connection(&state, user_id, &presence_connection_id).await;
 
@@ -221,6 +224,17 @@ pub(crate) async fn run_connection(
                         skipped = skipped,
                         "Hub receiver lagged; dropping stale websocket messages"
                     );
+                    let resync_msg = json!({
+                        "event": "resync_required",
+                        "data": { "reason": "hub_lagged" }
+                    });
+                    if let Err(e) = actor_clone.send_raw(resync_msg) {
+                        warn!(
+                            connection_id = %replay_connection_id,
+                            error = %e,
+                            "Failed to send resync_required after hub lag"
+                        );
+                    }
                     continue;
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => {
@@ -306,6 +320,19 @@ pub(crate) async fn run_connection(
                     }
                     Some(WsEvent::PongReceived) => {
                         trace!(connection_id = %actor_connection_id, "Pong received");
+                    }
+                    Some(WsEvent::ResyncRequired { reason }) => {
+                        let resync_msg = json!({
+                            "event": "resync_required",
+                            "data": { "reason": reason }
+                        });
+                        if let Err(e) = actor.send_raw(resync_msg) {
+                            warn!(
+                                connection_id = %actor_connection_id,
+                                error = %e,
+                                "Failed to send resync_required to client"
+                            );
+                        }
                     }
                     Some(WsEvent::Closed(reason)) => {
                         info!(

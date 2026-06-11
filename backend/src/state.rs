@@ -36,4 +36,5 @@ pub struct AppState {
         async_channel::Sender<crate::services::membership_reconciliation::ReconciliationTask>,
     >,
     pub agent_runtime: Option<Arc<AgentRuntime>>,
+    pub shutdown: tokio_util::sync::CancellationToken,
 }

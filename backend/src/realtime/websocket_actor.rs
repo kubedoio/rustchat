@@ -47,12 +47,17 @@ fn is_benign_disconnect_error(error: &str) -> bool {
 fn emit_event(event_tx: &mpsc::Sender<WsEvent>, connection_id: &str, event: WsEvent) -> bool {
     match event_tx.try_send(event) {
         Ok(()) => true,
-        Err(TrySendError::Full(_)) => {
+        Err(TrySendError::Full(_dropped)) => {
             metrics::record_ws_dropped("actor_event_queue_full", 1);
             warn!(
                 connection_id = %connection_id,
                 "Dropping websocket event because event queue is full"
             );
+            // Best-effort signal to the connection handler that the client
+            // should perform a full resync.
+            let _ = event_tx.try_send(WsEvent::ResyncRequired {
+                reason: "queue_full".to_string(),
+            });
             false
         }
         Err(TrySendError::Closed(_)) => false,
@@ -109,6 +114,8 @@ pub enum WsEvent {
     Closed(CloseReason),
     /// Error occurred
     Error(String),
+    /// Resync required due to queue overflow or lag
+    ResyncRequired { reason: String },
 }
 
 /// Reason for connection close
@@ -268,6 +275,11 @@ impl WebSocketActor {
         self.last_activity
             .store(Instant::now().elapsed().as_secs(), Ordering::SeqCst);
         self.state.touch();
+    }
+
+    /// Clone the command sender for external shutdown signalling.
+    pub fn cmd_tx(&self) -> mpsc::Sender<WsCommand> {
+        self.cmd_tx.clone()
     }
 
     /// Check if the connection is alive (not timed out)

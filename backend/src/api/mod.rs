@@ -2,7 +2,7 @@
 //!
 //! Provides HTTP routes and handlers.
 
-mod admin;
+pub mod admin;
 mod admin_audit;
 mod admin_email;
 mod admin_membership_policies;
@@ -92,6 +92,7 @@ use crate::services::knowledge::vector_store::{PgVectorStore, VectorStore};
 use crate::services::llm::{OpenAiProvider, ProviderRegistry};
 use crate::storage::S3Client;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 fn parse_cors_allowed_origins(raw: &str) -> Vec<HeaderValue> {
     raw.split(',')
@@ -142,6 +143,10 @@ fn build_cors_layer(config: &Config) -> CorsLayer {
 pub use crate::state::AppState;
 
 /// Build the main application router
+///
+/// Returns the router and the constructed [`AppState`] so callers can
+/// perform graceful-shutdown cleanup (e.g. closing WebSockets).
+#[allow(clippy::too_many_arguments)]
 pub fn router(
     db: PgPool,
     redis: deadpool_redis::Pool,
@@ -150,7 +155,8 @@ pub fn router(
     ws_hub: Arc<WsHub>,
     s3_client: S3Client,
     config: Config,
-) -> Router {
+    shutdown: CancellationToken,
+) -> (Router, AppState) {
     let (voice_event_tx, voice_event_rx) = mpsc::channel(VOICE_EVENT_CHANNEL_CAPACITY);
     let sfu_manager = SFUManager::new(config.calls.clone(), voice_event_tx);
     let call_state_manager = Arc::new(CallStateManager::with_backend(
@@ -242,6 +248,7 @@ pub fn router(
         circuit_breakers: Arc::new(ServiceCircuitBreakers::new()),
         reconciliation_tx: None,
         agent_runtime: agent_runtime.clone(),
+        shutdown: shutdown.clone(),
     });
 
     // Spawn membership reconciliation worker
@@ -273,6 +280,7 @@ pub fn router(
         circuit_breakers: Arc::new(ServiceCircuitBreakers::new()),
         reconciliation_tx: Some(reconciliation_tx),
         agent_runtime,
+        shutdown,
     };
 
     let _keycloak_sync_handle = if state.config.keycloak_sync.enabled {
@@ -328,7 +336,7 @@ pub fn router(
         .merge(posts::router().layer(DefaultBodyLimit::max(MEDIUM_BODY_LIMIT)))
         // Files router gets large limit for uploads
         .merge(files::router().layer(DefaultBodyLimit::max(LARGE_BODY_LIMIT)))
-        .merge(search::router().layer(DefaultBodyLimit::max(SMALL_BODY_LIMIT)))
+        .merge(search::router(state.clone()).layer(DefaultBodyLimit::max(SMALL_BODY_LIMIT)))
         .merge(integrations::router().layer(DefaultBodyLimit::max(SMALL_BODY_LIMIT)))
         .merge(admin::router().layer(DefaultBodyLimit::max(MEDIUM_BODY_LIMIT)))
         .merge(preferences::router().layer(DefaultBodyLimit::max(SMALL_BODY_LIMIT)))
@@ -354,7 +362,7 @@ pub fn router(
         crate::middleware::security_headers::SecurityHeadersConfig::development()
     };
 
-    Router::new()
+    let router = Router::new()
         .merge(oauth::web_compat_router())
         .nest("/api/v1", api_v1)
         .nest("/api/v1", v1::router()) // Phase 1 entity endpoints
@@ -405,5 +413,7 @@ pub fn router(
                 ),
         )
         .layer(cors)
-        .with_state(state)
+        .with_state(state.clone());
+
+    (router, state)
 }

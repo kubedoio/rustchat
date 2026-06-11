@@ -1,5 +1,6 @@
 use rustchat::{api, config::Config, db, realtime::WsHub, storage::S3Client, telemetry};
 use std::net::SocketAddr;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 #[tokio::main]
@@ -125,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // Build application router (spawns reconciliation worker internally)
-    let app = api::router(
+    let (app, state) = api::router(
         db_pool.clone(),
         redis_pool,
         config.jwt_secret.clone(),
@@ -133,6 +134,7 @@ async fn main() -> anyhow::Result<()> {
         ws_hub,
         s3_client,
         config.clone(),
+        CancellationToken::new(),
     );
 
     // Start server
@@ -143,11 +145,44 @@ async fn main() -> anyhow::Result<()> {
     info!("Listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    let state_for_shutdown = state.clone();
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(async move {
+        shutdown_signal().await;
+        state_for_shutdown
+            .ws_hub
+            .close_all_with_code(1012, "Service restarting")
+            .await;
+    })
     .await?;
 
     Ok(())
+}
+
+/// Wait for a shutdown signal (Ctrl+C or SIGTERM).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }

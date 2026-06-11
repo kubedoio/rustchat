@@ -115,7 +115,11 @@ async fn handle_socket(
     let (mut sender, mut receiver) = socket.split();
 
     // Add connection to hub
-    let (connection_id, mut rx) = state.ws_hub.add_connection(user_id, username.clone()).await;
+    let (cmd_tx, _cmd_rx) = tokio::sync::mpsc::channel(1);
+    let (connection_id, mut rx) = state
+        .ws_hub
+        .add_connection(user_id, username.clone(), cmd_tx)
+        .await;
     let connection_id_str = connection_id.to_string();
     websocket_core::register_presence_connection(&state, user_id, &connection_id_str).await;
 

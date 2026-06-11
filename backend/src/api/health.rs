@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 use super::AppState;
 use crate::db;
+use crate::db::EXPECTED_SCHEMA_VERSION;
 use crate::telemetry::metrics;
 
 #[derive(Serialize)]
@@ -98,6 +99,28 @@ async fn readiness(State(state): State<AppState>) -> Result<Json<ReadinessRespon
         },
     );
 
+    // Check migration state
+    let migration_healthy =
+        match sqlx::query_scalar::<_, i64>("SELECT MAX(version) FROM _sqlx_migrations")
+            .fetch_optional(&state.db)
+            .await
+        {
+            Ok(Some(max_version)) => max_version == EXPECTED_SCHEMA_VERSION,
+            Ok(None) => false,
+            Err(err) => {
+                tracing::warn!(error = %err, "Failed to query migration state");
+                false
+            }
+        };
+    checks.insert(
+        "migrations".to_string(),
+        if migration_healthy {
+            "ok".to_string()
+        } else {
+            "pending".to_string()
+        },
+    );
+
     // Check email outbox lag/pressure (operational readiness signal).
     let outbox_healthy = match check_email_outbox_pressure(&state.db).await {
         Ok((queued_old, oldest_age_secs)) => {
@@ -127,7 +150,8 @@ async fn readiness(State(state): State<AppState>) -> Result<Json<ReadinessRespon
         }
     };
 
-    let all_healthy = db_healthy && redis_healthy && s3_healthy && outbox_healthy;
+    let all_healthy =
+        db_healthy && redis_healthy && s3_healthy && outbox_healthy && migration_healthy;
 
     let response = ReadinessResponse {
         status: if all_healthy { "ok" } else { "degraded" },

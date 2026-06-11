@@ -47,7 +47,7 @@ pub enum AppError {
     ExternalService(String),
 
     #[error("Too many requests: {0}")]
-    TooManyRequests(String),
+    TooManyRequests(String, Option<u64>),
 
     #[error("Rate limit exceeded: {0}")]
     RateLimitExceeded(String),
@@ -329,7 +329,7 @@ impl AppError {
             AppError::Validation(_) => "VALIDATION_ERROR",
             AppError::Config(_) => "CONFIG_ERROR",
             AppError::ExternalService(_) => "EXTERNAL_SERVICE_ERROR",
-            AppError::TooManyRequests(_) => "TOO_MANY_REQUESTS",
+            AppError::TooManyRequests(_, _) => "TOO_MANY_REQUESTS",
             AppError::RateLimitExceeded(_) => "RATE_LIMIT_EXCEEDED",
             // NotFound typed variants
             AppError::PostNotFound => "NOT_FOUND",
@@ -433,7 +433,7 @@ impl AppError {
             AppError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             AppError::Config(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::ExternalService(_) => StatusCode::BAD_GATEWAY,
-            AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
+            AppError::TooManyRequests(_, _) => StatusCode::TOO_MANY_REQUESTS,
             AppError::RateLimitExceeded(_) => StatusCode::TOO_MANY_REQUESTS,
             // NotFound typed variants
             AppError::PostNotFound => StatusCode::NOT_FOUND,
@@ -529,6 +529,13 @@ impl IntoResponse for AppError {
         let status = self.status_code();
         let message = self.to_string();
 
+        // Extract retry-after before consuming self
+        let retry_after = match &self {
+            AppError::TooManyRequests(_, retry_after) => *retry_after,
+            AppError::RateLimitExceeded(_) => None,
+            _ => None,
+        };
+
         // Log the error for debugging: 5xx is error, 4xx is warn
         if status.is_server_error() {
             tracing::error!(error = %message, code = %self.code(), status = %status, "API error");
@@ -544,7 +551,19 @@ impl IntoResponse for AppError {
             },
         };
 
-        (status, Json(body)).into_response()
+        let mut response = (status, Json(body)).into_response();
+
+        if let Some(retry_after_secs) = retry_after {
+            if let Ok(header_value) =
+                axum::http::HeaderValue::from_str(&retry_after_secs.to_string())
+            {
+                response
+                    .headers_mut()
+                    .insert(axum::http::header::RETRY_AFTER, header_value);
+            }
+        }
+
+        response
     }
 }
 

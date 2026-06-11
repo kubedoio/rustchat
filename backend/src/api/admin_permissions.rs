@@ -75,5 +75,24 @@ pub async fn update_role_permissions(
         .set_role_permissions(&role, &valid_ids)
         .await?;
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let role_name = role.clone();
+    let permission_count = valid_ids.len();
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::RolePermissionUpdate,
+            "role",
+            None,
+            serde_json::json!({
+                "role": role_name,
+                "permission_count": permission_count,
+            }),
+        )
+        .await;
+    });
+
     Ok(Json(valid_ids))
 }

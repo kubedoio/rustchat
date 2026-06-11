@@ -347,9 +347,37 @@ async fn download_file_content(
         .await?
         .ok_or_else(|| AppError::FileNotFound)?;
 
-    check_file_access(&state, &file, auth.user_id).await?;
+    if let Err(e) = check_file_access(&state, &file, auth.user_id).await {
+        if matches!(e, AppError::Forbidden(_)) {
+            let _ = crate::services::audit::audit(
+                &state.db,
+                auth.user_id,
+                crate::services::audit::AuditAction::FileDownloadDenied,
+                "file",
+                Some(id),
+                serde_json::json!({ "file_name": file.name }),
+            )
+            .await;
+        }
+        return Err(e);
+    }
 
     let stream = state.s3_client.download_stream(&file.key).await?;
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let file_name = file.name.clone();
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::FileDownload,
+            "file",
+            Some(id),
+            serde_json::json!({ "file_name": file_name }),
+        )
+        .await;
+    });
 
     Ok((
         [

@@ -82,11 +82,11 @@ pub fn router_with_body_limits(
         // User management - medium limit for profiles
         .merge(users::router(state.clone()).layer(DefaultBodyLimit::max(medium_limit)))
         // Teams - small limit
-        .merge(teams::router().layer(DefaultBodyLimit::max(small_limit)))
+        .merge(teams::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
         // Groups - small limit
         .merge(groups::router().layer(DefaultBodyLimit::max(small_limit)))
         // Channels - medium limit for descriptions/settings
-        .merge(channels::router().layer(DefaultBodyLimit::max(medium_limit)))
+        .merge(channels::router(state.clone()).layer(DefaultBodyLimit::max(medium_limit)))
         // Emoji - small limit
         .merge(emoji::router().layer(DefaultBodyLimit::max(small_limit)))
         // Commands - small limit
@@ -96,13 +96,20 @@ pub fn router_with_body_limits(
         // Categories - small limit
         .merge(categories::router().layer(DefaultBodyLimit::max(small_limit)))
         // Posts - medium limit for message content
-        .merge(posts::router().layer(DefaultBodyLimit::max(medium_limit)))
+        .merge(posts::router(state.clone()).layer(DefaultBodyLimit::max(medium_limit)))
         // Status - small limit
         .merge(status::router().layer(DefaultBodyLimit::max(small_limit)))
         // Bookmarks - small limit
         .merge(channel_bookmarks::router().layer(DefaultBodyLimit::max(small_limit)))
         // Files - large limit for uploads
-        .merge(files::router().layer(DefaultBodyLimit::max(large_limit)))
+        .merge(
+            files::router(state.clone())
+                .layer(DefaultBodyLimit::max(large_limit))
+                .layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    crate::middleware::rate_limit::upload_ip_rate_limit,
+                )),
+        )
         // System - small limit
         .merge(system::router().layer(DefaultBodyLimit::max(small_limit)))
         // Config - small limit
@@ -162,7 +169,14 @@ pub fn router_with_body_limits(
         // Dialogs - small limit
         .merge(dialogs::router().layer(DefaultBodyLimit::max(small_limit)))
         // Uploads - large limit for file uploads
-        .merge(uploads::router().layer(DefaultBodyLimit::max(large_limit)))
+        .merge(
+            uploads::router()
+                .layer(DefaultBodyLimit::max(large_limit))
+                .layer(axum::middleware::from_fn_with_state(
+                    state.clone(),
+                    crate::middleware::rate_limit::upload_ip_rate_limit,
+                )),
+        )
         // Threads - medium limit
         .merge(threads::router().layer(DefaultBodyLimit::max(medium_limit)))
         // Image - medium limit for image processing

@@ -39,16 +39,23 @@ async fn check_file_access(state: &AppState, file: &FileInfo, user_id: Uuid) -> 
     Ok(())
 }
 
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
+        .route("/files/search", post(search_files_global))
+        .route("/teams/{team_id}/files/search", post(search_files_for_team))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
     Router::new()
+        .merge(search_routes)
         .route("/files", post(upload_file))
         .route("/files/{file_id}", get(get_file))
         .route("/files/{file_id}/info", get(get_file_info))
         .route("/files/{file_id}/thumbnail", get(get_thumbnail))
         .route("/files/{file_id}/preview", get(get_preview))
         .route("/files/{file_id}/link", get(get_link))
-        .route("/files/search", post(search_files_global))
-        .route("/teams/{team_id}/files/search", post(search_files_for_team))
 }
 
 fn filename_extension(filename: &str) -> Option<&str> {

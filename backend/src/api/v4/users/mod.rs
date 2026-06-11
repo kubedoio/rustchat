@@ -150,12 +150,20 @@ pub fn router(state: AppState) -> Router<AppState> {
         Router::new()
             .route("/users/login", post(login))
             .layer(middleware::from_fn_with_state(
-                state,
+                state.clone(),
                 rate_limit::auth_ip_rate_limit,
             ));
 
+    let search_routes = Router::new()
+        .route("/users/search", post(search_users))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            rate_limit::search_ip_rate_limit,
+        ));
+
     Router::new()
         .merge(login_routes)
+        .merge(search_routes)
         .route("/users/login/type", post(login_type))
         .route("/users/login/cws", post(login_cws))
         .route(
@@ -241,7 +249,6 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/users/me/sessions", get(get_sessions))
         .route("/users/logout", get(logout).post(logout))
         .route("/users/autocomplete", get(autocomplete_users))
-        .route("/users/search", post(search_users))
         .route("/users/known", get(get_known_users))
         .route("/users/stats", get(get_user_stats))
         .route("/users/stats/filtered", post(get_user_stats_filtered))

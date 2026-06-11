@@ -135,6 +135,21 @@ pub async fn delete_admin_team(
     let repo = AdminRepository::new(&state.db);
     repo.delete_team(id).await?;
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let team_id = id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::TeamDelete,
+            "team",
+            Some(team_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
+
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }
 
@@ -179,6 +194,22 @@ pub async fn add_team_member(
         );
     }
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let team_id = id;
+    let user_id = payload.user_id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::TeamMemberAdd,
+            "team",
+            Some(team_id),
+            serde_json::json!({ "user_id": user_id }),
+        )
+        .await;
+    });
+
     Ok(Json(member))
 }
 
@@ -191,6 +222,22 @@ pub async fn remove_team_member(
 
     let repo = AdminRepository::new(&state.db);
     repo.remove_team_member(id, user_id).await?;
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let team_id = id;
+    let member_id = user_id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::TeamMemberRemove,
+            "team",
+            Some(team_id),
+            serde_json::json!({ "user_id": member_id }),
+        )
+        .await;
+    });
 
     Ok(Json(serde_json::json!({"status": "removed"})))
 }
@@ -316,6 +363,21 @@ pub async fn delete_admin_channel(
 
     let repo = AdminRepository::new(&state.db);
     repo.delete_channel(id).await?;
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let channel_id = id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            actor,
+            crate::services::audit::AuditAction::ChannelDelete,
+            "channel",
+            Some(channel_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }
