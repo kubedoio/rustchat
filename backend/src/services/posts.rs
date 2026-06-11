@@ -324,14 +324,21 @@ pub async fn create_post(
                 "client_msg_id must be at most 64 characters".to_string(),
             ));
         }
-        if PostRepository::new(state.db.clone())
+        if let Some(existing_id) = PostRepository::new(state.db.clone())
             .find_post_by_client_msg_id(user_id, id)
             .await?
-            .is_some()
         {
-            return Err(AppError::Conflict(
-                "Duplicate client message id".to_string(),
-            ));
+            let existing_post = PostRepository::new(state.db.clone())
+                .get_post_by_id(existing_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+            return build_post_response(
+                state,
+                existing_post,
+                user_id,
+                client_msg_id.map(|s| s.to_string()),
+            )
+            .await;
         }
     }
 
