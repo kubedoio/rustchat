@@ -480,7 +480,8 @@ async fn run_agent_response(
                     "from_agent": true,
                     "agent_id": agent_user_id.to_string(),
                 }),
-                &[], // file_ids
+                &[],  // file_ids
+                None, // client_msg_id
             )
             .await?;
         tx.commit().await.map_err(AppError::Database)?;

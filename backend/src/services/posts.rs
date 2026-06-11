@@ -37,6 +37,20 @@ async fn validate_create_post(
         .require_channel_membership(channel_id, user_id)
         .await?;
 
+    // Idempotency check for client_msg_id
+    if let Some(ref client_msg_id) = input.client_msg_id {
+        if !client_msg_id.is_empty()
+            && PostRepository::new(state.db.clone())
+                .find_post_by_client_msg_id(user_id, client_msg_id)
+                .await?
+                .is_some()
+        {
+            return Err(AppError::Conflict(
+                "Duplicate client message id".to_string(),
+            ));
+        }
+    }
+
     // Validate message
     if input.message.trim().is_empty() && input.file_ids.is_empty() {
         return Err(AppError::Validation("Message cannot be empty".to_string()));
@@ -401,23 +415,19 @@ pub async fn create_post(
             &input.message,
             input.props.clone().unwrap_or(serde_json::json!({})),
             &input.file_ids,
+            client_msg_id.as_deref(),
         )
         .await?;
 
-    // Link files to this post inside the transaction
+    // Link files to this post inside the transaction (with ownership re-validation)
     if !input.file_ids.is_empty() {
-        let result = sqlx::query(
-            "UPDATE files SET post_id = $1, channel_id = $3 WHERE id = ANY($2) AND post_id IS NULL",
-        )
-        .bind(post.id)
-        .bind(&input.file_ids)
-        .bind(channel_id)
-        .execute(&mut *tx)
-        .await?;
+        let attached_ids = FileRepository::new(&state.db)
+            .attach_files_to_post_in_tx(&mut tx, &input.file_ids, post.id, channel_id, user_id)
+            .await?;
 
-        if result.rows_affected() != input.file_ids.len() as u64 {
+        if attached_ids.len() != input.file_ids.len() {
             return Err(AppError::Validation(
-                "One or more files were already attached to another post".to_string(),
+                "One or more files could not be attached".to_string(),
             ));
         }
     }

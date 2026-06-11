@@ -44,6 +44,7 @@ pub struct PostWithUser {
     pub reply_count: i64,
     pub last_reply_at: Option<DateTime<Utc>>,
     pub seq: i64,
+    pub client_msg_id: Option<String>,
     // User fields
     pub username: Option<String>,
     pub avatar_url: Option<String>,
@@ -98,6 +99,7 @@ impl PostRepository {
         COALESCE(p.file_ids, '{}'::uuid[]) as file_ids,
         p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
         p.reply_count::int8 as reply_count, p.last_reply_at, p.seq,
+        p.client_msg_id,
         u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
     "#;
 
@@ -106,7 +108,7 @@ impl PostRepository {
         id, channel_id, user_id, root_post_id, message, props, file_ids,
         is_pinned, created_at, edited_at, deleted_at,
         reply_count::int8 as reply_count,
-        last_reply_at, seq
+        last_reply_at, seq, client_msg_id
     "#;
 
     /// Get a single post by ID with user info
@@ -616,6 +618,38 @@ impl PostRepository {
         .bind(scheduled_at)
         .bind(scheduled_id)
         .bind(user_id)
+        .fetch_optional(&self.db)
+        .await?;
+
+        Ok(row)
+    }
+
+    /// Get a scheduled post by ID
+    pub async fn get_scheduled_post(
+        &self,
+        scheduled_id: Uuid,
+    ) -> ApiResult<
+        Option<(
+            Uuid,
+            Uuid,
+            Uuid,
+            Option<Uuid>,
+            String,
+            serde_json::Value,
+            Vec<Uuid>,
+            i64,
+            chrono::DateTime<chrono::Utc>,
+            chrono::DateTime<chrono::Utc>,
+        )>,
+    > {
+        let row = sqlx::query_as(
+            r#"
+            SELECT id, channel_id, user_id, root_id, message, props, file_ids, (extract(epoch from scheduled_at) * 1000)::bigint, created_at, updated_at
+            FROM scheduled_posts
+            WHERE id = $1
+            "#,
+        )
+        .bind(scheduled_id)
         .fetch_optional(&self.db)
         .await?;
 
@@ -1912,11 +1946,12 @@ impl PostRepository {
         message: &str,
         props: serde_json::Value,
         file_ids: &[Uuid],
+        client_msg_id: Option<&str>,
     ) -> ApiResult<crate::models::Post> {
         let post = sqlx::query_as::<_, crate::models::Post>(&format!(
             r#"
-            INSERT INTO posts (channel_id, user_id, root_post_id, message, props, file_ids)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO posts (channel_id, user_id, root_post_id, message, props, file_ids, client_msg_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING {}
             "#,
             Self::POST_COLUMNS_NO_USER
@@ -1927,6 +1962,7 @@ impl PostRepository {
         .bind(message)
         .bind(props)
         .bind(file_ids)
+        .bind(client_msg_id)
         .fetch_one(&mut **tx)
         .await?;
 
@@ -1955,11 +1991,12 @@ impl PostRepository {
         message: &str,
         props: serde_json::Value,
         file_ids: &[Uuid],
+        client_msg_id: Option<&str>,
     ) -> ApiResult<crate::models::Post> {
         let post = sqlx::query_as::<_, crate::models::Post>(&format!(
             r#"
-            INSERT INTO posts (id, channel_id, user_id, root_post_id, message, props, file_ids)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO posts (id, channel_id, user_id, root_post_id, message, props, file_ids, client_msg_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING {}
             "#,
             Self::POST_COLUMNS_NO_USER
@@ -1971,6 +2008,7 @@ impl PostRepository {
         .bind(message)
         .bind(props)
         .bind(file_ids)
+        .bind(client_msg_id)
         .fetch_one(&mut **tx)
         .await?;
 
@@ -1984,6 +2022,23 @@ impl PostRepository {
         }
 
         Ok(post)
+    }
+
+    /// Find a post by client_msg_id for a specific user.
+    pub async fn find_post_by_client_msg_id(
+        &self,
+        user_id: Uuid,
+        client_msg_id: &str,
+    ) -> ApiResult<Option<Uuid>> {
+        let id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM posts WHERE user_id = $1 AND client_msg_id = $2 LIMIT 1",
+        )
+        .bind(user_id)
+        .bind(client_msg_id)
+        .fetch_optional(&self.db)
+        .await?;
+
+        Ok(id)
     }
 
     /// Update post props inside an existing transaction.
@@ -2279,6 +2334,7 @@ struct PostWithUserRow {
     pub reply_count: i64,
     pub last_reply_at: Option<DateTime<Utc>>,
     pub seq: i64,
+    pub client_msg_id: Option<String>,
     // User fields (Option because of LEFT JOIN)
     pub username: Option<String>,
     pub avatar_url: Option<String>,
@@ -2303,6 +2359,7 @@ impl From<PostWithUserRow> for PostWithUser {
             reply_count: row.reply_count,
             last_reply_at: row.last_reply_at,
             seq: row.seq,
+            client_msg_id: row.client_msg_id,
             username: row.username,
             avatar_url: row.avatar_url,
             email: row.email,
@@ -2334,7 +2391,7 @@ impl From<PostWithUser> for crate::models::post::PostResponse {
             files: vec![],
             reactions: vec![],
             is_saved: false,
-            client_msg_id: None,
+            client_msg_id: p.client_msg_id,
             seq: p.seq,
         }
     }

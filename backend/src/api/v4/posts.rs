@@ -1164,6 +1164,25 @@ async fn delete_scheduled_post(
         .ok_or_else(|| AppError::ValidationInvalidScheduledPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
+    let scheduled = repo
+        .get_scheduled_post(scheduled_id)
+        .await?
+        .ok_or_else(|| AppError::ScheduledPostNotFound)?;
+
+    // Verify ownership
+    if scheduled.2 != auth.user_id {
+        return Err(AppError::ScheduledPostNotFound);
+    }
+
+    // Verify channel membership; do NOT leak existence with a separate error
+    if repo
+        .require_channel_membership(scheduled.1, auth.user_id)
+        .await
+        .is_err()
+    {
+        return Err(AppError::ScheduledPostNotFound);
+    }
+
     let row = repo
         .delete_scheduled_post(scheduled_id, auth.user_id)
         .await?

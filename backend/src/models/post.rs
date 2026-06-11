@@ -27,6 +27,8 @@ pub struct Post {
     pub seq: i64,
     #[sqlx(default)]
     pub has_reactions: bool,
+    #[sqlx(default)]
+    pub client_msg_id: Option<String>,
 }
 
 /// Aggregated reaction for responses

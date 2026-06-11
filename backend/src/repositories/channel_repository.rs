@@ -256,6 +256,28 @@ impl<'a> ChannelRepository<'a> {
         .await
     }
 
+    /// Get all channel IDs a user is a member of within a team
+    pub async fn get_user_channel_ids_in_team(
+        &self,
+        user_id: Uuid,
+        team_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        let rows: Vec<(Uuid,)> = sqlx::query_as(
+            r#"
+            SELECT cm.channel_id
+            FROM channel_members cm
+            JOIN channels c ON c.id = cm.channel_id
+            WHERE cm.user_id = $1 AND c.team_id = $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(team_id)
+        .fetch_all(self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| r.0).collect())
+    }
+
     /// Check if a user is a member of a team
     pub async fn is_team_member(&self, team_id: Uuid, user_id: Uuid) -> ApiResult<bool> {
         let exists: bool = sqlx::query_scalar(

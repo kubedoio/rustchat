@@ -14,7 +14,7 @@ use crate::models::{
     normalize_avatar_url, AddTeamMember, AdminChannelResponse, AdminTeamResponse, CreateChannel,
     TeamMember, TeamMemberResponse, UpdateChannel,
 };
-use crate::repositories::AdminRepository;
+use crate::repositories::{AdminRepository, ChannelRepository};
 use crate::services::team_membership::apply_default_channel_membership_for_team_join;
 
 pub fn router() -> Router<AppState> {
@@ -222,6 +222,15 @@ pub async fn remove_team_member(
 
     let repo = AdminRepository::new(&state.db);
     repo.remove_team_member(id, user_id).await?;
+
+    // Revoke WebSocket subscriptions for all team channels and the team itself
+    let channel_ids = ChannelRepository::new(&state.db)
+        .get_user_channel_ids_in_team(user_id, id)
+        .await?;
+    for channel_id in channel_ids {
+        state.ws_hub.unsubscribe_channel(user_id, channel_id).await;
+    }
+    state.ws_hub.unsubscribe_team(user_id, id).await;
 
     let db = state.db.clone();
     let actor = auth.user_id;

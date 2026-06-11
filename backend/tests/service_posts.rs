@@ -795,6 +795,7 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
             "reply",
             serde_json::json!({}),
             &[],
+            None,
         )
         .await
         .expect("post insert should succeed");

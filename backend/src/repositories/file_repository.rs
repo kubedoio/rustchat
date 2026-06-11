@@ -181,4 +181,34 @@ impl<'a> FileRepository<'a> {
         .await?;
         Ok(files)
     }
+
+    /// Attach files to a post inside a transaction, validating ownership and channel binding.
+    pub async fn attach_files_to_post_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        file_ids: &[Uuid],
+        post_id: Uuid,
+        channel_id: Uuid,
+        user_id: Uuid,
+    ) -> ApiResult<Vec<Uuid>> {
+        let rows: Vec<(Uuid,)> = sqlx::query_as(
+            r#"
+            UPDATE files
+            SET post_id = $1, channel_id = $3
+            WHERE id = ANY($2)
+              AND post_id IS NULL
+              AND uploader_id = $4
+              AND (channel_id = $3 OR channel_id IS NULL)
+            RETURNING id
+            "#,
+        )
+        .bind(post_id)
+        .bind(file_ids)
+        .bind(channel_id)
+        .bind(user_id)
+        .fetch_all(&mut **tx)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| r.0).collect())
+    }
 }
