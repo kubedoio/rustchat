@@ -298,8 +298,24 @@ async fn get_my_status(
 /// GET /api/v1/users/{id}/status
 async fn get_user_status(
     State(state): State<AppState>,
+    auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<UserStatusResponse>> {
+    let user = UserRepository::new(&state.db)
+        .get_by_id(id)
+        .await?
+        .ok_or_else(|| AppError::UserNotFound)?;
+
+    let can_view = auth.user_id == user.id
+        || auth.has_permission(&permissions::ADMIN_FULL)
+        || (auth.org_id.is_some() && auth.org_id == user.org_id);
+
+    if !can_view {
+        return Err(AppError::Forbidden(
+            "Cannot view this user's status".to_string(),
+        ));
+    }
+
     get_user_status_by_id(&state, id).await
 }
 
@@ -422,6 +438,7 @@ async fn delete_my_status(
 /// Accepts both: ["id1", "id2"] and {"user_ids": ["id1", "id2"]}
 async fn get_statuses_by_ids(
     State(state): State<AppState>,
+    auth: AuthUser,
     Json(body): Json<serde_json::Value>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Extract user_ids from either array format or object format
@@ -457,10 +474,21 @@ async fn get_statuses_by_ids(
         .get_presences_by_ids(&user_ids)
         .await?;
 
+    let users = UserRepository::new(&state.db).get_by_ids(&user_ids).await?;
+
+    let can_view = |user: &User| {
+        auth.user_id == user.id
+            || auth.has_permission(&permissions::ADMIN_FULL)
+            || (auth.org_id.is_some() && auth.org_id == user.org_id)
+    };
+
+    let authorized_ids: Vec<Uuid> = users.into_iter().filter(can_view).map(|u| u.id).collect();
+
     // Build response map - return format expected by frontend
     // Frontend expects: [{"user_id": "...", "status": "...", ...}]
     let result: Vec<serde_json::Value> = statuses
         .into_iter()
+        .filter(|(user_id, _)| authorized_ids.contains(user_id))
         .map(|(user_id, status)| {
             serde_json::json!({
                 "user_id": user_id.to_string(),
