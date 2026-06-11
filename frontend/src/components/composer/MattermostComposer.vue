@@ -120,6 +120,7 @@ function updateSelection() {
 
 // Get current text selection
 function getTextSelection(): TextSelection {
+  updateSelection()
   return {
     text: content.value,
     selectionStart: selectionStart.value,
@@ -440,6 +441,11 @@ function onSend() {
       textarea.focus()
     }
   })
+}
+
+function onSendNow() {
+  onSend()
+  showSendOptions.value = false
 }
 
 // File handling
@@ -883,10 +889,7 @@ const canSend = computed(() => {
             >
               <button
                 class="w-full px-3 py-2 text-left text-sm text-text-2 hover:bg-bg-surface-2 hover:text-text-1 transition-standard"
-                @click="
-                  onSend()
-                  showSendOptions = false
-                "
+                @click="onSendNow"
               >
                 Send now
               </button>

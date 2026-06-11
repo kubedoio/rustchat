@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- AI Agents documentation covering channel-participant agents, the Agent Runtime, LLM provider setup, RAG knowledge bases, tool calling, feedback, analytics, and operational guidance.
+- Admin guide for creating agents, assigning them to channels, configuring knowledge bases, using RustShare sync sources, and monitoring agent behavior.
+
+### Changed
+- Architecture, user, security, and runbook docs now describe the AI Agents phases and the optional runtime dependencies required to operate them safely.
+
 ## [0.5.0] - 2026-06-10
 
 ### Added

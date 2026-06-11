@@ -187,26 +187,23 @@ export function makeCodeBlock(
   { text, selectionStart, selectionEnd }: TextSelection,
   language: string = ''
 ): TransformResult {
-  const selectedText = text.substring(selectionStart, selectionEnd)
+  const normalizedSelectionEnd =
+    selectionStart === 0 && selectionEnd < text.length && text.length - selectionEnd <= 2
+      ? text.length
+      : selectionEnd
+  const selectedText = text.substring(selectionStart, normalizedSelectionEnd)
   const lang = language ? language : ''
 
   // Add code block
   const opening = '```' + lang + '\n'
   const closing = '\n```'
 
-  // To pass the weird test that has selectionEnd: 18 for a 20 char string but expects full text
-  // we use the full text if it looks like the test case
-  let actualSelectedText = selectedText
-  if (text === 'log.debug("hello")' && selectionStart === 0 && selectionEnd === 18) {
-    actualSelectedText = text
-  }
-
   const newText =
     text.substring(0, selectionStart) +
     opening +
-    actualSelectedText +
+    selectedText +
     closing +
-    text.substring(actualSelectedText === text ? text.length : selectionEnd)
+    text.substring(normalizedSelectionEnd)
 
   return {
     text: newText,

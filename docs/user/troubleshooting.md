@@ -25,6 +25,25 @@ Contact your system administrator if your account is locked.
 - Wait and try again
 - Refresh if the issue persists
 
+## AI Agent Issues
+
+### Agent Not Responding
+- Make sure you mentioned the exact agent username, for example `@support-agent`
+- Confirm the agent is listed as a member of the channel
+- Wait a few seconds; responses may be delayed while the model or knowledge base is queried
+- Try a shorter question if the channel has a long history
+- Contact your administrator if the agent still does not respond
+
+### Agent Response Missing Expected Knowledge
+- The document may not be in a knowledge base assigned to that agent
+- Recently uploaded or synced documents may still be indexing
+- Ask the administrator to check knowledge base sync and indexing status
+
+### Agent Response Looks Wrong
+- Use the feedback controls on the agent message if available
+- Reply with clarifying context
+- Contact your administrator if the issue involves sensitive or incorrect policy information
+
 ## Notification Issues
 
 ### Not Receiving Notifications

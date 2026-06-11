@@ -17,6 +17,7 @@ This guide is for system administrators, DevOps engineers, and IT staff responsi
 
 ### Configuration
 - [Configuration Reference](./configuration.md) - All environment variables
+- [AI Agents](./ai-agents.md) - Agent runtime, knowledge bases, tools, feedback, and operations
 - [Email Setup](./email.md) - SMTP configuration for notifications
 - [SSO Configuration](./sso.md) - Single Sign-On setup (OAuth/SAML)
 - [Push Notifications](./push-notifications.md) - Mobile push setup
@@ -41,6 +42,7 @@ Before deploying, review the [System Architecture](../architecture/overview.md) 
 - Database (PostgreSQL)
 - Cache and pub/sub (Redis)
 - File storage (S3-compatible)
+- Optional AI agent runtime, RAG knowledge bases, and tool integrations
 
 ---
 

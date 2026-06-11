@@ -1,8 +1,19 @@
 #![allow(dead_code)]
 use once_cell::sync::Lazy;
-use rustchat::{api, config::Config, realtime::WsHub, storage::S3Client};
+use rustchat::{
+    api,
+    config::Config,
+    models::{
+        AgentChannelSettings, AgentConfig, Channel, ChannelType, KnowledgeBase, KnowledgeDocument,
+        Organization, Team, User,
+    },
+    realtime::WsHub,
+    services::{agent_runtime::AgentRuntime, llm::ProviderRegistry},
+    storage::S3Client,
+};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use futures_util::{SinkExt, StreamExt};
@@ -473,4 +484,318 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
         reconciliation_tx: None,
         agent_runtime: None,
     })
+}
+
+/// Create a minimal AppState with an injected agent runtime.
+#[allow(dead_code)]
+pub async fn create_test_state_with_agent_runtime(
+    pool: PgPool,
+    provider_registry: Arc<ProviderRegistry>,
+) -> anyhow::Result<rustchat::api::AppState> {
+    let mut state = create_test_state(pool).await?;
+    state.agent_runtime = Some(Arc::new(AgentRuntime::new(
+        state.db.clone(),
+        state.ws_hub.clone(),
+        provider_registry,
+        None,
+        None,
+        None,
+    )));
+    Ok(state)
+}
+
+#[allow(dead_code)]
+pub async fn create_test_organization(db: &PgPool, name: &str) -> Organization {
+    let slug = unique_slug(name);
+    sqlx::query_as::<_, Organization>(
+        r#"
+        INSERT INTO organizations (name, display_name, description)
+        VALUES ($1, $2, $3)
+        RETURNING *
+        "#,
+    )
+    .bind(&slug)
+    .bind(name)
+    .bind("Test organization")
+    .fetch_one(db)
+    .await
+    .expect("test organization should be created")
+}
+
+#[allow(dead_code)]
+pub async fn create_test_user(db: &PgPool, username: &str) -> User {
+    let org = create_test_organization(db, &format!("{username}-org")).await;
+    create_test_user_in_org(db, org.id, username, "member").await
+}
+
+#[allow(dead_code)]
+pub async fn create_test_admin_user(db: &PgPool, username: &str) -> User {
+    let org = create_test_organization(db, &format!("{username}-org")).await;
+    create_test_user_in_org(db, org.id, username, "system_admin").await
+}
+
+#[allow(dead_code)]
+pub async fn create_test_user_in_org(
+    db: &PgPool,
+    org_id: Uuid,
+    username: &str,
+    role: &str,
+) -> User {
+    let slug = unique_slug(username);
+    let email = format!("{slug}@example.test");
+    sqlx::query_as::<_, User>(
+        r#"
+        INSERT INTO users (
+            org_id, username, email, password_hash, display_name, is_bot, is_active, role,
+            entity_type, entity_metadata, rate_limit_tier, email_verified
+        )
+        VALUES ($1, $2, $3, 'test-password-hash', $4, false, true, $5, 'human', '{}'::jsonb, 'human_standard', true)
+        RETURNING *
+        "#,
+    )
+    .bind(org_id)
+    .bind(&slug)
+    .bind(&email)
+    .bind(username)
+    .bind(role)
+    .fetch_one(db)
+    .await
+    .expect("test user should be created")
+}
+
+#[allow(dead_code)]
+pub async fn create_test_team(db: &PgPool, owner: &User, name: &str) -> Team {
+    let slug = unique_slug(name);
+    let team = sqlx::query_as::<_, Team>(
+        r#"
+        INSERT INTO teams (org_id, name, display_name, description)
+        VALUES ($1, $2, $3, 'Test team')
+        RETURNING *
+        "#,
+    )
+    .bind(owner.org_id.expect("test owner should have an org"))
+    .bind(&slug)
+    .bind(name)
+    .fetch_one(db)
+    .await
+    .expect("test team should be created");
+
+    sqlx::query("INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'team_admin')")
+        .bind(team.id)
+        .bind(owner.id)
+        .execute(db)
+        .await
+        .expect("test team owner should be added");
+
+    team
+}
+
+#[allow(dead_code)]
+pub async fn create_test_channel(db: &PgPool, team: &Team, creator: &User, name: &str) -> Channel {
+    let slug = unique_slug(name);
+    let channel = sqlx::query_as::<_, Channel>(
+        r#"
+        INSERT INTO channels (team_id, type, name, display_name, creator_id)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+        "#,
+    )
+    .bind(team.id)
+    .bind(ChannelType::Public)
+    .bind(&slug)
+    .bind(name)
+    .bind(creator.id)
+    .fetch_one(db)
+    .await
+    .expect("test channel should be created");
+
+    sqlx::query(
+        "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'channel_admin')",
+    )
+    .bind(channel.id)
+    .bind(creator.id)
+    .execute(db)
+    .await
+    .expect("test channel creator should be added");
+
+    channel
+}
+
+#[allow(dead_code)]
+pub async fn create_test_agent(db: &PgPool, name: &str) -> AgentConfig {
+    let creator = create_test_admin_user(db, &format!("{name}-creator")).await;
+    create_test_agent_for_creator(db, &creator, name).await
+}
+
+#[allow(dead_code)]
+pub async fn create_test_agent_for_creator(db: &PgPool, creator: &User, name: &str) -> AgentConfig {
+    let slug = unique_slug(name);
+    let email = format!("{slug}-agent@example.test");
+    let agent_user: User = sqlx::query_as(
+        r#"
+        INSERT INTO users (
+            org_id, username, email, password_hash, display_name, is_bot, is_active, role,
+            entity_type, entity_metadata, rate_limit_tier, email_verified
+        )
+        VALUES ($1, $2, $3, NULL, $4, true, true, 'member', 'agent', '{}'::jsonb, 'agent_high', true)
+        RETURNING *
+        "#,
+    )
+    .bind(creator.org_id)
+    .bind(&slug)
+    .bind(&email)
+    .bind(name)
+    .fetch_one(db)
+    .await
+    .expect("test agent user should be created");
+
+    sqlx::query_as::<_, AgentConfig>(
+        r#"
+        INSERT INTO agent_configs (
+            user_id, title, description, system_prompt, provider, model,
+            temperature, max_context_messages, max_output_tokens, capabilities,
+            rag_enabled, rag_top_k, is_active, created_by
+        )
+        VALUES (
+            $1, $2, 'Test agent', 'You are a deterministic test agent.', 'mock', 'mock-model',
+            0.0, 10, 256,
+            '{"respond_to_mentions": true, "respond_to_all": false, "use_memory": true, "use_rag": false}'::jsonb,
+            false, 5, true, $3
+        )
+        RETURNING *
+        "#,
+    )
+    .bind(agent_user.id)
+    .bind(name)
+    .bind(creator.id)
+    .fetch_one(db)
+    .await
+    .expect("test agent config should be created")
+}
+
+#[allow(dead_code)]
+pub async fn create_test_knowledge_base(db: &PgPool, name: &str) -> KnowledgeBase {
+    let owner = create_test_admin_user(db, &format!("{name}-owner")).await;
+    let team = create_test_team(db, &owner, &format!("{name}-team")).await;
+    create_test_knowledge_base_for_team(db, &team, &owner, name).await
+}
+
+#[allow(dead_code)]
+pub async fn create_test_knowledge_base_for_team(
+    db: &PgPool,
+    team: &Team,
+    created_by: &User,
+    name: &str,
+) -> KnowledgeBase {
+    sqlx::query_as::<_, KnowledgeBase>(
+        r#"
+        INSERT INTO knowledge_bases (
+            team_id, name, description, embedding_model, embedding_dimensions,
+            chunk_size, chunk_overlap, is_active, created_by
+        )
+        VALUES ($1, $2, 'Test knowledge base', 'text-embedding-3-small', 1536, 512, 50, true, $3)
+        RETURNING *
+        "#,
+    )
+    .bind(team.id)
+    .bind(name)
+    .bind(created_by.id)
+    .fetch_one(db)
+    .await
+    .expect("test knowledge base should be created")
+}
+
+#[allow(dead_code)]
+pub async fn create_test_document(db: &PgPool, kb_id: Uuid, filename: &str) -> KnowledgeDocument {
+    let kb: KnowledgeBase = sqlx::query_as("SELECT * FROM knowledge_bases WHERE id = $1")
+        .bind(kb_id)
+        .fetch_one(db)
+        .await
+        .expect("test knowledge base should exist");
+    create_test_document_for_kb(db, &kb, kb.created_by, filename).await
+}
+
+#[allow(dead_code)]
+pub async fn create_test_document_for_kb(
+    db: &PgPool,
+    kb: &KnowledgeBase,
+    created_by: Uuid,
+    filename: &str,
+) -> KnowledgeDocument {
+    let document_id = Uuid::new_v4();
+    sqlx::query_as::<_, KnowledgeDocument>(
+        r#"
+        INSERT INTO knowledge_documents (
+            id, knowledge_base_id, team_id, title, source_type, s3_key, s3_bucket,
+            content_hash, mime_type, size_bytes, extracted_text, is_indexed,
+            chunk_count, created_by
+        )
+        VALUES (
+            $1, $2, $3, $4, 'upload', $5, 'test-bucket',
+            $6, 'text/plain', 12, 'test document content', false, 0, $7
+        )
+        RETURNING *
+        "#,
+    )
+    .bind(document_id)
+    .bind(kb.id)
+    .bind(kb.team_id)
+    .bind(filename)
+    .bind(format!("test-documents/{document_id}/{filename}"))
+    .bind(format!("{:064x}", document_id.as_u128()))
+    .bind(created_by)
+    .fetch_one(db)
+    .await
+    .expect("test knowledge document should be created")
+}
+
+#[allow(dead_code)]
+pub async fn create_test_agent_channel_setting(
+    db: &PgPool,
+    agent_id: Uuid,
+    channel_id: Uuid,
+) -> AgentChannelSettings {
+    sqlx::query(
+        "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+    )
+    .bind(channel_id)
+    .bind(agent_id)
+    .execute(db)
+    .await
+    .expect("test agent should be added to channel members");
+
+    sqlx::query_as::<_, AgentChannelSettings>(
+        r#"
+        INSERT INTO agent_channel_settings (agent_id, channel_id, is_active)
+        VALUES ($1, $2, true)
+        ON CONFLICT (agent_id, channel_id)
+        DO UPDATE SET is_active = EXCLUDED.is_active
+        RETURNING *
+        "#,
+    )
+    .bind(agent_id)
+    .bind(channel_id)
+    .fetch_one(db)
+    .await
+    .expect("test agent channel setting should be created")
+}
+
+fn unique_slug(input: &str) -> String {
+    let normalized: String = input
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let trimmed = normalized.trim_matches('-');
+    let base = if trimmed.is_empty() { "test" } else { trimmed };
+    let max_base_len = 40.min(base.len());
+    format!("{}-{}", &base[..max_base_len], Uuid::new_v4().simple())
+        .chars()
+        .take(64)
+        .collect()
 }

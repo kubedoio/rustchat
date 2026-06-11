@@ -8,9 +8,11 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+pub mod mock;
 pub mod openai;
 pub mod registry;
 
+pub use mock::MockLlmProvider;
 pub use openai::OpenAiProvider;
 pub use registry::ProviderRegistry;
 

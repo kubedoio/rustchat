@@ -168,12 +168,14 @@ async fn create_agent(
             id, username, email, display_name,
             entity_type, api_key_hash, api_key_prefix,
             password_hash, is_bot, is_active, role, presence,
-            notify_props, email_verified, created_at, updated_at
+            auth_provider, auth_provider_id,
+            notify_props, email_verified, email_verified_at, created_at, updated_at
         ) VALUES (
             $1, $2, $3, $4,
             'agent', $5, $6,
             NULL, TRUE, TRUE, 'member', 'offline',
-            '{}', TRUE, $7, $8
+            'agent', $1::text,
+            '{}', TRUE, $7, $8, $9
         )
         "#,
     )
@@ -183,6 +185,7 @@ async fn create_agent(
     .bind(&req.display_name)
     .bind(&api_key_hash)
     .bind(&api_key_prefix)
+    .bind(now)
     .bind(now)
     .bind(now)
     .execute(&state.db)
