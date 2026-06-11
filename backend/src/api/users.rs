@@ -291,6 +291,7 @@ async fn get_my_status(
 /// GET /api/v1/users/{id}/status
 async fn get_user_status(
     State(state): State<AppState>,
+    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<UserStatusResponse>> {
     get_user_status_by_id(&state, id).await
@@ -415,6 +416,7 @@ async fn delete_my_status(
 /// Accepts both: ["id1", "id2"] and {"user_ids": ["id1", "id2"]}
 async fn get_statuses_by_ids(
     State(state): State<AppState>,
+    _auth: AuthUser,
     Json(body): Json<serde_json::Value>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Extract user_ids from either array format or object format

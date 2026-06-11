@@ -126,6 +126,15 @@ async fn upload_file(
         if name == "channel_id" {
             let txt = field.text().await.unwrap_or_default();
             if let Some(id) = parse_mm_or_uuid(&txt) {
+                // Validate channel membership immediately, before buffering any
+                // file chunks to disk, so a non-member cannot force temp-file I/O.
+                let repo = ChannelRepository::new(&state.db);
+                let is_member = repo.is_channel_member(id, auth.user_id).await?;
+                if !is_member {
+                    return Err(AppError::Forbidden(
+                        "You are not a member of this channel".to_string(),
+                    ));
+                }
                 channel_id = Some(id);
             }
         } else if name == "client_ids" {
@@ -172,17 +181,6 @@ async fn upload_file(
                     head,
                 });
             }
-        }
-    }
-
-    // Enforce channel membership before associating files with a channel
-    if let Some(cid) = channel_id {
-        let repo = ChannelRepository::new(&state.db);
-        let is_member = repo.is_channel_member(cid, auth.user_id).await?;
-        if !is_member {
-            return Err(AppError::Forbidden(
-                "You are not a member of this channel".to_string(),
-            ));
         }
     }
 

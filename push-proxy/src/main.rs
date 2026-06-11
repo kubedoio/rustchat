@@ -134,9 +134,15 @@ async fn main() -> anyhow::Result<()> {
     // Initialize APNS client (iOS VoIP)
     let apns_client = init_apns_client().await?;
 
-    let auth_key = std::env::var("PUSH_PROXY_AUTH_KEY")
-        .ok()
-        .filter(|s| !s.is_empty());
+    // Push-proxy auth key is required in all environments. An empty or missing
+    // key would let anyone send push notifications, so fail closed.
+    let auth_key = match std::env::var("PUSH_PROXY_AUTH_KEY") {
+        Ok(key) if !key.trim().is_empty() => Some(key),
+        _ => {
+            error!("PUSH_PROXY_AUTH_KEY must be set to a non-empty secret");
+            std::process::exit(1);
+        }
+    };
 
     let state = Arc::new(AppState {
         fcm_client,

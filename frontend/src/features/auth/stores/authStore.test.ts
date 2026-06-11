@@ -18,7 +18,7 @@ const syncTheme = vi.fn()
 const replaceLocation = vi.fn()
 
 vi.mock('@vueuse/core', () => ({
-  useStorage: (_key: string, initialValue: string) => ref(initialValue),
+  useSessionStorage: (_key: string, initialValue: string) => ref(initialValue),
 }))
 
 vi.mock('../../../composables/useUserSummary', () => ({
