@@ -37,27 +37,6 @@ async fn validate_create_post(
         .require_channel_membership(channel_id, user_id)
         .await?;
 
-    // Idempotency check for client_msg_id
-    if let Some(ref client_msg_id) = input.client_msg_id {
-        let trimmed = client_msg_id.trim();
-        if !trimmed.is_empty() {
-            if trimmed.len() > 64 {
-                return Err(AppError::Validation(
-                    "client_msg_id must be at most 64 characters".to_string(),
-                ));
-            }
-            if PostRepository::new(state.db.clone())
-                .find_post_by_client_msg_id(user_id, trimmed)
-                .await?
-                .is_some()
-            {
-                return Err(AppError::Conflict(
-                    "Duplicate client message id".to_string(),
-                ));
-            }
-        }
-    }
-
     // Validate message
     if input.message.trim().is_empty() && input.file_ids.is_empty() {
         return Err(AppError::Validation("Message cannot be empty".to_string()));
@@ -334,6 +313,28 @@ pub async fn create_post(
 ) -> ApiResult<PostResponse> {
     let root_post_id = validate_create_post(state, user_id, channel_id, &input).await?;
 
+    // Validate and normalize the persisted client_msg_id (covers v4 pending_post_id path).
+    let client_msg_id = client_msg_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    if let Some(id) = client_msg_id {
+        if id.len() > 64 {
+            return Err(AppError::Validation(
+                "client_msg_id must be at most 64 characters".to_string(),
+            ));
+        }
+        if PostRepository::new(state.db.clone())
+            .find_post_by_client_msg_id(user_id, id)
+            .await?
+            .is_some()
+        {
+            return Err(AppError::Conflict(
+                "Duplicate client message id".to_string(),
+            ));
+        }
+    }
+
     // Pre-compute data needed before the transaction.
     let team_id_opt = ChannelRepository::new(&state.db)
         .get_team_id(channel_id)
@@ -422,10 +423,7 @@ pub async fn create_post(
             &input.message,
             input.props.clone().unwrap_or(serde_json::json!({})),
             &input.file_ids,
-            client_msg_id
-                .as_ref()
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty()),
+            client_msg_id,
         )
         .await?;
 
@@ -538,7 +536,8 @@ pub async fn create_post(
     // POST-COMMIT: best-effort external effects only.
     // ========================================================================
 
-    let mut response = build_post_response(state, post, user_id, client_msg_id).await?;
+    let mut response =
+        build_post_response(state, post, user_id, client_msg_id.map(|s| s.to_string())).await?;
     response.props = serde_json::Value::Object(props);
 
     // Broadcast post over WS

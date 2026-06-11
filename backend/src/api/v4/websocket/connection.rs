@@ -228,13 +228,13 @@ pub(crate) async fn run_connection(
                         "event": "resync_required",
                         "data": { "reason": "hub_lagged" }
                     });
-                    if let Err(err) = actor_clone.send_raw(resync_msg) {
+                    let _ = actor_clone.send_raw(resync_msg).inspect_err(|err| {
                         warn!(
                             connection_id = %replay_connection_id,
                             error = %err,
                             "Failed to send resync_required after hub lag"
                         );
-                    }
+                    });
                     continue;
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => {
