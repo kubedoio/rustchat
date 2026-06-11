@@ -89,6 +89,15 @@ fn require_admin(auth: &AuthUser) -> ApiResult<()> {
     Ok(())
 }
 
+fn require_admin_or_creator(auth: &AuthUser, created_by: Uuid) -> ApiResult<()> {
+    if auth.has_role("system_admin") || auth.has_role("org_admin") || auth.user_id == created_by {
+        return Ok(());
+    }
+    Err(AppError::Forbidden(
+        "Only admins or the creator can access this agent".to_string(),
+    ))
+}
+
 // ------------------------------------------------------------------
 // Knowledge Base Handlers
 // ------------------------------------------------------------------
@@ -494,6 +503,19 @@ pub async fn assign_kb_to_agent(
         .await?
         .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
 
+    require_admin_or_creator(&auth, agent.created_by)?;
+
+    let team_repo = TeamRepository::new(&state.db);
+    let creator_in_team = team_repo
+        .is_team_member(team_id, agent.created_by)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    if !creator_in_team {
+        return Err(AppError::Forbidden(
+            "Agent is not in the same team as the knowledge base".to_string(),
+        ));
+    }
+
     // Verify KB exists and belongs to user's team
     let kb_repo = KnowledgeRepository::new(&state.db);
     kb_repo
@@ -528,6 +550,19 @@ pub async fn list_agent_knowledge_bases(
         .get_config_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
+
+    require_admin_or_creator(&auth, agent.created_by)?;
+
+    let team_repo = TeamRepository::new(&state.db);
+    let creator_in_team = team_repo
+        .is_team_member(team_id, agent.created_by)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    if !creator_in_team {
+        return Err(AppError::Forbidden(
+            "Agent is not in the same team as the knowledge base".to_string(),
+        ));
+    }
 
     let kbs: Vec<AgentKnowledgeBaseDetail> = sqlx::query_as(
         r#"
@@ -569,6 +604,19 @@ pub async fn unassign_kb_from_agent(
         .get_config_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
+
+    require_admin_or_creator(&auth, agent.created_by)?;
+
+    let team_repo = TeamRepository::new(&state.db);
+    let creator_in_team = team_repo
+        .is_team_member(team_id, agent.created_by)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    if !creator_in_team {
+        return Err(AppError::Forbidden(
+            "Agent is not in the same team as the knowledge base".to_string(),
+        ));
+    }
 
     // Verify KB exists and belongs to user's team
     let kb_repo = KnowledgeRepository::new(&state.db);
