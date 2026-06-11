@@ -20,8 +20,8 @@ use crate::auth::AuthUser;
 use crate::crypto;
 use crate::error::{ApiResult, AppError};
 use crate::models::agent::{
-    AgentChannelSettings, AgentConfigResponse, AgentMemory, AgentSummary, CreateAgentRequest,
-    TestAgentRequest, TestAgentResponse, UpdateAgentRequest,
+    AgentChannelSettings, AgentConfig, AgentConfigResponse, AgentMemory, AgentSummary,
+    CreateAgentRequest, TestAgentRequest, TestAgentResponse, UpdateAgentRequest,
 };
 use crate::models::agent_feedback::*;
 use crate::models::agent_usage::{AgentDailyUsage, AgentUsageSummary};
@@ -161,6 +161,8 @@ async fn create_agent(
     let entity_id = Uuid::new_v4();
     let now = chrono::Utc::now();
 
+    let mut tx = state.db.begin().await?;
+
     // Insert user row for the agent
     sqlx::query(
         r#"
@@ -188,43 +190,76 @@ async fn create_agent(
     .bind(now)
     .bind(now)
     .bind(now)
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await
     .map_err(|e| {
         tracing::error!("Failed to insert agent user: {}", e);
         AppError::Database(e)
     })?;
 
-    // Create agent config
     let capabilities = req.capabilities.unwrap_or_default();
-    let repo = AgentRepository::new(&state.db);
-    let config = repo
-        .create_config(
-            entity_id,
-            &req.title,
-            req.description.as_deref(),
-            &req.system_prompt,
-            &req.provider,
-            &req.model,
-            api_token_encrypted.as_deref(),
-            req.temperature.unwrap_or(0.7),
-            req.max_context_messages.unwrap_or(10),
-            req.max_output_tokens.unwrap_or(1024),
-            &capabilities,
-            req.rag_enabled.unwrap_or(false),
-            req.rag_top_k.unwrap_or(3),
-            auth.user_id,
+    let capabilities_json = serde_json::to_value(&capabilities)
+        .map_err(|e| AppError::BadRequest(format!("Invalid capabilities: {}", e)))?;
+    let temperature = req.temperature.unwrap_or(0.7);
+    let max_context_messages = req.max_context_messages.unwrap_or(10);
+    let max_output_tokens = req.max_output_tokens.unwrap_or(1024);
+    let rag_enabled = req.rag_enabled.unwrap_or(false);
+    let rag_top_k = req.rag_top_k.unwrap_or(3);
+
+    let config: AgentConfig = sqlx::query_as(
+        r#"
+        INSERT INTO agent_configs (
+            user_id, title, description, system_prompt,
+            provider, model, api_token_encrypted, temperature,
+            max_context_messages, max_output_tokens, capabilities,
+            rag_enabled, rag_top_k, created_by
         )
-        .await?;
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING *
+        "#,
+    )
+    .bind(entity_id)
+    .bind(&req.title)
+    .bind(req.description.as_deref())
+    .bind(&req.system_prompt)
+    .bind(&req.provider)
+    .bind(&req.model)
+    .bind(api_token_encrypted.as_deref())
+    .bind(temperature)
+    .bind(max_context_messages)
+    .bind(max_output_tokens)
+    .bind(capabilities_json)
+    .bind(rag_enabled)
+    .bind(rag_top_k)
+    .bind(auth.user_id)
+    .fetch_one(&mut *tx)
+    .await?;
 
     // Add to channels if specified
     if let Some(channel_ids) = req.channel_ids {
         for channel_id in channel_ids {
-            repo.add_agent_to_channel(entity_id, channel_id, true, None, None)
-                .await?;
-            add_to_channel_members(&state.db, channel_id, entity_id).await?;
+            sqlx::query(
+                r#"
+                INSERT INTO agent_channel_settings
+                    (agent_id, channel_id, is_active, custom_prompt_override, max_context_messages_override)
+                VALUES ($1, $2, TRUE, NULL, NULL)
+                ON CONFLICT (agent_id, channel_id)
+                DO UPDATE SET
+                    is_active = EXCLUDED.is_active,
+                    custom_prompt_override = EXCLUDED.custom_prompt_override,
+                    max_context_messages_override = EXCLUDED.max_context_messages_override,
+                    updated_at = NOW()
+                "#,
+            )
+            .bind(entity_id)
+            .bind(channel_id)
+            .execute(&mut *tx)
+            .await?;
+            add_to_channel_members_tx(&mut tx, channel_id, entity_id).await?;
         }
     }
+
+    tx.commit().await?;
 
     tracing::info!(
         agent_id = %config.id,
@@ -484,7 +519,8 @@ async fn delete_memory(
 
     require_admin_or_creator(&auth, config.created_by)?;
 
-    repo.delete_memory(memory_id).await?;
+    repo.delete_memory_for_agent(config.user_id, memory_id)
+        .await?;
 
     Ok(Json(serde_json::json!({ "success": true })))
 }
@@ -525,7 +561,7 @@ async fn test_agent(
         system_prompt: config.system_prompt,
         messages: vec![ChatMessage::user(req.message, None)],
         model: config.model,
-        temperature: config.temperature as f32,
+        temperature: config.temperature,
         max_tokens: test_max_tokens,
     };
 
@@ -698,6 +734,21 @@ async fn add_to_channel_members(db: &PgPool, channel_id: Uuid, user_id: Uuid) ->
     .bind(channel_id)
     .bind(user_id)
     .execute(db)
+    .await?;
+    Ok(())
+}
+
+async fn add_to_channel_members_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    channel_id: Uuid,
+    user_id: Uuid,
+) -> ApiResult<()> {
+    sqlx::query(
+        "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING"
+    )
+    .bind(channel_id)
+    .bind(user_id)
+    .execute(&mut **tx)
     .await?;
     Ok(())
 }

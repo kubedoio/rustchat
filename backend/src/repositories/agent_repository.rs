@@ -214,7 +214,7 @@ impl<'a> AgentRepository<'a> {
             Some(t) => t,
             None => existing.api_token_encrypted.as_deref(),
         };
-        let temperature = temperature.unwrap_or(existing.temperature);
+        let temperature = temperature.unwrap_or(f64::from(existing.temperature));
         let max_context_messages = max_context_messages.unwrap_or(existing.max_context_messages);
         let max_output_tokens = max_output_tokens.unwrap_or(existing.max_output_tokens);
         let capabilities_json = match capabilities {
@@ -351,6 +351,20 @@ impl<'a> AgentRepository<'a> {
     pub async fn delete_memory(&self, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query("DELETE FROM agent_memories WHERE id = $1")
             .bind(id)
+            .execute(self.pool)
+            .await
+            .map(|_| ())
+    }
+
+    /// Delete a specific memory entry only when it belongs to the supplied agent.
+    pub async fn delete_memory_for_agent(
+        &self,
+        agent_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM agent_memories WHERE id = $1 AND agent_id = $2")
+            .bind(id)
+            .bind(agent_id)
             .execute(self.pool)
             .await
             .map(|_| ())

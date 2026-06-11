@@ -568,6 +568,53 @@ async fn api_v1_agents_memories_feedback_stats_and_analytics() {
 }
 
 #[tokio::test]
+async fn api_v1_agents_delete_memory_scopes_memory_to_requested_agent() {
+    let app = spawn_app().await;
+    let admin = register_user(
+        &app,
+        "agentmemoryscope",
+        "agentmemoryscope@example.com",
+        "system_admin",
+    )
+    .await;
+    let channel_id = create_channel(&app, &admin, "agent-memory-scope").await;
+    let first_agent = seed_agent(&app, admin.user_id, "memoryscopeone").await;
+    let second_agent = seed_agent(&app, admin.user_id, "memoryscopetwo").await;
+
+    let foreign_memory_id: Uuid = sqlx::query_scalar(
+        r#"
+        INSERT INTO agent_memories (agent_id, channel_id, memory_type, content, importance_score)
+        VALUES ($1, $2, 'fact', 'Belongs to the second agent.', 0.7)
+        RETURNING id
+        "#,
+    )
+    .bind(second_agent.user_id)
+    .bind(channel_id)
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("foreign memory should be inserted");
+
+    let delete_response = app
+        .api_client
+        .delete(format!(
+            "{}/api/v1/agents/{}/memories/{}",
+            app.address, first_agent.config_id, foreign_memory_id
+        ))
+        .bearer_auth(&admin.token)
+        .send()
+        .await
+        .expect("delete foreign memory request should complete");
+    assert_eq!(StatusCode::OK, delete_response.status());
+
+    let remaining: Option<Uuid> = sqlx::query_scalar("SELECT id FROM agent_memories WHERE id = $1")
+        .bind(foreign_memory_id)
+        .fetch_optional(&app.db_pool)
+        .await
+        .expect("memory lookup should complete");
+    assert_eq!(Some(foreign_memory_id), remaining);
+}
+
+#[tokio::test]
 async fn api_v1_agents_feedback_rejects_non_members_and_non_agent_posts() {
     let app = spawn_app().await;
     let admin = register_user(

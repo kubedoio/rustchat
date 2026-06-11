@@ -19,6 +19,7 @@ use uuid::Uuid;
 use crate::{
     api::AppState,
     auth::AuthUser,
+    crypto,
     error::{ApiResult, AppError},
     models::knowledge::*,
     repositories::{AgentRepository, KnowledgeRepository, TeamRepository},
@@ -536,7 +537,8 @@ pub async fn list_agent_knowledge_bases(
             akb.top_k,
             akb.relevance_threshold,
             kb.name as knowledge_base_name,
-            kb.description as knowledge_base_description
+            kb.description as knowledge_base_description,
+            kb.team_id as team_id
         FROM agent_knowledge_bases akb
         JOIN knowledge_bases kb ON kb.id = akb.knowledge_base_id
         WHERE akb.agent_id = $1 AND kb.team_id = $2
@@ -597,10 +599,7 @@ async fn create_sync_source(
     let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
 
     let repo = KnowledgeRepository::new(&state.db);
-    let config_json = serde_json::to_string(&req.config)
-        .map_err(|e| AppError::BadRequest(format!("Invalid config: {}", e)))?;
-    // TODO: encrypt config_json with RUSTCHAT_ENCRYPTION_KEY
-    let config_encrypted = base64::engine::general_purpose::STANDARD.encode(config_json);
+    let config_encrypted = encrypt_sync_config(&req.config, &state.config.encryption_key)?;
 
     let source = repo
         .create_sync_source(
@@ -663,9 +662,7 @@ async fn update_sync_source(
     let repo = KnowledgeRepository::new(&state.db);
 
     let config_encrypted = if let Some(config) = req.config {
-        let config_json = serde_json::to_string(&config)
-            .map_err(|e| AppError::BadRequest(format!("Invalid config: {}", e)))?;
-        Some(base64::engine::general_purpose::STANDARD.encode(config_json))
+        Some(encrypt_sync_config(&config, &state.config.encryption_key)?)
     } else {
         None
     };
@@ -718,11 +715,7 @@ async fn trigger_sync(
         .ok_or_else(|| AppError::NotFound("Sync source not found".to_string()))?;
 
     // Parse config to get kb_id
-    let config_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&source.config_encrypted)
-        .map_err(|e| AppError::BadRequest(format!("Invalid config encoding: {}", e)))?;
-    let config_json: serde_json::Value = serde_json::from_slice(&config_bytes)
-        .map_err(|e| AppError::BadRequest(format!("Invalid config JSON: {}", e)))?;
+    let config_json = decrypt_sync_config(&source.config_encrypted, &state.config.encryption_key)?;
     let kb_id = config_json
         .get("knowledge_base_id")
         .and_then(|v| v.as_str())
@@ -785,6 +778,26 @@ async fn handle_rustshare_webhook(
     // For now, just acknowledge receipt
 
     Ok(StatusCode::OK)
+}
+
+fn encrypt_sync_config(config: &serde_json::Value, key: &str) -> ApiResult<String> {
+    let config_json = serde_json::to_string(config)
+        .map_err(|e| AppError::BadRequest(format!("Invalid config: {}", e)))?;
+    crypto::encrypt(&config_json, key)
+}
+
+fn decrypt_sync_config(config_encrypted: &str, key: &str) -> ApiResult<serde_json::Value> {
+    match crypto::decrypt(config_encrypted, key) {
+        Ok(config_json) => serde_json::from_str(&config_json)
+            .map_err(|e| AppError::BadRequest(format!("Invalid config JSON: {}", e))),
+        Err(decrypt_error) => {
+            let config_bytes = base64::engine::general_purpose::STANDARD
+                .decode(config_encrypted)
+                .map_err(|_| decrypt_error)?;
+            serde_json::from_slice(&config_bytes)
+                .map_err(|e| AppError::BadRequest(format!("Invalid config JSON: {}", e)))
+        }
+    }
 }
 
 #[cfg(test)]
