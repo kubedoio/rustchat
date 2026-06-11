@@ -444,6 +444,23 @@ pub async fn create_post(
                                 .get_post_by_id(existing_id)
                                 .await?
                                 .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
+
+                            // Verify this is a true idempotent retry, not a reuse of
+                            // client_msg_id for a different post.
+                            let same_channel = existing_post.channel_id == channel_id;
+                            let same_root = existing_post.root_post_id == root_post_id;
+                            let same_message = existing_post.message == input.message;
+                            let mut existing_file_ids = existing_post.file_ids.clone();
+                            existing_file_ids.sort();
+                            let mut request_file_ids = input.file_ids.clone();
+                            request_file_ids.sort();
+                            let same_files = existing_file_ids == request_file_ids;
+                            if !same_channel || !same_root || !same_message || !same_files {
+                                return Err(AppError::Conflict(
+                                    "client_msg_id reused with different post content".to_string(),
+                                ));
+                            }
+
                             return build_post_response(
                                 state,
                                 existing_post,

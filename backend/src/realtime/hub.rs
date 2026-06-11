@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::time::timeout;
 use uuid::Uuid;
 
 use super::cluster_broadcast::ClusterBroadcast;
@@ -377,15 +379,27 @@ impl WsHub {
             .unwrap_or(0)
     }
 
-    /// Send a close command to every active connection.
+    /// Send a close command to every active connection, waiting for each
+    /// command queue to accept it rather than silently dropping on a full queue.
     pub async fn close_all_with_code(&self, code: u16, reason: &str) {
         let connections = self.connections.read().await;
+        let mut tasks = Vec::new();
         for user_connections in connections.values() {
             for handles in user_connections.values() {
-                let _ = handles
-                    .cmd_tx
-                    .try_send(WsCommand::Close(code, reason.to_string()));
+                let cmd_tx = handles.cmd_tx.clone();
+                let reason = reason.to_string();
+                tasks.push(tokio::spawn(async move {
+                    let _ = timeout(
+                        Duration::from_secs(5),
+                        cmd_tx.send(WsCommand::Close(code, reason)),
+                    )
+                    .await;
+                }));
             }
+        }
+        // Best-effort wait for all close commands to be enqueued.
+        for task in tasks {
+            let _ = task.await;
         }
     }
 }
