@@ -10,7 +10,7 @@ use uuid::Uuid;
 use super::AppState;
 use crate::api::v4::status as v4_status;
 use crate::auth::policy::permissions;
-use crate::auth::{hash_password, AuthUser};
+use crate::auth::{hash_password, verify_password, AuthUser};
 use crate::error::{ApiResult, AppError};
 use crate::models::{
     normalize_avatar_url, validate_username_token, ChangePassword, UpdateUser, User, UserResponse,
@@ -244,11 +244,23 @@ async fn change_password(
         ));
     }
 
-    // Fetch user with current password hash (still needed to ensure user exists and for other potential logic)
-    let _user: User = UserRepository::new(&state.db)
+    // Fetch user with current password hash
+    let user: User = UserRepository::new(&state.db)
         .get_by_id_unchecked(id)
         .await?
         .ok_or_else(|| AppError::UserNotFound)?;
+
+    let current_password = input
+        .current_password
+        .as_deref()
+        .ok_or_else(|| AppError::BadRequest("current_password is required".to_string()))?;
+    let password_hash = user
+        .password_hash
+        .as_deref()
+        .ok_or_else(|| AppError::BadRequest("No existing password to change".to_string()))?;
+    if !verify_password(current_password, password_hash)? {
+        return Err(AppError::BadRequest("Invalid current password".to_string()));
+    }
 
     // Validate new password complexity
     let config = crate::services::auth_config::get_password_rules(&state.db).await?;

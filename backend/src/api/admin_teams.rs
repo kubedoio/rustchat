@@ -221,12 +221,12 @@ pub async fn remove_team_member(
     require_admin(&auth)?;
 
     let repo = AdminRepository::new(&state.db);
-    repo.remove_team_member(id, user_id).await?;
-
-    // Revoke WebSocket subscriptions for all team channels and the team itself
     let channel_ids = ChannelRepository::new(&state.db)
         .get_user_channel_ids_in_team(user_id, id)
         .await?;
+    repo.remove_team_member(id, user_id).await?;
+
+    // Revoke WebSocket subscriptions for all team channels and the team itself
     for channel_id in channel_ids {
         state.ws_hub.unsubscribe_channel(user_id, channel_id).await;
     }

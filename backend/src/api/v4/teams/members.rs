@@ -113,13 +113,13 @@ pub async fn remove_team_member(
     let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
     let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
-    TeamRepository::new(&state.db)
-        .remove_team_member(team_id, user_id)
-        .await?;
 
     // Revoke WebSocket subscriptions for all team channels and the team itself
     let channel_ids = ChannelRepository::new(&state.db)
         .get_user_channel_ids_in_team(user_id, team_id)
+        .await?;
+    TeamRepository::new(&state.db)
+        .remove_team_member(team_id, user_id)
         .await?;
     for channel_id in channel_ids {
         state.ws_hub.unsubscribe_channel(user_id, channel_id).await;

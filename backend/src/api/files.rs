@@ -19,6 +19,7 @@ use super::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
+use crate::middleware::rate_limit::upload_ip_rate_limit;
 use crate::models::{FileInfo, FileUploadResponse};
 use crate::repositories::{ChannelRepository, FileRepository};
 
@@ -75,9 +76,13 @@ fn content_disposition_filename(filename: &str) -> String {
 }
 
 /// Build files routes
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let upload_route = Router::new().route("/files", post(upload_file)).layer(
+        axum::middleware::from_fn_with_state(state, upload_ip_rate_limit),
+    );
+
     Router::new()
-        .route("/files", post(upload_file))
+        .merge(upload_route)
         .route("/files/presign", post(get_presigned_upload))
         .route("/files/{id}", get(get_file).delete(delete_file))
         .route("/files/{id}/download", get(download_file))

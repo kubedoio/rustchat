@@ -335,7 +335,7 @@ pub fn router(
         )
         .merge(posts::router().layer(DefaultBodyLimit::max(MEDIUM_BODY_LIMIT)))
         // Files router gets large limit for uploads
-        .merge(files::router().layer(DefaultBodyLimit::max(LARGE_BODY_LIMIT)))
+        .merge(files::router(state.clone()).layer(DefaultBodyLimit::max(LARGE_BODY_LIMIT)))
         .merge(search::router(state.clone()).layer(DefaultBodyLimit::max(SMALL_BODY_LIMIT)))
         .merge(integrations::router().layer(DefaultBodyLimit::max(SMALL_BODY_LIMIT)))
         .merge(admin::router().layer(DefaultBodyLimit::max(MEDIUM_BODY_LIMIT)))
