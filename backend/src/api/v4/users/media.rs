@@ -20,9 +20,20 @@ pub async fn get_user_image(
     let user_uuid = parse_mm_or_uuid(&user_id)
         .ok_or_else(|| AppError::BadRequest("Invalid user ID".to_string()))?;
 
-    // Try to fetch from S3
+    // Try to fetch from S3. If storage is unhealthy or misconfigured, fall back to the
+    // default avatar rather than returning a 500 to the client.
     let key = format!("avatars/{}.png", user_uuid);
-    let mut data = state.s3_client.download_optional(&key).await?;
+    let mut data = match state.s3_client.download_optional(&key).await {
+        Ok(data) => data,
+        Err(e) => {
+            tracing::warn!(
+                user_id = %user_uuid,
+                error = %e,
+                "Avatar canonical S3 fetch failed; falling back to default"
+            );
+            None
+        }
+    };
 
     if data.is_none() {
         let legacy_avatar_url: Option<String> =
@@ -37,7 +48,18 @@ pub async fn get_user_image(
             .and_then(|url| legacy_avatar_key_from_url(user_uuid, url));
 
         if let Some(ref key) = legacy_key {
-            data = state.s3_client.download_optional(key).await?;
+            data = match state.s3_client.download_optional(key).await {
+                Ok(data) => data,
+                Err(e) => {
+                    tracing::warn!(
+                        user_id = %user_uuid,
+                        legacy_key = %key,
+                        error = %e,
+                        "Avatar legacy S3 fetch failed; falling back to default"
+                    );
+                    None
+                }
+            };
         }
 
         tracing::info!(
