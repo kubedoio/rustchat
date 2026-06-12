@@ -33,12 +33,13 @@ pub fn router(state: AppState) -> Router<AppState> {
                 state.clone(),
                 crate::middleware::rate_limit::register_ip_rate_limit,
             ));
-    let login_routes = Router::new()
-        .route("/login", post(login))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::rate_limit::auth_ip_rate_limit,
-        ));
+    let login_routes =
+        Router::new()
+            .route("/login", post(login))
+            .layer(middleware::from_fn_with_state(
+                state.clone(),
+                crate::middleware::rate_limit::auth_ip_rate_limit,
+            ));
     let logout_routes = Router::new().route("/logout", post(logout));
     let verification_routes = Router::new()
         .route("/verify-email", post(verify_email))

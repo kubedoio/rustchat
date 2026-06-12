@@ -297,7 +297,7 @@ pub struct UpdateUser {
 /// DTO for changing password
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangePassword {
-    pub current_password: Option<String>,
+    pub current_password: String,
     pub new_password: String,
 }
 

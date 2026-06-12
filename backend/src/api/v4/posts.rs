@@ -1170,13 +1170,13 @@ async fn delete_scheduled_post(
         .ok_or_else(|| AppError::ScheduledPostNotFound)?;
 
     // Verify ownership
-    if scheduled.2 != auth.user_id {
+    if scheduled.user_id != auth.user_id {
         return Err(AppError::ScheduledPostNotFound);
     }
 
     // Verify channel membership; do NOT leak existence with a separate error
     if repo
-        .require_channel_membership(scheduled.1, auth.user_id)
+        .require_channel_membership(scheduled.channel_id, auth.user_id)
         .await
         .is_err()
     {

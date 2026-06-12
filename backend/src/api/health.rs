@@ -9,7 +9,6 @@ use std::collections::HashMap;
 
 use super::AppState;
 use crate::db;
-use crate::db::EXPECTED_SCHEMA_VERSION;
 use crate::telemetry::metrics;
 
 #[derive(Serialize)]
@@ -100,24 +99,24 @@ async fn readiness(State(state): State<AppState>) -> Result<Json<ReadinessRespon
     );
 
     // Check migration state
-    let migration_healthy =
-        match sqlx::query_scalar::<_, i64>("SELECT MAX(version) FROM _sqlx_migrations")
-            .fetch_optional(&state.db)
-            .await
-        {
-            Ok(Some(max_version)) => max_version >= EXPECTED_SCHEMA_VERSION,
-            Ok(None) => false,
-            Err(err) => {
-                tracing::warn!(error = %err, "Failed to query migration state");
-                false
-            }
-        };
+    let migration_healthy = match sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM _sqlx_migrations WHERE success = false",
+    )
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(failed_count) => failed_count == 0,
+        Err(err) => {
+            tracing::warn!(error = %err, "Failed to query migration state");
+            false
+        }
+    };
     checks.insert(
         "migrations".to_string(),
         if migration_healthy {
             "ok".to_string()
         } else {
-            "pending".to_string()
+            "failed".to_string()
         },
     );
 

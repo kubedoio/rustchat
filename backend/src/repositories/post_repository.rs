@@ -64,6 +64,24 @@ pub struct ChannelUnreadStats {
     pub urgent_mention_count: i64,
 }
 
+/// Named row type for `get_scheduled_post` queries
+///
+/// Using a named struct instead of a positional tuple prevents silent field
+/// mis-indexing if the SELECT column order ever changes.
+#[derive(sqlx::FromRow)]
+pub struct ScheduledPostRow {
+    pub id: Uuid,
+    pub channel_id: Uuid,
+    pub user_id: Uuid,
+    pub root_id: Option<Uuid>,
+    pub message: String,
+    pub props: serde_json::Value,
+    pub file_ids: Vec<Uuid>,
+    pub scheduled_at_ms: i64,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
 /// Thread snapshot row for CRT thread responses
 #[derive(sqlx::FromRow)]
 pub struct ThreadSnapshotRow {
@@ -659,23 +677,12 @@ impl PostRepository {
     pub async fn get_scheduled_post(
         &self,
         scheduled_id: Uuid,
-    ) -> ApiResult<
-        Option<(
-            Uuid,
-            Uuid,
-            Uuid,
-            Option<Uuid>,
-            String,
-            serde_json::Value,
-            Vec<Uuid>,
-            i64,
-            chrono::DateTime<chrono::Utc>,
-            chrono::DateTime<chrono::Utc>,
-        )>,
-    > {
-        let row = sqlx::query_as(
+    ) -> ApiResult<Option<ScheduledPostRow>> {
+        let row = sqlx::query_as::<_, ScheduledPostRow>(
             r#"
-            SELECT id, channel_id, user_id, root_id, message, props, file_ids, (extract(epoch from scheduled_at) * 1000)::bigint, created_at, updated_at
+            SELECT id, channel_id, user_id, root_id, message, props, file_ids,
+                   (extract(epoch from scheduled_at) * 1000)::bigint AS scheduled_at_ms,
+                   created_at, updated_at
             FROM scheduled_posts
             WHERE id = $1
             "#,

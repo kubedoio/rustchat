@@ -53,16 +53,20 @@ fn emit_event(event_tx: &mpsc::Sender<WsEvent>, connection_id: &str, event: WsEv
                 connection_id = %connection_id,
                 "Dropping websocket event because event queue is full"
             );
-            // Queue an async resync signal so it waits for capacity instead
-            // of being dropped by a second full-queue try_send.
-            let event_tx_clone = event_tx.clone();
-            tokio::spawn(async move {
-                let _ = event_tx_clone
-                    .send(WsEvent::ResyncRequired {
-                        reason: "queue_full".to_string(),
-                    })
-                    .await;
-            });
+            // Attempt a non-blocking enqueue of the resync signal.
+            // If the channel is still full, skip the spawn — a previous
+            // resync signal is already queued or in-flight.
+            let resync = WsEvent::ResyncRequired {
+                reason: "queue_full".to_string(),
+            };
+            match event_tx.try_send(resync) {
+                Ok(()) => {} // resync enqueued directly, no spawn needed
+                Err(TrySendError::Full(_)) => {
+                    // Channel is saturated; a resync is already pending or the
+                    // consumer is so far behind that it will reconcile when it drains.
+                }
+                Err(TrySendError::Closed(_)) => {} // connection going away
+            }
             false
         }
         Err(TrySendError::Closed(_)) => false,

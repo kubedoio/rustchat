@@ -398,21 +398,23 @@ impl WsHub {
         };
 
         let reason = reason.to_string();
-        let mut tasks = Vec::new();
+        let mut set = tokio::task::JoinSet::new();
         for cmd_tx in cmd_txs {
             let reason = reason.clone();
-            tasks.push(tokio::spawn(async move {
+            set.spawn(async move {
                 let _ = timeout(
                     Duration::from_secs(5),
                     cmd_tx.send(WsCommand::Close(code, reason)),
                 )
                 .await;
-            }));
+            });
         }
-        // Best-effort wait for all close commands to be enqueued.
-        for task in tasks {
-            let _ = task.await;
-        }
+        // Drive all close tasks concurrently with a global 10-second deadline.
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while set.join_next().await.is_some() {}
+        })
+        .await
+        .ok();
     }
 }
 

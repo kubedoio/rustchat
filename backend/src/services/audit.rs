@@ -3,8 +3,8 @@
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::api::admin::insert_admin_audit_log;
 use crate::error::AppError;
+use crate::repositories::admin_repository::AdminRepository;
 
 /// Security-sensitive and admin actions that should be recorded in the audit log.
 pub enum AuditAction {
@@ -64,8 +64,8 @@ impl AuditAction {
 
 /// Insert an audit log entry.
 ///
-/// Wraps [`insert_admin_audit_log`] with a typed action so callers don't have to
-/// hard-code string constants.
+/// Calls [`AdminRepository::insert_audit_log`] directly with a typed action so callers
+/// don't have to hard-code string constants.
 pub async fn audit(
     db: &sqlx::PgPool,
     actor_user_id: Option<Uuid>,
@@ -74,13 +74,13 @@ pub async fn audit(
     target_id: Option<Uuid>,
     metadata: Value,
 ) -> Result<(), AppError> {
-    insert_admin_audit_log(
-        db,
-        actor_user_id,
-        action.as_str(),
-        target_type,
-        target_id,
-        metadata,
-    )
-    .await
+    AdminRepository::new(db)
+        .insert_audit_log(
+            actor_user_id,
+            action.as_str(),
+            target_type,
+            target_id,
+            metadata,
+        )
+        .await
 }
