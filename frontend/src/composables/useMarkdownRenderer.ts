@@ -46,13 +46,17 @@ async function loadMarkdownLibs(): Promise<void> {
 
   isLoading = true
   try {
-    const [{ marked }, hljsModule] = await Promise.all([
+    const [markedModule, hljsModule] = await Promise.all([
       import('marked'),
       import('highlight.js/lib/common'),
     ])
 
+    // Handle both ESM named export and default export shapes across Vitest/CI environments.
+    const marked = markedModule.marked ?? (markedModule as any).default ?? (markedModule as any)
+    const hljs = hljsModule.default ?? (hljsModule as any)
+
     markedInstance = marked
-    hljsInstance = hljsModule.default
+    hljsInstance = hljs
 
     // Configure marked with syntax highlighting
     const renderer = new marked.Renderer()
