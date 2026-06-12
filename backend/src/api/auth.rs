@@ -35,11 +35,11 @@ pub fn router(state: AppState) -> Router<AppState> {
             ));
     let login_routes = Router::new()
         .route("/login", post(login))
-        .route("/logout", post(logout))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::rate_limit::auth_ip_rate_limit,
         ));
+    let logout_routes = Router::new().route("/logout", post(logout));
     let verification_routes = Router::new()
         .route("/verify-email", post(verify_email))
         .route("/resend-verification", post(resend_verification))
@@ -59,6 +59,7 @@ pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .merge(registration_routes)
         .merge(login_routes)
+        .merge(logout_routes)
         .merge(verification_routes)
         .merge(password_reset_routes)
         .route("/me", get(me))
