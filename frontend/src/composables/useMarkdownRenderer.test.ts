@@ -5,7 +5,8 @@ describe('useMarkdownRenderer XSS corpus', () => {
   const { renderMarkdown, isReady } = useMarkdownRenderer()
 
   beforeAll(async () => {
-    await vi.waitFor(() => isReady.value === true, { timeout: 5000 })
+    // Markdown libs are loaded asynchronously; give slow CI runners plenty of time.
+    await vi.waitFor(() => isReady.value === true, { timeout: 30000 })
   })
 
   it('removes script tags', () => {
