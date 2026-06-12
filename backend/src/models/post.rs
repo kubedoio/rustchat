@@ -102,7 +102,6 @@ pub struct PostResponse {
     pub reactions: Vec<ReactionResponse>,
     #[sqlx(skip)]
     pub is_saved: bool,
-    #[sqlx(skip)]
     pub client_msg_id: Option<String>,
     #[sqlx(default)]
     pub seq: i64,
