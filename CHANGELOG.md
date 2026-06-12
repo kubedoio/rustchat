@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Architecture, user, security, and runbook docs now describe the AI Agents phases and the optional runtime dependencies required to operate them safely.
 
+## [0.5.1] - 2026-06-12
+
+### Fixed
+- Include `client_msg_id` in v1 channel posts list queries so message history loads instead of returning HTTP 500.
+
 ## [0.5.0] - 2026-06-10
 
 ### Added

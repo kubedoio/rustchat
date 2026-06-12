@@ -104,7 +104,7 @@ impl S3Client {
             .await
             .map_err(|e| {
                 error!(error = ?e, bucket = %self.bucket, key = %key, "S3 upload failed");
-                AppError::Internal(format!("S3 upload error: {}", e))
+                AppError::ExternalService(format!("S3 upload error: {}", e))
             })?;
 
         Ok(())
@@ -119,7 +119,7 @@ impl S3Client {
     ) -> Result<(), AppError> {
         let body = ByteStream::from_path(path)
             .await
-            .map_err(|e| AppError::Internal(format!("ByteStream from path error: {}", e)))?;
+            .map_err(|e| AppError::ExternalService(format!("ByteStream from path error: {}", e)))?;
 
         self.client
             .put_object()
@@ -131,7 +131,7 @@ impl S3Client {
             .await
             .map_err(|e| {
                 error!(error = ?e, bucket = %self.bucket, key = %key, "S3 upload failed");
-                AppError::Internal(format!("S3 upload error: {}", e))
+                AppError::ExternalService(format!("S3 upload error: {}", e))
             })?;
 
         Ok(())
@@ -270,11 +270,13 @@ impl S3Client {
             Ok(response) => Ok(Some(response.body)),
             Err(SdkError::ServiceError(service_error)) => {
                 let code = service_error.err().code().unwrap_or_default();
-                if code == "NoSuchKey" {
+                // Treat all common S3/S3-compatible "not found" codes as a missing key so
+                // callers can fall back gracefully.
+                if matches!(code, "NoSuchKey" | "NotFound" | "NoSuchObject") {
                     Ok(None)
                 } else {
                     error!(error = ?service_error, bucket = %self.bucket, key = %key, "S3 download failed");
-                    Err(AppError::Internal(format!(
+                    Err(AppError::ExternalService(format!(
                         "S3 download error: {:?}",
                         service_error
                     )))
@@ -282,7 +284,10 @@ impl S3Client {
             }
             Err(e) => {
                 error!(error = ?e, bucket = %self.bucket, key = %key, "S3 download failed");
-                Err(AppError::Internal(format!("S3 download error: {}", e)))
+                Err(AppError::ExternalService(format!(
+                    "S3 download error: {}",
+                    e
+                )))
             }
         }
     }
