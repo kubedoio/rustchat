@@ -163,7 +163,7 @@ pub fn router(
         Some(redis.clone()),
         CallStateBackend::parse(&config.calls.state_backend),
     ));
-    let connection_store = ConnectionStore::new();
+    let connection_store = ConnectionStore::new(shutdown.clone());
 
     // Initialize LLM provider registry if env vars are present
     let agent_runtime = {

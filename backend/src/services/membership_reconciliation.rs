@@ -45,15 +45,29 @@ impl ReconciliationWorker {
         (Self { state, rx }, tx)
     }
 
-    /// Run the worker loop
+    /// Run the worker loop, exiting cleanly when the shutdown token is cancelled.
     pub async fn run(self) {
         info!("Starting membership reconciliation worker");
 
-        while let Ok(task) = self.rx.recv().await {
-            debug!("Processing reconciliation task: {:?}", task);
+        loop {
+            tokio::select! {
+                biased;
+                _ = self.state.shutdown.cancelled() => {
+                    info!("Membership reconciliation worker received shutdown signal");
+                    break;
+                }
+                task = self.rx.recv() => {
+                    match task {
+                        Ok(task) => {
+                            debug!("Processing reconciliation task: {:?}", task);
 
-            if let Err(e) = self.process_task(task).await {
-                error!("Reconciliation task failed: {}", e);
+                            if let Err(e) = self.process_task(task).await {
+                                error!("Reconciliation task failed: {}", e);
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
             }
         }
 
@@ -409,7 +423,7 @@ pub fn spawn_reconciliation_worker(
 
 /// Spawn periodic reconciliation tasks
 pub fn spawn_periodic_reconciliation(
-    _state: Arc<AppState>,
+    state: Arc<AppState>,
     tx: async_channel::Sender<ReconciliationTask>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
@@ -417,11 +431,15 @@ pub fn spawn_periodic_reconciliation(
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
-            interval.tick().await;
-
-            debug!("Triggering periodic full reconciliation");
-            if let Err(e) = tx.send(ReconciliationTask::FullReconciliation).await {
-                error!("Failed to queue periodic reconciliation: {}", e);
+            tokio::select! {
+                biased;
+                _ = state.shutdown.cancelled() => break,
+                _ = interval.tick() => {
+                    debug!("Triggering periodic full reconciliation");
+                    if let Err(e) = tx.send(ReconciliationTask::FullReconciliation).await {
+                        error!("Failed to queue periodic reconciliation: {}", e);
+                    }
+                }
             }
         }
     })

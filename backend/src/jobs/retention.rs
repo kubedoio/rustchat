@@ -6,6 +6,7 @@
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use std::time::Duration as StdDuration;
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
 /// Retention job configuration
@@ -75,14 +76,15 @@ pub struct RetentionStats {
 }
 
 /// Spawn the retention job as a background task
-pub fn spawn_retention_job(db: PgPool) {
+pub fn spawn_retention_job(db: PgPool, shutdown: CancellationToken) {
     tokio::spawn(async move {
         let mut restart_delay_secs = 1u64;
 
         loop {
             let db_for_run = db.clone();
+            let shutdown_for_run = shutdown.clone();
             let run_handle = tokio::spawn(async move {
-                run_retention_loop(db_for_run).await;
+                run_retention_loop(db_for_run, shutdown_for_run).await;
             });
 
             match run_handle.await {
@@ -97,7 +99,11 @@ pub fn spawn_retention_job(db: PgPool) {
                 }
             }
 
-            tokio::time::sleep(StdDuration::from_secs(restart_delay_secs)).await;
+            tokio::select! {
+                biased;
+                _ = shutdown.cancelled() => break,
+                _ = tokio::time::sleep(StdDuration::from_secs(restart_delay_secs)) => {}
+            }
             restart_delay_secs = (restart_delay_secs * 2).min(60);
         }
     });
@@ -105,12 +111,16 @@ pub fn spawn_retention_job(db: PgPool) {
     info!("Retention worker supervisor started");
 }
 
-async fn run_retention_loop(db: PgPool) {
+async fn run_retention_loop(db: PgPool, shutdown: CancellationToken) {
     // Run every hour
     let mut interval = tokio::time::interval(StdDuration::from_secs(3600));
 
     loop {
-        interval.tick().await;
+        tokio::select! {
+            biased;
+            _ = shutdown.cancelled() => break,
+            _ = interval.tick() => {}
+        }
 
         // Fetch current retention config from DB
         let config_result: Result<Option<(i32, i32)>, sqlx::Error> = sqlx::query_as(
@@ -152,5 +162,16 @@ async fn run_retention_loop(db: PgPool) {
                 warn!("Failed to fetch retention config: {}", e);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spawn_retention_job_accepts_cancellation_token() {
+        // Compile-time check that the public spawn API accepts a shutdown token.
+        let _: fn(PgPool, CancellationToken) = spawn_retention_job;
     }
 }

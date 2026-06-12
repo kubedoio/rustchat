@@ -73,8 +73,8 @@ async fn create_call_thread_post(
         });
     state.ws_hub.broadcast(broadcast).await;
 
-    let _ =
-        crate::services::unreads::increment_unreads(state, channel_id, owner_id, post.seq).await;
+    let _ = crate::services::unreads::increment_unreads(state, channel_id, owner_id, post.seq, "")
+        .await;
 
     Ok(post.id)
 }

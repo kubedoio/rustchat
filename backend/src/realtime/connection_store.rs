@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 use dashmap::DashMap;
 use serde_json::Value;
 use tokio::time::interval;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -173,8 +174,8 @@ pub struct ConnectionStore {
 }
 
 impl ConnectionStore {
-    /// Create a new connection store
-    pub fn new() -> Arc<Self> {
+    /// Create a new connection store and start its background cleanup task.
+    pub fn new(shutdown: CancellationToken) -> Arc<Self> {
         let store = Arc::new(Self {
             connections: DashMap::new(),
             user_connections: DashMap::new(),
@@ -185,7 +186,11 @@ impl ConnectionStore {
         tokio::spawn(async move {
             let mut cleanup_interval = interval(CLEANUP_INTERVAL);
             loop {
-                cleanup_interval.tick().await;
+                tokio::select! {
+                    biased;
+                    _ = shutdown.cancelled() => break,
+                    _ = cleanup_interval.tick() => {}
+                }
                 store_clone.cleanup_expired().await;
             }
         });
@@ -477,7 +482,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_resume_or_create() {
-        let store = ConnectionStore::new();
+        let store = ConnectionStore::new(tokio_util::sync::CancellationToken::new());
         let user_id = Uuid::new_v4();
 
         // Create new connection
@@ -508,7 +513,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_new_connection_first_queued_sequence_is_one() {
-        let store = ConnectionStore::new();
+        let store = ConnectionStore::new(tokio_util::sync::CancellationToken::new());
         let user_id = Uuid::new_v4();
 
         let (state, _, _) = store.resume_or_create(None, user_id, None);
@@ -521,7 +526,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_new_connection_with_requested_sequence_starts_at_one() {
-        let store = ConnectionStore::new();
+        let store = ConnectionStore::new(tokio_util::sync::CancellationToken::new());
         let user_id = Uuid::new_v4();
 
         let (state, _, _) = store.resume_or_create(None, user_id, Some(10));
@@ -534,7 +539,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_unknown_resume_connection_id_creates_new_connection_id() {
-        let store = ConnectionStore::new();
+        let store = ConnectionStore::new(tokio_util::sync::CancellationToken::new());
         let user_id = Uuid::new_v4();
         let requested_connection_id = Uuid::new_v4().to_string();
 
@@ -553,7 +558,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_resume_rejects_connection_hijack() {
-        let store = ConnectionStore::new();
+        let store = ConnectionStore::new(tokio_util::sync::CancellationToken::new());
         let owner_id = Uuid::new_v4();
         let attacker_id = Uuid::new_v4();
 

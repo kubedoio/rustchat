@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_borrows_for_generic_args)]
-use crate::common::spawn_app;
 use rustchat::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use serde_json::json;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 mod common;
@@ -13,12 +13,18 @@ struct TestContext {
     sender_id: Uuid,
     receiver_token: String,
     receiver_id: Uuid,
+    receiver_username: String,
+    observer_token: String,
+    observer_id: Uuid,
+    observer_username: String,
     team_id: Uuid,
     channel_id: Uuid,
 }
 
 async fn setup_context() -> TestContext {
-    let app = spawn_app().await;
+    let mut config = common::test_config();
+    config.unread.post_priority_enabled = true;
+    let app = common::spawn_app_with_config(config).await;
 
     let org_id = Uuid::new_v4();
     sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)")
@@ -131,6 +137,66 @@ async fn setup_context() -> TestContext {
         .as_str()
         .and_then(parse_mm_or_uuid)
         .expect("receiver id should parse");
+    let receiver_username = receiver_me["username"]
+        .as_str()
+        .expect("receiver username should be string")
+        .to_string();
+
+    // Register observer
+    let observer_email = format!("observer_{}@example.com", Uuid::new_v4());
+    app.api_client
+        .post(format!("{}/api/v1/auth/register", &app.address))
+        .json(&json!({
+            "username": format!("observer_{}", &observer_email[..8]),
+            "email": observer_email,
+            "password": "Password123!",
+            "display_name": "Observer",
+            "org_id": org_id
+        }))
+        .send()
+        .await
+        .expect("failed to register observer")
+        .error_for_status()
+        .expect("observer register should succeed");
+
+    let observer_login = app
+        .api_client
+        .post(format!("{}/api/v4/users/login", &app.address))
+        .json(&json!({ "login_id": observer_email, "password": "Password123!" }))
+        .send()
+        .await
+        .expect("failed to login observer")
+        .error_for_status()
+        .expect("observer login should succeed");
+
+    let observer_token = observer_login
+        .headers()
+        .get("Token")
+        .and_then(|v| v.to_str().ok())
+        .expect("missing observer token")
+        .to_string();
+
+    let observer_me = app
+        .api_client
+        .get(format!("{}/api/v4/users/me", &app.address))
+        .header("Authorization", format!("Bearer {observer_token}"))
+        .send()
+        .await
+        .expect("failed to get observer me")
+        .error_for_status()
+        .expect("observer me should succeed")
+        .json::<serde_json::Value>()
+        .await
+        .expect("observer me should be json");
+
+    let observer_id = observer_me["id"]
+        .as_str()
+        .and_then(parse_mm_or_uuid)
+        .expect("observer id should parse");
+    let observer_username = observer_me["username"]
+        .as_str()
+        .expect("observer username should be string")
+        .to_string();
 
     // Create team and channel
     let team_id = Uuid::new_v4();
@@ -145,7 +211,7 @@ async fn setup_context() -> TestContext {
     .await
     .expect("failed to create team");
 
-    for uid in [sender_id, receiver_id] {
+    for uid in [sender_id, receiver_id, observer_id] {
         sqlx::query("INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'member')")
             .bind(team_id)
             .bind(uid)
@@ -163,7 +229,7 @@ async fn setup_context() -> TestContext {
         .await
         .expect("failed to create channel");
 
-    for uid in [sender_id, receiver_id] {
+    for uid in [sender_id, receiver_id, observer_id] {
         sqlx::query("INSERT INTO channel_members (channel_id, user_id, role, notify_props) VALUES ($1, $2, 'member', '{}')")
             .bind(channel_id)
             .bind(uid)
@@ -178,6 +244,10 @@ async fn setup_context() -> TestContext {
         sender_id,
         receiver_token,
         receiver_id,
+        receiver_username,
+        observer_token,
+        observer_id,
+        observer_username,
         team_id,
         channel_id,
     }
@@ -205,6 +275,47 @@ async fn get_channel_unread(
         .await
         .expect("channel unread should be json");
     res
+}
+
+async fn get_redis_channel_unread(
+    app: &common::TestApp,
+    user_id: Uuid,
+    channel_id: Uuid,
+) -> HashMap<String, i64> {
+    let key = format!("rc:unread:v2:uc:{}:{}", user_id, channel_id);
+    let mut conn = app.redis_pool.get().await.expect("redis connection");
+
+    let values: Vec<Option<String>> = redis::cmd("HMGET")
+        .arg(&key)
+        .arg(&[
+            "msg_count",
+            "msg_count_root",
+            "mention_count",
+            "mention_count_root",
+            "urgent_mention_count",
+        ])
+        .query_async(&mut conn)
+        .await
+        .expect("hmget should succeed");
+
+    let fields = [
+        "msg_count",
+        "msg_count_root",
+        "mention_count",
+        "mention_count_root",
+        "urgent_mention_count",
+    ];
+    fields
+        .iter()
+        .zip(values.iter())
+        .map(|(field, value)| {
+            let parsed = value
+                .as_ref()
+                .and_then(|v| v.parse::<i64>().ok())
+                .unwrap_or(0);
+            (field.to_string(), parsed)
+        })
+        .collect()
 }
 
 async fn create_post(
@@ -346,4 +457,87 @@ async fn get_unread_counts_returns_correct_values() {
         after_read["msg_count"], 0,
         "receiver should have 0 unreads after marking channel read"
     );
+}
+
+#[tokio::test]
+async fn plain_message_increments_only_msg_counts_in_redis() {
+    let ctx = setup_context().await;
+
+    create_post(&ctx.app, &ctx.sender_token, ctx.channel_id, "Hello world").await;
+
+    for user_id in [ctx.receiver_id, ctx.observer_id] {
+        let counts = get_redis_channel_unread(&ctx.app, user_id, ctx.channel_id).await;
+        assert_eq!(counts["msg_count"], 1, "msg_count should increment");
+        assert_eq!(
+            counts["msg_count_root"], 1,
+            "msg_count_root should increment"
+        );
+        assert_eq!(
+            counts["mention_count"], 0,
+            "mention_count should stay 0 for plain message"
+        );
+        assert_eq!(
+            counts["mention_count_root"], 0,
+            "mention_count_root should stay 0 for plain message"
+        );
+        assert_eq!(
+            counts["urgent_mention_count"], 0,
+            "urgent_mention_count should stay 0 for plain message"
+        );
+    }
+}
+
+#[tokio::test]
+async fn user_mention_increments_mention_counts_for_that_user_only() {
+    let ctx = setup_context().await;
+
+    create_post(
+        &ctx.app,
+        &ctx.sender_token,
+        ctx.channel_id,
+        &format!("hey @{} check this", ctx.receiver_username),
+    )
+    .await;
+
+    let receiver_counts = get_redis_channel_unread(&ctx.app, ctx.receiver_id, ctx.channel_id).await;
+    assert_eq!(receiver_counts["msg_count"], 1);
+    assert_eq!(receiver_counts["mention_count"], 1);
+    assert_eq!(receiver_counts["mention_count_root"], 1);
+    assert_eq!(receiver_counts["urgent_mention_count"], 0);
+
+    let observer_counts = get_redis_channel_unread(&ctx.app, ctx.observer_id, ctx.channel_id).await;
+    assert_eq!(observer_counts["msg_count"], 1);
+    assert_eq!(
+        observer_counts["mention_count"], 0,
+        "observer should not be mentioned"
+    );
+    assert_eq!(
+        observer_counts["mention_count_root"], 0,
+        "observer should not be mentioned"
+    );
+    assert_eq!(observer_counts["urgent_mention_count"], 0);
+}
+
+#[tokio::test]
+async fn here_mention_increments_urgent_count_for_channel_members() {
+    let ctx = setup_context().await;
+
+    create_post(&ctx.app, &ctx.sender_token, ctx.channel_id, "@here urgent").await;
+
+    for user_id in [ctx.receiver_id, ctx.observer_id] {
+        let counts = get_redis_channel_unread(&ctx.app, user_id, ctx.channel_id).await;
+        assert_eq!(counts["msg_count"], 1);
+        assert_eq!(
+            counts["mention_count"], 0,
+            "@here alone is not a regular mention"
+        );
+        assert_eq!(
+            counts["mention_count_root"], 0,
+            "@here alone is not a regular mention"
+        );
+        assert_eq!(
+            counts["urgent_mention_count"], 1,
+            "@here should increment urgent count"
+        );
+    }
 }

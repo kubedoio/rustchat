@@ -57,6 +57,9 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Shutdown coordination token
+    let shutdown_token = CancellationToken::new();
+
     // Create WebSocket hub
     let ws_hub = WsHub::new();
     info!("WebSocket hub initialized");
@@ -71,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
         config.redis_url.clone(),
         ws_hub.clone(),
     );
-    match cluster_broadcast.start().await {
+    match cluster_broadcast.start(shutdown_token.child_token()).await {
         Ok(()) => {
             ws_hub.set_cluster_broadcast(cluster_broadcast).await;
             info!("WebSocket cluster fan-out enabled");
@@ -115,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Spawn background jobs
-    rustchat::jobs::spawn_retention_job(db_pool.clone());
+    rustchat::jobs::spawn_retention_job(db_pool.clone(), shutdown_token.child_token());
 
     // Spawn email worker
     let email_worker_config = rustchat::jobs::EmailWorkerConfig::default();
@@ -123,6 +126,7 @@ async fn main() -> anyhow::Result<()> {
         db_pool.clone(),
         email_worker_config,
         config.encryption_key.clone(),
+        shutdown_token.child_token(),
     );
 
     // Build application router (spawns reconciliation worker internally)
@@ -134,7 +138,7 @@ async fn main() -> anyhow::Result<()> {
         ws_hub,
         s3_client,
         config.clone(),
-        CancellationToken::new(),
+        shutdown_token.clone(),
     );
 
     // Start server
@@ -152,6 +156,8 @@ async fn main() -> anyhow::Result<()> {
     )
     .with_graceful_shutdown(async move {
         shutdown_signal().await;
+        // Signal all background loops to exit cleanly before closing websockets.
+        state_for_shutdown.shutdown.cancel();
         state_for_shutdown
             .ws_hub
             .close_all_with_code(1012, "Service restarting")

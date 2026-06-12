@@ -381,21 +381,33 @@ impl WsHub {
 
     /// Send a close command to every active connection, waiting for each
     /// command queue to accept it rather than silently dropping on a full queue.
+    ///
+    /// The read lock is dropped before spawning close tasks so that connection
+    /// additions and removals are not blocked during shutdown.
     pub async fn close_all_with_code(&self, code: u16, reason: &str) {
-        let connections = self.connections.read().await;
+        let cmd_txs: Vec<mpsc::Sender<WsCommand>> = {
+            let connections = self.connections.read().await;
+            connections
+                .values()
+                .flat_map(|user_connections| {
+                    user_connections
+                        .values()
+                        .map(|handles| handles.cmd_tx.clone())
+                })
+                .collect()
+        };
+
+        let reason = reason.to_string();
         let mut tasks = Vec::new();
-        for user_connections in connections.values() {
-            for handles in user_connections.values() {
-                let cmd_tx = handles.cmd_tx.clone();
-                let reason = reason.to_string();
-                tasks.push(tokio::spawn(async move {
-                    let _ = timeout(
-                        Duration::from_secs(5),
-                        cmd_tx.send(WsCommand::Close(code, reason)),
-                    )
-                    .await;
-                }));
-            }
+        for cmd_tx in cmd_txs {
+            let reason = reason.clone();
+            tasks.push(tokio::spawn(async move {
+                let _ = timeout(
+                    Duration::from_secs(5),
+                    cmd_tx.send(WsCommand::Close(code, reason)),
+                )
+                .await;
+            }));
         }
         // Best-effort wait for all close commands to be enqueued.
         for task in tasks {
@@ -616,5 +628,46 @@ mod tests {
 
         let rev = hub.user_team_subscriptions.read().await;
         assert!(!rev.contains_key(&user));
+    }
+
+    #[tokio::test]
+    async fn close_all_with_code_does_not_hold_connections_lock() {
+        let hub = WsHub::new();
+        let user = Uuid::new_v4();
+
+        // Add a normal connection and a slow connection whose command queue
+        // will block, keeping the close tasks alive long enough to test lock
+        // behaviour.
+        let (normal_conn, _rx) = hub
+            .add_connection(user, "u".to_string(), dummy_cmd_tx())
+            .await;
+        let (blocking_tx, _blocking_rx) = mpsc::channel(1);
+        blocking_tx
+            .try_send(WsCommand::Close(0, "block".to_string()))
+            .ok();
+        let (slow_conn, _rx2) = hub.add_connection(user, "u".to_string(), blocking_tx).await;
+
+        let hub_clone = hub.clone();
+        let close_fut = tokio::spawn(async move {
+            hub_clone.close_all_with_code(1012, "shutdown").await;
+        });
+
+        // Try to add a new connection while close_all_with_code is in progress.
+        // If the connections lock were still held, this would time out.
+        let add_result = tokio::time::timeout(
+            Duration::from_millis(500),
+            hub.add_connection(Uuid::new_v4(), "new".to_string(), dummy_cmd_tx()),
+        )
+        .await;
+
+        assert!(
+            add_result.is_ok(),
+            "add_connection should not be blocked by close_all_with_code"
+        );
+
+        let _ = close_fut.await;
+
+        hub.remove_connection(user, normal_conn).await;
+        hub.remove_connection(user, slow_conn).await;
     }
 }

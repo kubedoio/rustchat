@@ -652,6 +652,7 @@ pub async fn create_post(
             response.seq,
             team_id,
             members,
+            &input.message,
         )
         .await;
     }
@@ -859,7 +860,7 @@ pub async fn create_system_message(
                 .await
                 .unwrap_or_default();
         let _ = crate::services::unreads::increment_unreads_external(
-            state, channel_id, bot_user, post.seq, team_id, members,
+            state, channel_id, bot_user, post.seq, team_id, members, &message,
         )
         .await;
     }

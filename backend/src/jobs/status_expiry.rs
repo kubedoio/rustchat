@@ -22,7 +22,11 @@ pub fn spawn_custom_status_expiry_worker(state: Arc<AppState>) -> tokio::task::J
         ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
-            ticker.tick().await;
+            tokio::select! {
+                biased;
+                _ = state.shutdown.cancelled() => break,
+                _ = ticker.tick() => {}
+            }
 
             match run_custom_status_expiry_cleanup(&state).await {
                 Ok(expired_user_ids) => {

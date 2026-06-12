@@ -460,7 +460,9 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
         jwt_audience: config.jwt_audience.clone(),
         jwt_expiry_hours,
         ws_hub,
-        connection_store: rustchat::realtime::ConnectionStore::new(),
+        connection_store: rustchat::realtime::ConnectionStore::new(
+            tokio_util::sync::CancellationToken::new(),
+        ),
         s3_client,
         http_client: reqwest::Client::new(),
         start_time: std::time::Instant::now(),
