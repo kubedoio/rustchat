@@ -10,6 +10,7 @@ use axum::{
 use std::net::SocketAddr;
 
 use super::AppState;
+use crate::auth::{build_auth_cookie, clear_auth_cookie};
 use crate::auth::{create_token_with_policy, hash_password, verify_password, AuthUser};
 use crate::error::{ApiResult, AppError};
 use crate::middleware::rate_limit::{self, RateLimitConfig};
@@ -32,13 +33,13 @@ pub fn router(state: AppState) -> Router<AppState> {
                 state.clone(),
                 crate::middleware::rate_limit::register_ip_rate_limit,
             ));
-    let login_routes =
-        Router::new()
-            .route("/login", post(login))
-            .layer(middleware::from_fn_with_state(
-                state.clone(),
-                crate::middleware::rate_limit::auth_ip_rate_limit,
-            ));
+    let login_routes = Router::new()
+        .route("/login", post(login))
+        .route("/logout", post(logout))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit::auth_ip_rate_limit,
+        ));
     let verification_routes = Router::new()
         .route("/verify-email", post(verify_email))
         .route("/resend-verification", post(resend_verification))
@@ -431,16 +432,7 @@ async fn login_inner(
 
     let max_age = state.jwt_expiry_hours.saturating_mul(3600);
     let mut headers = HeaderMap::new();
-    let cookie_value = format!(
-        "MMAUTHTOKEN={}; Path=/; Max-Age={}; HttpOnly{}; SameSite=Lax",
-        token,
-        max_age,
-        if state.config.is_production() {
-            "; Secure"
-        } else {
-            ""
-        }
-    );
+    let cookie_value = build_auth_cookie(&token, max_age, state.config.is_production());
     let cookie_header = axum::http::HeaderValue::from_str(&cookie_value)
         .map_err(|_| AppError::Internal("Invalid cookie characters".into()))?;
     headers.insert(axum::http::header::SET_COOKIE, cookie_header);
@@ -453,6 +445,21 @@ async fn login_inner(
             expires_in: state.jwt_expiry_hours * 3600,
             user: UserResponse::from(user),
         }),
+    ))
+}
+
+async fn logout(State(state): State<AppState>) -> ApiResult<(HeaderMap, Json<serde_json::Value>)> {
+    let mut headers = HeaderMap::new();
+    let cookie_header =
+        axum::http::HeaderValue::from_str(&clear_auth_cookie(state.config.is_production()))
+            .map_err(|_| AppError::Internal("Invalid cookie characters".into()))?;
+    headers.insert(axum::http::header::SET_COOKIE, cookie_header);
+
+    Ok((
+        headers,
+        Json(serde_json::json!({
+            "success": true
+        })),
     ))
 }
 

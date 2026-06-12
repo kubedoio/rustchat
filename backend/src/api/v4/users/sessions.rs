@@ -8,7 +8,8 @@ use serde::Deserialize;
 
 use super::MmAuthUser;
 use crate::api::AppState;
-use crate::error::ApiResult;
+use crate::auth::clear_auth_cookie;
+use crate::error::{ApiResult, AppError};
 
 #[derive(Deserialize)]
 pub struct AttachDeviceRequest {
@@ -175,8 +176,14 @@ pub async fn get_sessions() -> ApiResult<Json<Vec<serde_json::Value>>> {
     Ok(Json(vec![]))
 }
 
-pub async fn logout() -> ApiResult<Json<serde_json::Value>> {
-    Ok(Json(serde_json::json!({"status": "OK"})))
+pub async fn logout(State(state): State<AppState>) -> ApiResult<impl IntoResponse> {
+    let mut headers = HeaderMap::new();
+    let cookie_header =
+        axum::http::HeaderValue::from_str(&clear_auth_cookie(state.config.is_production()))
+            .map_err(|_| AppError::Internal("Invalid cookie characters".into()))?;
+    headers.insert(axum::http::header::SET_COOKIE, cookie_header);
+
+    Ok((headers, Json(serde_json::json!({"status": "OK"}))))
 }
 
 pub async fn get_user_sessions(
