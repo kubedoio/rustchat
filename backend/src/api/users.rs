@@ -250,11 +250,16 @@ async fn change_password(
         .await?
         .ok_or_else(|| AppError::UserNotFound)?;
 
+    let current_password = input
+        .current_password
+        .as_deref()
+        .ok_or_else(|| AppError::BadRequest("Current password is required".to_string()))?;
+
     let password_hash = user
         .password_hash
         .as_deref()
         .ok_or_else(|| AppError::BadRequest("Invalid current password".to_string()))?;
-    if !verify_password(input.current_password.as_str(), password_hash)? {
+    if !verify_password(current_password, password_hash)? {
         return Err(AppError::BadRequest("Invalid current password".to_string()));
     }
 

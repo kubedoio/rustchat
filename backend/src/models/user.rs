@@ -297,7 +297,8 @@ pub struct UpdateUser {
 /// DTO for changing password
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangePassword {
-    pub current_password: String,
+    #[serde(default)]
+    pub current_password: Option<String>,
     pub new_password: String,
 }
 

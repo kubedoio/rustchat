@@ -134,7 +134,12 @@ async fn create_knowledge_base(app: &TestApp, token: &str, name: &str) -> Uuid {
         .expect("knowledge base id should be UUID")
 }
 
-async fn seed_agent(app: &TestApp, creator_id: Uuid, username: &str) -> AgentContext {
+async fn seed_agent(
+    app: &TestApp,
+    team_id: Uuid,
+    creator_id: Uuid,
+    username: &str,
+) -> AgentContext {
     let user_id = Uuid::new_v4();
     let config_id = Uuid::new_v4();
 
@@ -161,6 +166,13 @@ async fn seed_agent(app: &TestApp, creator_id: Uuid, username: &str) -> AgentCon
     .execute(&app.db_pool)
     .await
     .expect("agent user should be inserted");
+
+    sqlx::query("INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'member')")
+        .bind(team_id)
+        .bind(user_id)
+        .execute(&app.db_pool)
+        .await
+        .expect("agent should be a member of the team");
 
     sqlx::query(
         r#"
@@ -355,7 +367,7 @@ async fn api_v1_knowledge_sync_sources_agent_assignment_and_webhook() {
     let app = spawn_app().await;
     let admin = register_user(&app, "syncadmin", "syncadmin@example.com", "system_admin").await;
     let kb_id = create_knowledge_base(&app, &admin.token, "Synced Docs").await;
-    let agent = seed_agent(&app, admin.user_id, "knowledgeagent").await;
+    let agent = seed_agent(&app, admin.team_id, admin.user_id, "knowledgeagent").await;
 
     let create_source_response = app
         .api_client
