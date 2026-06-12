@@ -113,7 +113,8 @@ async fn fetch_username(state: &AppState, user_id: Uuid) -> ApiResult<String> {
 /// Returns `(mention_count, mention_count_root, urgent_mention_count)` where:
 /// - `mention_count` includes messages mentioning the user, `@all`, or `@channel`
 /// - `mention_count_root` is the subset of `mention_count` from root posts only
-/// - `urgent_mention_count` includes messages that also contain `@here`
+/// - `urgent_mention_count` includes messages that contain `@here`, independent of
+///   whether the message also mentions the user
 fn count_mentions_in_messages(messages: &[(String, bool)], username: &str) -> (i64, i64, i64) {
     let mut mention_count = 0i64;
     let mut mention_count_root = 0i64;
@@ -133,9 +134,9 @@ fn count_mentions_in_messages(messages: &[(String, bool)], username: &str) -> (i
             if *is_root {
                 mention_count_root += 1;
             }
-            if has_here {
-                urgent_mention_count += 1;
-            }
+        }
+        if has_here {
+            urgent_mention_count += 1;
         }
     }
 
@@ -269,7 +270,6 @@ async fn compute_channel_unread_from_db(
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND LOWER(p.message) ~ $3
                   AND LOWER(p.message) ~ $4
             )::BIGINT AS urgent_mention_count
         FROM channel_members cm
@@ -387,7 +387,6 @@ async fn compute_team_unread_from_db(
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND LOWER(p.message) ~ $3
                   AND LOWER(p.message) ~ $4
             )::BIGINT AS urgent_mention_count
         FROM channel_members cm
@@ -1328,7 +1327,10 @@ pub async fn mark_all_as_read(state: &AppState, user_id: Uuid) -> ApiResult<()> 
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_mentioned_members, unread_here_pattern, unread_mention_pattern};
+    use super::{
+        count_mentions_in_messages, resolve_mentioned_members, unread_here_pattern,
+        unread_mention_pattern,
+    };
     use regex::Regex;
     use std::collections::{HashMap, HashSet};
     use uuid::Uuid;
@@ -1439,5 +1441,25 @@ mod tests {
         );
 
         assert!(mentioned.is_empty());
+    }
+
+    #[test]
+    fn count_mentions_here_only_counts_as_urgent() {
+        let messages = vec![("@here urgent".to_string(), true)];
+        let (mention_count, mention_count_root, urgent_count) =
+            count_mentions_in_messages(&messages, "alice");
+        assert_eq!(mention_count, 0);
+        assert_eq!(mention_count_root, 0);
+        assert_eq!(urgent_count, 1);
+    }
+
+    #[test]
+    fn count_mentions_user_and_here_counts_both() {
+        let messages = vec![("@alice @here please review".to_string(), true)];
+        let (mention_count, mention_count_root, urgent_count) =
+            count_mentions_in_messages(&messages, "alice");
+        assert_eq!(mention_count, 1);
+        assert_eq!(mention_count_root, 1);
+        assert_eq!(urgent_count, 1);
     }
 }

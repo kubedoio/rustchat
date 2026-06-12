@@ -1449,7 +1449,7 @@ impl PostRepository {
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2)::BIGINT AS msg_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND LOWER(p.message) ~ $3)::BIGINT AS mention_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL AND LOWER(p.message) ~ $3)::BIGINT AS mention_count_root,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND LOWER(p.message) ~ $3 AND LOWER(p.message) ~ $4)::BIGINT AS urgent_mention_count,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND LOWER(p.message) ~ $4)::BIGINT AS urgent_mention_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL)::BIGINT AS msg_count_root
             FROM posts p
             WHERE p.channel_id = $1

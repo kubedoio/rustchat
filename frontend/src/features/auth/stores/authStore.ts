@@ -217,6 +217,14 @@ export const useAuthStore = defineStore('authStore', () => {
     clearTokenExpiryTimer()
     clearSelfStatusExpiryTimer()
     try {
+      // Ask the backend to clear the HttpOnly MMAUTHTOKEN cookie so the
+      // browser stops sending it on future requests.
+      try {
+        await client.post('/auth/logout')
+      } catch (e) {
+        log.error('Failed to notify server of logout', e)
+      }
+
       token.value = ''
       user.value = null
       await clearSessionState()
