@@ -108,6 +108,106 @@ async fn fetch_username(state: &AppState, user_id: Uuid) -> ApiResult<String> {
     Ok(username.unwrap_or_default())
 }
 
+/// Count mentions in a list of messages using the parser-backed `parse_mentions`.
+///
+/// Returns `(mention_count, mention_count_root, urgent_mention_count)` where:
+/// - `mention_count` includes messages mentioning the user, `@all`, or `@channel`
+/// - `mention_count_root` is the subset of `mention_count` from root posts only
+/// - `urgent_mention_count` includes messages that contain `@here`, independent of
+///   whether the message also mentions the user
+fn count_mentions_in_messages(messages: &[(String, bool)], username: &str) -> (i64, i64, i64) {
+    let mut mention_count = 0i64;
+    let mut mention_count_root = 0i64;
+    let mut urgent_mention_count = 0i64;
+
+    for (message, is_root) in messages {
+        let mentions = crate::services::posts::parse_mentions(message);
+        let has_user_mention = mentions.iter().any(|m| {
+            m.eq_ignore_ascii_case(username)
+                || m.eq_ignore_ascii_case("all")
+                || m.eq_ignore_ascii_case("channel")
+        });
+        let has_here = mentions.iter().any(|m| m.eq_ignore_ascii_case("here"));
+
+        if has_user_mention {
+            mention_count += 1;
+            if *is_root {
+                mention_count_root += 1;
+            }
+        }
+        if has_here {
+            urgent_mention_count += 1;
+        }
+    }
+
+    (mention_count, mention_count_root, urgent_mention_count)
+}
+
+/// Resolve which channel members are mentioned by a message.
+///
+/// Uses the parser-aware `parse_mentions` helper, so mentions inside code blocks
+/// or URLs are ignored. Returns the set of mentioned member IDs and whether the
+/// message contains `@here`.
+fn resolve_mentioned_members(
+    members: &[Uuid],
+    member_usernames: &HashMap<Uuid, String>,
+    message: &str,
+) -> (HashSet<Uuid>, bool) {
+    let mentions = crate::services::posts::parse_mentions(message);
+    let has_all = mentions.iter().any(|m| m.eq_ignore_ascii_case("all"));
+    let has_channel = mentions.iter().any(|m| m.eq_ignore_ascii_case("channel"));
+    let has_here = mentions.iter().any(|m| m.eq_ignore_ascii_case("here"));
+
+    let mut mentioned = HashSet::new();
+    if has_all || has_channel {
+        mentioned.extend(members.iter().copied());
+    } else {
+        let normalized_mentions: HashSet<String> = mentions
+            .iter()
+            .filter(|m| {
+                !m.eq_ignore_ascii_case("all")
+                    && !m.eq_ignore_ascii_case("channel")
+                    && !m.eq_ignore_ascii_case("here")
+            })
+            .map(|m| m.to_ascii_lowercase())
+            .collect();
+
+        if !normalized_mentions.is_empty() {
+            for member in members {
+                if let Some(username) = member_usernames.get(member) {
+                    if normalized_mentions.contains(&username.to_ascii_lowercase()) {
+                        mentioned.insert(*member);
+                    }
+                }
+            }
+        }
+    }
+
+    (mentioned, has_here)
+}
+
+async fn fetch_member_usernames(
+    state: &AppState,
+    members: &[Uuid],
+) -> ApiResult<HashMap<Uuid, String>> {
+    if members.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows: Vec<(Uuid, String)> = sqlx::query_as(
+        r#"
+        SELECT id, username
+        FROM users
+        WHERE id = ANY($1)
+        "#,
+    )
+    .bind(members)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows.into_iter().collect())
+}
+
 async fn fetch_user_channels(state: &AppState, user_id: Uuid) -> ApiResult<Vec<(Uuid, Uuid)>> {
     let channels: Vec<(Uuid, Uuid)> = sqlx::query_as(
         r#"
@@ -170,7 +270,6 @@ async fn compute_channel_unread_from_db(
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND LOWER(p.message) ~ $3
                   AND LOWER(p.message) ~ $4
             )::BIGINT AS urgent_mention_count
         FROM channel_members cm
@@ -196,8 +295,8 @@ async fn compute_channel_unread_from_db(
         manually_unread,
         msg_count,
         msg_count_root,
-        mention_count,
-        mention_count_root,
+        mut mention_count,
+        mut mention_count_root,
         mut urgent_mention_count,
     )) = row
     else {
@@ -213,6 +312,27 @@ async fn compute_channel_unread_from_db(
             version: V2_SCHEMA_VERSION,
         });
     };
+
+    // Use parser-backed mention counting when unread volume is low enough.
+    if msg_count > 0 && msg_count < 500 {
+        let repo = crate::repositories::PostRepository::new(state.db.clone());
+        match repo.get_unread_posts_messages(channel_id, user_id).await {
+            Ok(messages) => {
+                let (mc, mcr, uc) = count_mentions_in_messages(&messages, username);
+                mention_count = mc;
+                mention_count_root = mcr;
+                urgent_mention_count = uc;
+            }
+            Err(err) => {
+                warn!(
+                    user_id = %user_id,
+                    channel_id = %channel_id,
+                    error = %err,
+                    "Failed to fetch unread messages for mention parsing; falling back to SQL regex"
+                );
+            }
+        }
+    }
 
     if !state.config.unread.post_priority_enabled {
         urgent_mention_count = 0;
@@ -267,7 +387,6 @@ async fn compute_team_unread_from_db(
             COUNT(*) FILTER (
                 WHERE p.deleted_at IS NULL
                   AND p.seq > COALESCE(cr.last_read_message_id, 0)
-                  AND LOWER(p.message) ~ $3
                   AND LOWER(p.message) ~ $4
             )::BIGINT AS urgent_mention_count
         FROM channel_members cm
@@ -293,6 +412,7 @@ async fn compute_team_unread_from_db(
     let mut msg_count_root = 0i64;
     let mut mention_count = 0i64;
     let mut mention_count_root = 0i64;
+    let mut total_unread_count = 0i64;
     for (
         notify_props,
         channel_msg_count,
@@ -307,6 +427,8 @@ async fn compute_team_unread_from_db(
             .and_then(|v| v.as_str())
             .unwrap_or("all");
 
+        total_unread_count += channel_msg_count;
+
         if mark_unread != "mention" {
             msg_count += channel_msg_count;
             msg_count_root += channel_msg_count_root;
@@ -315,6 +437,41 @@ async fn compute_team_unread_from_db(
         mention_count += channel_mention_count;
         mention_count_root += channel_mention_count_root;
         let _ = channel_urgent_mention_count;
+    }
+
+    // Use parser-backed mention counting when total unread volume is low enough.
+    if total_unread_count > 0 && total_unread_count < 500 {
+        match sqlx::query_as::<_, (String, bool)>(
+            r#"
+            SELECT p.message, p.root_post_id IS NULL as is_root
+            FROM posts p
+            JOIN channel_members cm ON cm.channel_id = p.channel_id AND cm.user_id = $1
+            JOIN channels c ON c.id = cm.channel_id
+            LEFT JOIN channel_reads cr ON cr.channel_id = p.channel_id AND cr.user_id = $1
+            WHERE c.team_id = $2
+              AND p.deleted_at IS NULL
+              AND p.seq > COALESCE(cr.last_read_message_id, 0)
+            "#,
+        )
+        .bind(user_id)
+        .bind(team_id)
+        .fetch_all(&state.db)
+        .await
+        {
+            Ok(messages) => {
+                let (mc, mcr, _) = count_mentions_in_messages(&messages, username);
+                mention_count = mc;
+                mention_count_root = mcr;
+            }
+            Err(err) => {
+                warn!(
+                    user_id = %user_id,
+                    team_id = %team_id,
+                    error = %err,
+                    "Failed to fetch unread messages for team mention parsing; falling back to SQL regex"
+                );
+            }
+        }
     }
 
     let (thread_count, thread_mention_count, thread_urgent_mention_count): (i64, i64, i64) =
@@ -649,7 +806,11 @@ pub async fn reconcile_dirty_users_once(state: &AppState) -> ApiResult<usize> {
 pub async fn run_unread_v2_reconciler(state: AppState) {
     let mut interval = tokio::time::interval(Duration::from_secs(30));
     loop {
-        interval.tick().await;
+        tokio::select! {
+            biased;
+            _ = state.shutdown.cancelled() => break,
+            _ = interval.tick() => {}
+        }
         if !state.config.unread.unread_v2_enabled {
             continue;
         }
@@ -914,6 +1075,7 @@ pub async fn increment_unreads_external(
     message_seq: i64,
     team_id: Uuid,
     members: Vec<Uuid>,
+    message: &str,
 ) -> ApiResult<()> {
     let mut conn = match state.redis.get().await {
         Ok(conn) => conn,
@@ -937,6 +1099,10 @@ pub async fn increment_unreads_external(
         return Ok(());
     }
 
+    let member_usernames = fetch_member_usernames(state, &non_author_members).await?;
+    let (mentioned_members, has_here) =
+        resolve_mentioned_members(&non_author_members, &member_usernames, message);
+
     // Batch all per-member Redis writes and the final GET for each
     // unread count into a single pipeline.
     let mut pipe = redis::pipe();
@@ -947,6 +1113,7 @@ pub async fn increment_unreads_external(
         let team_hash_key = v2_team_unread_key(*mid, team_id);
         let dirty_key = v2_dirty_key(*mid);
         let marker = format!("channel:{}", channel_id);
+        let is_mentioned = mentioned_members.contains(mid);
 
         pipe.cmd("INCR").arg(&unread_key).arg(1).ignore();
         pipe.cmd("INCR").arg(&team_unread_key).arg(1).ignore();
@@ -960,6 +1127,35 @@ pub async fn increment_unreads_external(
             .arg("msg_count_root")
             .arg(1)
             .ignore();
+        if is_mentioned {
+            pipe.cmd("HINCRBY")
+                .arg(&channel_hash_key)
+                .arg("mention_count")
+                .arg(1)
+                .ignore();
+            pipe.cmd("HINCRBY")
+                .arg(&channel_hash_key)
+                .arg("mention_count_root")
+                .arg(1)
+                .ignore();
+            pipe.cmd("HINCRBY")
+                .arg(&team_hash_key)
+                .arg("mention_count")
+                .arg(1)
+                .ignore();
+            pipe.cmd("HINCRBY")
+                .arg(&team_hash_key)
+                .arg("mention_count_root")
+                .arg(1)
+                .ignore();
+        }
+        if has_here && state.config.unread.post_priority_enabled {
+            pipe.cmd("HINCRBY")
+                .arg(&channel_hash_key)
+                .arg("urgent_mention_count")
+                .arg(1)
+                .ignore();
+        }
         pipe.cmd("HSET")
             .arg(&channel_hash_key)
             .arg("version")
@@ -1016,6 +1212,7 @@ pub async fn increment_unreads(
     channel_id: Uuid,
     author_id: Uuid,
     message_seq: i64,
+    message: &str,
 ) -> ApiResult<()> {
     let team_id: Uuid = sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
         .bind(channel_id)
@@ -1045,7 +1242,16 @@ pub async fn increment_unreads(
             .fetch_all(&state.db)
             .await?;
 
-    increment_unreads_external(state, channel_id, author_id, message_seq, team_id, members).await
+    increment_unreads_external(
+        state,
+        channel_id,
+        author_id,
+        message_seq,
+        team_id,
+        members,
+        message,
+    )
+    .await
 }
 
 /// Mark all channels as read for a user
@@ -1121,8 +1327,13 @@ pub async fn mark_all_as_read(state: &AppState, user_id: Uuid) -> ApiResult<()> 
 
 #[cfg(test)]
 mod tests {
-    use super::{unread_here_pattern, unread_mention_pattern};
+    use super::{
+        count_mentions_in_messages, resolve_mentioned_members, unread_here_pattern,
+        unread_mention_pattern,
+    };
     use regex::Regex;
+    use std::collections::{HashMap, HashSet};
+    use uuid::Uuid;
 
     #[test]
     fn unread_mention_pattern_matches_exact_tokens() {
@@ -1151,5 +1362,104 @@ mod tests {
         assert!(pattern.is_match("@here please review"));
         assert!(pattern.is_match("ping (@here)"));
         assert!(!pattern.is_match("@hereafter"));
+    }
+
+    #[test]
+    fn resolve_mentioned_members_plain_message_mentions_nobody() {
+        let a = Uuid::new_v4();
+        let b = Uuid::new_v4();
+        let usernames = HashMap::from([(a, "alice".to_string()), (b, "bob".to_string())]);
+
+        let (mentioned, has_here) =
+            resolve_mentioned_members(&[a, b], &usernames, "just a regular message");
+
+        assert!(mentioned.is_empty());
+        assert!(!has_here);
+    }
+
+    #[test]
+    fn resolve_mentioned_members_user_mention_only_targets_that_user() {
+        let alice = Uuid::new_v4();
+        let bob = Uuid::new_v4();
+        let usernames = HashMap::from([(alice, "alice".to_string()), (bob, "bob".to_string())]);
+
+        let (mentioned, has_here) =
+            resolve_mentioned_members(&[alice, bob], &usernames, "hey @alice check this");
+
+        assert_eq!(mentioned, HashSet::from([alice]));
+        assert!(!has_here);
+    }
+
+    #[test]
+    fn resolve_mentioned_members_all_mentions_everyone() {
+        let alice = Uuid::new_v4();
+        let bob = Uuid::new_v4();
+        let usernames = HashMap::from([(alice, "alice".to_string()), (bob, "bob".to_string())]);
+
+        let (mentioned, has_here) =
+            resolve_mentioned_members(&[alice, bob], &usernames, "@all meeting now");
+
+        assert_eq!(mentioned, HashSet::from([alice, bob]));
+        assert!(!has_here);
+    }
+
+    #[test]
+    fn resolve_mentioned_members_channel_mentions_everyone() {
+        let alice = Uuid::new_v4();
+        let bob = Uuid::new_v4();
+        let usernames = HashMap::from([(alice, "alice".to_string()), (bob, "bob".to_string())]);
+
+        let (mentioned, has_here) =
+            resolve_mentioned_members(&[alice, bob], &usernames, "@channel heads up");
+
+        assert_eq!(mentioned, HashSet::from([alice, bob]));
+        assert!(!has_here);
+    }
+
+    #[test]
+    fn resolve_mentioned_members_here_detected_independently() {
+        let alice = Uuid::new_v4();
+        let bob = Uuid::new_v4();
+        let usernames = HashMap::from([(alice, "alice".to_string()), (bob, "bob".to_string())]);
+
+        let (mentioned, has_here) =
+            resolve_mentioned_members(&[alice, bob], &usernames, "@here urgent");
+
+        assert!(mentioned.is_empty());
+        assert!(has_here);
+    }
+
+    #[test]
+    fn resolve_mentioned_members_ignores_mentions_in_code_blocks_and_urls() {
+        let alice = Uuid::new_v4();
+        let usernames = HashMap::from([(alice, "alice".to_string())]);
+
+        let (mentioned, _) = resolve_mentioned_members(
+            &[alice],
+            &usernames,
+            "```\n@alice\n```\nhello `@alice`\nsee https://@alice",
+        );
+
+        assert!(mentioned.is_empty());
+    }
+
+    #[test]
+    fn count_mentions_here_only_counts_as_urgent() {
+        let messages = vec![("@here urgent".to_string(), true)];
+        let (mention_count, mention_count_root, urgent_count) =
+            count_mentions_in_messages(&messages, "alice");
+        assert_eq!(mention_count, 0);
+        assert_eq!(mention_count_root, 0);
+        assert_eq!(urgent_count, 1);
+    }
+
+    #[test]
+    fn count_mentions_user_and_here_counts_both() {
+        let messages = vec![("@alice @here please review".to_string(), true)];
+        let (mention_count, mention_count_root, urgent_count) =
+            count_mentions_in_messages(&messages, "alice");
+        assert_eq!(mention_count, 1);
+        assert_eq!(mention_count_root, 1);
+        assert_eq!(urgent_count, 1);
     }
 }

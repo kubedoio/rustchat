@@ -86,7 +86,7 @@ async function handleRegister() {
     } else {
       // Auto-login was provided, redirect to home
       if (response.data.token) {
-        localStorage.setItem('auth_token', response.data.token)
+        sessionStorage.setItem('auth_token', response.data.token)
         window.location.href = '/'
       }
     }

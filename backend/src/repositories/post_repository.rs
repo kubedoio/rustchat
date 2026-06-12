@@ -44,6 +44,7 @@ pub struct PostWithUser {
     pub reply_count: i64,
     pub last_reply_at: Option<DateTime<Utc>>,
     pub seq: i64,
+    pub client_msg_id: Option<String>,
     // User fields
     pub username: Option<String>,
     pub avatar_url: Option<String>,
@@ -61,6 +62,24 @@ pub struct ChannelUnreadStats {
     pub mention_count: i64,
     pub mention_count_root: i64,
     pub urgent_mention_count: i64,
+}
+
+/// Named row type for `get_scheduled_post` queries
+///
+/// Using a named struct instead of a positional tuple prevents silent field
+/// mis-indexing if the SELECT column order ever changes.
+#[derive(sqlx::FromRow)]
+pub struct ScheduledPostRow {
+    pub id: Uuid,
+    pub channel_id: Uuid,
+    pub user_id: Uuid,
+    pub root_id: Option<Uuid>,
+    pub message: String,
+    pub props: serde_json::Value,
+    pub file_ids: Vec<Uuid>,
+    pub scheduled_at_ms: i64,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// Thread snapshot row for CRT thread responses
@@ -98,6 +117,7 @@ impl PostRepository {
         COALESCE(p.file_ids, '{}'::uuid[]) as file_ids,
         p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
         p.reply_count::int8 as reply_count, p.last_reply_at, p.seq,
+        p.client_msg_id,
         u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
     "#;
 
@@ -106,7 +126,7 @@ impl PostRepository {
         id, channel_id, user_id, root_post_id, message, props, file_ids,
         is_pinned, created_at, edited_at, deleted_at,
         reply_count::int8 as reply_count,
-        last_reply_at, seq
+        last_reply_at, seq, client_msg_id
     "#;
 
     /// Get a single post by ID with user info
@@ -349,6 +369,37 @@ impl PostRepository {
         Ok(result)
     }
 
+    /// Get unread post messages for a user in a channel.
+    ///
+    /// Returns tuples of `(message, is_root)` for posts the user has not yet read.
+    /// Used by unread mention counting to apply parser-backed mention detection
+    /// that excludes code blocks and URLs.
+    pub async fn get_unread_posts_messages(
+        &self,
+        channel_id: Uuid,
+        user_id: Uuid,
+    ) -> ApiResult<Vec<(String, bool)>> {
+        let rows: Vec<(String, bool)> = sqlx::query_as(
+            r#"
+            SELECT p.message, p.root_post_id IS NULL as is_root
+            FROM posts p
+            LEFT JOIN channel_reads cr
+                   ON cr.channel_id = p.channel_id
+                  AND cr.user_id = $2
+            WHERE p.channel_id = $1
+              AND p.deleted_at IS NULL
+              AND p.seq > COALESCE(cr.last_read_message_id, 0)
+            ORDER BY p.seq ASC
+            "#,
+        )
+        .bind(channel_id)
+        .bind(user_id)
+        .fetch_all(&self.db)
+        .await?;
+
+        Ok(rows)
+    }
+
     /// Pin a post
     pub async fn pin_post(&self, post_id: Uuid) -> ApiResult<()> {
         sqlx::query("UPDATE posts SET is_pinned = true WHERE id = $1")
@@ -378,7 +429,7 @@ impl PostRepository {
             SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
                    p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                    p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
+                   p.last_reply_at, p.seq, p.client_msg_id,
                    u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
             FROM updated_post p
             LEFT JOIN users u ON p.user_id = u.id
@@ -407,7 +458,7 @@ impl PostRepository {
             SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
                    p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                    p.reply_count::int8 as reply_count,
-                   p.last_reply_at, p.seq,
+                   p.last_reply_at, p.seq, p.client_msg_id,
                    u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
             FROM updated_post p
             LEFT JOIN users u ON p.user_id = u.id
@@ -616,6 +667,27 @@ impl PostRepository {
         .bind(scheduled_at)
         .bind(scheduled_id)
         .bind(user_id)
+        .fetch_optional(&self.db)
+        .await?;
+
+        Ok(row)
+    }
+
+    /// Get a scheduled post by ID
+    pub async fn get_scheduled_post(
+        &self,
+        scheduled_id: Uuid,
+    ) -> ApiResult<Option<ScheduledPostRow>> {
+        let row = sqlx::query_as::<_, ScheduledPostRow>(
+            r#"
+            SELECT id, channel_id, user_id, root_id, message, props, file_ids,
+                   (extract(epoch from scheduled_at) * 1000)::bigint AS scheduled_at_ms,
+                   created_at, updated_at
+            FROM scheduled_posts
+            WHERE id = $1
+            "#,
+        )
+        .bind(scheduled_id)
         .fetch_optional(&self.db)
         .await?;
 
@@ -1384,7 +1456,7 @@ impl PostRepository {
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2)::BIGINT AS msg_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND LOWER(p.message) ~ $3)::BIGINT AS mention_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL AND LOWER(p.message) ~ $3)::BIGINT AS mention_count_root,
-                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND LOWER(p.message) ~ $3 AND LOWER(p.message) ~ $4)::BIGINT AS urgent_mention_count,
+                COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND LOWER(p.message) ~ $4)::BIGINT AS urgent_mention_count,
                 COUNT(*) FILTER (WHERE p.deleted_at IS NULL AND p.seq > $2 AND p.root_post_id IS NULL)::BIGINT AS msg_count_root
             FROM posts p
             WHERE p.channel_id = $1
@@ -1790,7 +1862,7 @@ impl PostRepository {
                 SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
                        p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                        p.reply_count::int8 as reply_count,
-                       p.last_reply_at, p.seq,
+                       p.last_reply_at, p.seq, p.client_msg_id,
                        u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
@@ -1803,7 +1875,7 @@ impl PostRepository {
                 SELECT p.id, p.channel_id, p.user_id, p.root_post_id, p.message, p.props, p.file_ids,
                        p.is_pinned, p.created_at, p.edited_at, p.deleted_at,
                        p.reply_count::int8 as reply_count,
-                       p.last_reply_at, p.seq,
+                       p.last_reply_at, p.seq, p.client_msg_id,
                        u.username, u.avatar_url, u.email, COALESCE(u.is_bot, false) as is_bot
                 FROM posts p
                 LEFT JOIN users u ON p.user_id = u.id
@@ -1912,11 +1984,12 @@ impl PostRepository {
         message: &str,
         props: serde_json::Value,
         file_ids: &[Uuid],
+        client_msg_id: Option<&str>,
     ) -> ApiResult<crate::models::Post> {
         let post = sqlx::query_as::<_, crate::models::Post>(&format!(
             r#"
-            INSERT INTO posts (channel_id, user_id, root_post_id, message, props, file_ids)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO posts (channel_id, user_id, root_post_id, message, props, file_ids, client_msg_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING {}
             "#,
             Self::POST_COLUMNS_NO_USER
@@ -1927,6 +2000,7 @@ impl PostRepository {
         .bind(message)
         .bind(props)
         .bind(file_ids)
+        .bind(client_msg_id)
         .fetch_one(&mut **tx)
         .await?;
 
@@ -1955,11 +2029,12 @@ impl PostRepository {
         message: &str,
         props: serde_json::Value,
         file_ids: &[Uuid],
+        client_msg_id: Option<&str>,
     ) -> ApiResult<crate::models::Post> {
         let post = sqlx::query_as::<_, crate::models::Post>(&format!(
             r#"
-            INSERT INTO posts (id, channel_id, user_id, root_post_id, message, props, file_ids)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO posts (id, channel_id, user_id, root_post_id, message, props, file_ids, client_msg_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING {}
             "#,
             Self::POST_COLUMNS_NO_USER
@@ -1971,6 +2046,7 @@ impl PostRepository {
         .bind(message)
         .bind(props)
         .bind(file_ids)
+        .bind(client_msg_id)
         .fetch_one(&mut **tx)
         .await?;
 
@@ -1984,6 +2060,23 @@ impl PostRepository {
         }
 
         Ok(post)
+    }
+
+    /// Find a post by client_msg_id for a specific user.
+    pub async fn find_post_by_client_msg_id(
+        &self,
+        user_id: Uuid,
+        client_msg_id: &str,
+    ) -> ApiResult<Option<Uuid>> {
+        let id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM posts WHERE user_id = $1 AND client_msg_id = $2 LIMIT 1",
+        )
+        .bind(user_id)
+        .bind(client_msg_id)
+        .fetch_optional(&self.db)
+        .await?;
+
+        Ok(id)
     }
 
     /// Update post props inside an existing transaction.
@@ -2279,6 +2372,7 @@ struct PostWithUserRow {
     pub reply_count: i64,
     pub last_reply_at: Option<DateTime<Utc>>,
     pub seq: i64,
+    pub client_msg_id: Option<String>,
     // User fields (Option because of LEFT JOIN)
     pub username: Option<String>,
     pub avatar_url: Option<String>,
@@ -2303,6 +2397,7 @@ impl From<PostWithUserRow> for PostWithUser {
             reply_count: row.reply_count,
             last_reply_at: row.last_reply_at,
             seq: row.seq,
+            client_msg_id: row.client_msg_id,
             username: row.username,
             avatar_url: row.avatar_url,
             email: row.email,
@@ -2334,7 +2429,7 @@ impl From<PostWithUser> for crate::models::post::PostResponse {
             files: vec![],
             reactions: vec![],
             is_saved: false,
-            client_msg_id: None,
+            client_msg_id: p.client_msg_id,
             seq: p.seq,
         }
     }

@@ -10,7 +10,7 @@ use uuid::Uuid;
 use super::AppState;
 use crate::api::v4::status as v4_status;
 use crate::auth::policy::permissions;
-use crate::auth::{hash_password, AuthUser};
+use crate::auth::{hash_password, verify_password, AuthUser};
 use crate::error::{ApiResult, AppError};
 use crate::models::{
     normalize_avatar_url, validate_username_token, ChangePassword, UpdateUser, User, UserResponse,
@@ -244,11 +244,19 @@ async fn change_password(
         ));
     }
 
-    // Fetch user with current password hash (still needed to ensure user exists and for other potential logic)
-    let _user: User = UserRepository::new(&state.db)
+    // Fetch user with current password hash
+    let user: User = UserRepository::new(&state.db)
         .get_by_id_unchecked(id)
         .await?
         .ok_or_else(|| AppError::UserNotFound)?;
+
+    let password_hash = user
+        .password_hash
+        .as_deref()
+        .ok_or_else(|| AppError::BadRequest("Invalid current password".to_string()))?;
+    if !verify_password(input.current_password.as_str(), password_hash)? {
+        return Err(AppError::BadRequest("Invalid current password".to_string()));
+    }
 
     // Validate new password complexity
     let config = crate::services::auth_config::get_password_rules(&state.db).await?;
@@ -279,6 +287,7 @@ async fn get_my_status(
 /// GET /api/v1/users/{id}/status
 async fn get_user_status(
     State(state): State<AppState>,
+    _auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<UserStatusResponse>> {
     get_user_status_by_id(&state, id).await
@@ -403,6 +412,7 @@ async fn delete_my_status(
 /// Accepts both: ["id1", "id2"] and {"user_ids": ["id1", "id2"]}
 async fn get_statuses_by_ids(
     State(state): State<AppState>,
+    _auth: AuthUser,
     Json(body): Json<serde_json::Value>,
 ) -> ApiResult<Json<serde_json::Value>> {
     // Extract user_ids from either array format or object format

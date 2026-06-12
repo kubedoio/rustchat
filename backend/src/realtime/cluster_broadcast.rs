@@ -8,6 +8,7 @@ use std::sync::Arc;
 use deadpool_redis::redis::{AsyncCommands, Msg};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
@@ -74,8 +75,8 @@ impl ClusterBroadcast {
     /// Start the cluster broadcast subscriber
     ///
     /// Note: This spawns a background task that maintains a dedicated pub/sub connection.
-    /// The task will automatically reconnect on errors.
-    pub async fn start(self: &Arc<Self>) -> anyhow::Result<()> {
+    /// The task will automatically reconnect on errors and exit when `shutdown` is cancelled.
+    pub async fn start(self: &Arc<Self>, shutdown: CancellationToken) -> anyhow::Result<()> {
         let redis_url = self.redis_url.clone();
         let hub = self.hub.clone();
         let node_id = self.node_id.clone();
@@ -89,14 +90,23 @@ impl ClusterBroadcast {
         // Spawn subscriber in a background task
         let _handle = tokio::spawn(async move {
             loop {
-                match Self::run_subscriber(&redis_url, &hub, &node_id).await {
-                    Ok(_) => {
-                        info!("Cluster subscriber ended normally");
+                tokio::select! {
+                    biased;
+                    _ = shutdown.cancelled() => {
+                        info!("Cluster broadcast subscriber shutting down");
                         break;
                     }
-                    Err(e) => {
-                        error!(error = %e, "Cluster subscriber error, reconnecting in 5s...");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    result = Self::run_subscriber(&redis_url, &hub, &node_id) => {
+                        match result {
+                            Ok(_) => {
+                                info!("Cluster subscriber ended normally");
+                                break;
+                            }
+                            Err(e) => {
+                                error!(error = %e, "Cluster subscriber error, reconnecting in 5s...");
+                                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                            }
+                        }
                     }
                 }
             }

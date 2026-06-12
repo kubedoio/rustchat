@@ -304,24 +304,26 @@ impl<'a> TeamRepository<'a> {
     }
 
     /// Remove a user from all channels in a team.
+    /// Returns the channel IDs the user was removed from.
     pub async fn remove_user_from_team_channels(
         &self,
         user_id: Uuid,
         team_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        let rows: Vec<(Uuid,)> = sqlx::query_as(
             r#"
             DELETE FROM channel_members
             WHERE user_id = $1 AND channel_id IN (
                 SELECT id FROM channels WHERE team_id = $2
             )
+            RETURNING channel_id
             "#,
         )
         .bind(user_id)
         .bind(team_id)
-        .execute(self.pool)
+        .fetch_all(self.pool)
         .await?;
-        Ok(())
+        Ok(rows.into_iter().map(|r| r.0).collect())
     }
 }
 

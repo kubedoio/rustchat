@@ -13,7 +13,7 @@ use crate::mattermost_compat::{
     models as mm,
 };
 use crate::models::TeamMember;
-use crate::repositories::{TeamRepository, UserRepository};
+use crate::repositories::{ChannelRepository, TeamRepository, UserRepository};
 
 pub async fn get_team_members(
     State(state): State<AppState>,
@@ -113,9 +113,19 @@ pub async fn remove_team_member(
     let team_id = parse_mm_or_uuid(&team_id).ok_or_else(|| AppError::InvalidTeamId)?;
     ensure_team_admin_or_system_manage(&state, team_id, &auth).await?;
     let user_id = parse_mm_or_uuid(&user_id).ok_or_else(|| AppError::InvalidUserId)?;
+
+    // Revoke WebSocket subscriptions for all team channels and the team itself
+    let channel_ids = ChannelRepository::new(&state.db)
+        .get_user_channel_ids_in_team(user_id, team_id)
+        .await?;
     TeamRepository::new(&state.db)
         .remove_team_member(team_id, user_id)
         .await?;
+    for channel_id in channel_ids {
+        state.ws_hub.unsubscribe_channel(user_id, channel_id).await;
+    }
+    state.ws_hub.unsubscribe_team(user_id, team_id).await;
+
     Ok(status_ok())
 }
 

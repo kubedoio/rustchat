@@ -354,7 +354,15 @@ pub(crate) async fn broadcast_call_state_event(
 /// Start a background task to listen for voice events from the SFU and broadcast them via WebSockets
 pub async fn start_voice_event_listener(state: AppState, mut rx: mpsc::Receiver<VoiceEvent>) {
     info!("Starting Calls Voice Event Listener");
-    while let Some(event) = rx.recv().await {
+    loop {
+        let event = tokio::select! {
+            biased;
+            _ = state.shutdown.cancelled() => break,
+            event = rx.recv() => match event {
+                Some(event) => event,
+                None => break,
+            }
+        };
         match event {
             VoiceEvent::VoiceOn {
                 call_id,

@@ -375,8 +375,16 @@ async fn leave_team(
     let repo = TeamRepository::new(&state.db);
 
     // Remove from all channels in team first
-    repo.remove_user_from_team_channels(auth.user_id, id)
+    let removed_channel_ids = repo
+        .remove_user_from_team_channels(auth.user_id, id)
         .await?;
+
+    for channel_id in removed_channel_ids {
+        state
+            .ws_hub
+            .unsubscribe_channel(auth.user_id, channel_id)
+            .await;
+    }
 
     // Remove from team
     repo.remove_team_member(id, auth.user_id).await?;

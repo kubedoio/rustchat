@@ -245,7 +245,7 @@ function getAuthToken(): string {
   if (typeof window === 'undefined') {
     return ''
   }
-  return localStorage.getItem(AUTH_TOKEN_KEY) || ''
+  return sessionStorage.getItem(AUTH_TOKEN_KEY) || ''
 }
 
 function buildPreferencePayload(

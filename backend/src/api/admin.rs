@@ -65,7 +65,7 @@ pub fn require_global_admin(auth: &AuthUser) -> ApiResult<()> {
 
 pub async fn insert_admin_audit_log(
     db: &sqlx::PgPool,
-    actor_user_id: uuid::Uuid,
+    actor_user_id: Option<uuid::Uuid>,
     action: &str,
     target_type: &str,
     target_id: Option<uuid::Uuid>,
@@ -132,6 +132,21 @@ async fn update_config(
         None,
     );
     state.ws_hub.broadcast(event).await;
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let category_clone = category.clone();
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::ConfigUpdate,
+            "config",
+            None,
+            serde_json::json!({ "category": category_clone }),
+        )
+        .await;
+    });
 
     Ok(Json(result.0 .0))
 }

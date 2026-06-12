@@ -186,6 +186,21 @@ pub async fn create_sso_config(
         .insert_sso_config(org_id, &input, encrypted_secret, scopes)
         .await?;
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let config_id = config.id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::SsoConfigCreate,
+            "sso_config",
+            Some(config_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
+
     Ok(Json(config.into()))
 }
 
@@ -232,6 +247,21 @@ pub async fn update_sso_config(
         .update_sso_config(id, &input, encrypted_secret)
         .await?;
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let config_id = id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::SsoConfigUpdate,
+            "sso_config",
+            Some(config_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
+
     Ok(Json(config.into()))
 }
 
@@ -252,6 +282,21 @@ pub async fn delete_sso_config(
             "SSO configuration not found".to_string(),
         ));
     }
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let config_id = id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::SsoConfigDelete,
+            "sso_config",
+            Some(config_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }

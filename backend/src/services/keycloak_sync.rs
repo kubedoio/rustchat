@@ -100,13 +100,18 @@ pub fn spawn_periodic_keycloak_sync(state: Arc<AppState>) -> tokio::task::JoinHa
         ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
-            ticker.tick().await;
-            if !state.config.keycloak_sync.enabled {
-                continue;
-            }
+            tokio::select! {
+                biased;
+                _ = state.shutdown.cancelled() => break,
+                _ = ticker.tick() => {
+                    if !state.config.keycloak_sync.enabled {
+                        continue;
+                    }
 
-            if let Err(err) = run_full_sync(&state).await {
-                warn!(error = %err, "Periodic Keycloak sync failed");
+                    if let Err(err) = run_full_sync(&state).await {
+                        warn!(error = %err, "Periodic Keycloak sync failed");
+                    }
+                }
             }
         }
     })

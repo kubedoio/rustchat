@@ -1,6 +1,6 @@
 # Base image with all dependencies pre-compiled
 # Build and push this manually when Cargo.toml changes
-FROM rust:1.96-alpine AS builder
+FROM rust:1.96-alpine@sha256:2ea3db105d38fdfa4e31f366674287fcaa828087e2fe3973befdc537f2d443b1 AS builder
 
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev
 

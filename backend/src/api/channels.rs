@@ -189,6 +189,15 @@ async fn create_channel(
             .await?;
 
         if let Some(mut channel) = existing {
+            if !ChannelRepository::new(&state.db)
+                .is_team_member(channel.team_id, auth.user_id)
+                .await?
+            {
+                return Err(AppError::Forbidden(
+                    "You are not a member of this team".to_string(),
+                ));
+            }
+
             // Re-add both users as members just in case they left (resurrect DM)
             // Do this atomically inside a transaction.
             let mut tx = state.db.begin().await?;
@@ -226,7 +235,16 @@ async fn create_channel(
         }
 
         // Validate target user exists in the team
-        if !ChannelRepository::new(&state.db)
+        let channel_repo = ChannelRepository::new(&state.db);
+        if !channel_repo
+            .is_team_member(input.team_id, auth.user_id)
+            .await?
+        {
+            return Err(AppError::Forbidden(
+                "You are not a member of this team".to_string(),
+            ));
+        }
+        if !channel_repo
             .is_team_member(input.team_id, target_id)
             .await?
         {
@@ -547,8 +565,14 @@ async fn add_member(
                     "Cannot join private channel without invite".to_string(),
                 ));
             }
+        } else if !ChannelRepository::new(&state.db)
+            .is_team_member(channel.team_id, auth.user_id)
+            .await?
+        {
+            return Err(AppError::Forbidden(
+                "You are not a member of this team".to_string(),
+            ));
         }
-        // If public, allow proceed
     } else {
         // Adding someone else - require admin
         let member = ChannelRepository::new(&state.db)

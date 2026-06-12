@@ -18,7 +18,7 @@ export function getGlobalAuthToken(): string | null {
   // First check memory
   if (globalAuthToken) return globalAuthToken
 
-  // Then check localStorage
+  // Then check sessionStorage
   return authRepository.getStoredToken()
 }
 
@@ -37,9 +37,6 @@ class AuthService {
 
     // Set global token for API client
     globalAuthToken = token
-
-    // Set cookie for media access
-    authRepository.setAuthCookie(token)
 
     try {
       // Fetch user profile
@@ -64,9 +61,6 @@ class AuthService {
       authRepository.setStoredToken(token)
       globalAuthToken = token
 
-      // Set cookie for media access
-      authRepository.setAuthCookie(token)
-
       // Update store
       this.store.setToken(token)
       this.store.setUser(user)
@@ -87,9 +81,6 @@ class AuthService {
   async fetchProfile(): Promise<User | null> {
     if (!this.store.token) return null
 
-    // Sync cookie (token may be in localStorage but cookie cleared)
-    authRepository.setAuthCookie(this.store.token)
-
     try {
       const user = await authRepository.fetchMe()
       this.store.setUser(user)
@@ -108,7 +99,6 @@ class AuthService {
 
     // Clear storage
     authRepository.clearStoredToken()
-    authRepository.clearAuthCookie()
     globalAuthToken = null
 
     // Clear store

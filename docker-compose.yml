@@ -42,7 +42,7 @@ services:
       - TURN_SERVER_CREDENTIAL=${TURN_SERVER_CREDENTIAL:-}
       # Push Notification Proxy
       - RUSTCHAT_PUSH_PROXY_URL=${RUSTCHAT_PUSH_PROXY_URL:-http://push-proxy:3000}
-      - PUSH_PROXY_AUTH_KEY=${PUSH_PROXY_AUTH_KEY:-}
+      - PUSH_PROXY_AUTH_KEY=${PUSH_PROXY_AUTH_KEY:?PUSH_PROXY_AUTH_KEY must be set to a non-empty secret}
       # Cloudflare Turnstile (Bot Protection)
       - RUSTCHAT_TURNSTILE_ENABLED=${RUSTCHAT_TURNSTILE_ENABLED:-false}
       - RUSTCHAT_TURNSTILE_SITE_KEY=${RUSTCHAT_TURNSTILE_SITE_KEY:-}

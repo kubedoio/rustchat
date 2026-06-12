@@ -6,6 +6,7 @@
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use tokio::time::interval;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -74,8 +75,8 @@ impl EmailWorker {
         }
     }
 
-    /// Run the worker loop
-    pub async fn run(&self) {
+    /// Run the worker loop, exiting cleanly when `shutdown` is cancelled.
+    pub async fn run(&self, shutdown: CancellationToken) {
         info!(
             "Email worker started (poll_interval={}s, batch_size={})",
             self.config.poll_interval_secs, self.config.batch_size
@@ -86,7 +87,11 @@ impl EmailWorker {
         ));
 
         loop {
-            interval.tick().await;
+            tokio::select! {
+                biased;
+                _ = shutdown.cancelled() => break,
+                _ = interval.tick() => {}
+            }
 
             match self.process_batch().await {
                 Ok(stats) => {
@@ -642,7 +647,12 @@ fn classify_error(error: &str) -> String {
 }
 
 /// Spawn the email worker as a background task
-pub fn spawn_email_worker(db: PgPool, config: EmailWorkerConfig, encryption_key: String) {
+pub fn spawn_email_worker(
+    db: PgPool,
+    config: EmailWorkerConfig,
+    encryption_key: String,
+    shutdown: CancellationToken,
+) {
     tokio::spawn(async move {
         let mut restart_delay_secs = 1u64;
 
@@ -650,10 +660,11 @@ pub fn spawn_email_worker(db: PgPool, config: EmailWorkerConfig, encryption_key:
             let db_for_run = db.clone();
             let config_for_run = config.clone();
             let encryption_key_for_run = encryption_key.clone();
+            let shutdown_for_run = shutdown.clone();
 
             let run_handle = tokio::spawn(async move {
                 let worker = EmailWorker::new(db_for_run, config_for_run, encryption_key_for_run);
-                worker.run().await;
+                worker.run(shutdown_for_run).await;
             });
 
             match run_handle.await {
@@ -665,10 +676,25 @@ pub fn spawn_email_worker(db: PgPool, config: EmailWorkerConfig, encryption_key:
                 }
             }
 
-            tokio::time::sleep(tokio::time::Duration::from_secs(restart_delay_secs)).await;
+            tokio::select! {
+                biased;
+                _ = shutdown.cancelled() => break,
+                _ = tokio::time::sleep(tokio::time::Duration::from_secs(restart_delay_secs)) => {}
+            }
             restart_delay_secs = (restart_delay_secs * 2).min(60);
         }
     });
 
     info!("Email worker supervisor started");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spawn_email_worker_accepts_cancellation_token() {
+        // Compile-time check that the public spawn API accepts a shutdown token.
+        let _: fn(PgPool, EmailWorkerConfig, String, CancellationToken) = spawn_email_worker;
+    }
 }

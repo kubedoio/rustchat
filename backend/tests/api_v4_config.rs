@@ -31,7 +31,7 @@ async fn config_client_returns_diagnostic_id() {
     );
 
     // 2. Build router using public api
-    let app = router(
+    let (app, _state) = router(
         db,
         redis,
         "secret".to_string(),
@@ -39,6 +39,7 @@ async fn config_client_returns_diagnostic_id() {
         ws_hub,
         s3_client,
         test_config(),
+        tokio_util::sync::CancellationToken::new(),
     );
 
     // 3. Make request
@@ -94,7 +95,7 @@ async fn license_client_returns_boolean() {
     );
 
     // 2. Build router using public api
-    let app = router(
+    let (app, _state) = router(
         db,
         redis,
         "secret".to_string(),
@@ -102,6 +103,7 @@ async fn license_client_returns_boolean() {
         ws_hub,
         s3_client,
         test_config(),
+        tokio_util::sync::CancellationToken::new(),
     );
 
     // 3. Make request

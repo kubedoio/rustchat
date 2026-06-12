@@ -1,7 +1,7 @@
 import { log } from '@/utils/log'
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { useStorage } from '@vueuse/core'
+import { useSessionStorage } from '@vueuse/core'
 import client from '../../../api/client'
 import type {
   AuthUser,
@@ -62,7 +62,7 @@ function parseJwtExpiryMs(tokenValue: string): number | null {
 }
 
 export const useAuthStore = defineStore('authStore', () => {
-  const token = useStorage('auth_token', '')
+  const token = useSessionStorage('auth_token', '')
   const user = ref<AuthUser | null>(null)
   const authPolicy = ref<AuthPolicy | null>(null)
   const error = ref<string | null>(null)
@@ -70,15 +70,6 @@ export const useAuthStore = defineStore('authStore', () => {
   let tokenExpiryTimer: ReturnType<typeof setTimeout> | null = null
   const statusExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>()
   let isLoggingOut = false
-
-  // Set MMAUTHTOKEN cookie for img/video tags that can't send headers
-  function setAuthCookie(tokenValue: string) {
-    document.cookie = `MMAUTHTOKEN=${tokenValue}; path=/; SameSite=Strict`
-  }
-
-  function clearAuthCookie() {
-    document.cookie = 'MMAUTHTOKEN=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-  }
 
   function clearTokenExpiryTimer() {
     if (tokenExpiryTimer) {
@@ -189,7 +180,6 @@ export const useAuthStore = defineStore('authStore', () => {
   async function login(credentials: LoginCredentials) {
     const { data } = await client.post<AuthResponse>('/auth/login', credentials)
     token.value = data.token
-    setAuthCookie(data.token)
     user.value = data.user
     // Fetch full profile
     await fetchMe()
@@ -197,8 +187,6 @@ export const useAuthStore = defineStore('authStore', () => {
 
   async function fetchMe() {
     if (!token.value) return
-    // Sync cookie on page reload (token may be in localStorage but cookie cleared)
-    setAuthCookie(token.value)
     try {
       const { data } = await client.get('/auth/me')
       // Map custom_status fields for easier access
@@ -229,9 +217,15 @@ export const useAuthStore = defineStore('authStore', () => {
     clearTokenExpiryTimer()
     clearSelfStatusExpiryTimer()
     try {
+      // Ask the backend to clear the HttpOnly MMAUTHTOKEN cookie so the
+      // browser stops sending it on future requests.
+      try {
+        await client.post('/auth/logout')
+      } catch (e) {
+        log.error('Failed to notify server of logout', e)
+      }
+
       token.value = ''
-      localStorage.setItem('auth_token', '')
-      clearAuthCookie()
       user.value = null
       await clearSessionState()
 

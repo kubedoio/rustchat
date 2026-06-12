@@ -304,7 +304,44 @@ async fn mm_files_upload() {
         .unwrap()
         .to_string();
 
-    // Upload
+    // Set up team and channel membership
+    let user_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
+        .bind("f@x.com")
+        .fetch_one(&app.db_pool)
+        .await
+        .unwrap();
+    let team_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO teams (id, org_id, name, display_name, allow_open_invite) VALUES ($1, $2, 'fileteam', 'File Team', true)",
+    )
+    .bind(team_id)
+    .bind(org_id)
+    .execute(&app.db_pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'member')")
+        .bind(team_id)
+        .bind(user_id)
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+    let channel_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO channels (id, team_id, name, type) VALUES ($1, $2, 'filechannel', 'public')",
+    )
+    .bind(channel_id)
+    .bind(team_id)
+    .execute(&app.db_pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO channel_members (channel_id, user_id, role, notify_props) VALUES ($1, $2, 'member', '{}')")
+        .bind(channel_id)
+        .bind(user_id)
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+
+    // Upload with channel_id query parameter (web client behavior)
     let part = reqwest::multipart::Part::bytes(b"hello world".to_vec())
         .file_name("test.txt")
         .mime_str("text/plain")
@@ -313,7 +350,10 @@ async fn mm_files_upload() {
 
     let upload_res = app
         .api_client
-        .post(format!("{}/api/v4/files", &app.address))
+        .post(format!(
+            "{}/api/v4/files?channel_id={}",
+            &app.address, channel_id
+        ))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
         .send()

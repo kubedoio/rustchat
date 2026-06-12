@@ -27,6 +27,8 @@ pub struct Post {
     pub seq: i64,
     #[sqlx(default)]
     pub has_reactions: bool,
+    #[sqlx(default)]
+    pub client_msg_id: Option<String>,
 }
 
 /// Aggregated reaction for responses
@@ -100,7 +102,6 @@ pub struct PostResponse {
     pub reactions: Vec<ReactionResponse>,
     #[sqlx(skip)]
     pub is_saved: bool,
-    #[sqlx(skip)]
     pub client_msg_id: Option<String>,
     #[sqlx(default)]
     pub seq: i64,

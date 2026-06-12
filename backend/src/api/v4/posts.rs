@@ -72,8 +72,17 @@ pub async fn build_mm_posts_map(
     Ok((order, posts_map))
 }
 
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
+        .route("/posts/search", post(search_posts_all_teams))
+        .route("/teams/{team_id}/posts/search", post(search_team_posts))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
     Router::new()
+        .merge(search_routes)
         .route("/posts", post(create_post_handler))
         .route("/posts/ids", post(get_posts_by_ids))
         .route("/posts/ids/reactions", post(get_reactions_by_post_ids))
@@ -128,8 +137,6 @@ pub fn router() -> Router<AppState> {
             "/users/{user_id}/posts/{post_id}/reminder",
             post(set_post_reminder),
         )
-        .route("/posts/search", post(search_posts_all_teams))
-        .route("/teams/{team_id}/posts/search", post(search_team_posts))
         .route(
             "/users/{user_id}/channels/{channel_id}/posts/unread",
             get(get_posts_around_unread),
@@ -1157,6 +1164,25 @@ async fn delete_scheduled_post(
         .ok_or_else(|| AppError::ValidationInvalidScheduledPostId)?;
 
     let repo = PostRepository::new(state.db.clone());
+    let scheduled = repo
+        .get_scheduled_post(scheduled_id)
+        .await?
+        .ok_or_else(|| AppError::ScheduledPostNotFound)?;
+
+    // Verify ownership
+    if scheduled.user_id != auth.user_id {
+        return Err(AppError::ScheduledPostNotFound);
+    }
+
+    // Verify channel membership; do NOT leak existence with a separate error
+    if repo
+        .require_channel_membership(scheduled.channel_id, auth.user_id)
+        .await
+        .is_err()
+    {
+        return Err(AppError::ScheduledPostNotFound);
+    }
+
     let row = repo
         .delete_scheduled_post(scheduled_id, auth.user_id)
         .await?

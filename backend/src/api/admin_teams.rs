@@ -14,7 +14,7 @@ use crate::models::{
     normalize_avatar_url, AddTeamMember, AdminChannelResponse, AdminTeamResponse, CreateChannel,
     TeamMember, TeamMemberResponse, UpdateChannel,
 };
-use crate::repositories::AdminRepository;
+use crate::repositories::{AdminRepository, ChannelRepository};
 use crate::services::team_membership::apply_default_channel_membership_for_team_join;
 
 pub fn router() -> Router<AppState> {
@@ -135,6 +135,21 @@ pub async fn delete_admin_team(
     let repo = AdminRepository::new(&state.db);
     repo.delete_team(id).await?;
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let team_id = id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::TeamDelete,
+            "team",
+            Some(team_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
+
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }
 
@@ -179,6 +194,22 @@ pub async fn add_team_member(
         );
     }
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let team_id = id;
+    let user_id = payload.user_id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::TeamMemberAdd,
+            "team",
+            Some(team_id),
+            serde_json::json!({ "user_id": user_id }),
+        )
+        .await;
+    });
+
     Ok(Json(member))
 }
 
@@ -190,7 +221,32 @@ pub async fn remove_team_member(
     require_admin(&auth)?;
 
     let repo = AdminRepository::new(&state.db);
+    let channel_ids = ChannelRepository::new(&state.db)
+        .get_user_channel_ids_in_team(user_id, id)
+        .await?;
     repo.remove_team_member(id, user_id).await?;
+
+    // Revoke WebSocket subscriptions for all team channels and the team itself
+    for channel_id in channel_ids {
+        state.ws_hub.unsubscribe_channel(user_id, channel_id).await;
+    }
+    state.ws_hub.unsubscribe_team(user_id, id).await;
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let team_id = id;
+    let member_id = user_id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::TeamMemberRemove,
+            "team",
+            Some(team_id),
+            serde_json::json!({ "user_id": member_id }),
+        )
+        .await;
+    });
 
     Ok(Json(serde_json::json!({"status": "removed"})))
 }
@@ -316,6 +372,21 @@ pub async fn delete_admin_channel(
 
     let repo = AdminRepository::new(&state.db);
     repo.delete_channel(id).await?;
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let channel_id = id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::ChannelDelete,
+            "channel",
+            Some(channel_id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }

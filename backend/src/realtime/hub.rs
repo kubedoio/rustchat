@@ -2,11 +2,14 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use std::time::Duration;
+use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::time::timeout;
 use uuid::Uuid;
 
 use super::cluster_broadcast::ClusterBroadcast;
 use super::events::WsEnvelope;
+use super::websocket_actor::WsCommand;
 use crate::telemetry::metrics;
 
 /// Connection info for a WebSocket client
@@ -17,10 +20,16 @@ pub struct ConnectionInfo {
     pub teams: Vec<Uuid>,
 }
 
+/// Connection handles stored per socket.
+struct ConnectionHandles {
+    broadcast_tx: broadcast::Sender<String>,
+    cmd_tx: mpsc::Sender<WsCommand>,
+}
+
 /// WebSocket Hub manages all active connections
 pub struct WsHub {
-    /// Active connections: user_id -> sender
-    connections: RwLock<HashMap<Uuid, HashMap<Uuid, broadcast::Sender<String>>>>,
+    /// Active connections: user_id -> connection_id -> handles
+    connections: RwLock<HashMap<Uuid, HashMap<Uuid, ConnectionHandles>>>,
     /// User subscriptions to channels
     channel_subscriptions: RwLock<HashMap<Uuid, Vec<Uuid>>>, // channel_id -> user_ids
     /// User subscriptions to teams
@@ -61,15 +70,20 @@ impl WsHub {
         &self,
         user_id: Uuid,
         username: String,
+        cmd_tx: mpsc::Sender<WsCommand>,
     ) -> (Uuid, broadcast::Receiver<String>) {
         let (tx, rx) = broadcast::channel(100);
         let connection_id = Uuid::new_v4();
+        let handles = ConnectionHandles {
+            broadcast_tx: tx,
+            cmd_tx,
+        };
 
         let mut connections = self.connections.write().await;
         connections
             .entry(user_id)
             .or_insert_with(HashMap::new)
-            .insert(connection_id, tx);
+            .insert(connection_id, handles);
 
         let mut presence = self.presence.write().await;
         presence.insert(user_id, "online".to_string());
@@ -276,8 +290,8 @@ impl WsHub {
                         }
 
                         if let Some(user_connections) = connections.get(user_id) {
-                            for tx in user_connections.values() {
-                                let _ = tx.send(message.clone());
+                            for handles in user_connections.values() {
+                                let _ = handles.broadcast_tx.send(message.clone());
                             }
                         }
                     }
@@ -296,7 +310,7 @@ impl WsHub {
 
                         if let Some(user_connections) = connections.get(user_id) {
                             for tx in user_connections.values() {
-                                let _ = tx.send(message.clone());
+                                let _ = tx.broadcast_tx.send(message.clone());
                             }
                         }
                     }
@@ -304,16 +318,16 @@ impl WsHub {
             } else if let Some(user_id) = broadcast.user_id {
                 // Direct message to specific user
                 if let Some(user_connections) = connections.get(&user_id) {
-                    for tx in user_connections.values() {
-                        let _ = tx.send(message.clone());
+                    for handles in user_connections.values() {
+                        let _ = handles.broadcast_tx.send(message.clone());
                     }
                 }
             }
         } else {
             // Broadcast to all (rare, mainly for system messages)
             for user_connections in connections.values() {
-                for tx in user_connections.values() {
-                    let _ = tx.send(message.clone());
+                for handles in user_connections.values() {
+                    let _ = handles.broadcast_tx.send(message.clone());
                 }
             }
         }
@@ -364,6 +378,44 @@ impl WsHub {
             .map(|user_connections| user_connections.len())
             .unwrap_or(0)
     }
+
+    /// Send a close command to every active connection, waiting for each
+    /// command queue to accept it rather than silently dropping on a full queue.
+    ///
+    /// The read lock is dropped before spawning close tasks so that connection
+    /// additions and removals are not blocked during shutdown.
+    pub async fn close_all_with_code(&self, code: u16, reason: &str) {
+        let cmd_txs: Vec<mpsc::Sender<WsCommand>> = {
+            let connections = self.connections.read().await;
+            connections
+                .values()
+                .flat_map(|user_connections| {
+                    user_connections
+                        .values()
+                        .map(|handles| handles.cmd_tx.clone())
+                })
+                .collect()
+        };
+
+        let reason = reason.to_string();
+        let mut set = tokio::task::JoinSet::new();
+        for cmd_tx in cmd_txs {
+            let reason = reason.clone();
+            set.spawn(async move {
+                let _ = timeout(
+                    Duration::from_secs(5),
+                    cmd_tx.send(WsCommand::Close(code, reason)),
+                )
+                .await;
+            });
+        }
+        // Drive all close tasks concurrently with a global 10-second deadline.
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while set.join_next().await.is_some() {}
+        })
+        .await
+        .ok();
+    }
 }
 
 impl Default for WsHub {
@@ -390,6 +442,11 @@ mod tests {
     use super::*;
     use crate::realtime::{EventType, WsBroadcast, WsEnvelope};
 
+    fn dummy_cmd_tx() -> mpsc::Sender<WsCommand> {
+        let (tx, _rx) = mpsc::channel(1);
+        tx
+    }
+
     #[tokio::test]
     async fn channel_broadcast_respects_exclude_user() {
         let hub = WsHub::new();
@@ -399,9 +456,15 @@ mod tests {
         let user_c = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
 
-        let (_conn_a, mut rx_a) = hub.add_connection(user_a, "user-a".to_string()).await;
-        let (_conn_b, mut rx_b) = hub.add_connection(user_b, "user-b".to_string()).await;
-        let (_conn_c, mut rx_c) = hub.add_connection(user_c, "user-c".to_string()).await;
+        let (_conn_a, mut rx_a) = hub
+            .add_connection(user_a, "user-a".to_string(), dummy_cmd_tx())
+            .await;
+        let (_conn_b, mut rx_b) = hub
+            .add_connection(user_b, "user-b".to_string(), dummy_cmd_tx())
+            .await;
+        let (_conn_c, mut rx_c) = hub
+            .add_connection(user_c, "user-c".to_string(), dummy_cmd_tx())
+            .await;
 
         hub.subscribe_channel(user_a, channel_id).await;
         hub.subscribe_channel(user_b, channel_id).await;
@@ -440,8 +503,12 @@ mod tests {
         let target = Uuid::new_v4();
         let other = Uuid::new_v4();
 
-        let (_target_conn, mut target_rx) = hub.add_connection(target, "target".to_string()).await;
-        let (_other_conn, mut other_rx) = hub.add_connection(other, "other".to_string()).await;
+        let (_target_conn, mut target_rx) = hub
+            .add_connection(target, "target".to_string(), dummy_cmd_tx())
+            .await;
+        let (_other_conn, mut other_rx) = hub
+            .add_connection(other, "other".to_string(), dummy_cmd_tx())
+            .await;
 
         let envelope = WsEnvelope::event(
             EventType::ChannelSubscribed,
@@ -476,7 +543,9 @@ mod tests {
         let user = Uuid::new_v4();
         let channel = Uuid::new_v4();
 
-        let (_conn, _rx) = hub.add_connection(user, "u".to_string()).await;
+        let (_conn, _rx) = hub
+            .add_connection(user, "u".to_string(), dummy_cmd_tx())
+            .await;
         hub.subscribe_channel(user, channel).await;
         hub.remove_connection(user, _conn).await;
 
@@ -490,8 +559,12 @@ mod tests {
         let user = Uuid::new_v4();
         let channel = Uuid::new_v4();
 
-        let (conn1, _rx1) = hub.add_connection(user, "u".to_string()).await;
-        let (conn2, _rx2) = hub.add_connection(user, "u".to_string()).await;
+        let (conn1, _rx1) = hub
+            .add_connection(user, "u".to_string(), dummy_cmd_tx())
+            .await;
+        let (conn2, _rx2) = hub
+            .add_connection(user, "u".to_string(), dummy_cmd_tx())
+            .await;
         hub.subscribe_channel(user, channel).await;
 
         hub.remove_connection(user, conn1).await;
@@ -511,7 +584,9 @@ mod tests {
         let user = Uuid::new_v4();
         let channel = Uuid::new_v4();
 
-        let (_conn, _rx) = hub.add_connection(user, "u".to_string()).await;
+        let (_conn, _rx) = hub
+            .add_connection(user, "u".to_string(), dummy_cmd_tx())
+            .await;
         hub.subscribe_channel(user, channel).await;
         hub.unsubscribe_channel(user, channel).await;
 
@@ -528,7 +603,9 @@ mod tests {
         let user = Uuid::new_v4();
         let team = Uuid::new_v4();
 
-        let (_conn, _rx) = hub.add_connection(user, "u".to_string()).await;
+        let (_conn, _rx) = hub
+            .add_connection(user, "u".to_string(), dummy_cmd_tx())
+            .await;
         hub.subscribe_team(user, team).await;
         hub.remove_connection(user, _conn).await;
 
@@ -542,7 +619,9 @@ mod tests {
         let user = Uuid::new_v4();
         let team = Uuid::new_v4();
 
-        let (_conn, _rx) = hub.add_connection(user, "u".to_string()).await;
+        let (_conn, _rx) = hub
+            .add_connection(user, "u".to_string(), dummy_cmd_tx())
+            .await;
         hub.subscribe_team(user, team).await;
         hub.unsubscribe_team(user, team).await;
 
@@ -551,5 +630,46 @@ mod tests {
 
         let rev = hub.user_team_subscriptions.read().await;
         assert!(!rev.contains_key(&user));
+    }
+
+    #[tokio::test]
+    async fn close_all_with_code_does_not_hold_connections_lock() {
+        let hub = WsHub::new();
+        let user = Uuid::new_v4();
+
+        // Add a normal connection and a slow connection whose command queue
+        // will block, keeping the close tasks alive long enough to test lock
+        // behaviour.
+        let (normal_conn, _rx) = hub
+            .add_connection(user, "u".to_string(), dummy_cmd_tx())
+            .await;
+        let (blocking_tx, _blocking_rx) = mpsc::channel(1);
+        blocking_tx
+            .try_send(WsCommand::Close(0, "block".to_string()))
+            .ok();
+        let (slow_conn, _rx2) = hub.add_connection(user, "u".to_string(), blocking_tx).await;
+
+        let hub_clone = hub.clone();
+        let close_fut = tokio::spawn(async move {
+            hub_clone.close_all_with_code(1012, "shutdown").await;
+        });
+
+        // Try to add a new connection while close_all_with_code is in progress.
+        // If the connections lock were still held, this would time out.
+        let add_result = tokio::time::timeout(
+            Duration::from_millis(500),
+            hub.add_connection(Uuid::new_v4(), "new".to_string(), dummy_cmd_tx()),
+        )
+        .await;
+
+        assert!(
+            add_result.is_ok(),
+            "add_connection should not be blocked by close_all_with_code"
+        );
+
+        let _ = close_fut.await;
+
+        hub.remove_connection(user, normal_conn).await;
+        hub.remove_connection(user, slow_conn).await;
     }
 }

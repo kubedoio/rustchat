@@ -146,8 +146,20 @@ pub async fn search_team_channels(
     Ok(channels.into_iter().map(|c| c.into()).collect())
 }
 
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
+        .route(
+            "/teams/{team_id}/channels/search",
+            post(search::search_channels),
+        )
+        .route("/teams/search", post(search::search_teams))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
     Router::new()
+        .merge(search_routes)
         .route("/teams", get(crud::get_teams))
         .route("/teams/{team_id}", get(crud::get_team))
         .route("/teams/{team_id}/patch", put(crud::patch_team))
@@ -255,11 +267,6 @@ pub fn router() -> Router<AppState> {
             "/teams/name/{team_name}/channels/name/{channel_name}",
             get(channels::get_team_channel_by_name_for_team_name),
         )
-        .route(
-            "/teams/{team_id}/channels/search",
-            post(search::search_channels),
-        )
-        .route("/teams/search", post(search::search_teams))
         .route(
             "/teams/{team_id}/commands/autocomplete",
             get(commands::autocomplete_team_commands),

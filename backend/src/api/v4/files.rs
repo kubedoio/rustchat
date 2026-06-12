@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     http::{header, StatusCode},
     response::IntoResponse,
     routing::{get, post},
@@ -39,16 +39,30 @@ async fn check_file_access(state: &AppState, file: &FileInfo, user_id: Uuid) -> 
     Ok(())
 }
 
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
+        .route("/files/search", post(search_files_global))
+        .route("/teams/{team_id}/files/search", post(search_files_for_team))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
+    let upload_route = Router::new().route("/files", post(upload_file)).layer(
+        axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::rate_limit::upload_ip_rate_limit,
+        ),
+    );
+
     Router::new()
-        .route("/files", post(upload_file))
+        .merge(search_routes)
+        .merge(upload_route)
         .route("/files/{file_id}", get(get_file))
         .route("/files/{file_id}/info", get(get_file_info))
         .route("/files/{file_id}/thumbnail", get(get_thumbnail))
         .route("/files/{file_id}/preview", get(get_preview))
         .route("/files/{file_id}/link", get(get_link))
-        .route("/files/search", post(search_files_global))
-        .route("/teams/{team_id}/files/search", post(search_files_for_team))
 }
 
 fn filename_extension(filename: &str) -> Option<&str> {
@@ -68,12 +82,37 @@ fn content_disposition_filename(filename: &str) -> String {
         .collect()
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct UploadQuery {
+    channel_id: Option<String>,
+}
+
 async fn upload_file(
     State(state): State<AppState>,
     auth: MmAuthUser,
+    Query(query): Query<UploadQuery>,
     mut multipart: Multipart,
 ) -> ApiResult<(StatusCode, Json<serde_json::Value>)> {
-    let mut channel_id: Option<Uuid> = None;
+    // channel_id may be supplied as a query parameter (web client) or as a multipart
+    // form field (mobile/React Native clients). Resolve and validate channel membership
+    // before any file chunk is buffered to disk so unauthorized requests cannot force
+    // temp-file I/O.
+    let mut channel_id: Option<Uuid> = match query.channel_id.as_deref() {
+        Some(raw) => Some(parse_mm_or_uuid(raw).ok_or_else(|| {
+            AppError::BadRequest(format!("Invalid channel_id query parameter: {}", raw))
+        })?),
+        None => None,
+    };
+    if let Some(id) = channel_id {
+        let repo = ChannelRepository::new(&state.db);
+        let is_member = repo.is_channel_member(id, auth.user_id).await?;
+        if !is_member {
+            return Err(AppError::Forbidden(
+                "You are not a member of this channel".to_string(),
+            ));
+        }
+    }
+
     let mut client_ids: Vec<String> = Vec::new();
 
     struct TempFile(std::path::PathBuf);
@@ -110,17 +149,37 @@ async fn upload_file(
         let name = field.name().unwrap_or("").to_string();
 
         if name == "channel_id" {
-            let txt = field.text().await.unwrap_or_default();
-            if let Some(id) = parse_mm_or_uuid(&txt) {
-                channel_id = Some(id);
+            if channel_id.is_some() {
+                // channel_id was already supplied and validated via query parameter;
+                // ignore duplicate form field.
+                let _ = field.text().await;
+                continue;
             }
+            let txt = field.text().await.unwrap_or_default();
+            let id = parse_mm_or_uuid(&txt)
+                .ok_or_else(|| AppError::BadRequest(format!("Invalid channel_id: {}", txt)))?;
+            let repo = ChannelRepository::new(&state.db);
+            let is_member = repo.is_channel_member(id, auth.user_id).await?;
+            if !is_member {
+                return Err(AppError::Forbidden(
+                    "You are not a member of this channel".to_string(),
+                ));
+            }
+            channel_id = Some(id);
         } else if name == "client_ids" {
             let txt = field.text().await.unwrap_or_default();
             client_ids.push(txt);
         } else if !name.is_empty() {
-            // Accept multiple field names: "files", "file", "attachment", or unnamed
-            // React Native network client may use different field names
+            // Accept multiple field names: "files", "file", "attachment", or unnamed.
+            // React Native network client may use different field names.
             if field.file_name().is_some() || field.content_type().is_some() {
+                if channel_id.is_none() {
+                    // A file field arrived before channel_id was supplied and validated.
+                    // Reject without buffering any file chunks to disk.
+                    return Err(AppError::BadRequest(
+                        "channel_id is required before file fields".to_string(),
+                    ));
+                }
                 let filename = field.file_name().unwrap_or("unknown").to_string();
 
                 let temp_path =
@@ -161,16 +220,8 @@ async fn upload_file(
         }
     }
 
-    // Enforce channel membership before associating files with a channel
-    if let Some(cid) = channel_id {
-        let repo = ChannelRepository::new(&state.db);
-        let is_member = repo.is_channel_member(cid, auth.user_id).await?;
-        if !is_member {
-            return Err(AppError::Forbidden(
-                "You are not a member of this channel".to_string(),
-            ));
-        }
-    }
+    let channel_id =
+        channel_id.ok_or_else(|| AppError::BadRequest("channel_id is required".to_string()))?;
 
     let mut file_infos: Vec<mm::FileInfo> = Vec::new();
 
@@ -306,7 +357,7 @@ async fn upload_file(
             .create_full(
                 file_id,
                 auth.user_id,
-                channel_id,
+                Some(channel_id),
                 &filename,
                 &key,
                 &content_type,
@@ -323,7 +374,7 @@ async fn upload_file(
             id: encode_mm_id(file_id),
             user_id: encode_mm_id(auth.user_id),
             post_id: "".to_string(),
-            channel_id: channel_id.map(encode_mm_id).unwrap_or_default(),
+            channel_id: encode_mm_id(channel_id),
             create_at: Utc::now().timestamp_millis(),
             update_at: Utc::now().timestamp_millis(),
             delete_at: 0,

@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1@sha256:e606721f52d95169364bf39cae726a94ed8b397625011ccfaa8340db488b823b AS chef
 WORKDIR /app
 
 FROM chef AS planner
@@ -14,7 +14,7 @@ COPY . .
 RUN cargo build --release --bin push-proxy
 
 # We use debian:bookworm-slim for the runtime image
-FROM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim@sha256:96e378d7e6531ac9a15ad505478fcc2e69f371b10f5cdf87857c4b8188404716 AS runtime
 WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates libssl3 wget && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/push-proxy /usr/local/bin

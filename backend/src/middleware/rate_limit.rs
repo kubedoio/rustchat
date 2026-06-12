@@ -110,6 +110,7 @@ pub async fn register_ip_rate_limit(
     if !check_ip_rate_limit(&state.redis, "register", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
         return Err(AppError::TooManyRequests(
             "Too many registration attempts. Please try again later.".to_string(),
+            Some(WINDOW_SECS),
         ));
     }
 
@@ -142,6 +143,7 @@ pub async fn auth_ip_rate_limit(
     if !check_ip_rate_limit(&state.redis, "auth", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
         return Err(AppError::TooManyRequests(
             "Too many authentication attempts. Please try again later.".to_string(),
+            Some(WINDOW_SECS),
         ));
     }
 
@@ -182,6 +184,7 @@ pub async fn password_reset_ip_rate_limit(
     {
         return Err(AppError::TooManyRequests(
             "Too many password reset attempts. Please try again later.".to_string(),
+            Some(WINDOW_SECS),
         ));
     }
 
@@ -214,6 +217,73 @@ pub async fn websocket_ip_rate_limit(
     if !check_ip_rate_limit(&state.redis, "websocket", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
         return Err(AppError::TooManyRequests(
             "Too many WebSocket connection attempts. Please try again later.".to_string(),
+            Some(WINDOW_SECS),
+        ));
+    }
+
+    Ok(next.run(request).await)
+}
+
+/// Rate limit middleware for file upload endpoints
+///
+/// Limits file upload attempts to 30 requests per 15 minutes per IP.
+pub async fn upload_ip_rate_limit(
+    State(state): State<crate::api::AppState>,
+    request: Request,
+    next: Next,
+) -> Result<Response, AppError> {
+    if !state.config.security.rate_limit_enabled {
+        return Ok(next.run(request).await);
+    }
+
+    const WINDOW_SECS: u64 = 15 * 60;
+    const MAX_REQUESTS: u64 = 30;
+
+    let ip = match extract_client_ip(&request) {
+        Some(ip) => ip,
+        None => {
+            tracing::warn!("Unable to determine client IP for upload rate limiting");
+            return Ok(next.run(request).await);
+        }
+    };
+
+    if !check_ip_rate_limit(&state.redis, "upload", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
+        return Err(AppError::TooManyRequests(
+            "Too many file upload attempts. Please try again later.".to_string(),
+            Some(WINDOW_SECS),
+        ));
+    }
+
+    Ok(next.run(request).await)
+}
+
+/// Rate limit middleware for search endpoints
+///
+/// Limits search requests to 60 requests per 1 minute per IP.
+pub async fn search_ip_rate_limit(
+    State(state): State<crate::api::AppState>,
+    request: Request,
+    next: Next,
+) -> Result<Response, AppError> {
+    if !state.config.security.rate_limit_enabled {
+        return Ok(next.run(request).await);
+    }
+
+    const WINDOW_SECS: u64 = 60;
+    const MAX_REQUESTS: u64 = 60;
+
+    let ip = match extract_client_ip(&request) {
+        Some(ip) => ip,
+        None => {
+            tracing::warn!("Unable to determine client IP for search rate limiting");
+            return Ok(next.run(request).await);
+        }
+    };
+
+    if !check_ip_rate_limit(&state.redis, "search", &ip, WINDOW_SECS, MAX_REQUESTS).await? {
+        return Err(AppError::TooManyRequests(
+            "Too many search requests. Please try again later.".to_string(),
+            Some(WINDOW_SECS),
         ));
     }
 

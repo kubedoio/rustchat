@@ -24,6 +24,17 @@ pub struct PostsQuery {
     pub after: Option<Uuid>,
 }
 
+/// Returns true when the database error is the unique violation on the
+/// partial unique index for client_msg_id.
+fn is_client_msg_id_conflict(err: &sqlx::Error) -> bool {
+    if let Some(db_err) = err.as_database_error() {
+        db_err.code().as_deref() == Some("23505")
+            && db_err.constraint() == Some("idx_posts_client_msg_id_unique")
+    } else {
+        false
+    }
+}
+
 async fn validate_create_post(
     state: &AppState,
     user_id: Uuid,
@@ -313,6 +324,19 @@ pub async fn create_post(
 ) -> ApiResult<PostResponse> {
     let root_post_id = validate_create_post(state, user_id, channel_id, &input).await?;
 
+    // Validate and normalize the persisted client_msg_id (covers v4 pending_post_id path).
+    let client_msg_id = client_msg_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    if let Some(id) = client_msg_id {
+        if id.len() > 64 {
+            return Err(AppError::Validation(
+                "client_msg_id must be at most 64 characters".to_string(),
+            ));
+        }
+    }
+
     // Pre-compute data needed before the transaction.
     let team_id_opt = ChannelRepository::new(&state.db)
         .get_team_id(channel_id)
@@ -391,8 +415,9 @@ pub async fn create_post(
     // ========================================================================
     let mut tx = state.db.begin().await?;
 
-    // 1. Insert post + reply count
-    let post = PostRepository::new(state.db.clone())
+    // 1. Insert post + reply count. If a concurrent request already inserted
+    // the same client_msg_id, the unique index raises 23505; return that post.
+    let post = match PostRepository::new(state.db.clone())
         .create_post_in_tx(
             &mut tx,
             channel_id,
@@ -401,23 +426,65 @@ pub async fn create_post(
             &input.message,
             input.props.clone().unwrap_or(serde_json::json!({})),
             &input.file_ids,
+            client_msg_id,
         )
-        .await?;
+        .await
+    {
+        Ok(post) => post,
+        Err(err) => {
+            if let AppError::Database(ref sqlx_err) = err {
+                if is_client_msg_id_conflict(sqlx_err) {
+                    drop(tx);
+                    if let Some(id) = client_msg_id {
+                        if let Some(existing_id) = PostRepository::new(state.db.clone())
+                            .find_post_by_client_msg_id(user_id, id)
+                            .await?
+                        {
+                            let existing_post = PostRepository::new(state.db.clone())
+                                .get_post_by_id(existing_id)
+                                .await?
+                                .ok_or_else(|| AppError::NotFound("Post not found".to_string()))?;
 
-    // Link files to this post inside the transaction
+                            // Verify this is a true idempotent retry, not a reuse of
+                            // client_msg_id for a different post.
+                            let same_channel = existing_post.channel_id == channel_id;
+                            let same_root = existing_post.root_post_id == root_post_id;
+                            let same_message = existing_post.message == input.message;
+                            let mut existing_file_ids = existing_post.file_ids.clone();
+                            existing_file_ids.sort();
+                            let mut request_file_ids = input.file_ids.clone();
+                            request_file_ids.sort();
+                            let same_files = existing_file_ids == request_file_ids;
+                            if !same_channel || !same_root || !same_message || !same_files {
+                                return Err(AppError::Conflict(
+                                    "client_msg_id reused with different post content".to_string(),
+                                ));
+                            }
+
+                            return build_post_response(
+                                state,
+                                existing_post,
+                                user_id,
+                                client_msg_id.map(|s| s.to_string()),
+                            )
+                            .await;
+                        }
+                    }
+                }
+            }
+            return Err(err);
+        }
+    };
+
+    // Link files to this post inside the transaction (with ownership re-validation)
     if !input.file_ids.is_empty() {
-        let result = sqlx::query(
-            "UPDATE files SET post_id = $1, channel_id = $3 WHERE id = ANY($2) AND post_id IS NULL",
-        )
-        .bind(post.id)
-        .bind(&input.file_ids)
-        .bind(channel_id)
-        .execute(&mut *tx)
-        .await?;
+        let attached_ids = FileRepository::new(&state.db)
+            .attach_files_to_post_in_tx(&mut tx, &input.file_ids, post.id, channel_id, user_id)
+            .await?;
 
-        if result.rows_affected() != input.file_ids.len() as u64 {
+        if attached_ids.len() != input.file_ids.len() {
             return Err(AppError::Validation(
-                "One or more files were already attached to another post".to_string(),
+                "One or more files could not be attached".to_string(),
             ));
         }
     }
@@ -518,7 +585,8 @@ pub async fn create_post(
     // POST-COMMIT: best-effort external effects only.
     // ========================================================================
 
-    let mut response = build_post_response(state, post, user_id, client_msg_id).await?;
+    let mut response =
+        build_post_response(state, post, user_id, client_msg_id.map(|s| s.to_string())).await?;
     response.props = serde_json::Value::Object(props);
 
     // Broadcast post over WS
@@ -584,6 +652,7 @@ pub async fn create_post(
             response.seq,
             team_id,
             members,
+            &input.message,
         )
         .await;
     }
@@ -791,7 +860,7 @@ pub async fn create_system_message(
                 .await
                 .unwrap_or_default();
         let _ = crate::services::unreads::increment_unreads_external(
-            state, channel_id, bot_user, post.seq, team_id, members,
+            state, channel_id, bot_user, post.seq, team_id, members, &message,
         )
         .await;
     }
@@ -994,7 +1063,7 @@ pub async fn get_thread(
 }
 
 /// Parse @mentions from a message, excluding code blocks and URLs.
-fn parse_mentions(message: &str) -> Vec<String> {
+pub(crate) fn parse_mentions(message: &str) -> Vec<String> {
     let mention_re = Regex::new(r"@([a-zA-Z0-9_\-\.]+)").expect("valid regex");
     let mut mentions = Vec::new();
     let mut in_code_block = false;

@@ -338,14 +338,15 @@ async fn mm_post_files_info_returns_files() {
         .file_name("test.txt")
         .mime_str("text/plain")
         .unwrap();
-    let form = reqwest::multipart::Form::new()
-        .part("files", part)
-        .text("channel_id", channel_id.to_string());
+    let form = reqwest::multipart::Form::new().part("files", part);
 
     let upload_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/files", &ctx.app.address))
+        .post(format!(
+            "{}/api/v4/files?channel_id={}",
+            &ctx.app.address, channel_id
+        ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .multipart(form)
         .send()
@@ -798,14 +799,15 @@ async fn mm_channel_posts_include_file_metadata_for_mobile_history() {
         .file_name("photo.png")
         .mime_str("image/png")
         .unwrap();
-    let form = reqwest::multipart::Form::new()
-        .part("files", part)
-        .text("channel_id", channel_id.to_string());
+    let form = reqwest::multipart::Form::new().part("files", part);
 
     let upload_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/files", &ctx.app.address))
+        .post(format!(
+            "{}/api/v4/files?channel_id={}",
+            &ctx.app.address, channel_id
+        ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .multipart(form)
         .send()

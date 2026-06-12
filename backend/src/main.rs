@@ -1,5 +1,6 @@
 use rustchat::{api, config::Config, db, realtime::WsHub, storage::S3Client, telemetry};
 use std::net::SocketAddr;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 #[tokio::main]
@@ -56,6 +57,9 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Shutdown coordination token
+    let shutdown_token = CancellationToken::new();
+
     // Create WebSocket hub
     let ws_hub = WsHub::new();
     info!("WebSocket hub initialized");
@@ -70,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
         config.redis_url.clone(),
         ws_hub.clone(),
     );
-    match cluster_broadcast.start().await {
+    match cluster_broadcast.start(shutdown_token.child_token()).await {
         Ok(()) => {
             ws_hub.set_cluster_broadcast(cluster_broadcast).await;
             info!("WebSocket cluster fan-out enabled");
@@ -114,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Spawn background jobs
-    rustchat::jobs::spawn_retention_job(db_pool.clone());
+    rustchat::jobs::spawn_retention_job(db_pool.clone(), shutdown_token.child_token());
 
     // Spawn email worker
     let email_worker_config = rustchat::jobs::EmailWorkerConfig::default();
@@ -122,10 +126,11 @@ async fn main() -> anyhow::Result<()> {
         db_pool.clone(),
         email_worker_config,
         config.encryption_key.clone(),
+        shutdown_token.child_token(),
     );
 
     // Build application router (spawns reconciliation worker internally)
-    let app = api::router(
+    let (app, state) = api::router(
         db_pool.clone(),
         redis_pool,
         config.jwt_secret.clone(),
@@ -133,6 +138,7 @@ async fn main() -> anyhow::Result<()> {
         ws_hub,
         s3_client,
         config.clone(),
+        shutdown_token.clone(),
     );
 
     // Start server
@@ -143,11 +149,46 @@ async fn main() -> anyhow::Result<()> {
     info!("Listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    let state_for_shutdown = state.clone();
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(async move {
+        shutdown_signal().await;
+        // Signal all background loops to exit cleanly before closing websockets.
+        state_for_shutdown.shutdown.cancel();
+        state_for_shutdown
+            .ws_hub
+            .close_all_with_code(1012, "Service restarting")
+            .await;
+    })
     .await?;
 
     Ok(())
+}
+
+/// Wait for a shutdown signal (Ctrl+C or SIGTERM).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }

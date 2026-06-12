@@ -161,7 +161,7 @@ pub async fn spawn_app_with_config(config: Config) -> TestApp {
     // Initialize Redis using explicit test URL first, then known local fallbacks.
     let redis_pool = configure_redis_with_fallback(&collect_test_redis_urls()).await;
 
-    let app = api::router(
+    let (app, _state) = api::router(
         db_pool.clone(),
         redis_pool.clone(),
         jwt_secret,
@@ -169,6 +169,7 @@ pub async fn spawn_app_with_config(config: Config) -> TestApp {
         ws_hub,
         s3_client,
         config,
+        tokio_util::sync::CancellationToken::new(),
     );
 
     let server = axum::serve(
@@ -437,7 +438,7 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
 
     // Build a temporary router to get properly initialized managers
     // This is cleaner than trying to construct them directly
-    let _temp_router = rustchat::api::router(
+    let (_temp_router, _temp_state) = rustchat::api::router(
         pool.clone(),
         redis_pool.clone(),
         jwt_secret.clone(),
@@ -445,6 +446,7 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
         ws_hub.clone(),
         s3_client.clone(),
         config.clone(),
+        tokio_util::sync::CancellationToken::new(),
     );
 
     // Extract state from the router
@@ -458,7 +460,9 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
         jwt_audience: config.jwt_audience.clone(),
         jwt_expiry_hours,
         ws_hub,
-        connection_store: rustchat::realtime::ConnectionStore::new(),
+        connection_store: rustchat::realtime::ConnectionStore::new(
+            tokio_util::sync::CancellationToken::new(),
+        ),
         s3_client,
         http_client: reqwest::Client::new(),
         start_time: std::time::Instant::now(),
@@ -483,6 +487,7 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
         ),
         reconciliation_tx: None,
         agent_runtime: None,
+        shutdown: tokio_util::sync::CancellationToken::new(),
     })
 }
 

@@ -30,6 +30,21 @@ use crate::{
     services::sync::rustshare::orchestrator::SyncOrchestrator,
 };
 
+async fn require_agent_in_team(
+    state: &AppState,
+    agent_user_id: Uuid,
+    team_id: Uuid,
+) -> ApiResult<()> {
+    let is_member = TeamRepository::new(&state.db)
+        .is_team_member(team_id, agent_user_id)
+        .await
+        .map_err(AppError::Database)?;
+    if !is_member {
+        return Err(AppError::NotFound("Agent not found".to_string()));
+    }
+    Ok(())
+}
+
 // ------------------------------------------------------------------
 // Router
 // ------------------------------------------------------------------
@@ -493,6 +508,7 @@ pub async fn assign_kb_to_agent(
         .get_config_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
+    require_agent_in_team(&state, agent.user_id, team_id).await?;
 
     // Verify KB exists and belongs to user's team
     let kb_repo = KnowledgeRepository::new(&state.db);
@@ -528,6 +544,7 @@ pub async fn list_agent_knowledge_bases(
         .get_config_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
+    require_agent_in_team(&state, agent.user_id, team_id).await?;
 
     let kbs: Vec<AgentKnowledgeBaseDetail> = sqlx::query_as(
         r#"
@@ -569,6 +586,7 @@ pub async fn unassign_kb_from_agent(
         .get_config_by_id(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?;
+    require_agent_in_team(&state, agent.user_id, team_id).await?;
 
     // Verify KB exists and belongs to user's team
     let kb_repo = KnowledgeRepository::new(&state.db);

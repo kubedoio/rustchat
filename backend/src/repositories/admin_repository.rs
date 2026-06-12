@@ -75,7 +75,7 @@ impl<'a> AdminRepository<'a> {
     /// Insert a new audit log entry
     pub async fn insert_audit_log(
         &self,
-        actor_user_id: Uuid,
+        actor_user_id: Option<Uuid>,
         action: &str,
         target_type: &str,
         target_id: Option<Uuid>,

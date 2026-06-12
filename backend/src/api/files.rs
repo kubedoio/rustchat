@@ -19,6 +19,7 @@ use super::AppState;
 use crate::auth::policy::permissions;
 use crate::auth::AuthUser;
 use crate::error::{ApiResult, AppError};
+use crate::middleware::rate_limit::upload_ip_rate_limit;
 use crate::models::{FileInfo, FileUploadResponse};
 use crate::repositories::{ChannelRepository, FileRepository};
 
@@ -75,9 +76,13 @@ fn content_disposition_filename(filename: &str) -> String {
 }
 
 /// Build files routes
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let upload_route = Router::new().route("/files", post(upload_file)).layer(
+        axum::middleware::from_fn_with_state(state, upload_ip_rate_limit),
+    );
+
     Router::new()
-        .route("/files", post(upload_file))
+        .merge(upload_route)
         .route("/files/presign", post(get_presigned_upload))
         .route("/files/{id}", get(get_file).delete(delete_file))
         .route("/files/{id}/download", get(download_file))
@@ -347,9 +352,37 @@ async fn download_file_content(
         .await?
         .ok_or_else(|| AppError::FileNotFound)?;
 
-    check_file_access(&state, &file, auth.user_id).await?;
+    if let Err(e) = check_file_access(&state, &file, auth.user_id).await {
+        if matches!(e, AppError::Forbidden(_)) {
+            let _ = crate::services::audit::audit(
+                &state.db,
+                Some(auth.user_id),
+                crate::services::audit::AuditAction::FileDownloadDenied,
+                "file",
+                Some(id),
+                serde_json::json!({ "file_name": file.name }),
+            )
+            .await;
+        }
+        return Err(e);
+    }
 
     let stream = state.s3_client.download_stream(&file.key).await?;
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let file_name = file.name.clone();
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::FileDownload,
+            "file",
+            Some(id),
+            serde_json::json!({ "file_name": file_name }),
+        )
+        .await;
+    });
 
     Ok((
         [

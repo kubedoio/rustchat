@@ -2,6 +2,7 @@
 
 use axum::{
     extract::{ConnectInfo, State},
+    http::HeaderMap,
     middleware,
     routing::{get, post},
     Json, Router,
@@ -9,6 +10,7 @@ use axum::{
 use std::net::SocketAddr;
 
 use super::AppState;
+use crate::auth::{build_auth_cookie, clear_auth_cookie};
 use crate::auth::{create_token_with_policy, hash_password, verify_password, AuthUser};
 use crate::error::{ApiResult, AppError};
 use crate::middleware::rate_limit::{self, RateLimitConfig};
@@ -38,6 +40,7 @@ pub fn router(state: AppState) -> Router<AppState> {
                 state.clone(),
                 crate::middleware::rate_limit::auth_ip_rate_limit,
             ));
+    let logout_routes = Router::new().route("/logout", post(logout));
     let verification_routes = Router::new()
         .route("/verify-email", post(verify_email))
         .route("/resend-verification", post(resend_verification))
@@ -57,6 +60,7 @@ pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .merge(registration_routes)
         .merge(login_routes)
+        .merge(logout_routes)
         .merge(verification_routes)
         .merge(password_reset_routes)
         .route("/me", get(me))
@@ -95,7 +99,7 @@ async fn register(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(input): Json<CreateUser>,
-) -> ApiResult<Json<serde_json::Value>> {
+) -> ApiResult<(HeaderMap, Json<serde_json::Value>)> {
     // Check if public registration is enabled
     let auth_config = crate::services::auth_config::get_password_rules(&state.db).await?;
     if !auth_config.allow_registration {
@@ -260,14 +264,18 @@ async fn register(
                 state.jwt_audience.as_deref(),
                 state.jwt_expiry_hours,
             )?;
+            let headers = build_auth_cookie_header(&state, &token)?;
 
-            Ok(Json(serde_json::json!({
-                "success": true,
-                "message": "Registration successful. Please check your email to verify your account.",
-                "requires_password_setup": false,
-                "token": token,
-                "user": UserResponse::from(user)
-            })))
+            Ok((
+                headers,
+                Json(serde_json::json!({
+                    "success": true,
+                    "message": "Registration successful. Please check your email to verify your account.",
+                    "requires_password_setup": false,
+                    "token": token,
+                    "user": UserResponse::from(user)
+                })),
+            ))
         } else {
             // Passwordless registration: send password setup email
             match crate::services::password_reset::send_password_setup_email(
@@ -288,12 +296,15 @@ async fn register(
                 }
             }
 
-            Ok(Json(serde_json::json!({
-                "success": true,
-                "message": "Registration successful. Please check your email to set your password.",
-                "requires_password_setup": true,
-                "email": user.email
-            })))
+            Ok((
+                HeaderMap::new(),
+                Json(serde_json::json!({
+                    "success": true,
+                    "message": "Registration successful. Please check your email to set your password.",
+                    "requires_password_setup": true,
+                    "email": user.email
+                })),
+            ))
         }
     } else {
         tracing::warn!("site_url not configured, skipping email sending");
@@ -310,21 +321,28 @@ async fn register(
                 state.jwt_audience.as_deref(),
                 state.jwt_expiry_hours,
             )?;
+            let headers = build_auth_cookie_header(&state, &token)?;
 
-            Ok(Json(serde_json::json!({
-                "success": true,
-                "message": "Registration successful.",
-                "requires_password_setup": false,
-                "token": token,
-                "user": UserResponse::from(user)
-            })))
+            Ok((
+                headers,
+                Json(serde_json::json!({
+                    "success": true,
+                    "message": "Registration successful.",
+                    "requires_password_setup": false,
+                    "token": token,
+                    "user": UserResponse::from(user)
+                })),
+            ))
         } else {
-            Ok(Json(serde_json::json!({
-                "success": true,
-                "message": "Registration successful. Please contact administrator to set your password.",
-                "requires_password_setup": true,
-                "email": user.email
-            })))
+            Ok((
+                HeaderMap::new(),
+                Json(serde_json::json!({
+                    "success": true,
+                    "message": "Registration successful. Please contact administrator to set your password.",
+                    "requires_password_setup": true,
+                    "email": user.email
+                })),
+            ))
         }
     }
 }
@@ -333,7 +351,52 @@ async fn register(
 async fn login(
     State(state): State<AppState>,
     Json(input): Json<LoginRequest>,
-) -> ApiResult<Json<AuthResponse>> {
+) -> ApiResult<(HeaderMap, Json<AuthResponse>)> {
+    let email = input.email.clone();
+    match login_inner(State(state.clone()), Json(input)).await {
+        Ok(response) => {
+            let user_id = response.1.user.id;
+            let _ = crate::services::audit::audit(
+                &state.db,
+                Some(user_id),
+                crate::services::audit::AuditAction::LoginSuccess,
+                "user",
+                Some(user_id),
+                serde_json::json!({ "email": email }),
+            )
+            .await;
+            Ok(response)
+        }
+        Err(err) => {
+            let _ = crate::services::audit::audit(
+                &state.db,
+                None,
+                crate::services::audit::AuditAction::LoginFailed,
+                "user",
+                None,
+                serde_json::json!({ "email": email }),
+            )
+            .await;
+            Err(err)
+        }
+    }
+}
+
+/// Build a `Set-Cookie` header for the given JWT token using the same policy as login.
+fn build_auth_cookie_header(state: &AppState, token: &str) -> ApiResult<HeaderMap> {
+    let max_age = state.jwt_expiry_hours.saturating_mul(3600);
+    let mut headers = HeaderMap::new();
+    let cookie_value = build_auth_cookie(token, max_age, state.config.is_production());
+    let cookie_header = axum::http::HeaderValue::from_str(&cookie_value)
+        .map_err(|_| AppError::Internal("Invalid cookie characters".into()))?;
+    headers.insert(axum::http::header::SET_COOKIE, cookie_header);
+    Ok(headers)
+}
+
+async fn login_inner(
+    State(state): State<AppState>,
+    Json(input): Json<LoginRequest>,
+) -> ApiResult<(HeaderMap, Json<AuthResponse>)> {
     // Find user by email
     let user = UserRepository::new(&state.db)
         .get_active_by_email(&input.email)
@@ -353,6 +416,7 @@ async fn login(
             tracing::warn!(user_id = %user.id, "Rate limit exceeded for user login");
             return Err(AppError::TooManyRequests(
                 "Too many login attempts. Please try again later.".to_string(),
+                Some(config.window_secs),
             ));
         }
     }
@@ -393,12 +457,32 @@ async fn login(
         state.jwt_expiry_hours,
     )?;
 
-    Ok(Json(AuthResponse {
-        token,
-        token_type: "Bearer".to_string(),
-        expires_in: state.jwt_expiry_hours * 3600,
-        user: UserResponse::from(user),
-    }))
+    let headers = build_auth_cookie_header(&state, &token)?;
+
+    Ok((
+        headers,
+        Json(AuthResponse {
+            token,
+            token_type: "Bearer".to_string(),
+            expires_in: state.jwt_expiry_hours * 3600,
+            user: UserResponse::from(user),
+        }),
+    ))
+}
+
+async fn logout(State(state): State<AppState>) -> ApiResult<(HeaderMap, Json<serde_json::Value>)> {
+    let mut headers = HeaderMap::new();
+    let cookie_header =
+        axum::http::HeaderValue::from_str(&clear_auth_cookie(state.config.is_production()))
+            .map_err(|_| AppError::Internal("Invalid cookie characters".into()))?;
+    headers.insert(axum::http::header::SET_COOKIE, cookie_header);
+
+    Ok((
+        headers,
+        Json(serde_json::json!({
+            "success": true
+        })),
+    ))
 }
 
 async fn enforce_password_login_allowed(state: &AppState, user_email: &str) -> ApiResult<()> {
@@ -642,6 +726,7 @@ async fn reset_password_handler(
         Err(PasswordResetError::InvalidPassword(msg)) => Err(AppError::Validation(msg)),
         Err(PasswordResetError::RateLimitExceeded) => Err(AppError::TooManyRequests(
             "Too many attempts. Please try again later.".to_string(),
+            None,
         )),
         Err(e) => {
             tracing::error!("Password reset error: {}", e);

@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use super::parse_request_body;
 use crate::api::AppState;
-use crate::auth::{create_token_with_policy, verify_password};
+use crate::auth::{build_auth_cookie, create_token_with_policy, verify_password};
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::models as mm;
 use crate::middleware::rate_limit::{self, RateLimitConfig};
@@ -100,6 +100,7 @@ pub async fn login(
             );
             return Err(AppError::TooManyRequests(
                 "Too many login attempts. Please try again later.".to_string(),
+                Some(config.window_secs),
             ));
         }
     }
@@ -145,15 +146,10 @@ pub async fn login(
         .map_err(|_| AppError::Internal("Invalid token characters".into()))?;
     headers.insert(axum::http::header::AUTHORIZATION, auth_header);
     let max_age = state.jwt_expiry_hours.saturating_mul(3600);
-    let cookie_header = axum::http::HeaderValue::from_str(&format!(
-        "MMAUTHTOKEN={}; Path=/; Max-Age={}; HttpOnly{}; SameSite=Lax",
-        token,
+    let cookie_header = axum::http::HeaderValue::from_str(&build_auth_cookie(
+        &token,
         max_age,
-        if state.config.is_production() {
-            "; Secure"
-        } else {
-            ""
-        }
+        state.config.is_production(),
     ))
     .map_err(|_| AppError::Internal("Invalid cookie characters".into()))?;
     headers.insert(axum::http::header::SET_COOKIE, cookie_header);

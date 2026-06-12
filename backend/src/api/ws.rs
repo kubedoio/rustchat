@@ -18,6 +18,7 @@ use tokio::time::Duration;
 use super::AppState;
 use crate::api::v4::websocket::map_envelope_to_mm;
 use crate::api::websocket_core::{self, EnvelopeCommandOptions};
+use crate::realtime::websocket_actor::WsCommand;
 use crate::realtime::WsEnvelope;
 use crate::telemetry::metrics;
 
@@ -115,7 +116,11 @@ async fn handle_socket(
     let (mut sender, mut receiver) = socket.split();
 
     // Add connection to hub
-    let (connection_id, mut rx) = state.ws_hub.add_connection(user_id, username.clone()).await;
+    let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::channel(1);
+    let (connection_id, mut rx) = state
+        .ws_hub
+        .add_connection(user_id, username.clone(), cmd_tx)
+        .await;
     let connection_id_str = connection_id.to_string();
     websocket_core::register_presence_connection(&state, user_id, &connection_id_str).await;
 
@@ -146,8 +151,8 @@ async fn handle_socket(
         let _ = sender.send(Message::Text(msg.into())).await;
     }
 
-    // Channel to signal close frame should be sent
-    let (should_close_tx, mut should_close_rx) = tokio::sync::watch::channel(false);
+    // Channel to signal a close frame should be sent, carrying code + reason.
+    let (should_close_tx, mut should_close_rx) = tokio::sync::watch::channel(None::<(u16, String)>);
 
     // Spawn task to forward hub messages to client
     let mut send_task = tokio::spawn(async move {
@@ -177,11 +182,12 @@ async fn handle_socket(
                     }
                 }
                 _ = should_close_rx.changed() => {
-                    if *should_close_rx.borrow() {
-                        // Send close frame for auth expiry
+                    let close_info = should_close_rx.borrow().clone();
+                    if let Some((code, reason)) = close_info {
+                        // Send close frame (auth expiry or shutdown command)
                         let close_frame = CloseFrame {
-                            code: axum::extract::ws::close_code::POLICY,
-                            reason: "Authentication token expired".into(),
+                            code,
+                            reason: reason.into(),
                         };
                         let _ = sender.send(Message::Close(Some(close_frame))).await;
                         break;
@@ -243,7 +249,7 @@ async fn handle_socket(
     let auth_expiry_sleep = tokio::time::sleep(token_ttl);
     tokio::pin!(auth_expiry_sleep);
 
-    // Wait for either task to complete
+    // Wait for either task to complete, or for a shutdown command from the hub
     tokio::select! {
         _ = &mut send_task => {},
         _ = &mut receive_task => {},
@@ -254,9 +260,25 @@ async fn handle_socket(
                 "Closing websocket because authentication token expired"
             );
             // Signal send_task to send close frame
-            let _ = should_close_tx.send(true);
+            let _ = should_close_tx.send(Some((
+                axum::extract::ws::close_code::POLICY,
+                "Authentication token expired".to_string(),
+            )));
             // Give send_task time to send the close frame
             let _ = tokio::time::timeout(tokio::time::Duration::from_millis(100), &mut send_task).await;
+        },
+        Some(cmd) = cmd_rx.recv() => {
+            if let WsCommand::Close(code, reason) = cmd {
+                tracing::info!(
+                    user_id = %user_id,
+                    connection_id = %connection_id_str,
+                    code = code,
+                    reason = %reason,
+                    "Closing legacy websocket due to shutdown command"
+                );
+                let _ = should_close_tx.send(Some((code, reason)));
+                let _ = tokio::time::timeout(tokio::time::Duration::from_millis(100), &mut send_task).await;
+            }
         },
     }
 
