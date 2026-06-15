@@ -11,7 +11,7 @@ WORKDIR /app
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
 
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS ci-validate
+FROM alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4 AS ci-validate
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
@@ -47,7 +47,7 @@ RUN --mount=type=cache,id=backend-cargo-registry,target=/usr/local/cargo/registr
     cp /app/target/release/rustchat /tmp/rustchat
 
 # Runtime stage
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+FROM alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
 
 ARG VERSION
 ARG BUILD_DATE
