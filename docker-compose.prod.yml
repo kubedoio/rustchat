@@ -11,6 +11,7 @@ services:
       - RUSTCHAT_ENVIRONMENT=production
       - RUSTCHAT_SITE_URL=${RUSTCHAT_SITE_URL:?set public HTTPS URL in .env}
       - RUSTCHAT_CORS_ALLOWED_ORIGINS=${RUSTCHAT_CORS_ALLOWED_ORIGINS:?set allowed HTTPS origins in .env}
+      - RUSTCHAT_ALLOW_DEV_CORS=false
       - RUSTCHAT_DATABASE_URL=postgres://rustchat:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/rustchat
       - RUSTCHAT_REDIS_URL=redis://redis:6379
       - RUSTCHAT_JWT_SECRET=${RUSTCHAT_JWT_SECRET:?set RUSTCHAT_JWT_SECRET in .env}
