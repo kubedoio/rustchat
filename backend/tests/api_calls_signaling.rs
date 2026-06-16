@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
+use rustchat::constants::{ROLE_CHANNEL_ADMIN, ROLE_ORG_ADMIN, ROLE_SYSTEM_ADMIN, ROLE_TEAM_ADMIN};
 use rustchat::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use tokio_tungstenite::{
     connect_async,
@@ -281,14 +282,13 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
     // Promote user_a to channel admin so they can manage calls in this channel.
-    sqlx::query(
-        "UPDATE channel_members SET role = 'channel_admin' WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(user_a)
-    .execute(&app.db_pool)
-    .await
-    .expect("failed to promote user to channel admin");
+    sqlx::query("UPDATE channel_members SET role = $1 WHERE channel_id = $2 AND user_id = $3")
+        .bind(ROLE_CHANNEL_ADMIN)
+        .bind(channel_id)
+        .bind(user_a)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to promote user to channel admin");
 
     let start = app
         .api_client
@@ -853,7 +853,8 @@ async fn system_admin_can_end_call_even_when_not_host() {
         register_and_login(&app, org_id, "admin_end_b", "admin_end_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
-    sqlx::query("UPDATE users SET role = 'system_admin' WHERE id = $1")
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+        .bind(ROLE_SYSTEM_ADMIN)
         .bind(user_b)
         .execute(&app.db_pool)
         .await
@@ -1020,14 +1021,13 @@ async fn channel_admin_can_toggle_channel_calls() {
     .await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
-    sqlx::query(
-        "UPDATE channel_members SET role = 'channel_admin' WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(user_a)
-    .execute(&app.db_pool)
-    .await
-    .expect("failed to promote user to channel admin");
+    sqlx::query("UPDATE channel_members SET role = $1 WHERE channel_id = $2 AND user_id = $3")
+        .bind(ROLE_CHANNEL_ADMIN)
+        .bind(channel_id)
+        .bind(user_a)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to promote user to channel admin");
 
     let resp = app
         .api_client
@@ -1080,7 +1080,8 @@ async fn system_admin_can_toggle_channel_calls() {
     .await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
-    sqlx::query("UPDATE users SET role = 'system_admin' WHERE id = $1")
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+        .bind(ROLE_SYSTEM_ADMIN)
         .bind(user_a)
         .execute(&app.db_pool)
         .await
@@ -1143,10 +1144,11 @@ async fn team_admin_can_toggle_channel_calls() {
 
     sqlx::query(
         "UPDATE team_members \
-         SET role = 'team_admin' \
-         WHERE team_id = (SELECT team_id FROM channels WHERE id = $1) \
-         AND user_id = $2",
+         SET role = $1 \
+         WHERE team_id = (SELECT team_id FROM channels WHERE id = $2) \
+         AND user_id = $3",
     )
+    .bind(ROLE_TEAM_ADMIN)
     .bind(channel_id)
     .bind(user_a)
     .execute(&app.db_pool)
@@ -1208,7 +1210,8 @@ async fn org_admin_can_toggle_channel_calls() {
     .await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
-    sqlx::query("UPDATE users SET role = 'org_admin' WHERE id = $1")
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+        .bind(ROLE_ORG_ADMIN)
         .bind(user_a)
         .execute(&app.db_pool)
         .await

@@ -43,9 +43,9 @@ pub fn map_channel_with_team_data_row(row: ChannelWithTeamDataRow) -> ChannelWit
 
 /// Verify that the caller can manage the channel.
 ///
-/// This covers channel admins (via `channel_members`), team admins (via
-/// `team_members`), and anyone holding the `CHANNEL_MANAGE` permission
-/// (channel admin, team admin, org admin, or system admin).
+/// Authorizes channel admins (checked via `channel_members`/`team_members`
+/// as a DB fallback) plus anyone holding the `CHANNEL_MANAGE` permission
+/// (team admin, org admin, or system admin).
 pub async fn ensure_channel_admin_or_system_manage(
     state: &AppState,
     channel_id: Uuid,
