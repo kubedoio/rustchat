@@ -280,6 +280,16 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
         register_and_login(&app, org_id, "mobile_rest_b", "mobile_rest_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
+    // Promote user_a to channel admin so they can manage calls in this channel.
+    sqlx::query(
+        "UPDATE channel_members SET role = 'channel_admin' WHERE channel_id = $1 AND user_id = $2",
+    )
+    .bind(channel_id)
+    .bind(user_a)
+    .execute(&app.db_pool)
+    .await
+    .expect("failed to promote user to channel admin");
+
     let start = app
         .api_client
         .post(format!(
@@ -952,6 +962,146 @@ async fn calls_reaction_event_contains_mobile_fields() {
     assert!(reacted_event["timestamp"].as_i64().unwrap_or_default() > 0);
     assert_eq!(reacted_event["emoji"]["name"], "+1");
     assert_eq!(reacted_event["reaction"], "👍");
+}
+
+#[tokio::test]
+async fn regular_member_cannot_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle Forbidden Org").await;
+    let (_token_a, user_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_forbidden_a",
+        "toggle_forbidden_a@example.com",
+    )
+    .await;
+    let (token_b, user_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_forbidden_b",
+        "toggle_forbidden_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_b}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn channel_admin_can_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle Channel Admin Org").await;
+    let (token_a, user_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_channel_admin_a",
+        "toggle_channel_admin_a@example.com",
+    )
+    .await;
+    let (token_b, user_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_channel_admin_b",
+        "toggle_channel_admin_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    sqlx::query(
+        "UPDATE channel_members SET role = 'channel_admin' WHERE channel_id = $1 AND user_id = $2",
+    )
+    .bind(channel_id)
+    .bind(user_a)
+    .execute(&app.db_pool)
+    .await
+    .expect("failed to promote user to channel admin");
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert_eq!(body["enabled"], false);
+
+    // Regular members still cannot re-enable calls.
+    let resp_b = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_b}"))
+        .json(&serde_json::json!({ "enabled": true }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp_b.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn system_admin_can_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle System Admin Org").await;
+    let (_token_a, user_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_system_admin_a",
+        "toggle_system_admin_a@example.com",
+    )
+    .await;
+    let (_token_b, user_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_system_admin_b",
+        "toggle_system_admin_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    sqlx::query("UPDATE users SET role = 'system_admin' WHERE id = $1")
+        .bind(user_a)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to promote user to system_admin");
+    let token_a =
+        login_and_get_token(&app, "toggle_system_admin_a@example.com", "Password123!").await;
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert_eq!(body["enabled"], false);
 }
 
 async fn insert_org(app: &common::TestApp, name: &str) -> Uuid {

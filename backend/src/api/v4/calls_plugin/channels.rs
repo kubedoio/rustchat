@@ -13,8 +13,8 @@ use crate::mattermost_compat::id::encode_mm_id;
 
 use super::broadcast::broadcast_call_event;
 use super::helpers::{
-    build_call_state_response, channel_calls_enabled, check_channel_permission, resolve_channel_id,
-    CHANNEL_CALLS_ENABLED,
+    build_call_state_response, channel_calls_enabled, check_channel_management_permission,
+    check_channel_permission, resolve_channel_id, CHANNEL_CALLS_ENABLED,
 };
 use super::lifecycle::CallStateResponse;
 use super::state::CallState;
@@ -140,6 +140,7 @@ pub(crate) async fn set_channel_calls_enabled(
 ) -> ApiResult<Json<CallChannelInfo>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
     check_channel_permission(&state, auth.user_id, channel_uuid).await?;
+    check_channel_management_permission(&state, auth.user_id, channel_uuid).await?;
 
     CHANNEL_CALLS_ENABLED.insert(channel_uuid, payload.enabled);
 
