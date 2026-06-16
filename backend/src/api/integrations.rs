@@ -1026,8 +1026,11 @@ async fn execute_custom_slash_command(
             trigger_word: trigger.to_string(),
         };
 
+        // The HTTP client above enforces a 10-second per-request timeout. Use a
+        // single attempt so the total wall-clock time for slash-command execution
+        // stays at approximately 10 seconds.
         let retry_config = RetryConfig {
-            max_attempts: 3,
+            max_attempts: 1,
             initial_delay: Duration::from_millis(150),
             max_delay: Duration::from_secs(2),
             backoff_multiplier: 2.0,
