@@ -789,6 +789,10 @@ impl Config {
             tracing::warn!("Security configuration warning: {}", warning);
         }
 
+        if self.is_production() && self.allow_dev_cors {
+            anyhow::bail!("allow_dev_cors (permissive CORS) must not be enabled in production.");
+        }
+
         if self.is_production() {
             // In production, fail fast on security issues
             if !validation.is_valid {

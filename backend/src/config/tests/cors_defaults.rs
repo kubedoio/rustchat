@@ -83,6 +83,23 @@ async fn allow_dev_cors_false_blocks_cross_origin() {
 }
 
 #[tokio::test]
+async fn production_default_does_not_allow_all_origins_on_preflight() {
+    let config = load_config(&[
+        ("environment", Override::Str("production")),
+        ("allow_dev_cors", Override::Bool(false)),
+    ]);
+
+    let response = preflight(&config, "https://evil.example.com").await;
+    assert_ne!(
+        response
+            .headers()
+            .get("access-control-allow-origin")
+            .and_then(|v| v.to_str().ok()),
+        Some("*")
+    );
+}
+
+#[tokio::test]
 async fn configured_origins_take_precedence_over_dev_cors() {
     let config = load_config(&[
         ("environment", Override::Str("production")),
