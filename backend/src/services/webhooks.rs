@@ -12,6 +12,40 @@ use std::net::IpAddr;
 use std::time::Duration;
 use uuid::Uuid;
 
+/// Comprehensive check for private, reserved, or otherwise unsafe IP addresses.
+fn is_private_or_reserved_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_private()
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_multicast()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+        }
+        IpAddr::V6(v6) => {
+            let segments = v6.segments();
+            // ::1 (loopback)
+            if segments == [0, 0, 0, 0, 0, 0, 0, 1] {
+                return true;
+            }
+            // fe80::/10 (link-local)
+            if segments[0] & 0xffc0 == 0xfe80 {
+                return true;
+            }
+            // fc00::/7 (unique local addresses)
+            if segments[0] & 0xfe00 == 0xfc00 {
+                return true;
+            }
+            // ff00::/8 (multicast)
+            if segments[0] & 0xff00 == 0xff00 {
+                return true;
+            }
+            false
+        }
+    }
+}
+
 /// Validates that a URL is safe for webhook callbacks (no SSRF to internal networks)
 pub fn is_valid_callback_url(url: &str) -> bool {
     let Ok(parsed) = url.parse::<reqwest::Url>() else {
@@ -91,6 +125,40 @@ pub fn is_valid_callback_url(url: &str) -> bool {
     }
 
     true
+}
+
+/// Validates a callback URL at request time by resolving its hostname and checking
+/// that no returned IP address is private, link-local, multicast, or loopback.
+///
+/// This prevents DNS-rebinding SSRF attacks where a hostname resolves to a safe
+/// public IP during registration but to an internal IP when the webhook fires.
+pub async fn validate_callback_url_at_request_time(url: &str) -> bool {
+    // First apply the existing static filter.
+    if !is_valid_callback_url(url) {
+        return false;
+    }
+
+    let Ok(parsed) = url.parse::<reqwest::Url>() else {
+        return false;
+    };
+
+    // Only http and https are allowed (already verified by is_valid_callback_url).
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+
+    // For literal IP addresses, apply the comprehensive check directly.
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return !is_private_or_reserved_ip(ip);
+    }
+
+    // Resolve the hostname and reject if any address is unsafe.
+    let port = parsed.port_or_known_default().unwrap_or(80);
+    let Ok(mut addrs) = tokio::net::lookup_host((host, port)).await else {
+        return false;
+    };
+
+    addrs.all(|socket_addr| !is_private_or_reserved_ip(socket_addr.ip()))
 }
 
 /// Execute an incoming webhook - creates a post in the target channel
@@ -194,7 +262,7 @@ pub async fn check_outgoing_triggers(
 
             // Spawn async task to call each callback URL (filter out SSRF-risky URLs)
             for url in &hook.callback_urls {
-                if !is_valid_callback_url(url) {
+                if !validate_callback_url_at_request_time(url).await {
                     tracing::warn!("Skipping outgoing webhook to invalid URL: {}", url);
                     continue;
                 }
@@ -206,7 +274,21 @@ pub async fn check_outgoing_triggers(
                     .unwrap_or_else(|| "application/json".to_string());
 
                 tokio::spawn(async move {
-                    let client = reqwest::Client::new();
+                    let client = reqwest::Client::builder()
+                        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                            // Static validation of redirect targets. Full async validation
+                            // (DNS resolution at request time) should be added in a follow-up.
+                            if is_valid_callback_url(attempt.url().as_str()) {
+                                attempt.follow()
+                            } else {
+                                attempt.error(std::io::Error::new(
+                                    std::io::ErrorKind::PermissionDenied,
+                                    "redirect target rejected by SSRF filter",
+                                ))
+                            }
+                        }))
+                        .build()
+                        .unwrap_or_else(|_| reqwest::Client::new());
                     let request = client
                         .post(&url)
                         .header("Content-Type", &content_type)
