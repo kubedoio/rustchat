@@ -345,6 +345,7 @@ fn test_secret_entropy_validation() {
         admin_user: None,
         admin_password: None,
         cors_allowed_origins: None,
+        allow_dev_cors: false,
         turnstile: Default::default(),
         calls: Default::default(),
         security: Default::default(),

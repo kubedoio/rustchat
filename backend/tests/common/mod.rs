@@ -216,6 +216,7 @@ pub fn test_config() -> Config {
         admin_user: None,
         admin_password: None,
         cors_allowed_origins: None,
+        allow_dev_cors: false,
         turnstile: Default::default(),
         calls: Default::default(),
         security: rustchat::config::SecurityConfig {

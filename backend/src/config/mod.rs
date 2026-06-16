@@ -14,6 +14,11 @@ pub struct Config {
     #[serde(default = "default_environment")]
     pub environment: String,
 
+    /// Allow permissive CORS (`Access-Control-Allow-Origin: *`) for local development.
+    /// Defaults to false; never enable in production.
+    #[serde(default = "default_allow_dev_cors")]
+    pub allow_dev_cors: bool,
+
     /// Server host address
     #[serde(default = "default_host")]
     pub server_host: String,
@@ -561,7 +566,11 @@ fn default_host() -> String {
 }
 
 fn default_environment() -> String {
-    "development".to_string()
+    "production".to_string()
+}
+
+fn default_allow_dev_cors() -> bool {
+    false
 }
 
 fn default_port() -> u16 {
@@ -923,13 +932,4 @@ fn parse_csv_list(raw: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_default_values() {
-        assert_eq!(default_host(), "0.0.0.0");
-        assert_eq!(default_port(), 3000);
-        assert_eq!(default_log_level(), "info");
-    }
-}
+mod tests;
