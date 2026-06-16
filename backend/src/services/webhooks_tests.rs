@@ -27,6 +27,11 @@ mod tests {
         assert!(!validate_callback_url_at_request_time("http://192.168.1.1/callback").await);
         assert!(!validate_callback_url_at_request_time("http://127.0.0.1/callback").await);
         assert!(!validate_callback_url_at_request_time("http://169.254.169.254/callback").await);
+        assert!(!validate_callback_url_at_request_time("http://0.0.0.0/callback").await);
+        assert!(!validate_callback_url_at_request_time("http://100.64.0.1/callback").await);
+        assert!(!validate_callback_url_at_request_time("http://100.127.255.255/callback").await);
+        assert!(!validate_callback_url_at_request_time("http://198.18.0.1/callback").await);
+        assert!(!validate_callback_url_at_request_time("http://198.19.255.255/callback").await);
     }
 
     #[tokio::test]
@@ -34,6 +39,11 @@ mod tests {
         assert!(!validate_callback_url_at_request_time("http://[::1]/callback").await);
         assert!(!validate_callback_url_at_request_time("http://[fe80::1]/callback").await);
         assert!(!validate_callback_url_at_request_time("http://[fc00::1]/callback").await);
+        assert!(!validate_callback_url_at_request_time("http://[::]/callback").await);
+        assert!(!validate_callback_url_at_request_time("http://[2001:db8::1]/callback").await);
+        assert!(
+            !validate_callback_url_at_request_time("http://[2001:db8:ffff:ffff::1]/callback").await
+        );
     }
 
     #[tokio::test]

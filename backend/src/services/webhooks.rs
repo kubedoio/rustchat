@@ -16,12 +16,18 @@ use uuid::Uuid;
 fn is_private_or_reserved_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
+            let octets = v4.octets();
             v4.is_private()
                 || v4.is_loopback()
                 || v4.is_link_local()
                 || v4.is_multicast()
                 || v4.is_broadcast()
                 || v4.is_documentation()
+                || v4.is_unspecified()
+                // 100.64.0.0/10 (shared/CGNAT address space)
+                || (octets[0] == 100 && (octets[1] & 0b11000000) == 0b01000000)
+                // 198.18.0.0/15 (benchmarking range)
+                || (octets[0] == 198 && (octets[1] & 0xfe) == 18)
         }
         IpAddr::V6(v6) => {
             // Handle IPv4-mapped IPv6 addresses such as ::ffff:127.0.0.1 by
@@ -29,6 +35,10 @@ fn is_private_or_reserved_ip(ip: IpAddr) -> bool {
             // an attacker uses IPv6 literal syntax to reach IPv4-internal hosts.
             if let Some(mapped_v4) = v6.to_ipv4_mapped() {
                 return is_private_or_reserved_ip(IpAddr::V4(mapped_v4));
+            }
+
+            if v6.is_unspecified() {
+                return true;
             }
 
             let segments = v6.segments();
@@ -46,6 +56,10 @@ fn is_private_or_reserved_ip(ip: IpAddr) -> bool {
             }
             // ff00::/8 (multicast)
             if segments[0] & 0xff00 == 0xff00 {
+                return true;
+            }
+            // 2001:db8::/32 (IPv6 documentation range)
+            if segments[0] == 0x2001 && segments[1] == 0x0db8 {
                 return true;
             }
             false

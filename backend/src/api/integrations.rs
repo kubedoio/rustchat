@@ -21,7 +21,7 @@ use crate::models::{
     SlashCommand, WebhookPayload,
 };
 use crate::repositories::{ChannelRepository, IntegrationRepository, UserRepository};
-use crate::services::webhooks::is_valid_callback_url;
+use crate::services::webhooks::{is_valid_callback_url, validate_callback_url_at_request_time};
 use chrono::Utc;
 use std::time::Duration;
 
@@ -989,7 +989,23 @@ async fn execute_custom_slash_command(
             ));
         }
 
-        let client = reqwest::Client::new();
+        if !validate_callback_url_at_request_time(&cmd.url).await {
+            return Ok(build_command_response(
+                "ephemeral",
+                "Command URL is not valid or points to an internal address",
+                None,
+                None,
+            ));
+        }
+
+        let client = reqwest::Client::builder()
+            // Do not follow redirects for SSRF safety. A redirect target could resolve
+            // to an internal endpoint after the initial request passed validation.
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| {
+                AppError::Internal(format!("Failed to build command HTTP client: {}", e))
+            })?;
 
         let payload_out = OutgoingWebhookPayload {
             token: cmd.token.clone(),
