@@ -8,7 +8,7 @@ use crate::error::{ApiResult, AppError};
 use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, RetryConfig};
 use crate::models::{IncomingWebhook, OutgoingWebhook, OutgoingWebhookPayload, WebhookPayload};
 use crate::services::posts;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::OnceLock;
 use std::time::Duration;
 use uuid::Uuid;
@@ -143,11 +143,22 @@ pub(crate) async fn validate_callback_url_at_request_time(url: &str) -> bool {
         tokio::net::lookup_host((host, port)),
     )
     .await;
-    let Ok(Ok(mut addrs)) = lookup else {
+    let Ok(Ok(addrs)) = lookup else {
         return false;
     };
 
-    addrs.all(|socket_addr| !is_private_or_reserved_ip(socket_addr.ip()))
+    callback_addresses_are_safe(&addrs.collect::<Vec<_>>())
+}
+
+/// Returns true only when every resolved address is safe and at least one address exists.
+/// An empty resolution list is rejected because `Iterator::all` vacuously returns true.
+fn callback_addresses_are_safe(addrs: &[SocketAddr]) -> bool {
+    if addrs.is_empty() {
+        return false;
+    }
+    addrs
+        .iter()
+        .all(|socket_addr| !is_private_or_reserved_ip(socket_addr.ip()))
 }
 
 /// Shared no-redirect reqwest client for outgoing webhook delivery.
@@ -316,4 +327,33 @@ pub async fn check_outgoing_triggers(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_resolution_is_rejected() {
+        let addrs: Vec<SocketAddr> = vec![];
+        assert!(!callback_addresses_are_safe(&addrs));
+    }
+
+    #[test]
+    fn only_public_addresses_are_accepted() {
+        let addrs = vec![
+            "1.1.1.1:443".parse::<SocketAddr>().unwrap(),
+            "9.9.9.9:443".parse::<SocketAddr>().unwrap(),
+        ];
+        assert!(callback_addresses_are_safe(&addrs));
+    }
+
+    #[test]
+    fn any_private_address_is_rejected() {
+        let addrs = vec![
+            "1.1.1.1:443".parse::<SocketAddr>().unwrap(),
+            "192.168.1.1:443".parse::<SocketAddr>().unwrap(),
+        ];
+        assert!(!callback_addresses_are_safe(&addrs));
+    }
 }
