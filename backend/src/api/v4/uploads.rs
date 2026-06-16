@@ -16,7 +16,7 @@ use std::io::Cursor;
 use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
-use crate::api::file_validation::{validate_file_upload, ALLOWED_EXTENSIONS};
+use crate::api::file_validation::validate_file_upload;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{
@@ -29,23 +29,6 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/uploads", post(create_upload))
         .route("/uploads/{upload_id}", get(get_upload).post(upload_data))
-}
-
-/// Validate that a resumable upload's filename has an allowed extension.
-pub(crate) fn validate_upload_extension(filename: &str) -> Result<(), AppError> {
-    let ext = filename
-        .rsplit_once('.')
-        .map(|(_, e)| e.to_ascii_lowercase())
-        .unwrap_or_default();
-
-    if !ALLOWED_EXTENSIONS.contains(&ext.as_str()) {
-        return Err(AppError::BadRequest(format!(
-            "File extension '.{}' is not allowed",
-            ext
-        )));
-    }
-
-    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,7 +48,7 @@ async fn create_upload(
         parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
 
     // Reject disallowed file extensions before creating the upload session.
-    validate_upload_extension(&input.filename)?;
+    crate::api::file_validation::validate_file_extension(&input.filename)?;
 
     // Verify user has access to channel
     let _ = ChannelRepository::new(&state.db)
@@ -173,12 +156,9 @@ async fn upload_data(
         let (mime_type, extension) = validate_file_upload(&session.filename, &file_data)?;
         let filename = session.filename.clone();
 
-        // Generate S3 key
-        let key = if extension.is_empty() {
-            format!("files/{}/{}", auth.user_id, file_id)
-        } else {
-            format!("files/{}/{}.{}", auth.user_id, file_id, extension)
-        };
+        // Generate S3 key. `extension` is non-empty because `validate_file_upload` rejects
+        // files without an allowed extension, so this branch is unreachable in practice.
+        let key = format!("files/{}/{}.{}", auth.user_id, file_id, extension);
 
         // Calculate hash
         let mut hasher = Sha256::new();

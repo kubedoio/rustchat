@@ -1,16 +1,17 @@
 //! Unit tests for resumable upload validation.
 
-use crate::api::file_validation::{validate_file_upload, ALLOWED_EXTENSIONS};
-use crate::api::v4::uploads::validate_upload_extension;
+use crate::api::file_validation::{
+    validate_file_extension, validate_file_upload, ALLOWED_EXTENSIONS,
+};
 
 #[test]
 fn create_upload_rejects_exe_extension() {
     assert!(
-        validate_upload_extension("malware.exe").is_err(),
+        validate_file_extension("malware.exe").is_err(),
         ".exe should be rejected"
     );
     assert!(
-        validate_upload_extension("malware.EXE").is_err(),
+        validate_file_extension("malware.EXE").is_err(),
         ".EXE should be rejected case-insensitively"
     );
 }
@@ -19,13 +20,13 @@ fn create_upload_rejects_exe_extension() {
 fn create_upload_rejects_other_disallowed_extensions() {
     for ext in ["bat", "com", "dll", "doc", "svg", "js", "php", ""] {
         assert!(
-            validate_upload_extension(&format!("file.{}", ext)).is_err(),
+            validate_file_extension(&format!("file.{}", ext)).is_err(),
             "expected .{} to be rejected",
             ext
         );
     }
     assert!(
-        validate_upload_extension("no_extension").is_err(),
+        validate_file_extension("no_extension").is_err(),
         "missing extension should be rejected"
     );
 }
@@ -34,7 +35,7 @@ fn create_upload_rejects_other_disallowed_extensions() {
 fn create_upload_accepts_allowed_extensions() {
     for ext in ALLOWED_EXTENSIONS {
         assert!(
-            validate_upload_extension(&format!("file.{}", ext)).is_ok(),
+            validate_file_extension(&format!("file.{}", ext)).is_ok(),
             "expected .{} to be accepted",
             ext
         );
