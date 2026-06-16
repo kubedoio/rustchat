@@ -9,6 +9,7 @@ use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, Re
 use crate::models::{IncomingWebhook, OutgoingWebhook, OutgoingWebhookPayload, WebhookPayload};
 use crate::services::posts;
 use std::net::IpAddr;
+use std::sync::OnceLock;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -149,6 +150,24 @@ pub(crate) async fn validate_callback_url_at_request_time(url: &str) -> bool {
     addrs.all(|socket_addr| !is_private_or_reserved_ip(socket_addr.ip()))
 }
 
+/// Shared no-redirect reqwest client for outgoing webhook delivery.
+///
+/// Building one client and cloning it per task avoids the overhead of
+/// reconstructing TLS state for every spawned webhook request.
+fn shared_webhook_client() -> reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                // Do not follow redirects for SSRF safety. A redirect target could resolve
+                // to an internal endpoint after the initial request passed validation.
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .expect("Failed to build shared no-redirect webhook client")
+        })
+        .clone()
+}
+
 /// Execute an incoming webhook - creates a post in the target channel
 pub async fn execute_incoming_webhook(
     state: &AppState,
@@ -262,23 +281,7 @@ pub async fn check_outgoing_triggers(
                     .unwrap_or_else(|| "application/json".to_string());
 
                 tokio::spawn(async move {
-                    let client = match reqwest::Client::builder()
-                        // Do not follow redirects for SSRF safety. A redirect target could resolve
-                        // to an internal endpoint after the initial request passed validation.
-                        // Future enhancement: implement manual async validation of each redirect.
-                        .redirect(reqwest::redirect::Policy::none())
-                        .build()
-                    {
-                        Ok(client) => client,
-                        Err(e) => {
-                            tracing::error!(
-                                "Failed to build no-redirect webhook client for {}: {}",
-                                url,
-                                e
-                            );
-                            return;
-                        }
-                    };
+                    let client = shared_webhook_client();
                     let request = client
                         .post(&url)
                         .header("Content-Type", &content_type)

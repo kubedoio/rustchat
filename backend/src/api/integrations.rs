@@ -230,6 +230,15 @@ async fn create_outgoing_webhook(
         ));
     }
 
+    for url in &input.callback_urls {
+        if !is_valid_callback_url(url) {
+            return Err(AppError::Validation(format!(
+                "Invalid callback URL: {}",
+                url
+            )));
+        }
+    }
+
     let token = generate_token();
 
     let webhook = IntegrationRepository::new(&state.db)
@@ -999,6 +1008,7 @@ async fn execute_custom_slash_command(
             // Do not follow redirects for SSRF safety. A redirect target could resolve
             // to an internal endpoint after the initial request passed validation.
             .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(10))
             .build()
             .map_err(|e| {
                 tracing::error!("Failed to build no-redirect command HTTP client: {}", e);
