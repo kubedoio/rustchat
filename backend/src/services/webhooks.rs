@@ -68,48 +68,10 @@ pub fn is_valid_callback_url(url: &str) -> bool {
         return false;
     }
 
-    // Check if host is an IP address
+    // Check if host is an IP address and reject unsafe ranges.
     if let Ok(ip) = host.parse::<IpAddr>() {
-        // Block private IP ranges
-        match ip {
-            IpAddr::V4(v4) => {
-                let octets = v4.octets();
-                // 10.0.0.0/8
-                if octets[0] == 10 {
-                    return false;
-                }
-                // 172.16.0.0/12
-                if octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31 {
-                    return false;
-                }
-                // 192.168.0.0/16
-                if octets[0] == 192 && octets[1] == 168 {
-                    return false;
-                }
-                // 127.0.0.0/8 (loopback)
-                if octets[0] == 127 {
-                    return false;
-                }
-                // 169.254.0.0/16 (link-local/APIPA - includes cloud metadata)
-                if octets[0] == 169 && octets[1] == 254 {
-                    return false;
-                }
-            }
-            IpAddr::V6(v6) => {
-                let segments = v6.segments();
-                // ::1 (loopback)
-                if segments == [0, 0, 0, 0, 0, 0, 0, 1] {
-                    return false;
-                }
-                // fe80::/10 (link-local)
-                if segments[0] & 0xffc0 == 0xfe80 {
-                    return false;
-                }
-                // fc00::/7 (unique local addresses)
-                if segments[0] & 0xfe00 == 0xfc00 {
-                    return false;
-                }
-            }
+        if is_private_or_reserved_ip(ip) {
+            return false;
         }
     }
 
@@ -132,7 +94,7 @@ pub fn is_valid_callback_url(url: &str) -> bool {
 ///
 /// This prevents DNS-rebinding SSRF attacks where a hostname resolves to a safe
 /// public IP during registration but to an internal IP when the webhook fires.
-pub async fn validate_callback_url_at_request_time(url: &str) -> bool {
+pub(crate) async fn validate_callback_url_at_request_time(url: &str) -> bool {
     // First apply the existing static filter.
     if !is_valid_callback_url(url) {
         return false;
@@ -152,9 +114,14 @@ pub async fn validate_callback_url_at_request_time(url: &str) -> bool {
         return !is_private_or_reserved_ip(ip);
     }
 
-    // Resolve the hostname and reject if any address is unsafe.
+    // Resolve the hostname and reject if any address is unsafe or if resolution times out.
     let port = parsed.port_or_known_default().unwrap_or(80);
-    let Ok(mut addrs) = tokio::net::lookup_host((host, port)).await else {
+    let lookup = tokio::time::timeout(
+        Duration::from_secs(5),
+        tokio::net::lookup_host((host, port)),
+    )
+    .await;
+    let Ok(Ok(mut addrs)) = lookup else {
         return false;
     };
 
@@ -275,18 +242,10 @@ pub async fn check_outgoing_triggers(
 
                 tokio::spawn(async move {
                     let client = reqwest::Client::builder()
-                        .redirect(reqwest::redirect::Policy::custom(|attempt| {
-                            // Static validation of redirect targets. Full async validation
-                            // (DNS resolution at request time) should be added in a follow-up.
-                            if is_valid_callback_url(attempt.url().as_str()) {
-                                attempt.follow()
-                            } else {
-                                attempt.error(std::io::Error::new(
-                                    std::io::ErrorKind::PermissionDenied,
-                                    "redirect target rejected by SSRF filter",
-                                ))
-                            }
-                        }))
+                        // Do not follow redirects for SSRF safety. A redirect target could resolve
+                        // to an internal endpoint after the initial request passed validation.
+                        // Future enhancement: implement manual async validation of each redirect.
+                        .redirect(reqwest::redirect::Policy::none())
                         .build()
                         .unwrap_or_else(|_| reqwest::Client::new());
                     let request = client
