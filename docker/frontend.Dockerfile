@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM openresty/openresty:alpine@sha256:0fa1fcd37f275fe91554b1934c0b23404d937bdee4d3aa55321023f8865dc77b
+FROM openresty/openresty:alpine@sha256:49db7235f2f94aa179c1242882619aea258c112b20f48ba45aefba010a1d0607
 
 # Create required directories
 RUN mkdir -p /var/log/nginx /var/run/openresty
