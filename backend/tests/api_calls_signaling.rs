@@ -1104,6 +1104,57 @@ async fn system_admin_can_toggle_channel_calls() {
     assert_eq!(body["enabled"], false);
 }
 
+#[tokio::test]
+async fn team_admin_can_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle Team Admin Org").await;
+    let (_token_a, user_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_team_admin_a",
+        "toggle_team_admin_a@example.com",
+    )
+    .await;
+    let (_token_b, user_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_team_admin_b",
+        "toggle_team_admin_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    sqlx::query(
+        "UPDATE team_members \
+         SET role = 'team_admin' \
+         WHERE team_id = (SELECT team_id FROM channels WHERE id = $1) \
+         AND user_id = $2",
+    )
+    .bind(channel_id)
+    .bind(user_a)
+    .execute(&app.db_pool)
+    .await
+    .expect("failed to promote user to team_admin");
+    let token_a =
+        login_and_get_token(&app, "toggle_team_admin_a@example.com", "Password123!").await;
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert_eq!(body["enabled"], false);
+}
+
 async fn insert_org(app: &common::TestApp, name: &str) -> Uuid {
     let org_id = Uuid::new_v4();
     sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)")
