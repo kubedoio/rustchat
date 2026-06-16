@@ -3,7 +3,7 @@
 use crate::constants::*;
 use crate::error::AppError;
 
-const ALLOWED_EXTENSIONS: &[&str] = &[
+pub const ALLOWED_EXTENSIONS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "md", "zip",
 ];
 

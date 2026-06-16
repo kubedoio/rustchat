@@ -16,6 +16,7 @@ use std::io::Cursor;
 use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
+use crate::api::file_validation::{validate_file_upload, ALLOWED_EXTENSIONS};
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{
@@ -30,62 +31,21 @@ pub fn router() -> Router<AppState> {
         .route("/uploads/{upload_id}", get(get_upload).post(upload_data))
 }
 
-fn filename_extension(filename: &str) -> Option<&str> {
-    filename
+/// Validate that a resumable upload's filename has an allowed extension.
+pub(crate) fn validate_upload_extension(filename: &str) -> Result<(), AppError> {
+    let ext = filename
         .rsplit_once('.')
-        .and_then(|(_, ext)| if ext.is_empty() { None } else { Some(ext) })
-}
+        .map(|(_, e)| e.to_ascii_lowercase())
+        .unwrap_or_default();
 
-fn image_mime_and_extension_from_bytes(data: &[u8]) -> Option<(&'static str, &'static str)> {
-    let format = image::guess_format(data).ok()?;
-    match format {
-        ImageFormat::Png => Some(("image/png", "png")),
-        ImageFormat::Jpeg => Some(("image/jpeg", "jpg")),
-        ImageFormat::Gif => Some(("image/gif", "gif")),
-        ImageFormat::WebP => Some(("image/webp", "webp")),
-        ImageFormat::Bmp => Some(("image/bmp", "bmp")),
-        ImageFormat::Tiff => Some(("image/tiff", "tiff")),
-        _ => None,
-    }
-}
-
-fn extension_from_mime(mime_type: &str) -> Option<&'static str> {
-    match mime_type {
-        "image/jpeg" => Some("jpg"),
-        "image/png" => Some("png"),
-        "image/gif" => Some("gif"),
-        "image/webp" => Some("webp"),
-        "image/bmp" => Some("bmp"),
-        "image/tiff" => Some("tiff"),
-        _ => None,
-    }
-}
-
-fn normalize_upload_session_file_metadata(filename: &str, data: &[u8]) -> (String, String, String) {
-    let mut normalized_filename = filename.to_string();
-    let mut mime_type = mime_guess::from_path(filename)
-        .first_or_octet_stream()
-        .to_string();
-
-    if let Some((detected_mime, detected_ext)) = image_mime_and_extension_from_bytes(data) {
-        if mime_type == "application/octet-stream" || !mime_type.starts_with("image/") {
-            mime_type = detected_mime.to_string();
-        }
-
-        if filename_extension(&normalized_filename).is_none() {
-            normalized_filename = format!("{}.{}", normalized_filename, detected_ext);
-        }
-    } else if filename_extension(&normalized_filename).is_none() {
-        if let Some(ext) = extension_from_mime(&mime_type) {
-            normalized_filename = format!("{}.{}", normalized_filename, ext);
-        }
+    if !ALLOWED_EXTENSIONS.contains(&ext.as_str()) {
+        return Err(AppError::BadRequest(format!(
+            "File extension '.{}' is not allowed",
+            ext
+        )));
     }
 
-    let extension = filename_extension(&normalized_filename)
-        .unwrap_or_default()
-        .to_string();
-
-    (normalized_filename, mime_type, extension)
+    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,6 +63,9 @@ async fn create_upload(
 ) -> ApiResult<(StatusCode, Json<mm::UploadSession>)> {
     let channel_id =
         parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
+
+    // Reject disallowed file extensions before creating the upload session.
+    validate_upload_extension(&input.filename)?;
 
     // Verify user has access to channel
     let _ = ChannelRepository::new(&state.db)
@@ -205,8 +168,10 @@ async fn upload_data(
         // Create file record and upload to S3
         let file_id = Uuid::new_v4();
         let now = Utc::now();
-        let (filename, mime_type, extension) =
-            normalize_upload_session_file_metadata(&session.filename, &file_data);
+
+        // Authoritative validation: extension allowlist, size limits, and content/MIME match.
+        let (mime_type, extension) = validate_file_upload(&session.filename, &file_data)?;
+        let filename = session.filename.clone();
 
         // Generate S3 key
         let key = if extension.is_empty() {
@@ -371,3 +336,6 @@ async fn upload_data(
         Ok(StatusCode::NO_CONTENT.into_response())
     }
 }
+
+#[cfg(test)]
+mod uploads_tests;
