@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::api::AppState;
-use crate::constants::{ROLE_ADMIN, ROLE_CHANNEL_ADMIN, ROLE_SYSTEM_ADMIN, ROLE_TEAM_ADMIN};
+
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 
@@ -171,59 +171,4 @@ pub(crate) async fn check_channel_permission(
     }
 
     Ok(())
-}
-
-/// Verify the user has channel-management privileges (channel admin, team admin,
-/// or system admin). This is required for actions such as enabling/disabling
-/// calls in a channel.
-pub(crate) async fn check_channel_management_permission(
-    state: &AppState,
-    user_id: Uuid,
-    channel_id: Uuid,
-) -> ApiResult<()> {
-    #[derive(sqlx::FromRow)]
-    struct ChannelManagementRoles {
-        channel_role: String,
-        team_role: Option<String>,
-        user_role: String,
-    }
-
-    let roles: Option<ChannelManagementRoles> = sqlx::query_as(
-        r#"
-        SELECT cm.role AS channel_role,
-               tm.role AS team_role,
-               u.role AS user_role
-        FROM channel_members cm
-        JOIN channels c ON c.id = cm.channel_id
-        JOIN users u ON u.id = cm.user_id
-        LEFT JOIN team_members tm ON tm.team_id = c.team_id AND tm.user_id = cm.user_id
-        WHERE cm.channel_id = $1 AND cm.user_id = $2
-        "#,
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .fetch_optional(&state.db)
-    .await
-    .map_err(|e| AppError::Internal(format!("Database error: {}", e)))?;
-
-    match roles {
-        Some(r) => {
-            let is_channel_admin =
-                r.channel_role == ROLE_CHANNEL_ADMIN || r.channel_role == ROLE_ADMIN;
-            let is_team_admin = r.team_role.as_deref() == Some(ROLE_TEAM_ADMIN)
-                || r.team_role.as_deref() == Some(ROLE_ADMIN);
-            let is_system_admin = r.user_role == ROLE_SYSTEM_ADMIN || r.user_role == ROLE_ADMIN;
-
-            if is_channel_admin || is_team_admin || is_system_admin {
-                Ok(())
-            } else {
-                Err(AppError::Forbidden(
-                    "Channel management privileges required".to_string(),
-                ))
-            }
-        }
-        None => Err(AppError::Forbidden(
-            "You are not a member of this channel".to_string(),
-        )),
-    }
 }
