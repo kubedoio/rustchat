@@ -81,31 +81,39 @@ pub fn is_valid_callback_url(url: &str) -> bool {
     }
 
     // Check host is present
-    let Some(host) = parsed.host_str() else {
+    let Some(host) = parsed.host() else {
         return false;
     };
 
-    // Block localhost and loopback
-    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+    // Block localhost and loopback hostnames
+    if host == url::Host::Domain("localhost".to_string()) {
         return false;
     }
 
     // Check if host is an IP address and reject unsafe ranges.
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        if is_private_or_reserved_ip(ip) {
-            return false;
+    match host {
+        url::Host::Ipv4(ip) => {
+            if is_private_or_reserved_ip(IpAddr::V4(ip)) {
+                return false;
+            }
         }
-    }
-
-    // Block cloud metadata endpoints by hostname
-    let host_lower = host.to_lowercase();
-    if host_lower == "169.254.169.254"
-        || host_lower.ends_with(".internal")
-        || host_lower == "metadata.google.internal"
-        || host_lower == "instance-data.ec2.internal"
-        || host_lower == "metadata.azure.internal"
-    {
-        return false;
+        url::Host::Ipv6(ip) => {
+            if is_private_or_reserved_ip(IpAddr::V6(ip)) {
+                return false;
+            }
+        }
+        url::Host::Domain(host) => {
+            // Block cloud metadata endpoints by hostname
+            let host_lower = host.to_lowercase();
+            if host_lower == "169.254.169.254"
+                || host_lower.ends_with(".internal")
+                || host_lower == "metadata.google.internal"
+                || host_lower == "instance-data.ec2.internal"
+                || host_lower == "metadata.azure.internal"
+            {
+                return false;
+            }
+        }
     }
 
     true
@@ -127,27 +135,29 @@ pub(crate) async fn validate_callback_url_at_request_time(url: &str) -> bool {
     };
 
     // Only http and https are allowed (already verified by is_valid_callback_url).
-    let Some(host) = parsed.host_str() else {
+    let Some(host) = parsed.host() else {
         return false;
     };
 
     // For literal IP addresses, apply the comprehensive check directly.
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        return !is_private_or_reserved_ip(ip);
+    match host {
+        url::Host::Ipv4(ip) => !is_private_or_reserved_ip(IpAddr::V4(ip)),
+        url::Host::Ipv6(ip) => !is_private_or_reserved_ip(IpAddr::V6(ip)),
+        url::Host::Domain(host) => {
+            // Resolve the hostname and reject if any address is unsafe or if resolution times out.
+            let port = parsed.port_or_known_default().unwrap_or(80);
+            let lookup = tokio::time::timeout(
+                Duration::from_secs(5),
+                tokio::net::lookup_host((host, port)),
+            )
+            .await;
+            let Ok(Ok(addrs)) = lookup else {
+                return false;
+            };
+
+            callback_addresses_are_safe(&addrs.collect::<Vec<_>>())
+        }
     }
-
-    // Resolve the hostname and reject if any address is unsafe or if resolution times out.
-    let port = parsed.port_or_known_default().unwrap_or(80);
-    let lookup = tokio::time::timeout(
-        Duration::from_secs(5),
-        tokio::net::lookup_host((host, port)),
-    )
-    .await;
-    let Ok(Ok(addrs)) = lookup else {
-        return false;
-    };
-
-    callback_addresses_are_safe(&addrs.collect::<Vec<_>>())
 }
 
 /// Returns true only when every resolved address is safe and at least one address exists.
