@@ -24,6 +24,13 @@ fn is_private_or_reserved_ip(ip: IpAddr) -> bool {
                 || v4.is_documentation()
         }
         IpAddr::V6(v6) => {
+            // Handle IPv4-mapped IPv6 addresses such as ::ffff:127.0.0.1 by
+            // delegating to the IPv4 checks. This prevents SSRF bypasses where
+            // an attacker uses IPv6 literal syntax to reach IPv4-internal hosts.
+            if let Some(mapped_v4) = v6.to_ipv4_mapped() {
+                return is_private_or_reserved_ip(IpAddr::V4(mapped_v4));
+            }
+
             let segments = v6.segments();
             // ::1 (loopback)
             if segments == [0, 0, 0, 0, 0, 0, 0, 1] {
@@ -241,13 +248,23 @@ pub async fn check_outgoing_triggers(
                     .unwrap_or_else(|| "application/json".to_string());
 
                 tokio::spawn(async move {
-                    let client = reqwest::Client::builder()
+                    let client = match reqwest::Client::builder()
                         // Do not follow redirects for SSRF safety. A redirect target could resolve
                         // to an internal endpoint after the initial request passed validation.
                         // Future enhancement: implement manual async validation of each redirect.
                         .redirect(reqwest::redirect::Policy::none())
                         .build()
-                        .unwrap_or_else(|_| reqwest::Client::new());
+                    {
+                        Ok(client) => client,
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to build no-redirect webhook client for {}: {}",
+                                url,
+                                e
+                            );
+                            return;
+                        }
+                    };
                     let request = client
                         .post(&url)
                         .header("Content-Type", &content_type)
