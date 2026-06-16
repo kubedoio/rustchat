@@ -258,7 +258,7 @@ async fn test_slash_command_creation_rejects_invalid_urls() {
     assert_eq!(200, team_res.status().as_u16());
     let team: Team = team_res.json().await.expect("Failed to parse team");
 
-    let invalid_urls = vec![
+    let invalid_urls = [
         ("localhost", "http://localhost:12345/hook"),
         ("loopback_v4", "http://127.0.0.1:12345/hook"),
         ("loopback_v6", "http://[::1]:12345/hook"),
@@ -289,10 +289,7 @@ async fn test_slash_command_creation_rejects_invalid_urls() {
             .json(&new_cmd)
             .send()
             .await
-            .expect(&format!(
-                "Failed to send create command request for {}",
-                label
-            ));
+            .unwrap_or_else(|_| panic!("Failed to send create command request for {}", label));
 
         assert_eq!(
             422,
