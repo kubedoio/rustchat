@@ -319,6 +319,12 @@ async fn create_slash_command(
         return Err(AppError::Validation("Invalid trigger format".to_string()));
     }
 
+    if !is_valid_callback_url(&input.url) {
+        return Err(AppError::Validation(
+            "Invalid command callback URL: must use http(s) and must not point to internal, loopback, or reserved addresses".to_string(),
+        ));
+    }
+
     let token = generate_token();
     let trigger = input.trigger.trim_start_matches('/');
 
@@ -980,15 +986,6 @@ async fn execute_custom_slash_command(
             .flatten()
             .unwrap_or_else(|| "unknown".to_string());
 
-        if !is_valid_callback_url(&cmd.url) {
-            return Ok(build_command_response(
-                "ephemeral",
-                "Command URL is not valid or points to an internal address",
-                None,
-                None,
-            ));
-        }
-
         if !validate_callback_url_at_request_time(&cmd.url).await {
             return Ok(build_command_response(
                 "ephemeral",
@@ -1004,6 +1001,7 @@ async fn execute_custom_slash_command(
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| {
+                tracing::error!("Failed to build no-redirect command HTTP client: {}", e);
                 AppError::Internal(format!("Failed to build command HTTP client: {}", e))
             })?;
 
