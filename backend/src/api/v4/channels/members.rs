@@ -98,8 +98,8 @@ pub async fn add_channel_member(
         .map_err(|e| AppError::Internal(e.to_string()))?
         .ok_or_else(|| AppError::ChannelNotFound)?;
 
-    // For private channels, only channel admins or system admins may add members.
-    // Public channels allow any member to add others.
+    // For private channels, only channel admins or users with CHANNEL_MANAGE (team/org/system
+    // admins) may add members. Public channels allow any member to add others.
     if channel.channel_type == crate::models::channel::ChannelType::Private {
         ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
     } else {
@@ -185,7 +185,7 @@ async fn remove_channel_member_by_id(
     channel_id: uuid::Uuid,
     user_id: uuid::Uuid,
 ) -> ApiResult<impl IntoResponse> {
-    // Users may remove themselves; to remove others, channel or system admin is required
+    // Users may remove themselves; to remove others, channel admin or CHANNEL_MANAGE is required
     if auth.user_id != user_id {
         ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
     }
@@ -306,7 +306,7 @@ pub async fn update_channel_member_roles(
         parse_mm_or_uuid(&path.user_id).ok_or_else(|| crate::error::AppError::InvalidUserId)?
     };
 
-    // Only channel admins or system admins may change member roles
+    // Only channel admins or users with CHANNEL_MANAGE (team/org/system admins) may change member roles
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
     let role = if input.roles.contains("channel_admin") {
@@ -383,7 +383,7 @@ pub async fn update_channel_member_scheme_roles(
         parse_mm_or_uuid(&user_id).ok_or_else(|| crate::error::AppError::InvalidUserId)?
     };
 
-    // Only channel admins or system admins may change member scheme roles
+    // Only channel admins or users with CHANNEL_MANAGE (team/org/system admins) may change member scheme roles
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
     // Update the target user's role based on scheme_admin

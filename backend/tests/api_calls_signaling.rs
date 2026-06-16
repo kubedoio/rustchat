@@ -332,7 +332,7 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
         .iter()
         .find(|entry| entry["channel_id"] == encode_mm_id(channel_id))
         .expect("channel state should exist");
-    assert_eq!(channel_state["enabled"], true);
+    assert!(channel_state["enabled"].as_bool().unwrap());
     assert!(channel_state["call"].is_object());
     assert!(channel_state["call"]["sessions"].is_object());
     let list_thread_id = channel_state["call"]["thread_id"]
@@ -353,7 +353,7 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
     assert_eq!(get_channel_state.status(), StatusCode::OK);
     let get_channel_state_body: serde_json::Value =
         get_channel_state.json().await.expect("channel state JSON");
-    assert_eq!(get_channel_state_body["enabled"], true);
+    assert!(get_channel_state_body["enabled"].as_bool().unwrap());
     assert!(get_channel_state_body["call"].is_object());
     let thread_id = get_channel_state_body["call"]["thread_id"]
         .as_str()
@@ -382,18 +382,18 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
         .expect("calls config request failed");
     assert_eq!(config.status(), StatusCode::OK);
     let config_body: serde_json::Value = config.json().await.expect("config JSON");
-    assert_eq!(config_body["EnableRinging"], true);
-    assert_eq!(config_body["HostControlsAllowed"], true);
+    assert!(config_body["EnableRinging"].as_bool().unwrap());
+    assert!(config_body["HostControlsAllowed"].as_bool().unwrap());
     assert_eq!(config_body["MaxCallParticipants"], 0);
-    assert_eq!(config_body["AllowScreenSharing"], true);
-    assert_eq!(config_body["EnableSimulcast"], false);
-    assert_eq!(config_body["EnableAV1"], false);
+    assert!(config_body["AllowScreenSharing"].as_bool().unwrap());
+    assert!(!config_body["EnableSimulcast"].as_bool().unwrap());
+    assert!(!config_body["EnableAV1"].as_bool().unwrap());
     assert_eq!(config_body["MaxRecordingDuration"], 60);
     assert_eq!(config_body["TranscribeAPI"], "whisper.cpp");
     assert_eq!(config_body["sku_short_name"], "starter");
-    assert_eq!(config_body["EnableDCSignaling"], false);
-    assert_eq!(config_body["EnableTranscriptions"], false);
-    assert_eq!(config_body["EnableLiveCaptions"], false);
+    assert!(!config_body["EnableDCSignaling"].as_bool().unwrap());
+    assert!(!config_body["EnableTranscriptions"].as_bool().unwrap());
+    assert!(!config_body["EnableLiveCaptions"].as_bool().unwrap());
 
     let recording_start = app
         .api_client
@@ -420,7 +420,7 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
         .expect("disable calls request failed");
     assert_eq!(disable_calls.status(), StatusCode::OK);
     let disable_body: serde_json::Value = disable_calls.json().await.expect("disable JSON");
-    assert_eq!(disable_body["enabled"], false);
+    assert!(!disable_body["enabled"].as_bool().unwrap());
 
     let end_forbidden = app
         .api_client
@@ -1042,7 +1042,7 @@ async fn channel_admin_can_toggle_channel_calls() {
         .expect("toggle calls request failed");
     assert_eq!(resp.status(), StatusCode::OK);
     let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
-    assert_eq!(body["enabled"], false);
+    assert!(!body["enabled"].as_bool().unwrap());
 
     // Regular members still cannot re-enable calls.
     let resp_b = app
@@ -1101,7 +1101,23 @@ async fn system_admin_can_toggle_channel_calls() {
         .expect("toggle calls request failed");
     assert_eq!(resp.status(), StatusCode::OK);
     let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
-    assert_eq!(body["enabled"], false);
+    assert!(!body["enabled"].as_bool().unwrap());
+
+    // Re-enable calls as system admin.
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": true }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(body["enabled"].as_bool().unwrap());
 }
 
 #[tokio::test]
@@ -1152,7 +1168,23 @@ async fn team_admin_can_toggle_channel_calls() {
         .expect("toggle calls request failed");
     assert_eq!(resp.status(), StatusCode::OK);
     let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
-    assert_eq!(body["enabled"], false);
+    assert!(!body["enabled"].as_bool().unwrap());
+
+    // Re-enable calls as team admin.
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": true }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(body["enabled"].as_bool().unwrap());
 }
 
 #[tokio::test]
@@ -1196,7 +1228,23 @@ async fn org_admin_can_toggle_channel_calls() {
         .expect("toggle calls request failed");
     assert_eq!(resp.status(), StatusCode::OK);
     let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
-    assert_eq!(body["enabled"], false);
+    assert!(!body["enabled"].as_bool().unwrap());
+
+    // Re-enable calls as org admin.
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": true }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(body["enabled"].as_bool().unwrap());
 }
 
 async fn insert_org(app: &common::TestApp, name: &str) -> Uuid {

@@ -251,7 +251,7 @@ pub async fn delete_channel(
     let channel_id =
         parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
-    // Only channel admins or system admins may delete a channel
+    // Only channel admins or users with CHANNEL_MANAGE (team/org/system admins) may delete a channel
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
     let repo = ChannelRepository::new(&state.db);
@@ -381,7 +381,7 @@ pub async fn update_channel_privacy(
     let channel_id =
         parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
-    // Only channel admins or system admins may change channel privacy
+    // Only channel admins or users with CHANNEL_MANAGE (team/org/system admins) may change channel privacy
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
     let channel_type = match input.privacy.as_str() {
@@ -409,7 +409,7 @@ pub async fn restore_channel(
     let channel_id =
         parse_mm_or_uuid(&channel_id).ok_or_else(|| crate::error::AppError::InvalidChannelId)?;
 
-    // Only channel admins or system admins may restore a deleted channel
+    // Only channel admins or users with CHANNEL_MANAGE (team/org/system admins) may restore a deleted channel
     ensure_channel_admin_or_system_manage(&state, channel_id, &auth).await?;
 
     let repo = ChannelRepository::new(&state.db);
