@@ -64,11 +64,12 @@ else
   fail "backend/src/config/mod.rs default_environment must return \"production\""
 fi
 
-# 5. Webhook/slash-command URLs are validated at request time.
-if grep -qE '(pub\(crate\) async fn|fn) validate_callback_url_at_request_time' backend/src/services/webhooks.rs; then
-  pass "backend/src/services/webhooks.rs validates callback URLs at request time"
+# 5. Webhook/slash-command URLs are validated and bound to resolved addresses at request time.
+if grep -qE 'pub\(crate\) async fn callback_http_client' backend/src/services/webhooks.rs && \
+   grep -qE 'resolve_to_addrs' backend/src/services/webhooks.rs; then
+  pass "backend/src/services/webhooks.rs builds a pinned callback HTTP client"
 else
-  fail "backend/src/services/webhooks.rs must contain validate_callback_url_at_request_time"
+  fail "backend/src/services/webhooks.rs must build a pinned callback HTTP client"
 fi
 
 # 6. Retention cleanup deletes S3 objects and has an orphan scanner.

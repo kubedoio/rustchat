@@ -119,43 +119,57 @@ pub fn is_valid_callback_url(url: &str) -> bool {
     true
 }
 
-/// Validates a callback URL at request time by resolving its hostname and checking
-/// that no returned IP address is private, link-local, multicast, or loopback.
+/// Build a reqwest client that is bound to the validated IP addresses for `url`.
 ///
-/// This prevents DNS-rebinding SSRF attacks where a hostname resolves to a safe
-/// public IP during registration but to an internal IP when the webhook fires.
-pub(crate) async fn validate_callback_url_at_request_time(url: &str) -> bool {
-    // First apply the existing static filter.
+/// For IP-literal URLs this returns the shared no-redirect client after validating
+/// the address. For domain URLs it resolves the hostname once, verifies that every
+/// returned address is public, and then configures the client with `resolve` so
+/// reqwest connects to the vetted addresses instead of performing a second DNS lookup.
+/// This closes the DNS-rebinding SSRF window.
+pub(crate) async fn callback_http_client(url: &str) -> Option<(reqwest::Client, reqwest::Url)> {
+    let parsed: reqwest::Url = url.parse().ok()?;
     if !is_valid_callback_url(url) {
-        return false;
+        return None;
     }
 
-    let Ok(parsed) = url.parse::<reqwest::Url>() else {
-        return false;
-    };
+    let parsed_return = parsed.clone();
+    let host = parsed.host()?;
+    let port = parsed.port_or_known_default().unwrap_or(80);
 
-    // Only http and https are allowed (already verified by is_valid_callback_url).
-    let Some(host) = parsed.host() else {
-        return false;
-    };
-
-    // For literal IP addresses, apply the comprehensive check directly.
     match host {
-        url::Host::Ipv4(ip) => !is_private_or_reserved_ip(IpAddr::V4(ip)),
-        url::Host::Ipv6(ip) => !is_private_or_reserved_ip(IpAddr::V6(ip)),
-        url::Host::Domain(host) => {
-            // Resolve the hostname and reject if any address is unsafe or if resolution times out.
-            let port = parsed.port_or_known_default().unwrap_or(80);
+        url::Host::Ipv4(ip) => {
+            if is_private_or_reserved_ip(IpAddr::V4(ip)) {
+                return None;
+            }
+            Some((shared_webhook_client(), parsed_return))
+        }
+        url::Host::Ipv6(ip) => {
+            if is_private_or_reserved_ip(IpAddr::V6(ip)) {
+                return None;
+            }
+            Some((shared_webhook_client(), parsed_return))
+        }
+        url::Host::Domain(hostname) => {
             let lookup = tokio::time::timeout(
                 Duration::from_secs(5),
-                tokio::net::lookup_host((host, port)),
+                tokio::net::lookup_host((hostname, port)),
             )
             .await;
             let Ok(Ok(addrs)) = lookup else {
-                return false;
+                return None;
             };
+            let addrs: Vec<SocketAddr> = addrs.collect();
+            if !callback_addresses_are_safe(&addrs) {
+                return None;
+            }
 
-            callback_addresses_are_safe(&addrs.collect::<Vec<_>>())
+            let client = reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .timeout(Duration::from_secs(30))
+                .resolve_to_addrs(hostname, &addrs)
+                .build()
+                .ok()?;
+            Some((client, parsed_return))
         }
     }
 }
@@ -305,14 +319,13 @@ pub async fn check_outgoing_triggers(
                     .unwrap_or_else(|| "application/json".to_string());
 
                 tokio::spawn(async move {
-                    if !validate_callback_url_at_request_time(&url).await {
-                        tracing::warn!("Skipping outgoing webhook to invalid URL: {}", url);
+                    let Some((client, parsed_url)) = callback_http_client(&url).await else {
+                        tracing::warn!("Skipping outgoing webhook to unsafe URL: {}", url);
                         return;
-                    }
+                    };
 
-                    let client = shared_webhook_client();
                     let request = client
-                        .post(&url)
+                        .post(parsed_url.as_str())
                         .header("Content-Type", &content_type)
                         .json(&payload)
                         .timeout(Duration::from_secs(30));
