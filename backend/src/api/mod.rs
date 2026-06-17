@@ -101,7 +101,13 @@ fn parse_cors_allowed_origins(raw: &str) -> Vec<HeaderValue> {
             if trimmed.is_empty() {
                 return None;
             }
-            HeaderValue::from_str(trimmed).ok()
+            match HeaderValue::from_str(trimmed) {
+                Ok(hv) => Some(hv),
+                Err(e) => {
+                    tracing::warn!(origin = %trimmed, error = %e, "Dropping invalid CORS allowed origin");
+                    None
+                }
+            }
         })
         .collect()
 }

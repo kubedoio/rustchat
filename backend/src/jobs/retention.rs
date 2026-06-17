@@ -17,6 +17,11 @@ use crate::config::RetentionJobConfig;
 use crate::error::AppError;
 use crate::storage::{ListObjectsResult, ListedObject, ObjectStorage};
 
+/// Minimum grace period for orphan-scan age filtering. Config values below this
+/// floor are clamped so that an in-flight upload cannot be deleted before its
+/// `files` row is committed.
+const ORPHAN_SCAN_MIN_AGE_FLOOR_SECONDS: u64 = 60;
+
 /// Retention job configuration (days-based, from server_config).
 #[derive(Debug, Clone)]
 pub struct RetentionConfig {
@@ -319,7 +324,17 @@ pub async fn run_orphan_scan_with_store<S: ObjectStorage, O: OrphanStore>(
         .try_into()
         .unwrap_or(1000);
     let page_delay = StdDuration::from_millis(config.orphan_scan_page_delay_ms.max(1));
-    let min_age_cutoff = Utc::now() - Duration::seconds(config.orphan_scan_min_age_seconds as i64);
+    let effective_min_age_seconds = config
+        .orphan_scan_min_age_seconds
+        .max(ORPHAN_SCAN_MIN_AGE_FLOOR_SECONDS);
+    if effective_min_age_seconds != config.orphan_scan_min_age_seconds {
+        warn!(
+            configured = config.orphan_scan_min_age_seconds,
+            floor = ORPHAN_SCAN_MIN_AGE_FLOOR_SECONDS,
+            "Orphan scan min_age_seconds below safe floor; clamping"
+        );
+    }
+    let min_age_cutoff = Utc::now() - Duration::seconds(effective_min_age_seconds as i64);
 
     for prefix in ["files/", "thumbnails/", "previews/"] {
         let mut continuation_token: Option<String> = None;
@@ -481,6 +496,7 @@ async fn run_retention_loop(
 ) {
     // Run every hour
     let mut interval = tokio::time::interval(StdDuration::from_secs(3600));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut last_orphan_scan: Option<tokio::time::Instant> = None;
     let orphan_scan_interval = StdDuration::from_secs(job_config.orphan_scan_interval_hours * 3600);
 
@@ -1048,5 +1064,31 @@ mod tests {
             storage.deleted.lock().await.as_slice(),
             &["files/orphan.txt"]
         );
+    }
+
+    #[tokio::test]
+    async fn orphan_scan_clamps_zero_min_age_to_safe_floor() {
+        let store = InMemoryOrphanStore::default();
+        let storage = MockStorage {
+            listed: Arc::new(Mutex::new(vec![vec!["files/orphan.txt".to_string()]])),
+            last_modified: Arc::new(
+                [("files/orphan.txt".to_string(), Utc::now())]
+                    .into_iter()
+                    .collect(),
+            ),
+            ..Default::default()
+        };
+
+        let mut config = test_orphan_config();
+        config.orphan_scan_min_age_seconds = 0;
+
+        let stats = run_orphan_scan_with_store(&store, &storage, &config)
+            .await
+            .unwrap();
+
+        assert_eq!(stats.objects_scanned, 1);
+        assert_eq!(stats.pages_scanned, 3);
+        assert_eq!(stats.orphans_deleted, 0, "recent object must not be deleted when min_age is clamped");
+        assert!(storage.deleted.lock().await.is_empty());
     }
 }

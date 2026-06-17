@@ -50,6 +50,14 @@ async fn create_upload(
     // Reject disallowed file extensions before creating the upload session.
     crate::api::file_validation::validate_file_extension(&input.filename)?;
 
+    // Reject nonsensical upload sizes early so the session cannot be finalized
+    // with an empty or negative declared size.
+    if input.file_size <= 0 {
+        return Err(AppError::BadRequest(
+            "file_size must be a positive integer".to_string(),
+        ));
+    }
+
     // Verify user has access to channel
     let _ = ChannelRepository::new(&state.db)
         .require_member(channel_id, auth.user_id)
@@ -135,13 +143,23 @@ async fn upload_data(
 
     let new_offset = session.file_offset + body.len() as i64;
 
+    // Reject chunks that would exceed the declared size. Mattermost clients send
+    // a final chunk that lands exactly on file_size; extra bytes indicate a bug
+    // or a malicious attempt to store more than was declared.
+    if new_offset > session.file_size {
+        return Err(AppError::BadRequest(format!(
+            "upload exceeds declared file_size: {} > {}",
+            new_offset, session.file_size
+        )));
+    }
+
     // Append data to session
     UploadRepository::new(&state.db)
         .append_data(upload_id, body.as_ref(), new_offset)
         .await?;
 
-    // Check if upload is complete
-    if new_offset >= session.file_size {
+    // Finalize only when the accumulated bytes match the declared size exactly.
+    if new_offset == session.file_size {
         // Retrieve full file data
         let file_data = UploadRepository::new(&state.db)
             .get_file_data(upload_id)

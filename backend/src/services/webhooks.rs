@@ -9,9 +9,15 @@ use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, Re
 use crate::models::{IncomingWebhook, OutgoingWebhook, OutgoingWebhookPayload, WebhookPayload};
 use crate::services::posts;
 use std::net::{IpAddr, SocketAddr};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+use tokio::sync::Semaphore;
 use uuid::Uuid;
+
+/// Maximum number of outgoing webhook deliveries that may be in flight at once
+/// for a single message. This bounds memory and connection usage when many
+/// callback URLs are configured.
+const MAX_CONCURRENT_OUTGOING_WEBHOOKS: usize = 10;
 
 /// Comprehensive check for private, reserved, or otherwise unsafe IP addresses.
 fn is_private_or_reserved_ip(ip: IpAddr) -> bool {
@@ -78,6 +84,14 @@ pub fn is_valid_callback_url(url: &str) -> bool {
     match parsed.scheme() {
         "http" | "https" => {}
         _ => return false,
+    }
+
+    // Reject explicit non-standard ports to prevent SSRF to internal services
+    // listening on arbitrary ports (e.g., metadata APIs, databases).
+    if let Some(port) = parsed.port() {
+        if port != 80 && port != 443 {
+            return false;
+        }
     }
 
     // Check host is present
@@ -289,6 +303,8 @@ pub async fn check_outgoing_triggers(
     .fetch_all(&state.db)
     .await?;
 
+    let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_OUTGOING_WEBHOOKS));
+
     for hook in hooks {
         let matched_word = hook.trigger_words.iter().find(|tw| {
             let tw_lower = tw.to_lowercase();
@@ -324,7 +340,14 @@ pub async fn check_outgoing_triggers(
                     .clone()
                     .unwrap_or_else(|| "application/json".to_string());
 
+                let permit = semaphore
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .map_err(|_| AppError::Internal("Outgoing webhook semaphore closed".to_string()))?;
+
                 tokio::spawn(async move {
+                    let _permit = permit;
                     let Some((client, parsed_url)) = callback_http_client(&url).await else {
                         tracing::warn!("Skipping outgoing webhook to unsafe URL: {}", url);
                         return;
@@ -392,5 +415,21 @@ mod tests {
             "192.168.1.1:443".parse::<SocketAddr>().unwrap(),
         ];
         assert!(!callback_addresses_are_safe(&addrs));
+    }
+
+    #[test]
+    fn callback_url_allows_default_ports() {
+        assert!(is_valid_callback_url("http://example.com/path"));
+        assert!(is_valid_callback_url("https://example.com/path"));
+        assert!(is_valid_callback_url("http://example.com:80/path"));
+        assert!(is_valid_callback_url("https://example.com:443/path"));
+    }
+
+    #[test]
+    fn callback_url_rejects_arbitrary_ports() {
+        assert!(!is_valid_callback_url("http://example.com:8080/path"));
+        assert!(!is_valid_callback_url("https://example.com:8443/path"));
+        assert!(!is_valid_callback_url("http://1.1.1.1:25/path"));
+        assert!(!is_valid_callback_url("http://1.1.1.1:22/path"));
     }
 }
