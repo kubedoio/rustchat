@@ -1,6 +1,6 @@
 # Repo Current State
 
-**Last updated:** 2026-05-22
+**Last updated:** 2026-06-16
 **Version:** v0.4.0
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.

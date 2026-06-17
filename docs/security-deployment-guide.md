@@ -104,7 +104,7 @@ RustChat validates secrets on startup:
 
 ## Environment-Based Security Constraints
 
-Set `RUSTCHAT_ENVIRONMENT=production` to enable strict validation:
+The default environment is `production`. Only override it to `development` on explicitly non-production hosts.
 
 ```bash
 RUSTCHAT_ENVIRONMENT=production
@@ -112,6 +112,7 @@ RUSTCHAT_ENVIRONMENT=production
 
 Effects in production mode:
 - HTTP origins in `RUSTCHAT_CORS_ALLOWED_ORIGINS` are rejected (HTTPS only).
+- `RUSTCHAT_ALLOW_DEV_CORS` is rejected; permissive CORS cannot be enabled in production.
 - Stricter request validation on authentication flows.
 - Error responses may omit internal details.
 
@@ -168,6 +169,15 @@ RUSTCHAT_CORS_ALLOWED_ORIGINS=https://chat.example.com,https://app.example.com
 - Never use `*` in production.
 - Do not include `http://` origins.
 - If you embed RustChat in an iframe or mobile app WebView, add those exact origins.
+
+### Permissive Development CORS
+
+`RUSTCHAT_ALLOW_DEV_CORS` enables permissive CORS (`Access-Control-Allow-Origin: *`) that bypasses `RUSTCHAT_CORS_ALLOWED_ORIGINS`. It must be explicitly set to `true` to enable this behavior, and it is rejected when `RUSTCHAT_ENVIRONMENT=production`.
+
+```bash
+# Only for local development
+RUSTCHAT_ALLOW_DEV_CORS=false
+```
 
 ---
 
@@ -235,12 +245,30 @@ Ensure your Redis server has `tls-port` and `tls-cert-file` configured.
 ## File Upload Security
 
 1. **Size Limits:** Set upload size limits at the reverse proxy level (nginx `client_max_body_size`) to prevent oversized uploads from reaching RustChat.
-2. **Type Validation:** RustChat validates file MIME types and extensions. Do not disable this.
-3. **Storage Isolation:** Uploaded files should reside in a dedicated S3 bucket, separate from other application data.
-4. **Malware Scanning:** Consider integrating a virus scanner (ClamAV, commercial API) at the S3 ingress or via Lambda-style triggers.
-5. **Content Security:** Serve uploaded files from a separate subdomain or with strict `Content-Disposition: attachment` headers to reduce XSS vectors.
+2. **Type Validation:** RustChat validates file MIME types and extensions for both multipart and resumable (TUS) uploads. Do not disable this.
+3. **Resumable Uploads:** Resumable uploads are validated against the same extension and content-type allowlist as multipart uploads.
+4. **Storage Isolation:** Uploaded files should reside in a dedicated S3 bucket, separate from other application data.
+5. **Malware Scanning:** Consider integrating a virus scanner (ClamAV, commercial API) at the S3 ingress or via Lambda-style triggers.
+6. **Content Security:** Serve uploaded files from a separate subdomain or with strict `Content-Disposition: attachment` headers to reduce XSS vectors.
 
 ---
+
+## Channel Call Permissions
+
+Toggling channel calls (enabling or disabling calls in a channel) requires channel-management permission. This prevents non-administrators from changing a channel's call configuration.
+
+## Outgoing Webhooks and Slash Commands
+
+Outgoing webhook and slash-command URLs are validated when created or updated and are re-validated at request time before any outbound request is issued.
+
+Validation behavior:
+
+- URLs must resolve to allowed IP families/ranges (loopback, link-local, and multicast addresses are blocked).
+- DNS resolution is performed at request time to prevent DNS-rebinding SSRF attacks.
+- HTTP redirects are disabled; a redirect response fails the request instead of following it.
+- Invalid or unsafe URLs are rejected with a clear error.
+
+Administrators should review configured webhook and slash-command URLs in the admin console and ensure they point only to trusted, production-owned endpoints.
 
 ## AI Agents and Knowledge Base Security
 
@@ -377,11 +405,25 @@ access_log /var/log/nginx/access.log security;
 
 ---
 
+## Frontend Container User
+
+The frontend container runs as the unprivileged `rustchat` user (UID/GID created in `docker/frontend.Dockerfile`). It does not run as `root`.
+
+Verify at runtime:
+
+```bash
+docker exec <frontend-container> id
+# Expected: uid=... rustchat gid=... rustchat
+```
+
+---
+
 ## Quick Production Checklist
 
 - [ ] `RUSTCHAT_ENVIRONMENT=production`
 - [ ] `RUSTCHAT_SITE_URL` uses `https://`
 - [ ] `RUSTCHAT_CORS_ALLOWED_ORIGINS` uses `https://` only
+- [ ] `RUSTCHAT_ALLOW_DEV_CORS` is `false` or unset in production
 - [ ] `RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=cookie`
 - [ ] `RUSTCHAT_SECURITY_RATE_LIMIT_ENABLED=true`
 - [ ] All secrets are unique, random, and >= 32 characters
@@ -389,6 +431,8 @@ access_log /var/log/nginx/access.log security;
 - [ ] PostgreSQL uses SSL/TLS and dedicated user
 - [ ] Redis uses AUTH and TLS (if networked)
 - [ ] S3-compatible storage uses unique credentials and TLS
+- [ ] Outgoing webhook and slash-command URLs point only to trusted endpoints
+- [ ] Frontend container runs as the `rustchat` non-root user
 - [ ] AI provider and tool keys are stored as production secrets if agents are enabled
 - [ ] Agent channel assignments and knowledge base assignments have been reviewed
 - [ ] PostgreSQL `pgvector` is enabled before RAG knowledge bases are used

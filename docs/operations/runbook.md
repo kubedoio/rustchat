@@ -374,6 +374,44 @@ redis-cli --bigkeys
 redis-cli EVAL "return redis.call('del', unpack(redis.call('keys', 'rustchat:oauth:code:*')))" 0
 ```
 
+### Retention and Orphan S3 Cleanup
+
+Retention cleanup removes expired posts and file records from the database and now also deletes the corresponding objects from S3-compatible storage.
+
+An optional orphan scanner can periodically scan S3 for objects that have no matching row in the `files` table and delete them. Enable it when you want S3 storage to remain consistent with the database.
+
+Configuration variables (set in `.env`):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RUSTCHAT_RETENTION_ORPHAN_SCAN_ENABLED` | `false` | Enable the orphan scanner |
+| `RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS` | `24` | Hours between scans |
+| `RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE` | `1000` | S3 keys listed per page |
+| `RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS` | `100` | Delay between pages (milliseconds) |
+
+Enable the scanner:
+
+```bash
+RUSTCHAT_RETENTION_ORPHAN_SCAN_ENABLED=true
+# Optional tuning:
+# RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS=24
+# RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE=1000
+# RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS=100
+```
+
+After changing these values, restart the backend. Monitor logs for lines from the retention/orphan-scan task.
+
+### Frontend Container User Verification
+
+The frontend container runs as the non-root `rustchat` user. Verify after deployment:
+
+```bash
+docker exec <frontend-container> id
+# Expected output includes: uid=... rustchat gid=... rustchat
+```
+
+If the container is running as `root`, check `docker/frontend.Dockerfile` for the `USER rustchat` directive and rebuild the image.
+
 ### Backup Procedures
 
 ```bash
