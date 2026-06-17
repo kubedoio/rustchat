@@ -659,4 +659,29 @@ mod tests {
         assert_eq!(stats.orphan_delete_errors, 1);
         assert_eq!(storage.deleted.lock().await.as_slice(), &["a"]);
     }
+
+    #[tokio::test]
+    async fn orphan_scan_deletes_orphans_across_multiple_pages() {
+        let store = InMemoryOrphanStore::with_existing(&["a", "c"]);
+        let storage = MockStorage::with_listing(vec![
+            vec!["a".to_string(), "b".to_string()],
+            vec!["c".to_string(), "d".to_string()],
+        ]);
+
+        let mut config = test_orphan_config();
+        config.orphan_scan_page_delay_ms = 0;
+
+        let stats = run_orphan_scan_with_store(&store, &storage, &config)
+            .await
+            .unwrap();
+
+        assert_eq!(stats.objects_scanned, 4);
+        assert_eq!(stats.pages_scanned, 2);
+        assert_eq!(stats.orphans_deleted, 2);
+        assert_eq!(stats.orphan_delete_errors, 0);
+
+        let mut deleted = storage.deleted.lock().await.clone();
+        deleted.sort();
+        assert_eq!(deleted, vec!["b", "d"]);
+    }
 }

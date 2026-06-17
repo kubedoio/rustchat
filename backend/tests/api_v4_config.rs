@@ -175,5 +175,6 @@ fn test_config() -> Config {
         compatibility: rustchat::config::CompatibilityConfig {
             mobile_sso_code_exchange: true,
         },
+        retention: Default::default(),
     }
 }

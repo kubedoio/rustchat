@@ -798,6 +798,10 @@ impl Config {
         Ok(())
     }
 
+    fn apply_retention_env_overrides(&mut self) -> anyhow::Result<()> {
+        apply_retention_env_overrides_to(&mut self.retention)
+    }
+
     /// Load configuration from environment variables
     pub fn load() -> anyhow::Result<Self> {
         let mut builder = config::Config::builder();
@@ -824,6 +828,7 @@ impl Config {
         settings.apply_keycloak_env_overrides()?;
         settings.apply_messaging_env_overrides()?;
         settings.apply_compatibility_env_overrides()?;
+        settings.apply_retention_env_overrides()?;
 
         // Validate security settings
         settings.validate_security()?;
@@ -958,6 +963,26 @@ impl Config {
     }
 }
 
+fn apply_retention_env_overrides_to(retention: &mut RetentionJobConfig) -> anyhow::Result<()> {
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_ENABLED") {
+        retention.orphan_scan_enabled =
+            parse_bool_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_ENABLED", &raw)?;
+    }
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS") {
+        retention.orphan_scan_interval_hours =
+            parse_u64_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS", &raw)?;
+    }
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE") {
+        retention.orphan_scan_page_size =
+            parse_u32_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE", &raw)?;
+    }
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS") {
+        retention.orphan_scan_page_delay_ms =
+            parse_u64_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS", &raw)?;
+    }
+    Ok(())
+}
+
 fn parse_bool_env(name: &str, raw: &str) -> anyhow::Result<bool> {
     match raw.trim().to_ascii_lowercase().as_str() {
         "1" | "true" | "yes" | "on" => Ok(true),
@@ -970,6 +995,12 @@ fn parse_u16_env(name: &str, raw: &str) -> anyhow::Result<u16> {
     raw.trim()
         .parse::<u16>()
         .map_err(|e| anyhow!("invalid u16 for {}: {} ({})", name, raw, e))
+}
+
+fn parse_u32_env(name: &str, raw: &str) -> anyhow::Result<u32> {
+    raw.trim()
+        .parse::<u32>()
+        .map_err(|e| anyhow!("invalid u32 for {}: {} ({})", name, raw, e))
 }
 
 fn parse_u64_env(name: &str, raw: &str) -> anyhow::Result<u64> {
