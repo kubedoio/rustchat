@@ -183,6 +183,9 @@ fn shared_webhook_client() -> reqwest::Client {
                 // Do not follow redirects for SSRF safety. A redirect target could resolve
                 // to an internal endpoint after the initial request passed validation.
                 .redirect(reqwest::redirect::Policy::none())
+                // Apply a safe default timeout for all requests; callers can still override
+                // per-request via `.timeout(...)` on individual RequestBuilders.
+                .timeout(Duration::from_secs(30))
                 .build()
                 .expect("Failed to build shared no-redirect webhook client")
         })

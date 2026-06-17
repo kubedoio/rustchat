@@ -218,7 +218,7 @@ pub async fn run_orphan_scan_with_store<S: ObjectStorage, O: OrphanStore>(
 
     loop {
         let page = storage
-            .list_objects(None, continuation_token.as_deref(), max_keys)
+            .list_objects(Some("files/"), continuation_token.as_deref(), max_keys)
             .await?;
 
         process_orphan_page(store, storage, &page, &mut stats).await?;
@@ -526,12 +526,16 @@ mod tests {
 
         async fn list_objects(
             &self,
-            _prefix: Option<&str>,
+            prefix: Option<&str>,
             _continuation_token: Option<&str>,
             _max_keys: i32,
         ) -> Result<ListObjectsResult, AppError> {
             let mut listed = self.listed.lock().await;
-            let keys = listed.remove(0);
+            let page = listed.remove(0);
+            let keys: Vec<String> = page
+                .into_iter()
+                .filter(|key| prefix.map_or(true, |p| key.starts_with(p)))
+                .collect();
             let next_token = if listed.is_empty() {
                 None
             } else {
@@ -623,11 +627,11 @@ mod tests {
 
     #[tokio::test]
     async fn orphan_scan_deletes_only_unreferenced_keys() {
-        let store = InMemoryOrphanStore::with_existing(&["a", "c"]);
+        let store = InMemoryOrphanStore::with_existing(&["files/a", "files/c"]);
         let storage = MockStorage::with_listing(vec![vec![
-            "a".to_string(),
-            "b".to_string(),
-            "c".to_string(),
+            "files/a".to_string(),
+            "files/b".to_string(),
+            "files/c".to_string(),
         ]]);
 
         let stats = run_orphan_scan_with_store(&store, &storage, &test_orphan_config())
@@ -638,15 +642,18 @@ mod tests {
         assert_eq!(stats.pages_scanned, 1);
         assert_eq!(stats.orphans_deleted, 1);
         assert_eq!(stats.orphan_delete_errors, 0);
-        assert_eq!(storage.deleted.lock().await.as_slice(), &["b"]);
+        assert_eq!(storage.deleted.lock().await.as_slice(), &["files/b"]);
     }
 
     #[tokio::test]
     async fn orphan_scan_continues_on_delete_failure() {
         let store = InMemoryOrphanStore::default();
         let storage = MockStorage {
-            listed: Arc::new(Mutex::new(vec![vec!["a".to_string(), "b".to_string()]])),
-            fail_keys: Arc::new(["b".to_string()].into_iter().collect()),
+            listed: Arc::new(Mutex::new(vec![vec![
+                "files/a".to_string(),
+                "files/b".to_string(),
+            ]])),
+            fail_keys: Arc::new(["files/b".to_string()].into_iter().collect()),
             ..Default::default()
         };
 
@@ -657,15 +664,15 @@ mod tests {
         assert_eq!(stats.objects_scanned, 2);
         assert_eq!(stats.orphans_deleted, 1);
         assert_eq!(stats.orphan_delete_errors, 1);
-        assert_eq!(storage.deleted.lock().await.as_slice(), &["a"]);
+        assert_eq!(storage.deleted.lock().await.as_slice(), &["files/a"]);
     }
 
     #[tokio::test]
     async fn orphan_scan_deletes_orphans_across_multiple_pages() {
-        let store = InMemoryOrphanStore::with_existing(&["a", "c"]);
+        let store = InMemoryOrphanStore::with_existing(&["files/a", "files/c"]);
         let storage = MockStorage::with_listing(vec![
-            vec!["a".to_string(), "b".to_string()],
-            vec!["c".to_string(), "d".to_string()],
+            vec!["files/a".to_string(), "files/b".to_string()],
+            vec!["files/c".to_string(), "files/d".to_string()],
         ]);
 
         let mut config = test_orphan_config();
@@ -682,6 +689,27 @@ mod tests {
 
         let mut deleted = storage.deleted.lock().await.clone();
         deleted.sort();
-        assert_eq!(deleted, vec!["b", "d"]);
+        assert_eq!(deleted, vec!["files/b", "files/d"]);
+    }
+
+    #[tokio::test]
+    async fn orphan_scan_respects_files_prefix() {
+        let store = InMemoryOrphanStore::default();
+        let storage = MockStorage::with_listing(vec![vec![
+            "files/orphan.txt".to_string(),
+            "other-bucket-object".to_string(),
+            "logs/debug.log".to_string(),
+        ]]);
+
+        let stats = run_orphan_scan_with_store(&store, &storage, &test_orphan_config())
+            .await
+            .unwrap();
+
+        assert_eq!(stats.objects_scanned, 1);
+        assert_eq!(stats.orphans_deleted, 1);
+        assert_eq!(
+            storage.deleted.lock().await.as_slice(),
+            &["files/orphan.txt"]
+        );
     }
 }

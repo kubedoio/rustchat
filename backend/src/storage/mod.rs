@@ -25,7 +25,8 @@ pub trait ObjectStorage: Send + Sync {
     /// Delete the object at `key`. Missing objects are treated as success.
     async fn delete_object(&self, key: &str) -> Result<(), AppError>;
 
-    /// List objects in the storage backend.
+    /// List objects in the storage backend, optionally restricted to keys that
+    /// begin with `prefix`.
     async fn list_objects(
         &self,
         prefix: Option<&str>,
