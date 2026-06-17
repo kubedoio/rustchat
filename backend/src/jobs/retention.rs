@@ -6,7 +6,8 @@
 use std::collections::HashSet;
 use std::time::Duration as StdDuration;
 
-use chrono::{Duration, Utc};
+use async_trait::async_trait;
+use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
@@ -40,6 +41,81 @@ pub struct OrphanScanStats {
     pub orphan_delete_errors: u64,
 }
 
+/// Backend storage operations required by [`run_retention_cleanup`].
+#[async_trait]
+pub trait RetentionStore: Send + Sync {
+    /// Delete messages older than `cutoff`. Returns number of rows deleted.
+    async fn delete_old_messages(&self, cutoff: DateTime<Utc>) -> Result<u64, sqlx::Error>;
+
+    /// Fetch keys of file rows older than `cutoff`.
+    async fn fetch_expired_file_keys(
+        &self,
+        cutoff: DateTime<Utc>,
+    ) -> Result<Vec<String>, sqlx::Error>;
+
+    /// Delete file rows whose keys are in `keys`. Returns number of rows deleted.
+    async fn delete_files_by_keys(&self, keys: &[&str]) -> Result<u64, sqlx::Error>;
+}
+
+/// PostgreSQL implementation of [`RetentionStore`].
+pub struct PgRetentionStore<'a>(pub &'a PgPool);
+
+#[async_trait]
+impl RetentionStore for PgRetentionStore<'_> {
+    async fn delete_old_messages(&self, cutoff: DateTime<Utc>) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM posts WHERE created_at < $1 AND NOT is_pinned")
+            .bind(cutoff)
+            .execute(self.0)
+            .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    async fn fetch_expired_file_keys(
+        &self,
+        cutoff: DateTime<Utc>,
+    ) -> Result<Vec<String>, sqlx::Error> {
+        let files: Vec<(String,)> = sqlx::query_as("SELECT key FROM files WHERE created_at < $1")
+            .bind(cutoff)
+            .fetch_all(self.0)
+            .await?;
+
+        Ok(files.into_iter().map(|f| f.0).collect())
+    }
+
+    async fn delete_files_by_keys(&self, keys: &[&str]) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM files WHERE key = ANY($1::text[])")
+            .bind(keys)
+            .execute(self.0)
+            .await?;
+
+        Ok(result.rows_affected())
+    }
+}
+
+/// Backend storage operations required by [`run_orphan_scan`].
+#[async_trait]
+pub trait OrphanStore: Send + Sync {
+    /// Return the subset of `keys` that exist in the `files` table.
+    async fn filter_existing_keys(&self, keys: &[String]) -> Result<HashSet<String>, sqlx::Error>;
+}
+
+/// PostgreSQL implementation of [`OrphanStore`].
+pub struct PgOrphanStore<'a>(pub &'a PgPool);
+
+#[async_trait]
+impl OrphanStore for PgOrphanStore<'_> {
+    async fn filter_existing_keys(&self, keys: &[String]) -> Result<HashSet<String>, sqlx::Error> {
+        let existing_keys: Vec<(String,)> =
+            sqlx::query_as("SELECT key FROM files WHERE key = ANY($1::text[])")
+                .bind(keys)
+                .fetch_all(self.0)
+                .await?;
+
+        Ok(existing_keys.into_iter().map(|r| r.0).collect())
+    }
+}
+
 /// Run the retention cleanup job.
 ///
 /// File rows are deleted only after their corresponding S3 object has been
@@ -51,18 +127,23 @@ pub async fn run_retention_cleanup<S: ObjectStorage>(
     storage: &S,
     config: RetentionConfig,
 ) -> Result<RetentionStats, sqlx::Error> {
+    run_retention_cleanup_with_store(&PgRetentionStore(db), storage, config).await
+}
+
+/// Testable version of [`run_retention_cleanup`] that accepts any
+/// [`RetentionStore`] implementation.
+pub async fn run_retention_cleanup_with_store<S: ObjectStorage, R: RetentionStore>(
+    store: &R,
+    storage: &S,
+    config: RetentionConfig,
+) -> Result<RetentionStats, sqlx::Error> {
     let mut stats = RetentionStats::default();
 
     // Clean up old messages
     if config.message_retention_days > 0 {
         let cutoff = Utc::now() - Duration::days(config.message_retention_days);
 
-        let result = sqlx::query("DELETE FROM posts WHERE created_at < $1 AND NOT is_pinned")
-            .bind(cutoff)
-            .execute(db)
-            .await?;
-
-        stats.messages_deleted = result.rows_affected();
+        stats.messages_deleted = store.delete_old_messages(cutoff).await?;
         info!(
             "Retention: Deleted {} messages older than {} days",
             stats.messages_deleted, config.message_retention_days
@@ -73,12 +154,7 @@ pub async fn run_retention_cleanup<S: ObjectStorage>(
     if config.file_retention_days > 0 {
         let cutoff = Utc::now() - Duration::days(config.file_retention_days);
 
-        let files: Vec<(String,)> = sqlx::query_as("SELECT key FROM files WHERE created_at < $1")
-            .bind(cutoff)
-            .fetch_all(db)
-            .await?;
-
-        let keys: Vec<String> = files.into_iter().map(|f| f.0).collect();
+        let keys = store.fetch_expired_file_keys(cutoff).await?;
         let mut deleted_keys = Vec::with_capacity(keys.len());
 
         for key in &keys {
@@ -98,12 +174,7 @@ pub async fn run_retention_cleanup<S: ObjectStorage>(
         }
 
         if !deleted_keys.is_empty() {
-            let result = sqlx::query("DELETE FROM files WHERE key = ANY($1::text[])")
-                .bind(&deleted_keys)
-                .execute(db)
-                .await?;
-
-            stats.files_deleted = result.rows_affected();
+            stats.files_deleted = store.delete_files_by_keys(&deleted_keys).await?;
         }
 
         stats.file_keys = keys;
@@ -126,6 +197,16 @@ pub async fn run_orphan_scan<S: ObjectStorage>(
     storage: &S,
     config: &RetentionJobConfig,
 ) -> Result<OrphanScanStats, AppError> {
+    run_orphan_scan_with_store(&PgOrphanStore(db), storage, config).await
+}
+
+/// Testable version of [`run_orphan_scan`] that accepts any [`OrphanStore`]
+/// implementation.
+pub async fn run_orphan_scan_with_store<S: ObjectStorage, O: OrphanStore>(
+    store: &O,
+    storage: &S,
+    config: &RetentionJobConfig,
+) -> Result<OrphanScanStats, AppError> {
     let mut stats = OrphanScanStats::default();
     let mut continuation_token: Option<String> = None;
     let max_keys = config
@@ -140,7 +221,7 @@ pub async fn run_orphan_scan<S: ObjectStorage>(
             .list_objects(None, continuation_token.as_deref(), max_keys)
             .await?;
 
-        process_orphan_page(db, storage, &page, &mut stats).await?;
+        process_orphan_page(store, storage, &page, &mut stats).await?;
 
         continuation_token = page.next_continuation_token.clone();
         stats.pages_scanned += 1;
@@ -161,8 +242,8 @@ pub async fn run_orphan_scan<S: ObjectStorage>(
     Ok(stats)
 }
 
-async fn process_orphan_page<S: ObjectStorage>(
-    db: &PgPool,
+async fn process_orphan_page<S: ObjectStorage, O: OrphanStore>(
+    store: &O,
     storage: &S,
     page: &ListObjectsResult,
     stats: &mut OrphanScanStats,
@@ -171,13 +252,7 @@ async fn process_orphan_page<S: ObjectStorage>(
         return Ok(());
     }
 
-    let existing_keys: Vec<(String,)> =
-        sqlx::query_as("SELECT key FROM files WHERE key = ANY($1::text[])")
-            .bind(&page.keys)
-            .fetch_all(db)
-            .await?;
-
-    let existing: HashSet<String> = existing_keys.into_iter().map(|r| r.0).collect();
+    let existing = store.filter_existing_keys(&page.keys).await?;
     let orphans: Vec<&String> = page
         .keys
         .iter()
@@ -349,11 +424,65 @@ mod tests {
     use super::*;
     use tokio::sync::Mutex;
 
+    #[derive(Default, Clone)]
+    struct InMemoryRetentionStore {
+        file_keys: Arc<Mutex<Vec<String>>>,
+        deleted_files: Arc<Mutex<Vec<String>>>,
+    }
+
+    #[async_trait]
+    impl RetentionStore for InMemoryRetentionStore {
+        async fn delete_old_messages(&self, _cutoff: DateTime<Utc>) -> Result<u64, sqlx::Error> {
+            Ok(0)
+        }
+
+        async fn fetch_expired_file_keys(
+            &self,
+            _cutoff: DateTime<Utc>,
+        ) -> Result<Vec<String>, sqlx::Error> {
+            Ok(self.file_keys.lock().await.clone())
+        }
+
+        async fn delete_files_by_keys(&self, keys: &[&str]) -> Result<u64, sqlx::Error> {
+            let mut deleted = self.deleted_files.lock().await;
+            deleted.extend(keys.iter().map(|&k| k.to_string()));
+            Ok(keys.len() as u64)
+        }
+    }
+
+    #[derive(Default, Clone)]
+    struct InMemoryOrphanStore {
+        existing: Arc<HashSet<String>>,
+    }
+
+    impl InMemoryOrphanStore {
+        fn with_existing(keys: &[&str]) -> Self {
+            Self {
+                existing: Arc::new(keys.iter().map(|s| s.to_string()).collect()),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl OrphanStore for InMemoryOrphanStore {
+        async fn filter_existing_keys(
+            &self,
+            keys: &[String],
+        ) -> Result<HashSet<String>, sqlx::Error> {
+            Ok(keys
+                .iter()
+                .filter(|k| self.existing.contains(*k))
+                .cloned()
+                .collect())
+        }
+    }
+
     #[derive(Clone, Default)]
     struct MockStorage {
         deleted: Arc<Mutex<Vec<String>>>,
         listed: Arc<Mutex<Vec<Vec<String>>>>,
         fail_keys: Arc<HashSet<String>>,
+        not_found_keys: Arc<HashSet<String>>,
     }
 
     impl MockStorage {
@@ -370,9 +499,16 @@ mod tests {
                 ..Default::default()
             }
         }
+
+        fn with_not_found_keys(not_found_keys: &[&str]) -> Self {
+            Self {
+                not_found_keys: Arc::new(not_found_keys.iter().map(|s| s.to_string()).collect()),
+                ..Default::default()
+            }
+        }
     }
 
-    #[async_trait::async_trait]
+    #[async_trait]
     impl ObjectStorage for MockStorage {
         async fn delete_object(&self, key: &str) -> Result<(), AppError> {
             if self.fail_keys.contains(key) {
@@ -380,6 +516,9 @@ mod tests {
                     "mock delete failed for {}",
                     key
                 )));
+            }
+            if self.not_found_keys.contains(key) {
+                return Ok(());
             }
             self.deleted.lock().await.push(key.to_string());
             Ok(())
@@ -405,6 +544,22 @@ mod tests {
         }
     }
 
+    fn test_retention_config() -> RetentionConfig {
+        RetentionConfig {
+            message_retention_days: 0,
+            file_retention_days: 30,
+        }
+    }
+
+    fn test_orphan_config() -> RetentionJobConfig {
+        RetentionJobConfig {
+            orphan_scan_enabled: true,
+            orphan_scan_interval_hours: 24,
+            orphan_scan_page_size: 10,
+            orphan_scan_page_delay_ms: 1,
+        }
+    }
+
     #[test]
     fn spawn_retention_job_accepts_expected_arguments() {
         // Compile-time check that the public spawn API matches the expected signature.
@@ -412,40 +567,96 @@ mod tests {
             spawn_retention_job;
     }
 
-    #[test]
-    fn find_orphan_keys_filters_existing() {
-        let keys = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let existing: HashSet<String> = ["a".to_string(), "c".to_string()].into_iter().collect();
+    #[tokio::test]
+    async fn retention_cleanup_deletes_db_rows_when_s3_succeeds() {
+        let store = InMemoryRetentionStore {
+            file_keys: Arc::new(Mutex::new(vec!["a".to_string(), "b".to_string()])),
+            ..Default::default()
+        };
+        let storage = MockStorage::default();
 
-        let orphans: Vec<String> = keys
-            .into_iter()
-            .filter(|key| !existing.contains(key))
-            .collect();
+        let stats = run_retention_cleanup_with_store(&store, &storage, test_retention_config())
+            .await
+            .unwrap();
 
-        assert_eq!(orphans, vec!["b"]);
+        assert_eq!(stats.files_deleted, 2);
+        assert_eq!(stats.file_delete_errors, 0);
+        assert_eq!(store.deleted_files.lock().await.as_slice(), &["a", "b"]);
+        assert_eq!(storage.deleted.lock().await.as_slice(), &["a", "b"]);
     }
 
     #[tokio::test]
-    async fn mock_storage_records_deletions_and_failures() {
-        let storage = MockStorage::with_failed_keys(&["bad"]);
+    async fn retention_cleanup_preserves_db_rows_when_s3_fails() {
+        let store = InMemoryRetentionStore {
+            file_keys: Arc::new(Mutex::new(vec!["a".to_string(), "b".to_string()])),
+            ..Default::default()
+        };
+        let storage = MockStorage::with_failed_keys(&["b"]);
 
-        assert!(storage.delete_object("good").await.is_ok());
-        assert!(storage.delete_object("bad").await.is_err());
+        let stats = run_retention_cleanup_with_store(&store, &storage, test_retention_config())
+            .await
+            .unwrap();
 
-        let deleted = storage.deleted.lock().await;
-        assert_eq!(deleted.as_slice(), &["good"]);
+        assert_eq!(stats.files_deleted, 1);
+        assert_eq!(stats.file_delete_errors, 1);
+        assert_eq!(store.deleted_files.lock().await.as_slice(), &["a"]);
+        assert_eq!(storage.deleted.lock().await.as_slice(), &["a"]);
     }
 
     #[tokio::test]
-    async fn mock_storage_paginates_listings() {
-        let storage = MockStorage::with_listing(vec![vec!["a".to_string()], vec!["b".to_string()]]);
+    async fn retention_cleanup_deletes_db_rows_when_s3_not_found() {
+        let store = InMemoryRetentionStore {
+            file_keys: Arc::new(Mutex::new(vec!["a".to_string(), "b".to_string()])),
+            ..Default::default()
+        };
+        let storage = MockStorage::with_not_found_keys(&["b"]);
 
-        let first = storage.list_objects(None, None, 10).await.unwrap();
-        assert_eq!(first.keys, vec!["a"]);
-        assert!(first.next_continuation_token.is_some());
+        let stats = run_retention_cleanup_with_store(&store, &storage, test_retention_config())
+            .await
+            .unwrap();
 
-        let second = storage.list_objects(None, None, 10).await.unwrap();
-        assert_eq!(second.keys, vec!["b"]);
-        assert!(second.next_continuation_token.is_none());
+        assert_eq!(stats.files_deleted, 2);
+        assert_eq!(stats.file_delete_errors, 0);
+        assert_eq!(store.deleted_files.lock().await.as_slice(), &["a", "b"]);
+        assert_eq!(storage.deleted.lock().await.as_slice(), &["a"]);
+    }
+
+    #[tokio::test]
+    async fn orphan_scan_deletes_only_unreferenced_keys() {
+        let store = InMemoryOrphanStore::with_existing(&["a", "c"]);
+        let storage = MockStorage::with_listing(vec![vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ]]);
+
+        let stats = run_orphan_scan_with_store(&store, &storage, &test_orphan_config())
+            .await
+            .unwrap();
+
+        assert_eq!(stats.objects_scanned, 3);
+        assert_eq!(stats.pages_scanned, 1);
+        assert_eq!(stats.orphans_deleted, 1);
+        assert_eq!(stats.orphan_delete_errors, 0);
+        assert_eq!(storage.deleted.lock().await.as_slice(), &["b"]);
+    }
+
+    #[tokio::test]
+    async fn orphan_scan_continues_on_delete_failure() {
+        let store = InMemoryOrphanStore::default();
+        let storage = MockStorage {
+            listed: Arc::new(Mutex::new(vec![vec!["a".to_string(), "b".to_string()]])),
+            fail_keys: Arc::new(["b".to_string()].into_iter().collect()),
+            ..Default::default()
+        };
+
+        let stats = run_orphan_scan_with_store(&store, &storage, &test_orphan_config())
+            .await
+            .unwrap();
+
+        assert_eq!(stats.objects_scanned, 2);
+        assert_eq!(stats.orphans_deleted, 1);
+        assert_eq!(stats.orphan_delete_errors, 1);
+        assert_eq!(storage.deleted.lock().await.as_slice(), &["a"]);
     }
 }

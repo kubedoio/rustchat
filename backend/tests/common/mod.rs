@@ -2,7 +2,7 @@
 use once_cell::sync::Lazy;
 use rustchat::{
     api,
-    config::Config,
+    config::{Config, RetentionJobConfig},
     models::{
         AgentChannelSettings, AgentConfig, Channel, ChannelType, KnowledgeBase, KnowledgeDocument,
         Organization, Team, User,
@@ -229,6 +229,7 @@ pub fn test_config() -> Config {
         compatibility: rustchat::config::CompatibilityConfig {
             mobile_sso_code_exchange: true,
         },
+        retention: RetentionJobConfig::default(),
     }
 }
 
