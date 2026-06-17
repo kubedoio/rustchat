@@ -153,7 +153,14 @@ async fn upload_data(
         let now = Utc::now();
 
         // Authoritative validation: extension allowlist, size limits, and content/MIME match.
-        let (mime_type, extension) = validate_file_upload(&session.filename, &file_data)?;
+        let (mime_type, extension) = match validate_file_upload(&session.filename, &file_data) {
+            Ok(result) => result,
+            Err(e) => {
+                // Rejected uploads must not keep appended bytes in the database until expiry.
+                UploadRepository::new(&state.db).delete_session(upload_id).await?;
+                return Err(e);
+            }
+        };
         let filename = session.filename.clone();
 
         // Generate S3 key. `extension` is non-empty because `validate_file_upload` rejects

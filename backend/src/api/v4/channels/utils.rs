@@ -47,6 +47,8 @@ pub fn map_channel_with_team_data_row(row: ChannelWithTeamDataRow) -> ChannelWit
 ///   * system administrators (via the `SYSTEM_MANAGE` permission), and
 ///   * channel admins, team admins, or org admins of the channel's organization,
 ///     determined by querying `channels`, `channel_members`, `team_members`, and `users`.
+///   * users whose `users.role` is `admin` are treated as org admins, matching the
+///     policy-layer alias for `ROLE_ADMIN`.
 ///
 /// The query starts from `channels` and left-joins membership rows so that team and
 /// org admins who are not channel members are still recognized.
@@ -74,7 +76,7 @@ pub async fn ensure_channel_admin_or_system_manage(
         r#"
         SELECT cm.role AS channel_role,
                tm.role AS team_role,
-               (u.role ~ '(^|[[:space:],])org_admin([[:space:],]|$)' AND u.org_id = t.org_id) AS is_org_admin
+               (u.role ~ '(^|[[:space:],])(org_admin|admin)([[:space:],]|$)' AND u.org_id = t.org_id) AS is_org_admin
         FROM channels c
         JOIN teams t ON t.id = c.team_id
         JOIN users u ON u.id = $2
