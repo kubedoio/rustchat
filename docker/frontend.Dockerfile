@@ -19,8 +19,8 @@ RUN addgroup -S rustchat && adduser -S rustchat -G rustchat
 
 # Create required directories and ensure the non-root user owns the paths
 # nginx needs to write to (logs, pid file, temp directories).
-RUN mkdir -p /var/log/nginx /var/run/openresty /tmp/nginx /usr/local/openresty/nginx/logs /usr/share/nginx/html && \
-    chown -R rustchat:rustchat /var/log/nginx /var/run/openresty /tmp/nginx /usr/local/openresty/nginx/logs /usr/share/nginx/html
+RUN mkdir -p /var/log/nginx /tmp/nginx /usr/share/nginx/html && \
+    chown -R rustchat:rustchat /var/log/nginx /tmp/nginx /usr/share/nginx/html
 
 # Copy built assets with non-root ownership.
 COPY --from=builder --chown=rustchat:rustchat /app/dist /usr/share/nginx/html

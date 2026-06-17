@@ -28,7 +28,7 @@ Versioning follows semver. Releases are cut by pushing a `v*` tag — the `relea
 | Backend API | `backend/` | 3000 | ✅ Active |
 | Frontend SPA | `frontend/` | 5173 (dev) / 8080 (via Nginx) | ✅ Active |
 | Push Proxy | `push-proxy/` | 8065 | ✅ Active |
-| Nginx proxy | `docker/nginx.conf` | 8080 | ✅ Active (Docker) |
+| Nginx proxy | `frontend/nginx.conf` | 8080 | ✅ Active (Docker) |
 
 **External services required:**
 - PostgreSQL 16+ (port 5432)
