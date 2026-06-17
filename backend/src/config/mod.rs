@@ -129,6 +129,41 @@ pub struct Config {
     /// Compatibility-oriented feature flags.
     #[serde(default)]
     pub compatibility: CompatibilityConfig,
+
+    /// Retention job configuration.
+    #[serde(default)]
+    pub retention: RetentionJobConfig,
+}
+
+/// Retention job configuration
+#[derive(Debug, Clone, Deserialize)]
+pub struct RetentionJobConfig {
+    /// Enable periodic orphan S3 object scanning.
+    #[serde(default = "default_orphan_scan_enabled")]
+    pub orphan_scan_enabled: bool,
+
+    /// How often to run the orphan scan, in hours.
+    #[serde(default = "default_orphan_scan_interval_hours")]
+    pub orphan_scan_interval_hours: u64,
+
+    /// Maximum number of S3 keys to fetch per list request.
+    #[serde(default = "default_orphan_scan_page_size")]
+    pub orphan_scan_page_size: u32,
+
+    /// Delay between orphan scan list pages, in milliseconds.
+    #[serde(default = "default_orphan_scan_page_delay_ms")]
+    pub orphan_scan_page_delay_ms: u64,
+}
+
+impl Default for RetentionJobConfig {
+    fn default() -> Self {
+        Self {
+            orphan_scan_enabled: default_orphan_scan_enabled(),
+            orphan_scan_interval_hours: default_orphan_scan_interval_hours(),
+            orphan_scan_page_size: default_orphan_scan_page_size(),
+            orphan_scan_page_delay_ms: default_orphan_scan_page_delay_ms(),
+        }
+    }
 }
 
 /// Calls plugin configuration
@@ -599,6 +634,22 @@ fn default_s3_bucket() -> String {
 
 fn default_s3_region() -> String {
     "us-east-1".to_string()
+}
+
+fn default_orphan_scan_enabled() -> bool {
+    false
+}
+
+fn default_orphan_scan_interval_hours() -> u64 {
+    24
+}
+
+fn default_orphan_scan_page_size() -> u32 {
+    1000
+}
+
+fn default_orphan_scan_page_delay_ms() -> u64 {
+    100
 }
 
 impl Config {
