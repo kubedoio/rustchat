@@ -259,6 +259,17 @@ jobs:
           path: frontend/dependency-inventory.json
           if-no-files-found: ignore
 
+  p0-gates:
+    name: P0 Production-Readiness Gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Run P0 production-readiness gates
+        run: scripts/check-p0-gates.sh
+
   push-proxy-check:
     name: Push Proxy Check
     needs: detect-changes
@@ -423,7 +434,7 @@ jobs:
   ci-complete:
     name: CI Complete
     runs-on: ${{ inputs.runner || 'self-hosted' }}
-    needs: [detect-changes, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
+    needs: [detect-changes, p0-gates, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
     if: always()
     timeout-minutes: 5
     steps:
@@ -433,6 +444,7 @@ jobs:
 
       - name: Verify all checks passed
         env:
+          P0_GATES_RESULT: ${{ needs.p0-gates.result }}
           BACKEND_CHECK_RESULT: ${{ needs.backend-check.result }}
           FRONTEND_CHECK_RESULT: ${{ needs.frontend-check.result }}
           FRONTEND_E2E_RESULT: ${{ needs.frontend-e2e.result }}
@@ -440,7 +452,7 @@ jobs:
           DOCKER_VALIDATE_RESULT: ${{ needs.docker-validate.result }}
           BUILD_RELEASE_RESULT: ${{ needs.build-release.result }}
         run: |
-          for job in BACKEND_CHECK FRONTEND_CHECK FRONTEND_E2E PUSH_PROXY_CHECK DOCKER_VALIDATE BUILD_RELEASE; do
+          for job in P0_GATES BACKEND_CHECK FRONTEND_CHECK FRONTEND_E2E PUSH_PROXY_CHECK DOCKER_VALIDATE BUILD_RELEASE; do
             result_var="${job}_RESULT"
             result="${!result_var}"
             echo "$job: $result"
