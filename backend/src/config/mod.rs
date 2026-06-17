@@ -153,6 +153,12 @@ pub struct RetentionJobConfig {
     /// Delay between orphan scan list pages, in milliseconds.
     #[serde(default = "default_orphan_scan_page_delay_ms")]
     pub orphan_scan_page_delay_ms: u64,
+
+    /// Minimum age of an object before it can be considered an orphan, in
+    /// seconds. This protects in-flight uploads where the S3 object is written
+    /// before the `files` row is committed.
+    #[serde(default = "default_orphan_scan_min_age_seconds")]
+    pub orphan_scan_min_age_seconds: u64,
 }
 
 impl Default for RetentionJobConfig {
@@ -162,6 +168,7 @@ impl Default for RetentionJobConfig {
             orphan_scan_interval_hours: default_orphan_scan_interval_hours(),
             orphan_scan_page_size: default_orphan_scan_page_size(),
             orphan_scan_page_delay_ms: default_orphan_scan_page_delay_ms(),
+            orphan_scan_min_age_seconds: default_orphan_scan_min_age_seconds(),
         }
     }
 }
@@ -652,6 +659,13 @@ fn default_orphan_scan_page_delay_ms() -> u64 {
     100
 }
 
+fn default_orphan_scan_min_age_seconds() -> u64 {
+    // Five minutes is long enough to cover the S3-write -> DB-commit window
+    // for resumable and simple uploads while still allowing scans to clean up
+    // stale objects promptly.
+    300
+}
+
 impl Config {
     fn apply_calls_env_overrides(&mut self) -> anyhow::Result<()> {
         // Primary calls env vars used by local docker-compose.
@@ -979,6 +993,10 @@ fn apply_retention_env_overrides_to(retention: &mut RetentionJobConfig) -> anyho
     if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS") {
         retention.orphan_scan_page_delay_ms =
             parse_u64_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS", &raw)?;
+    }
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_MIN_AGE_SECONDS") {
+        retention.orphan_scan_min_age_seconds =
+            parse_u64_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_MIN_AGE_SECONDS", &raw)?;
     }
     Ok(())
 }

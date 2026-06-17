@@ -14,7 +14,7 @@ use std::time::Duration;
 use tracing::error;
 
 use crate::error::AppError;
-use crate::storage::{ListObjectsResult, ObjectStorage};
+use crate::storage::{ListObjectsResult, ListedObject, ObjectStorage};
 
 /// S3 storage client
 #[derive(Clone)]
@@ -335,15 +335,25 @@ impl S3Client {
             AppError::ExternalService(format!("S3 list objects error: {}", e))
         })?;
 
-        let keys = response
+        let objects: Vec<ListedObject> = response
             .contents
             .unwrap_or_default()
             .into_iter()
-            .filter_map(|obj| obj.key)
+            .filter_map(|obj| {
+                let key = obj.key?;
+                let last_modified = obj
+                    .last_modified
+                    .and_then(|dt| dt.to_millis().ok())
+                    .and_then(chrono::DateTime::from_timestamp_millis);
+                Some(ListedObject { key, last_modified })
+            })
             .collect();
+
+        let keys = objects.iter().map(|o| o.key.clone()).collect();
 
         Ok(ListObjectsResult {
             keys,
+            objects,
             next_continuation_token: response.next_continuation_token,
         })
     }

@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::config::RetentionJobConfig;
 use crate::error::AppError;
-use crate::storage::{ListObjectsResult, ObjectStorage};
+use crate::storage::{ListObjectsResult, ListedObject, ObjectStorage};
 
 /// Retention job configuration (days-based, from server_config).
 #[derive(Debug, Clone)]
@@ -319,6 +319,7 @@ pub async fn run_orphan_scan_with_store<S: ObjectStorage, O: OrphanStore>(
         .try_into()
         .unwrap_or(1000);
     let page_delay = StdDuration::from_millis(config.orphan_scan_page_delay_ms.max(1));
+    let min_age_cutoff = Utc::now() - Duration::seconds(config.orphan_scan_min_age_seconds as i64);
 
     for prefix in ["files/", "thumbnails/", "previews/"] {
         let mut continuation_token: Option<String> = None;
@@ -328,7 +329,7 @@ pub async fn run_orphan_scan_with_store<S: ObjectStorage, O: OrphanStore>(
                 .list_objects(Some(prefix), continuation_token.as_deref(), max_keys)
                 .await?;
 
-            process_orphan_page(store, storage, prefix, &page, &mut stats).await?;
+            process_orphan_page(store, storage, prefix, &page, min_age_cutoff, &mut stats).await?;
 
             continuation_token = page.next_continuation_token.clone();
             stats.pages_scanned += 1;
@@ -355,26 +356,47 @@ async fn process_orphan_page<S: ObjectStorage, O: OrphanStore>(
     storage: &S,
     prefix: &str,
     page: &ListObjectsResult,
+    min_age_cutoff: DateTime<Utc>,
     stats: &mut OrphanScanStats,
 ) -> Result<(), sqlx::Error> {
     if page.keys.is_empty() {
         return Ok(());
     }
 
+    let candidate_keys: Vec<String> = page
+        .objects
+        .iter()
+        .filter(|obj| is_old_enough_for_orphan_scan(obj, min_age_cutoff))
+        .map(|obj| obj.key.clone())
+        .collect();
+    let skipped = page.keys.len() - candidate_keys.len();
+
+    if skipped > 0 {
+        info!(
+            skipped,
+            prefix, "Orphan scan: skipped recently-created objects that may be in-flight uploads"
+        );
+    }
+
+    if candidate_keys.is_empty() {
+        return Ok(());
+    }
+
     let existing = if prefix == "files/" {
-        store.filter_existing_keys(&page.keys).await?
+        store.filter_existing_keys(&candidate_keys).await?
     } else {
-        store.filter_existing_derivative_keys(&page.keys).await?
+        store
+            .filter_existing_derivative_keys(&candidate_keys)
+            .await?
     };
-    let orphans: Vec<&String> = page
-        .keys
+    let orphans: Vec<&String> = candidate_keys
         .iter()
         .filter(|key| !existing.contains(*key))
         .collect();
 
     info!(
         "Orphan scan: page of {} objects, {} orphans found",
-        page.keys.len(),
+        candidate_keys.len(),
         orphans.len()
     );
 
@@ -392,6 +414,14 @@ async fn process_orphan_page<S: ObjectStorage, O: OrphanStore>(
     }
 
     Ok(())
+}
+
+/// Returns true when an object's last-modified timestamp is old enough that
+/// any in-flight upload should already have committed its `files` row.
+fn is_old_enough_for_orphan_scan(obj: &ListedObject, cutoff: DateTime<Utc>) -> bool {
+    obj.last_modified
+        .map(|last_modified| last_modified <= cutoff)
+        .unwrap_or(false)
 }
 
 /// Spawn the retention job as a background task.
@@ -532,6 +562,7 @@ async fn run_retention_loop(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     use super::*;
@@ -615,6 +646,9 @@ mod tests {
         listed: Arc<Mutex<Vec<Vec<String>>>>,
         fail_keys: Arc<HashSet<String>>,
         not_found_keys: Arc<HashSet<String>>,
+        /// Per-key last-modified overrides. Keys not present default to the
+        /// Unix epoch so they are always older than the orphan-scan grace period.
+        last_modified: Arc<HashMap<String, DateTime<Utc>>>,
     }
 
     impl MockStorage {
@@ -669,8 +703,20 @@ mod tests {
                 listed.remove(0)
             };
             let keys: Vec<String> = page
+                .clone()
                 .into_iter()
                 .filter(|key| prefix.is_none_or(|p| key.starts_with(p)))
+                .collect();
+            let objects: Vec<ListedObject> = keys
+                .iter()
+                .map(|key| ListedObject {
+                    key: key.clone(),
+                    last_modified: self
+                        .last_modified
+                        .get(key)
+                        .copied()
+                        .or(Some(DateTime::UNIX_EPOCH)),
+                })
                 .collect();
             // Empty pages terminate pagination so prefix-scoped tests can feed
             // distinct pages to files/, thumbnails/, and previews/.
@@ -681,6 +727,7 @@ mod tests {
             };
             Ok(ListObjectsResult {
                 keys,
+                objects,
                 next_continuation_token: next_token,
             })
         }
@@ -699,6 +746,7 @@ mod tests {
             orphan_scan_interval_hours: 24,
             orphan_scan_page_size: 10,
             orphan_scan_page_delay_ms: 1,
+            orphan_scan_min_age_seconds: 300,
         }
     }
 
@@ -969,6 +1017,36 @@ mod tests {
         assert_eq!(
             storage.deleted.lock().await.as_slice(),
             &["previews/u/3.jpg"]
+        );
+    }
+
+    #[tokio::test]
+    async fn orphan_scan_skips_recent_objects_to_protect_in_flight_uploads() {
+        let store = InMemoryOrphanStore::default();
+        let storage = MockStorage {
+            listed: Arc::new(Mutex::new(vec![vec![
+                "files/orphan.txt".to_string(),
+                "files/recent.txt".to_string(),
+            ]])),
+            last_modified: Arc::new(
+                [("files/recent.txt".to_string(), Utc::now())]
+                    .into_iter()
+                    .collect(),
+            ),
+            ..Default::default()
+        };
+
+        let stats = run_orphan_scan_with_store(&store, &storage, &test_orphan_config())
+            .await
+            .unwrap();
+
+        assert_eq!(stats.objects_scanned, 2);
+        assert_eq!(stats.pages_scanned, 3);
+        assert_eq!(stats.orphans_deleted, 1);
+        assert_eq!(stats.orphan_delete_errors, 0);
+        assert_eq!(
+            storage.deleted.lock().await.as_slice(),
+            &["files/orphan.txt"]
         );
     }
 }
