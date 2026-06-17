@@ -245,36 +245,37 @@ pub async fn run_retention_cleanup_with_store<S: ObjectStorage, R: RetentionStor
         for record in &records {
             let mut all_deleted = true;
 
-            if let Err(e) = storage.delete_object(&record.key).await {
-                all_deleted = false;
-                stats.file_delete_errors += 1;
-                warn!(
-                    error = %e,
-                    key = %record.key,
-                    "Retention: failed to delete S3 object; leaving files row for retry"
-                );
-            }
-
+            // Delete derivative objects first. If the primary delete fails we
+            // keep the files row for retry; derivatives are best-effort and must
+            // not prevent removing a row whose primary object is already gone.
             if let Some(thumbnail_key) = &record.thumbnail_key {
                 if let Err(e) = storage.delete_object(thumbnail_key).await {
-                    all_deleted = false;
                     stats.file_delete_errors += 1;
                     warn!(
                         error = %e,
                         key = %thumbnail_key,
-                        "Retention: failed to delete thumbnail S3 object; leaving files row for retry"
+                        "Retention: failed to delete thumbnail S3 object"
                     );
                 }
             }
 
             let preview_key = format!("previews/{}/{}.jpg", record.uploader_id, record.id);
             if let Err(e) = storage.delete_object(&preview_key).await {
-                all_deleted = false;
                 stats.file_delete_errors += 1;
                 warn!(
                     error = %e,
                     key = %preview_key,
-                    "Retention: failed to delete preview S3 object; leaving files row for retry"
+                    "Retention: failed to delete preview S3 object"
+                );
+            }
+
+            if let Err(e) = storage.delete_object(&record.key).await {
+                all_deleted = false;
+                stats.file_delete_errors += 1;
+                warn!(
+                    error = %e,
+                    key = %record.key,
+                    "Retention: failed to delete primary S3 object; leaving files row for retry"
                 );
             }
 
@@ -892,6 +893,39 @@ mod tests {
         assert!(deleted.contains("thumbnails/u/1.jpg"));
         assert!(deleted.contains(&expected_preview));
         assert_eq!(deleted.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn retention_cleanup_deletes_row_when_derivative_fails() {
+        let mut record = file_record("files/u/1.txt");
+        record.thumbnail_key = Some("thumbnails/u/1.jpg".to_string());
+        let expected_preview = preview_key(&record);
+
+        let store = InMemoryRetentionStore {
+            file_records: Arc::new(Mutex::new(vec![record.clone()])),
+            ..Default::default()
+        };
+        // Thumbnail delete fails, primary and preview succeed.
+        let storage = MockStorage::with_failed_keys(&["thumbnails/u/1.jpg"]);
+
+        let stats = run_retention_cleanup_with_store(&store, &storage, test_retention_config())
+            .await
+            .unwrap();
+
+        // The primary object is gone, so the files row must be removed even
+        // though the derivative delete failed.
+        assert_eq!(stats.files_deleted, 1);
+        assert_eq!(stats.file_delete_errors, 1);
+        assert_eq!(
+            store.deleted_files.lock().await.as_slice(),
+            &["files/u/1.txt"]
+        );
+
+        let deleted: HashSet<String> = storage.deleted.lock().await.iter().cloned().collect();
+        assert!(deleted.contains("files/u/1.txt"));
+        assert!(deleted.contains(&expected_preview));
+        assert!(!deleted.contains("thumbnails/u/1.jpg"));
+        assert_eq!(deleted.len(), 2);
     }
 
     #[tokio::test]
