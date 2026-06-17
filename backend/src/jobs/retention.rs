@@ -1088,7 +1088,10 @@ mod tests {
 
         assert_eq!(stats.objects_scanned, 1);
         assert_eq!(stats.pages_scanned, 3);
-        assert_eq!(stats.orphans_deleted, 0, "recent object must not be deleted when min_age is clamped");
+        assert_eq!(
+            stats.orphans_deleted, 0,
+            "recent object must not be deleted when min_age is clamped"
+        );
         assert!(storage.deleted.lock().await.is_empty());
     }
 }

@@ -175,7 +175,9 @@ async fn upload_data(
             Ok(result) => result,
             Err(e) => {
                 // Rejected uploads must not keep appended bytes in the database until expiry.
-                UploadRepository::new(&state.db).delete_session(upload_id).await?;
+                UploadRepository::new(&state.db)
+                    .delete_session(upload_id)
+                    .await?;
                 return Err(e);
             }
         };
