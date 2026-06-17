@@ -534,7 +534,7 @@ mod tests {
             let page = listed.remove(0);
             let keys: Vec<String> = page
                 .into_iter()
-                .filter(|key| prefix.map_or(true, |p| key.starts_with(p)))
+                .filter(|key| prefix.is_none_or(|p| key.starts_with(p)))
                 .collect();
             let next_token = if listed.is_empty() {
                 None
