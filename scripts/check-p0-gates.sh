@@ -36,7 +36,7 @@ else
 fi
 
 # 2. Dev CORS is documented as opt-in.
-if grep -q 'RUSTCHAT_ALLOW_DEV_CORS' .env.example; then
+if grep -qE '^\s*#?\s*RUSTCHAT_ALLOW_DEV_CORS\s*=' .env.example; then
   pass ".env.example documents RUSTCHAT_ALLOW_DEV_CORS"
 else
   fail ".env.example must document RUSTCHAT_ALLOW_DEV_CORS"
@@ -48,7 +48,7 @@ for var in \
   RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS \
   RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE \
   RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS; do
-  if grep -q "${var}" .env.example; then
+  if grep -qE "^\s*#?\s*${var}\s*=" .env.example; then
     pass ".env.example documents ${var}"
   else
     fail ".env.example must document ${var}"
@@ -56,27 +56,28 @@ for var in \
 done
 
 # 4. Default environment is production.
-if awk '/fn default_environment\(\)/,/^\}/' backend/src/config/mod.rs | grep -q '"production"'; then
+# Extract the function body with a brace counter so nested blocks do not prematurely end the scan.
+if awk '/fn default_environment\(\)/ {p=1} p {print; brace+=gsub(/\{/,"{")-gsub(/\}/,"}")} p && brace==0 {p=0}' backend/src/config/mod.rs | grep -q '"production"'; then
   pass "backend/src/config/mod.rs default_environment returns production"
 else
   fail "backend/src/config/mod.rs default_environment must return \"production\""
 fi
 
 # 5. Webhook/slash-command URLs are validated at request time.
-if grep -q 'validate_callback_url_at_request_time' backend/src/services/webhooks.rs; then
+if grep -qE '(pub\(crate\) async fn|fn) validate_callback_url_at_request_time' backend/src/services/webhooks.rs; then
   pass "backend/src/services/webhooks.rs validates callback URLs at request time"
 else
   fail "backend/src/services/webhooks.rs must contain validate_callback_url_at_request_time"
 fi
 
 # 6. Retention cleanup deletes S3 objects and has an orphan scanner.
-if grep -q 'run_orphan_scan' backend/src/jobs/retention.rs; then
+if grep -qE '(async fn|pub async fn) run_orphan_scan' backend/src/jobs/retention.rs; then
   pass "backend/src/jobs/retention.rs contains run_orphan_scan"
 else
   fail "backend/src/jobs/retention.rs must contain run_orphan_scan"
 fi
 
-if grep -q 'delete_object' backend/src/jobs/retention.rs; then
+if grep -qE 'storage\.delete_object|delete_object\(' backend/src/jobs/retention.rs; then
   pass "backend/src/jobs/retention.rs uses delete_object"
 else
   fail "backend/src/jobs/retention.rs must use delete_object"
