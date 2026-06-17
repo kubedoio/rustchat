@@ -169,7 +169,9 @@ impl OrphanStore for PgOrphanStore<'_> {
 
         let mut existing_derivatives = HashSet::new();
         for (index, prefix) in index_prefixes {
-            if existing_main_keys.iter().any(|k| k.starts_with(&prefix)) {
+            // `prefix` is a SQL LIKE pattern ending in '%'; compare the literal stem.
+            let literal = prefix.trim_end_matches('%');
+            if existing_main_keys.iter().any(|k| k.starts_with(literal)) {
                 existing_derivatives.insert(keys[index].clone());
             }
         }
