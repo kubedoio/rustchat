@@ -21,7 +21,7 @@ use crate::models::{
     SlashCommand, WebhookPayload,
 };
 use crate::repositories::{ChannelRepository, IntegrationRepository, UserRepository};
-use crate::services::webhooks::{is_valid_callback_url, validate_callback_url_at_request_time};
+use crate::services::webhooks::{callback_http_client, is_valid_callback_url};
 use chrono::Utc;
 use std::time::Duration;
 
@@ -995,25 +995,14 @@ async fn execute_custom_slash_command(
             .flatten()
             .unwrap_or_else(|| "unknown".to_string());
 
-        if !validate_callback_url_at_request_time(&cmd.url).await {
+        let Some((client, parsed_url)) = callback_http_client(&cmd.url).await else {
             return Ok(build_command_response(
                 "ephemeral",
                 "Command URL is not valid or points to an internal address",
                 None,
                 None,
             ));
-        }
-
-        let client = reqwest::Client::builder()
-            // Do not follow redirects for SSRF safety. A redirect target could resolve
-            // to an internal endpoint after the initial request passed validation.
-            .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(10))
-            .build()
-            .map_err(|e| {
-                tracing::error!("Failed to build no-redirect command HTTP client: {}", e);
-                AppError::Internal(format!("Failed to build command HTTP client: {}", e))
-            })?;
+        };
 
         let payload_out = OutgoingWebhookPayload {
             token: cmd.token.clone(),
@@ -1037,8 +1026,11 @@ async fn execute_custom_slash_command(
             retry_if: RetryCondition::Default,
         };
 
+        // `client` is bound to the validated IP addresses for `cmd.url` by
+        // `callback_http_client`, so this request cannot be DNS-rebound to an
+        // internal address even though the URL still contains the original hostname.
         let res = send_reqwest_with_retry(
-            client.post(&cmd.url).json(&payload_out),
+            client.post(parsed_url.as_str()).json(&payload_out),
             &retry_config,
             |e| AppError::Internal(format!("Command execution failed: {}", e)),
             || {
