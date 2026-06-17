@@ -340,13 +340,13 @@ pub async fn check_outgoing_triggers(
                     .clone()
                     .unwrap_or_else(|| "application/json".to_string());
 
-                let permit = semaphore
-                    .clone()
-                    .acquire_owned()
-                    .await
-                    .map_err(|_| AppError::Internal("Outgoing webhook semaphore closed".to_string()))?;
+                let semaphore = semaphore.clone();
 
                 tokio::spawn(async move {
+                    let Ok(permit) = semaphore.acquire_owned().await else {
+                        tracing::warn!("Outgoing webhook semaphore closed");
+                        return;
+                    };
                     let _permit = permit;
                     let Some((client, parsed_url)) = callback_http_client(&url).await else {
                         tracing::warn!("Skipping outgoing webhook to unsafe URL: {}", url);
