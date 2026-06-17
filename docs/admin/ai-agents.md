@@ -19,9 +19,9 @@ Recommended environment:
 RUSTCHAT_OPENAI_API_KEY=sk-...
 RUSTCHAT_OPENAI_MODEL=gpt-4o-mini
 RUSTCHAT_OPENAI_MAX_TOKENS=2048
-RUSTCHAT_AGENT_MAX_REQUESTS_PER_MINUTE=10
-RUSTCHAT_AGENT_MAX_TOKENS_PER_HOUR=100000
 ```
+
+Agent rate limits (requests per minute and tokens per hour) are internal constants, not configurable via environment variables.
 
 For RAG:
 

@@ -1,7 +1,7 @@
 # Repo Current State
 
 **Last updated:** 2026-06-16
-**Version:** v0.5.1
+**Version:** v0.5.0
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
 
@@ -9,7 +9,7 @@
 
 ## 1. Version
 
-**Current:** v0.5.1
+**Current:** v0.5.0
 
 Version is synchronized across two files:
 - `backend/Cargo.toml` → `[package] version`

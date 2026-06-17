@@ -145,7 +145,7 @@ RustChat applies two independent rate-limiting layers:
 
 2. **Per-account login sliding window** — configured by `RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE` and enforced inside the auth handlers. This throttles individual accounts independently of the IP-based limits.
 
-The `RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE` and `RUSTCHAT_SECURITY_RATE_LIMIT_WS_PER_MINUTE` settings do **not** tune the IP-based middleware values; only the per-account auth sliding window is adjustable.
+`RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE` does **not** tune the IP-based middleware values; it only adjusts the per-account login sliding window.
 
 If you run multiple backend instances behind a load balancer, the Redis-backed counters are shared automatically through RustChat's existing Redis connection.
 

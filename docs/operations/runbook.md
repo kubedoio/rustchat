@@ -89,7 +89,7 @@ done
 ```bash
 # Liveness (Kubernetes)
 curl http://localhost:3000/api/v1/health/live
-# Expected: {"status":"ok","version":"0.5.1","uptime_seconds":3600}
+# Expected: {"status":"ok","version":"0.5.0","uptime_seconds":3600}
 
 # Readiness (Kubernetes)
 curl http://localhost:3000/api/v1/health/ready

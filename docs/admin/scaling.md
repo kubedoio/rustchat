@@ -113,19 +113,19 @@ WHERE id = 'default';
 
 ```bash
 # Maximum connections in the pool (default: 20)
-RUSTCHAT_DB_POOL__MAX_CONNECTIONS=50
+DB_POOL_MAX_CONNECTIONS=50
 
 # Minimum connections maintained (default: 5)
-RUSTCHAT_DB_POOL__MIN_CONNECTIONS=10
+DB_POOL_MIN_CONNECTIONS=10
 
 # Timeout to acquire a connection in seconds (default: 3)
-RUSTCHAT_DB_POOL__ACQUIRE_TIMEOUT_SECS=5
+DB_POOL_ACQUIRE_TIMEOUT=5
 
 # Idle connection timeout in seconds (default: 600)
-RUSTCHAT_DB_POOL__IDLE_TIMEOUT_SECS=300
+DB_POOL_IDLE_TIMEOUT=300
 
 # Maximum connection lifetime in seconds (default: 1800)
-RUSTCHAT_DB_POOL__MAX_LIFETIME_SECS=3600
+DB_POOL_MAX_LIFETIME=3600
 ```
 
 ### Recommended Settings
