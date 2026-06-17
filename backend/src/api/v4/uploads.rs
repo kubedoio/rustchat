@@ -16,6 +16,7 @@ use std::io::Cursor;
 use uuid::Uuid;
 
 use super::extractors::MmAuthUser;
+use crate::api::file_validation::validate_file_upload;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::{
@@ -28,64 +29,6 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/uploads", post(create_upload))
         .route("/uploads/{upload_id}", get(get_upload).post(upload_data))
-}
-
-fn filename_extension(filename: &str) -> Option<&str> {
-    filename
-        .rsplit_once('.')
-        .and_then(|(_, ext)| if ext.is_empty() { None } else { Some(ext) })
-}
-
-fn image_mime_and_extension_from_bytes(data: &[u8]) -> Option<(&'static str, &'static str)> {
-    let format = image::guess_format(data).ok()?;
-    match format {
-        ImageFormat::Png => Some(("image/png", "png")),
-        ImageFormat::Jpeg => Some(("image/jpeg", "jpg")),
-        ImageFormat::Gif => Some(("image/gif", "gif")),
-        ImageFormat::WebP => Some(("image/webp", "webp")),
-        ImageFormat::Bmp => Some(("image/bmp", "bmp")),
-        ImageFormat::Tiff => Some(("image/tiff", "tiff")),
-        _ => None,
-    }
-}
-
-fn extension_from_mime(mime_type: &str) -> Option<&'static str> {
-    match mime_type {
-        "image/jpeg" => Some("jpg"),
-        "image/png" => Some("png"),
-        "image/gif" => Some("gif"),
-        "image/webp" => Some("webp"),
-        "image/bmp" => Some("bmp"),
-        "image/tiff" => Some("tiff"),
-        _ => None,
-    }
-}
-
-fn normalize_upload_session_file_metadata(filename: &str, data: &[u8]) -> (String, String, String) {
-    let mut normalized_filename = filename.to_string();
-    let mut mime_type = mime_guess::from_path(filename)
-        .first_or_octet_stream()
-        .to_string();
-
-    if let Some((detected_mime, detected_ext)) = image_mime_and_extension_from_bytes(data) {
-        if mime_type == "application/octet-stream" || !mime_type.starts_with("image/") {
-            mime_type = detected_mime.to_string();
-        }
-
-        if filename_extension(&normalized_filename).is_none() {
-            normalized_filename = format!("{}.{}", normalized_filename, detected_ext);
-        }
-    } else if filename_extension(&normalized_filename).is_none() {
-        if let Some(ext) = extension_from_mime(&mime_type) {
-            normalized_filename = format!("{}.{}", normalized_filename, ext);
-        }
-    }
-
-    let extension = filename_extension(&normalized_filename)
-        .unwrap_or_default()
-        .to_string();
-
-    (normalized_filename, mime_type, extension)
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,6 +46,17 @@ async fn create_upload(
 ) -> ApiResult<(StatusCode, Json<mm::UploadSession>)> {
     let channel_id =
         parse_mm_or_uuid(&input.channel_id).ok_or_else(|| AppError::InvalidChannelId)?;
+
+    // Reject disallowed file extensions before creating the upload session.
+    crate::api::file_validation::validate_file_extension(&input.filename)?;
+
+    // Reject nonsensical upload sizes early so the session cannot be finalized
+    // with an empty or negative declared size.
+    if input.file_size <= 0 {
+        return Err(AppError::BadRequest(
+            "file_size must be a positive integer".to_string(),
+        ));
+    }
 
     // Verify user has access to channel
     let _ = ChannelRepository::new(&state.db)
@@ -189,13 +143,23 @@ async fn upload_data(
 
     let new_offset = session.file_offset + body.len() as i64;
 
+    // Reject chunks that would exceed the declared size. Mattermost clients send
+    // a final chunk that lands exactly on file_size; extra bytes indicate a bug
+    // or a malicious attempt to store more than was declared.
+    if new_offset > session.file_size {
+        return Err(AppError::BadRequest(format!(
+            "upload exceeds declared file_size: {} > {}",
+            new_offset, session.file_size
+        )));
+    }
+
     // Append data to session
     UploadRepository::new(&state.db)
         .append_data(upload_id, body.as_ref(), new_offset)
         .await?;
 
-    // Check if upload is complete
-    if new_offset >= session.file_size {
+    // Finalize only when the accumulated bytes match the declared size exactly.
+    if new_offset == session.file_size {
         // Retrieve full file data
         let file_data = UploadRepository::new(&state.db)
             .get_file_data(upload_id)
@@ -205,15 +169,23 @@ async fn upload_data(
         // Create file record and upload to S3
         let file_id = Uuid::new_v4();
         let now = Utc::now();
-        let (filename, mime_type, extension) =
-            normalize_upload_session_file_metadata(&session.filename, &file_data);
 
-        // Generate S3 key
-        let key = if extension.is_empty() {
-            format!("files/{}/{}", auth.user_id, file_id)
-        } else {
-            format!("files/{}/{}.{}", auth.user_id, file_id, extension)
+        // Authoritative validation: extension allowlist, size limits, and content/MIME match.
+        let (mime_type, extension) = match validate_file_upload(&session.filename, &file_data) {
+            Ok(result) => result,
+            Err(e) => {
+                // Rejected uploads must not keep appended bytes in the database until expiry.
+                UploadRepository::new(&state.db)
+                    .delete_session(upload_id)
+                    .await?;
+                return Err(e);
+            }
         };
+        let filename = session.filename.clone();
+
+        // Generate S3 key. `extension` is non-empty because `validate_file_upload` rejects
+        // files without an allowed extension, so this branch is unreachable in practice.
+        let key = format!("files/{}/{}.{}", auth.user_id, file_id, extension);
 
         // Calculate hash
         let mut hasher = Sha256::new();
@@ -371,3 +343,6 @@ async fn upload_data(
         Ok(StatusCode::NO_CONTENT.into_response())
     }
 }
+
+#[cfg(test)]
+mod uploads_tests;

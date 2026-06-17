@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
+use rustchat::constants::{ROLE_CHANNEL_ADMIN, ROLE_ORG_ADMIN, ROLE_SYSTEM_ADMIN, ROLE_TEAM_ADMIN};
 use rustchat::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use tokio_tungstenite::{
     connect_async,
@@ -23,9 +24,9 @@ async fn calls_lifecycle_events_are_delivered_over_websocket() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Lifecycle Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "caller_a", "caller_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "caller_b", "caller_b@example.com").await;
 
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
@@ -145,9 +146,9 @@ async fn calls_start_in_direct_channel_auto_rings_other_participants() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Direct Ringing Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "direct_ring_a", "direct_ring_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "direct_ring_b", "direct_ring_b@example.com").await;
     let channel_id =
         create_team_and_channel_with_members_of_type(&app, org_id, &[user_a, user_b], "direct")
@@ -190,11 +191,11 @@ async fn ring_endpoint_requires_channel_membership() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Ring Permission Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "ring_member_a", "ring_member_a@example.com").await;
-    let (_token_b, user_b) =
+    let (_token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "ring_member_b", "ring_member_b@example.com").await;
-    let (token_outsider, _user_outsider) =
+    let (token_outsider, _user_outsider, _password_outsider) =
         register_and_login(&app, org_id, "ring_outsider", "ring_outsider@example.com").await;
 
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
@@ -229,7 +230,7 @@ async fn offer_generates_server_signaling_event_over_websocket() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Signaling Org").await;
-    let (token, user_id) =
+    let (token, user_id, _password) =
         register_and_login(&app, org_id, "signal_user", "signal_user@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_id]).await;
 
@@ -274,11 +275,20 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Mobile REST Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "mobile_rest_a", "mobile_rest_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "mobile_rest_b", "mobile_rest_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    // Promote user_a to channel admin so they can manage calls in this channel.
+    sqlx::query("UPDATE channel_members SET role = $1 WHERE channel_id = $2 AND user_id = $3")
+        .bind(ROLE_CHANNEL_ADMIN)
+        .bind(channel_id)
+        .bind(user_a)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to promote user to channel admin");
 
     let start = app
         .api_client
@@ -322,7 +332,7 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
         .iter()
         .find(|entry| entry["channel_id"] == encode_mm_id(channel_id))
         .expect("channel state should exist");
-    assert_eq!(channel_state["enabled"], true);
+    assert!(channel_state["enabled"].as_bool().unwrap());
     assert!(channel_state["call"].is_object());
     assert!(channel_state["call"]["sessions"].is_object());
     let list_thread_id = channel_state["call"]["thread_id"]
@@ -343,7 +353,7 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
     assert_eq!(get_channel_state.status(), StatusCode::OK);
     let get_channel_state_body: serde_json::Value =
         get_channel_state.json().await.expect("channel state JSON");
-    assert_eq!(get_channel_state_body["enabled"], true);
+    assert!(get_channel_state_body["enabled"].as_bool().unwrap());
     assert!(get_channel_state_body["call"].is_object());
     let thread_id = get_channel_state_body["call"]["thread_id"]
         .as_str()
@@ -372,18 +382,18 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
         .expect("calls config request failed");
     assert_eq!(config.status(), StatusCode::OK);
     let config_body: serde_json::Value = config.json().await.expect("config JSON");
-    assert_eq!(config_body["EnableRinging"], true);
-    assert_eq!(config_body["HostControlsAllowed"], true);
+    assert!(config_body["EnableRinging"].as_bool().unwrap());
+    assert!(config_body["HostControlsAllowed"].as_bool().unwrap());
     assert_eq!(config_body["MaxCallParticipants"], 0);
-    assert_eq!(config_body["AllowScreenSharing"], true);
-    assert_eq!(config_body["EnableSimulcast"], false);
-    assert_eq!(config_body["EnableAV1"], false);
+    assert!(config_body["AllowScreenSharing"].as_bool().unwrap());
+    assert!(!config_body["EnableSimulcast"].as_bool().unwrap());
+    assert!(!config_body["EnableAV1"].as_bool().unwrap());
     assert_eq!(config_body["MaxRecordingDuration"], 60);
     assert_eq!(config_body["TranscribeAPI"], "whisper.cpp");
     assert_eq!(config_body["sku_short_name"], "starter");
-    assert_eq!(config_body["EnableDCSignaling"], false);
-    assert_eq!(config_body["EnableTranscriptions"], false);
-    assert_eq!(config_body["EnableLiveCaptions"], false);
+    assert!(!config_body["EnableDCSignaling"].as_bool().unwrap());
+    assert!(!config_body["EnableTranscriptions"].as_bool().unwrap());
+    assert!(!config_body["EnableLiveCaptions"].as_bool().unwrap());
 
     let recording_start = app
         .api_client
@@ -410,7 +420,7 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
         .expect("disable calls request failed");
     assert_eq!(disable_calls.status(), StatusCode::OK);
     let disable_body: serde_json::Value = disable_calls.json().await.expect("disable JSON");
-    assert_eq!(disable_body["enabled"], false);
+    assert!(!disable_body["enabled"].as_bool().unwrap());
 
     let end_forbidden = app
         .api_client
@@ -479,9 +489,9 @@ async fn calls_mobile_event_names_and_payloads_are_compatible() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Mobile WS Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "mobile_ws_a", "mobile_ws_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "mobile_ws_b", "mobile_ws_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
@@ -764,9 +774,9 @@ async fn calls_host_transfers_when_original_host_leaves() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Host Transfer Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "host_leave_a", "host_leave_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "host_leave_b", "host_leave_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
@@ -837,18 +847,19 @@ async fn system_admin_can_end_call_even_when_not_host() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Admin End Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "admin_end_a", "admin_end_a@example.com").await;
-    let (_token_b, user_b) =
+    let (_token_b, user_b, password_b) =
         register_and_login(&app, org_id, "admin_end_b", "admin_end_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
-    sqlx::query("UPDATE users SET role = 'system_admin' WHERE id = $1")
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+        .bind(ROLE_SYSTEM_ADMIN)
         .bind(user_b)
         .execute(&app.db_pool)
         .await
         .expect("failed to promote user to system_admin");
-    let token_b = login_and_get_token(&app, "admin_end_b@example.com", "Password123!").await;
+    let token_b = login_and_get_token(&app, "admin_end_b@example.com", &password_b).await;
 
     let start = app
         .api_client
@@ -892,9 +903,9 @@ async fn calls_reaction_event_contains_mobile_fields() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Reaction Payload Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "reaction_a", "reaction_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "reaction_b", "reaction_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
@@ -954,6 +965,289 @@ async fn calls_reaction_event_contains_mobile_fields() {
     assert_eq!(reacted_event["reaction"], "👍");
 }
 
+#[tokio::test]
+async fn regular_member_cannot_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle Forbidden Org").await;
+    let (_token_a, user_a, _password_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_forbidden_a",
+        "toggle_forbidden_a@example.com",
+    )
+    .await;
+    let (token_b, user_b, _password_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_forbidden_b",
+        "toggle_forbidden_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_b}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn channel_admin_can_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle Channel Admin Org").await;
+    let (token_a, user_a, _password_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_channel_admin_a",
+        "toggle_channel_admin_a@example.com",
+    )
+    .await;
+    let (token_b, user_b, _password_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_channel_admin_b",
+        "toggle_channel_admin_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    sqlx::query("UPDATE channel_members SET role = $1 WHERE channel_id = $2 AND user_id = $3")
+        .bind(ROLE_CHANNEL_ADMIN)
+        .bind(channel_id)
+        .bind(user_a)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to promote user to channel admin");
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(!body["enabled"].as_bool().unwrap());
+
+    // Regular members still cannot re-enable calls.
+    let resp_b = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_b}"))
+        .json(&serde_json::json!({ "enabled": true }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp_b.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn system_admin_can_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle System Admin Org").await;
+    let (_token_a, user_a, password_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_system_admin_a",
+        "toggle_system_admin_a@example.com",
+    )
+    .await;
+    let (_token_b, user_b, _password_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_system_admin_b",
+        "toggle_system_admin_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+        .bind(ROLE_SYSTEM_ADMIN)
+        .bind(user_a)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to promote user to system_admin");
+    let token_a = login_and_get_token(&app, "toggle_system_admin_a@example.com", &password_a).await;
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(!body["enabled"].as_bool().unwrap());
+
+    // Re-enable calls as system admin.
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": true }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(body["enabled"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn team_admin_can_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle Team Admin Org").await;
+    let (_token_a, user_a, password_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_team_admin_a",
+        "toggle_team_admin_a@example.com",
+    )
+    .await;
+    let (_token_b, user_b, _password_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_team_admin_b",
+        "toggle_team_admin_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    sqlx::query(
+        "UPDATE team_members \
+         SET role = $1 \
+         WHERE team_id = (SELECT team_id FROM channels WHERE id = $2) \
+         AND user_id = $3",
+    )
+    .bind(ROLE_TEAM_ADMIN)
+    .bind(channel_id)
+    .bind(user_a)
+    .execute(&app.db_pool)
+    .await
+    .expect("failed to promote user to team_admin");
+    let token_a = login_and_get_token(&app, "toggle_team_admin_a@example.com", &password_a).await;
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(!body["enabled"].as_bool().unwrap());
+
+    // Re-enable calls as team admin.
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": true }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(body["enabled"].as_bool().unwrap());
+}
+
+#[tokio::test]
+async fn org_admin_can_toggle_channel_calls() {
+    let app = spawn_app().await;
+
+    let org_id = insert_org(&app, "Calls Toggle Org Admin Org").await;
+    let (_token_a, user_a, password_a) = register_and_login(
+        &app,
+        org_id,
+        "toggle_org_admin_a",
+        "toggle_org_admin_a@example.com",
+    )
+    .await;
+    let (_token_b, user_b, _password_b) = register_and_login(
+        &app,
+        org_id,
+        "toggle_org_admin_b",
+        "toggle_org_admin_b@example.com",
+    )
+    .await;
+    let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
+
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+        .bind(ROLE_ORG_ADMIN)
+        .bind(user_a)
+        .execute(&app.db_pool)
+        .await
+        .expect("failed to promote user to org_admin");
+    let token_a = login_and_get_token(&app, "toggle_org_admin_a@example.com", &password_a).await;
+
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": false }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(!body["enabled"].as_bool().unwrap());
+
+    // Re-enable calls as org admin.
+    let resp = app
+        .api_client
+        .post(format!(
+            "{}/api/v4/plugins/com.mattermost.calls/{}",
+            app.address, channel_id
+        ))
+        .header("Authorization", format!("Bearer {token_a}"))
+        .json(&serde_json::json!({ "enabled": true }))
+        .send()
+        .await
+        .expect("toggle calls request failed");
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = resp.json().await.expect("toggle calls JSON");
+    assert!(body["enabled"].as_bool().unwrap());
+}
+
 async fn insert_org(app: &common::TestApp, name: &str) -> Uuid {
     let org_id = Uuid::new_v4();
     sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)")
@@ -970,13 +1264,15 @@ async fn register_and_login(
     org_id: Uuid,
     username: &str,
     email: &str,
-) -> (String, Uuid) {
+) -> (String, Uuid, String) {
+    let password = format!("Pwd{}!", Uuid::new_v4().simple());
+
     app.api_client
         .post(format!("{}/api/v1/auth/register", app.address))
         .json(&serde_json::json!({
             "username": username,
             "email": email,
-            "password": "Password123!",
+            "password": password,
             "display_name": username,
             "org_id": org_id,
         }))
@@ -991,7 +1287,7 @@ async fn register_and_login(
         .post(format!("{}/api/v4/users/login", app.address))
         .json(&serde_json::json!({
             "login_id": email,
-            "password": "Password123!",
+            "password": password,
         }))
         .send()
         .await
@@ -1024,7 +1320,7 @@ async fn register_and_login(
         .and_then(parse_mm_or_uuid)
         .expect("user id should parse");
 
-    (token, user_id)
+    (token, user_id, password)
 }
 
 async fn login_and_get_token(app: &common::TestApp, email: &str, password: &str) -> String {

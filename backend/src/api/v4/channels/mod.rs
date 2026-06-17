@@ -34,6 +34,7 @@ use compat::{
 use view::{view_channel, view_channel_for_user};
 
 pub use direct::{create_direct_channel_internal, create_group_channel_internal};
+pub use utils::ensure_channel_admin_or_system_manage;
 
 pub fn router(state: AppState) -> Router<AppState> {
     let search_routes = Router::new()

@@ -23,20 +23,17 @@ export RUSTCHAT_ENCRYPTION_KEY="$(openssl rand -base64 48)"
 # 2. Create environment file
 cat > .env << EOF
 RUSTCHAT_ENVIRONMENT=production
+RUSTCHAT_SITE_URL=https://chat.example.com
 RUSTCHAT_JWT_SECRET=${RUSTCHAT_JWT_SECRET}
 RUSTCHAT_ENCRYPTION_KEY=${RUSTCHAT_ENCRYPTION_KEY}
+RUSTCHAT_JWT_ISSUER=rustchat
+RUSTCHAT_JWT_AUDIENCE=rustchat-users
 RUSTCHAT_DATABASE_URL=postgres://user:pass@db:5432/rustchat
 RUSTCHAT_REDIS_URL=redis://redis:6379
 RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=cookie
 EOF
 
-# 3. Verify configuration
-./rustchat --check-config
-
-# 4. Run database migrations
-./rustchat --migrate-only
-
-# 5. Start service
+# 3. Start service (migrations run automatically)
 ./rustchat
 ```
 
@@ -92,7 +89,7 @@ done
 ```bash
 # Liveness (Kubernetes)
 curl http://localhost:3000/api/v1/health/live
-# Expected: {"status":"ok","version":"0.3.1","uptime_seconds":3600}
+# Expected: {"status":"ok","version":"0.5.0","uptime_seconds":3600}
 
 # Readiness (Kubernetes)
 curl http://localhost:3000/api/v1/health/ready
@@ -193,7 +190,7 @@ psql -c "SELECT pid, state, query_start, query FROM pg_stat_activity WHERE state
 psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE state='idle in transaction' AND age(now(), query_start) > interval '5 minutes';"
 
 # 4. Temporary fix: Increase pool size
-export RUSTCHAT_DB_POOL__MAX_CONNECTIONS=100
+export DB_POOL_MAX_CONNECTIONS=100
 systemctl restart rustchat
 
 # 5. Permanent fix: Check for connection leaks in code
@@ -245,17 +242,16 @@ kubectl logs -l app=rustchat | grep "OAuth state"
 
 **Symptoms**: Legitimate users getting 429 errors
 
+IP-based rate limits are hardcoded; they cannot be tuned via environment variables.
+
 ```bash
-# 1. Check rate limit metrics
-curl http://localhost:3000/api/v1/health/metrics | grep rate_limit
+# 1. Identify source of high traffic (log-based diagnostics)
+kubectl logs -l app=rustchat | grep -E "Too many (authentication|registration|WebSocket)" | jq -r '.fields.remote_addr // .ip // empty' | sort | uniq -c | sort -rn | head -10
 
-# 2. Temporarily increase limits
+# 2. Tune the per-account login sliding window if needed
+# This only affects per-account auth throttling, not the IP-based middleware.
 export RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE=20
-export RUSTCHAT_SECURITY_RATE_LIMIT_WS_PER_MINUTE=60
 systemctl restart rustchat
-
-# 3. Identify source of high traffic
-kubectl logs -l app=rustchat | grep "Rate limit exceeded" | jq '.ip' | sort | uniq -c | sort -rn | head -10
 ```
 
 ### P7: AI Agents Not Responding
@@ -311,15 +307,12 @@ Large RustShare folders can take seconds to minutes to index. If indexing repeat
 # 1. Check agent-related logs
 kubectl logs -l app=rustchat --since=1h | grep -Ei "agent|tokens|usage"
 
-# 2. Temporarily reduce agent limits
-export RUSTCHAT_AGENT_MAX_REQUESTS_PER_MINUTE=5
-export RUSTCHAT_AGENT_MAX_TOKENS_PER_HOUR=25000
-systemctl restart rustchat
-
-# 3. Disable optional web search tool if needed
+# 2. Disable optional web search tool if needed
 unset TAVILY_API_KEY
 systemctl restart rustchat
 ```
+
+Agent rate limits are internal constants (10 requests/minute and 100,000 tokens/hour per agent) and are not configurable via environment variables.
 
 Review agents with `respond_to_all` enabled, broad channel assignments, and large knowledge base assignments. Disable or narrow the agent in the admin UI before increasing provider limits.
 
@@ -373,6 +366,44 @@ redis-cli --bigkeys
 # 4. Expire old keys manually (if needed)
 redis-cli EVAL "return redis.call('del', unpack(redis.call('keys', 'rustchat:oauth:code:*')))" 0
 ```
+
+### Retention and Orphan S3 Cleanup
+
+Retention cleanup removes expired posts and file records from the database and now also deletes the corresponding objects from S3-compatible storage.
+
+An optional orphan scanner can periodically scan S3 for objects that have no matching row in the `files` table and delete them. Enable it when you want S3 storage to remain consistent with the database.
+
+Configuration variables (set in `.env`):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RUSTCHAT_RETENTION_ORPHAN_SCAN_ENABLED` | `false` | Enable the orphan scanner |
+| `RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS` | `24` | Hours between scans |
+| `RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE` | `1000` | S3 keys listed per page |
+| `RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS` | `100` | Delay between pages (milliseconds) |
+
+Enable the scanner:
+
+```bash
+RUSTCHAT_RETENTION_ORPHAN_SCAN_ENABLED=true
+# Optional tuning:
+# RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS=24
+# RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE=1000
+# RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS=100
+```
+
+After changing these values, restart the backend. Monitor logs for lines from the retention/orphan-scan task.
+
+### Frontend Container User Verification
+
+The frontend container runs as the non-root `rustchat` user. Verify after deployment:
+
+```bash
+docker exec <frontend-container> id
+# Expected output includes: uid=... rustchat gid=... rustchat
+```
+
+If the container is running as `root`, check `docker/frontend.Dockerfile` for the `USER rustchat` directive and rebuild the image.
 
 ### Backup Procedures
 
@@ -431,8 +462,8 @@ LIMIT 10;
 # For cloud: max_connections = vCPU * 4
 
 # Example for 4 vCPU instance
-export RUSTCHAT_DB_POOL__MAX_CONNECTIONS=16
-export RUSTCHAT_DB_POOL__MIN_CONNECTIONS=4
+export DB_POOL_MAX_CONNECTIONS=16
+export DB_POOL_MIN_CONNECTIONS=4
 ```
 
 ### WebSocket Optimization

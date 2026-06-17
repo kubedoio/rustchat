@@ -41,31 +41,74 @@ pub fn map_channel_with_team_data_row(row: ChannelWithTeamDataRow) -> ChannelWit
     }
 }
 
-/// Verify that the caller is either a system admin or a channel admin.
-/// Returns the membership row on success so callers can avoid a second query.
+/// Verify that the caller can manage the channel.
+///
+/// Authorizes:
+///   * system administrators (via the `SYSTEM_MANAGE` permission), and
+///   * channel admins, team admins, or org admins of the channel's organization,
+///     determined by querying `channels`, `channel_members`, `team_members`, and `users`.
+///   * users whose `users.role` is `admin` are treated as org admins, matching the
+///     policy-layer alias for `ROLE_ADMIN`.
+///
+/// The query starts from `channels` and left-joins membership rows so that team and
+/// org admins who are not channel members are still recognized.
 pub async fn ensure_channel_admin_or_system_manage(
     state: &AppState,
     channel_id: Uuid,
     auth: &MmAuthUser,
 ) -> ApiResult<()> {
-    if auth.has_permission(&crate::auth::policy::permissions::SYSTEM_MANAGE) {
+    use crate::auth::policy::permissions::SYSTEM_MANAGE;
+    use crate::constants::{ROLE_ADMIN, ROLE_CHANNEL_ADMIN, ROLE_TEAM_ADMIN};
+
+    // System administrators may manage any channel.
+    if auth.has_permission(&SYSTEM_MANAGE) {
         return Ok(());
     }
-    let role: Option<String> = sqlx::query_scalar(
-        "SELECT role FROM channel_members WHERE channel_id = $1 AND user_id = $2",
+
+    #[derive(sqlx::FromRow)]
+    struct ChannelRoles {
+        channel_role: Option<String>,
+        team_role: Option<String>,
+        is_org_admin: bool,
+    }
+
+    let roles: Option<ChannelRoles> = sqlx::query_as(
+        r#"
+        SELECT cm.role AS channel_role,
+               tm.role AS team_role,
+               (u.role ~ '(^|[[:space:],])(org_admin|admin)([[:space:],]|$)' AND u.org_id = t.org_id) AS is_org_admin
+        FROM channels c
+        JOIN teams t ON t.id = c.team_id
+        JOIN users u ON u.id = $2
+        LEFT JOIN channel_members cm ON cm.channel_id = c.id AND cm.user_id = u.id
+        LEFT JOIN team_members tm ON tm.team_id = c.team_id AND tm.user_id = u.id
+        WHERE c.id = $1
+        "#,
     )
     .bind(channel_id)
     .bind(auth.user_id)
     .fetch_optional(&state.db)
     .await?;
 
-    match role.as_deref() {
-        Some("admin") | Some("channel_admin") | Some("team_admin") => Ok(()),
-        Some(_) => Err(AppError::Forbidden(
-            "Channel admin privileges required".to_string(),
-        )),
+    match roles {
+        Some(r) => {
+            let is_channel_admin = r.channel_role.as_deref() == Some(ROLE_ADMIN)
+                || r.channel_role.as_deref() == Some(ROLE_CHANNEL_ADMIN)
+                || r.channel_role.as_deref() == Some(ROLE_TEAM_ADMIN);
+            let is_team_admin = r.team_role.as_deref() == Some(ROLE_ADMIN)
+                || r.team_role.as_deref() == Some(ROLE_TEAM_ADMIN);
+            let is_org_admin = r.is_org_admin;
+
+            if is_channel_admin || is_team_admin || is_org_admin {
+                Ok(())
+            } else {
+                Err(AppError::Forbidden(
+                    "Channel admin privileges required".to_string(),
+                ))
+            }
+        }
         None => Err(AppError::Forbidden(
-            "Not a member of this channel".to_string(),
+            "Channel admin privileges required".to_string(),
         )),
     }
 }

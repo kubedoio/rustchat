@@ -93,7 +93,7 @@ RUSTCHAT_SECURITY_RATE_LIMIT_WS_PER_MINUTE=30
 
 | Setting | Development | Production | Why |
 |---------|-------------|------------|-----|
-| `RUSTCHAT_ENVIRONMENT` | `development` | `production` | Enables strict validation |
+| `RUSTCHAT_ENVIRONMENT` | `development` (explicit override) | `production` | Enables strict validation; default is `production` |
 | `RUSTCHAT_SITE_URL` | `http://localhost:8080` | `https://...` | Required for OAuth callbacks |
 | `CORS_ALLOWED_ORIGINS` | Permissive | Exact HTTPS domains | Prevents cross-origin attacks |
 | `OAUTH_TOKEN_DELIVERY` | `cookie` | `cookie` | Secure one-time OAuth token exchange |

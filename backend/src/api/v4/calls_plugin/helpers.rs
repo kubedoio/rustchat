@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::api::AppState;
+
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 

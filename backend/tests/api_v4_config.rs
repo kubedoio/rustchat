@@ -165,6 +165,7 @@ fn test_config() -> Config {
         admin_user: None,
         admin_password: None,
         cors_allowed_origins: None,
+        allow_dev_cors: false,
         turnstile: Default::default(),
         calls: Default::default(),
         security: Default::default(),
@@ -174,5 +175,6 @@ fn test_config() -> Config {
         compatibility: rustchat::config::CompatibilityConfig {
             mobile_sso_code_exchange: true,
         },
+        retention: Default::default(),
     }
 }

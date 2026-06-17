@@ -28,3 +28,6 @@ pub mod tools;
 pub mod turnstile;
 pub mod unreads;
 pub mod webhooks;
+
+#[cfg(test)]
+mod webhooks_tests;
