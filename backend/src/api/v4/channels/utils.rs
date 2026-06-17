@@ -53,7 +53,7 @@ pub async fn ensure_channel_admin_or_system_manage(
     auth: &MmAuthUser,
 ) -> ApiResult<()> {
     use crate::auth::policy::permissions::SYSTEM_MANAGE;
-    use crate::constants::{ROLE_ADMIN, ROLE_CHANNEL_ADMIN, ROLE_ORG_ADMIN, ROLE_TEAM_ADMIN};
+    use crate::constants::{ROLE_ADMIN, ROLE_CHANNEL_ADMIN, ROLE_TEAM_ADMIN};
 
     // System administrators may manage any channel.
     if auth.has_permission(&SYSTEM_MANAGE) {
@@ -71,7 +71,7 @@ pub async fn ensure_channel_admin_or_system_manage(
         r#"
         SELECT cm.role AS channel_role,
                tm.role AS team_role,
-               (u.role = $3 AND u.org_id = t.org_id) AS is_org_admin
+               (u.role ~ '(^|[[:space:],])org_admin([[:space:],]|$)' AND u.org_id = t.org_id) AS is_org_admin
         FROM channel_members cm
         JOIN channels c ON c.id = cm.channel_id
         JOIN teams t ON t.id = c.team_id
@@ -82,7 +82,6 @@ pub async fn ensure_channel_admin_or_system_manage(
     )
     .bind(channel_id)
     .bind(auth.user_id)
-    .bind(ROLE_ORG_ADMIN)
     .fetch_optional(&state.db)
     .await?;
 
