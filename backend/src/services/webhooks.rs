@@ -166,6 +166,9 @@ pub(crate) async fn callback_http_client(url: &str) -> Option<(reqwest::Client, 
             let client = reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
                 .timeout(Duration::from_secs(30))
+                // Bypass system proxies so the pinned addresses are the only route used.
+                // Without this, a proxy could re-resolve the hostname and defeat SSRF checks.
+                .no_proxy()
                 .resolve_to_addrs(hostname, &addrs)
                 .build()
                 .ok()?;
@@ -200,6 +203,9 @@ fn shared_webhook_client() -> reqwest::Client {
                 // Apply a safe default timeout for all requests; callers can still override
                 // per-request via `.timeout(...)` on individual RequestBuilders.
                 .timeout(Duration::from_secs(30))
+                // Bypass system proxies so outbound delivery uses only the validated IP.
+                // Without this, a proxy could re-resolve the hostname and defeat SSRF checks.
+                .no_proxy()
                 .build()
                 .expect("Failed to build shared no-redirect webhook client")
         })
