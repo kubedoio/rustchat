@@ -9,7 +9,7 @@ services:
     environment:
       - RUSTCHAT_SERVER_HOST=0.0.0.0
       - RUSTCHAT_SERVER_PORT=3000
-      - RUSTCHAT_ENVIRONMENT=${RUSTCHAT_ENVIRONMENT:-production}
+      - RUSTCHAT_ENVIRONMENT=${RUSTCHAT_ENVIRONMENT:-development}
       # ⚠️  PRODUCTION (behind reverse proxy):
       #   - Set SITE_URL to public HTTPS URL (e.g., https://chat.example.com)
       #   - Set CORS_ALLOWED_ORIGINS to same HTTPS URL(s)

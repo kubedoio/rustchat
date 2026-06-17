@@ -24,9 +24,9 @@ async fn calls_lifecycle_events_are_delivered_over_websocket() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Lifecycle Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "caller_a", "caller_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "caller_b", "caller_b@example.com").await;
 
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
@@ -146,9 +146,9 @@ async fn calls_start_in_direct_channel_auto_rings_other_participants() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Direct Ringing Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "direct_ring_a", "direct_ring_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "direct_ring_b", "direct_ring_b@example.com").await;
     let channel_id =
         create_team_and_channel_with_members_of_type(&app, org_id, &[user_a, user_b], "direct")
@@ -191,11 +191,11 @@ async fn ring_endpoint_requires_channel_membership() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Ring Permission Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "ring_member_a", "ring_member_a@example.com").await;
-    let (_token_b, user_b) =
+    let (_token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "ring_member_b", "ring_member_b@example.com").await;
-    let (token_outsider, _user_outsider) =
+    let (token_outsider, _user_outsider, _password_outsider) =
         register_and_login(&app, org_id, "ring_outsider", "ring_outsider@example.com").await;
 
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
@@ -230,7 +230,7 @@ async fn offer_generates_server_signaling_event_over_websocket() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Signaling Org").await;
-    let (token, user_id) =
+    let (token, user_id, _password) =
         register_and_login(&app, org_id, "signal_user", "signal_user@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_id]).await;
 
@@ -275,9 +275,9 @@ async fn calls_mobile_channel_state_and_end_route_are_compatible() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Mobile REST Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "mobile_rest_a", "mobile_rest_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "mobile_rest_b", "mobile_rest_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
@@ -489,9 +489,9 @@ async fn calls_mobile_event_names_and_payloads_are_compatible() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Mobile WS Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "mobile_ws_a", "mobile_ws_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "mobile_ws_b", "mobile_ws_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
@@ -774,9 +774,9 @@ async fn calls_host_transfers_when_original_host_leaves() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Host Transfer Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "host_leave_a", "host_leave_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "host_leave_b", "host_leave_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
@@ -847,9 +847,9 @@ async fn system_admin_can_end_call_even_when_not_host() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Admin End Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "admin_end_a", "admin_end_a@example.com").await;
-    let (_token_b, user_b) =
+    let (_token_b, user_b, password_b) =
         register_and_login(&app, org_id, "admin_end_b", "admin_end_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
@@ -859,7 +859,7 @@ async fn system_admin_can_end_call_even_when_not_host() {
         .execute(&app.db_pool)
         .await
         .expect("failed to promote user to system_admin");
-    let token_b = login_and_get_token(&app, "admin_end_b@example.com", "Password123!").await;
+    let token_b = login_and_get_token(&app, "admin_end_b@example.com", &password_b).await;
 
     let start = app
         .api_client
@@ -903,9 +903,9 @@ async fn calls_reaction_event_contains_mobile_fields() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Reaction Payload Org").await;
-    let (token_a, user_a) =
+    let (token_a, user_a, _password_a) =
         register_and_login(&app, org_id, "reaction_a", "reaction_a@example.com").await;
-    let (token_b, user_b) =
+    let (token_b, user_b, _password_b) =
         register_and_login(&app, org_id, "reaction_b", "reaction_b@example.com").await;
     let channel_id = create_team_and_channel_with_members(&app, org_id, &[user_a, user_b]).await;
 
@@ -970,14 +970,14 @@ async fn regular_member_cannot_toggle_channel_calls() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Toggle Forbidden Org").await;
-    let (_token_a, user_a) = register_and_login(
+    let (_token_a, user_a, _password_a) = register_and_login(
         &app,
         org_id,
         "toggle_forbidden_a",
         "toggle_forbidden_a@example.com",
     )
     .await;
-    let (token_b, user_b) = register_and_login(
+    let (token_b, user_b, _password_b) = register_and_login(
         &app,
         org_id,
         "toggle_forbidden_b",
@@ -1005,14 +1005,14 @@ async fn channel_admin_can_toggle_channel_calls() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Toggle Channel Admin Org").await;
-    let (token_a, user_a) = register_and_login(
+    let (token_a, user_a, _password_a) = register_and_login(
         &app,
         org_id,
         "toggle_channel_admin_a",
         "toggle_channel_admin_a@example.com",
     )
     .await;
-    let (token_b, user_b) = register_and_login(
+    let (token_b, user_b, _password_b) = register_and_login(
         &app,
         org_id,
         "toggle_channel_admin_b",
@@ -1064,14 +1064,14 @@ async fn system_admin_can_toggle_channel_calls() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Toggle System Admin Org").await;
-    let (_token_a, user_a) = register_and_login(
+    let (_token_a, user_a, password_a) = register_and_login(
         &app,
         org_id,
         "toggle_system_admin_a",
         "toggle_system_admin_a@example.com",
     )
     .await;
-    let (_token_b, user_b) = register_and_login(
+    let (_token_b, user_b, _password_b) = register_and_login(
         &app,
         org_id,
         "toggle_system_admin_b",
@@ -1086,8 +1086,7 @@ async fn system_admin_can_toggle_channel_calls() {
         .execute(&app.db_pool)
         .await
         .expect("failed to promote user to system_admin");
-    let token_a =
-        login_and_get_token(&app, "toggle_system_admin_a@example.com", "Password123!").await;
+    let token_a = login_and_get_token(&app, "toggle_system_admin_a@example.com", &password_a).await;
 
     let resp = app
         .api_client
@@ -1126,14 +1125,14 @@ async fn team_admin_can_toggle_channel_calls() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Toggle Team Admin Org").await;
-    let (_token_a, user_a) = register_and_login(
+    let (_token_a, user_a, password_a) = register_and_login(
         &app,
         org_id,
         "toggle_team_admin_a",
         "toggle_team_admin_a@example.com",
     )
     .await;
-    let (_token_b, user_b) = register_and_login(
+    let (_token_b, user_b, _password_b) = register_and_login(
         &app,
         org_id,
         "toggle_team_admin_b",
@@ -1154,8 +1153,7 @@ async fn team_admin_can_toggle_channel_calls() {
     .execute(&app.db_pool)
     .await
     .expect("failed to promote user to team_admin");
-    let token_a =
-        login_and_get_token(&app, "toggle_team_admin_a@example.com", "Password123!").await;
+    let token_a = login_and_get_token(&app, "toggle_team_admin_a@example.com", &password_a).await;
 
     let resp = app
         .api_client
@@ -1194,14 +1192,14 @@ async fn org_admin_can_toggle_channel_calls() {
     let app = spawn_app().await;
 
     let org_id = insert_org(&app, "Calls Toggle Org Admin Org").await;
-    let (_token_a, user_a) = register_and_login(
+    let (_token_a, user_a, password_a) = register_and_login(
         &app,
         org_id,
         "toggle_org_admin_a",
         "toggle_org_admin_a@example.com",
     )
     .await;
-    let (_token_b, user_b) = register_and_login(
+    let (_token_b, user_b, _password_b) = register_and_login(
         &app,
         org_id,
         "toggle_org_admin_b",
@@ -1216,7 +1214,7 @@ async fn org_admin_can_toggle_channel_calls() {
         .execute(&app.db_pool)
         .await
         .expect("failed to promote user to org_admin");
-    let token_a = login_and_get_token(&app, "toggle_org_admin_a@example.com", "Password123!").await;
+    let token_a = login_and_get_token(&app, "toggle_org_admin_a@example.com", &password_a).await;
 
     let resp = app
         .api_client
@@ -1266,13 +1264,15 @@ async fn register_and_login(
     org_id: Uuid,
     username: &str,
     email: &str,
-) -> (String, Uuid) {
+) -> (String, Uuid, String) {
+    let password = format!("Pwd{}!", Uuid::new_v4().simple());
+
     app.api_client
         .post(format!("{}/api/v1/auth/register", app.address))
         .json(&serde_json::json!({
             "username": username,
             "email": email,
-            "password": "Password123!",
+            "password": password,
             "display_name": username,
             "org_id": org_id,
         }))
@@ -1287,7 +1287,7 @@ async fn register_and_login(
         .post(format!("{}/api/v4/users/login", app.address))
         .json(&serde_json::json!({
             "login_id": email,
-            "password": "Password123!",
+            "password": password,
         }))
         .send()
         .await
@@ -1320,7 +1320,7 @@ async fn register_and_login(
         .and_then(parse_mm_or_uuid)
         .expect("user id should parse");
 
-    (token, user_id)
+    (token, user_id, password)
 }
 
 async fn login_and_get_token(app: &common::TestApp, email: &str, password: &str) -> String {

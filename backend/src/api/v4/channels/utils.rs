@@ -43,20 +43,20 @@ pub fn map_channel_with_team_data_row(row: ChannelWithTeamDataRow) -> ChannelWit
 
 /// Verify that the caller can manage the channel.
 ///
-/// Authorizes channel admins (checked via `channel_members`/`team_members`
-/// as a DB fallback) plus anyone holding the `CHANNEL_MANAGE` permission
-/// (team admin, org admin, or system admin).
+/// Authorizes:
+///   * system administrators (via the `SYSTEM_MANAGE` permission), and
+///   * channel admins, team admins, or org admins of the channel's organization,
+///     determined by querying `channel_members`, `team_members`, and `users`.
 pub async fn ensure_channel_admin_or_system_manage(
     state: &AppState,
     channel_id: Uuid,
     auth: &MmAuthUser,
 ) -> ApiResult<()> {
-    use crate::auth::policy::permissions::CHANNEL_MANAGE;
-    use crate::constants::{ROLE_ADMIN, ROLE_CHANNEL_ADMIN, ROLE_TEAM_ADMIN};
+    use crate::auth::policy::permissions::SYSTEM_MANAGE;
+    use crate::constants::{ROLE_ADMIN, ROLE_CHANNEL_ADMIN, ROLE_ORG_ADMIN, ROLE_TEAM_ADMIN};
 
-    // Anyone with the policy-level CHANNEL_MANAGE permission (team admin,
-    // org admin, system admin, etc.) may manage channels.
-    if auth.has_permission(&CHANNEL_MANAGE) {
+    // System administrators may manage any channel.
+    if auth.has_permission(&SYSTEM_MANAGE) {
         return Ok(());
     }
 
@@ -64,20 +64,25 @@ pub async fn ensure_channel_admin_or_system_manage(
     struct ChannelRoles {
         channel_role: String,
         team_role: Option<String>,
+        is_org_admin: bool,
     }
 
     let roles: Option<ChannelRoles> = sqlx::query_as(
         r#"
         SELECT cm.role AS channel_role,
-               tm.role AS team_role
+               tm.role AS team_role,
+               (u.role = $3 AND u.org_id = t.org_id) AS is_org_admin
         FROM channel_members cm
         JOIN channels c ON c.id = cm.channel_id
+        JOIN teams t ON t.id = c.team_id
+        JOIN users u ON u.id = cm.user_id
         LEFT JOIN team_members tm ON tm.team_id = c.team_id AND tm.user_id = cm.user_id
         WHERE cm.channel_id = $1 AND cm.user_id = $2
         "#,
     )
     .bind(channel_id)
     .bind(auth.user_id)
+    .bind(ROLE_ORG_ADMIN)
     .fetch_optional(&state.db)
     .await?;
 
@@ -88,8 +93,9 @@ pub async fn ensure_channel_admin_or_system_manage(
                 || r.channel_role == ROLE_TEAM_ADMIN;
             let is_team_admin = r.team_role.as_deref() == Some(ROLE_ADMIN)
                 || r.team_role.as_deref() == Some(ROLE_TEAM_ADMIN);
+            let is_org_admin = r.is_org_admin;
 
-            if is_channel_admin || is_team_admin {
+            if is_channel_admin || is_team_admin || is_org_admin {
                 Ok(())
             } else {
                 Err(AppError::Forbidden(

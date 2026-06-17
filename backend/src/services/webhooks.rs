@@ -293,7 +293,7 @@ pub async fn check_outgoing_triggers(
 
             // Spawn async task to call each callback URL (filter out SSRF-risky URLs)
             for url in &hook.callback_urls {
-                if !validate_callback_url_at_request_time(url).await {
+                if !is_valid_callback_url(url) {
                     tracing::warn!("Skipping outgoing webhook to invalid URL: {}", url);
                     continue;
                 }
@@ -305,6 +305,11 @@ pub async fn check_outgoing_triggers(
                     .unwrap_or_else(|| "application/json".to_string());
 
                 tokio::spawn(async move {
+                    if !validate_callback_url_at_request_time(&url).await {
+                        tracing::warn!("Skipping outgoing webhook to invalid URL: {}", url);
+                        return;
+                    }
+
                     let client = shared_webhook_client();
                     let request = client
                         .post(&url)
