@@ -2,12 +2,27 @@ use crate::api::AppState;
 use crate::error::ApiResult;
 use axum::{
     extract::{Path, State},
+    middleware,
     routing::{get, post},
     Json, Router,
 };
 use serde_json::json;
 
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
+        .route(
+            "/data_retention/policies/{policy_id}/teams/search",
+            post(search_teams_for_retention_policy),
+        )
+        .route(
+            "/data_retention/policies/{policy_id}/channels/search",
+            post(search_channels_for_retention_policy),
+        )
+        .layer(middleware::from_fn_with_state(
+            state,
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
     Router::new()
         .route(
             "/data_retention/policy",
@@ -27,16 +42,8 @@ pub fn router() -> Router<AppState> {
             get(get_teams_for_retention_policy).post(add_teams_to_retention_policy),
         )
         .route(
-            "/data_retention/policies/{policy_id}/teams/search",
-            post(search_teams_for_retention_policy),
-        )
-        .route(
             "/data_retention/policies/{policy_id}/channels",
             get(get_channels_for_retention_policy).post(add_channels_to_retention_policy),
-        )
-        .route(
-            "/data_retention/policies/{policy_id}/channels/search",
-            post(search_channels_for_retention_policy),
         )
         // User-specific data retention policies (for mobile compatibility)
         .route(
@@ -49,6 +56,7 @@ pub fn router() -> Router<AppState> {
         )
         // NPS endpoint stub
         .route("/nps", post(submit_nps))
+        .merge(search_routes)
 }
 
 /// GET /api/v4/data_retention/policy
