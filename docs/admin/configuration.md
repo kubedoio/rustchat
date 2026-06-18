@@ -10,7 +10,7 @@ All configuration is done via environment variables with the `RUSTCHAT_` prefix.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `RUSTCHAT_ENVIRONMENT` | No | `development` | Runtime mode: `development` or `production` |
+| `RUSTCHAT_ENVIRONMENT` | No | `production` | Runtime mode: `development` or `production` |
 | `RUSTCHAT_SITE_URL` | Yes | - | Public URL of your RustChat instance |
 | `RUSTCHAT_JWT_SECRET` | Yes | - | Secret key for JWT signing (min 32 chars) |
 | `RUSTCHAT_JWT_ISSUER` | Yes | - | JWT issuer claim |
@@ -55,11 +55,14 @@ RUSTCHAT_REDIS_URL=redis://localhost:6379/
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `RUSTCHAT_CORS_ALLOWED_ORIGINS` | Production | - | Comma-separated allowed origins |
+| `RUSTCHAT_ALLOW_DEV_CORS` | No | `false` | **Danger:** enables permissive CORS (`*`). Only for local development. |
 
 Example:
 ```bash
 RUSTCHAT_CORS_ALLOWED_ORIGINS=https://chat.example.com,https://app.example.com
 ```
+
+Cross-origin requests are denied by default. For local development you must either set `RUSTCHAT_ALLOW_DEV_CORS=true` (never in production) or configure `RUSTCHAT_CORS_ALLOWED_ORIGINS` with the exact origins your frontend uses (e.g. `http://localhost:8080,http://localhost:5173`).
 
 ### Email (SMTP)
 

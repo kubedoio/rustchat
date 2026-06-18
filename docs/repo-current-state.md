@@ -1,7 +1,7 @@
 # Repo Current State
 
-**Last updated:** 2026-05-22
-**Version:** v0.4.0
+**Last updated:** 2026-06-16
+**Version:** v0.5.0
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
 
@@ -9,7 +9,7 @@
 
 ## 1. Version
 
-**Current:** v0.4.0
+**Current:** v0.5.0
 
 Version is synchronized across two files:
 - `backend/Cargo.toml` → `[package] version`
@@ -28,7 +28,7 @@ Versioning follows semver. Releases are cut by pushing a `v*` tag — the `relea
 | Backend API | `backend/` | 3000 | ✅ Active |
 | Frontend SPA | `frontend/` | 5173 (dev) / 8080 (via Nginx) | ✅ Active |
 | Push Proxy | `push-proxy/` | 8065 | ✅ Active |
-| Nginx proxy | `docker/nginx.conf` | 8080 | ✅ Active (Docker) |
+| Nginx proxy | `frontend/nginx.conf` | 8080 | ✅ Active (Docker) |
 
 **External services required:**
 - PostgreSQL 16+ (port 5432)
@@ -72,6 +72,7 @@ For live in-flight work see [GitHub Issues](https://github.com/rustchatio/rustch
 | Phase 1: Entity Foundation | Entity registration, API keys, rate limiting, WebSocket JWT expiry, mobile compat audit | 2026-03-17 |
 | Governance Layer | `.governance/` policy files, CODEOWNERS, PR template, issue forms, branch protection, GitHub labels | 2026-03-22 |
 | Foundation Docs | 7 structured docs consolidating existing flat docs | 2026-03-22 |
+| P0 Production Readiness | Security/operations hardening alignment, runbook fixes, and doc/env alignment | 2026-06-16 |
 
 ---
 

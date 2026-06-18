@@ -8,9 +8,71 @@ use crate::error::{ApiResult, AppError};
 use crate::middleware::reliability::{send_reqwest_with_retry, RetryCondition, RetryConfig};
 use crate::models::{IncomingWebhook, OutgoingWebhook, OutgoingWebhookPayload, WebhookPayload};
 use crate::services::posts;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+use tokio::sync::Semaphore;
 use uuid::Uuid;
+
+/// Maximum number of outgoing webhook deliveries that may be in flight at once
+/// for a single message. This bounds memory and connection usage when many
+/// callback URLs are configured.
+const MAX_CONCURRENT_OUTGOING_WEBHOOKS: usize = 10;
+
+/// Comprehensive check for private, reserved, or otherwise unsafe IP addresses.
+fn is_private_or_reserved_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let octets = v4.octets();
+            v4.is_private()
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_multicast()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || v4.is_unspecified()
+                // 100.64.0.0/10 (shared/CGNAT address space)
+                || (octets[0] == 100 && (octets[1] & 0b11000000) == 0b01000000)
+                // 198.18.0.0/15 (benchmarking range)
+                || (octets[0] == 198 && (octets[1] & 0xfe) == 18)
+        }
+        IpAddr::V6(v6) => {
+            // Handle IPv4-mapped IPv6 addresses such as ::ffff:127.0.0.1 by
+            // delegating to the IPv4 checks. This prevents SSRF bypasses where
+            // an attacker uses IPv6 literal syntax to reach IPv4-internal hosts.
+            if let Some(mapped_v4) = v6.to_ipv4_mapped() {
+                return is_private_or_reserved_ip(IpAddr::V4(mapped_v4));
+            }
+
+            if v6.is_unspecified() {
+                return true;
+            }
+
+            let segments = v6.segments();
+            // ::1 (loopback)
+            if segments == [0, 0, 0, 0, 0, 0, 0, 1] {
+                return true;
+            }
+            // fe80::/10 (link-local)
+            if segments[0] & 0xffc0 == 0xfe80 {
+                return true;
+            }
+            // fc00::/7 (unique local addresses)
+            if segments[0] & 0xfe00 == 0xfc00 {
+                return true;
+            }
+            // ff00::/8 (multicast)
+            if segments[0] & 0xff00 == 0xff00 {
+                return true;
+            }
+            // 2001:db8::/32 (IPv6 documentation range)
+            if segments[0] == 0x2001 && segments[1] == 0x0db8 {
+                return true;
+            }
+            false
+        }
+    }
+}
 
 /// Validates that a URL is safe for webhook callbacks (no SSRF to internal networks)
 pub fn is_valid_callback_url(url: &str) -> bool {
@@ -24,73 +86,144 @@ pub fn is_valid_callback_url(url: &str) -> bool {
         _ => return false,
     }
 
+    // Reject explicit non-standard ports to prevent SSRF to internal services
+    // listening on arbitrary ports (e.g., metadata APIs, databases).
+    if let Some(port) = parsed.port() {
+        if port != 80 && port != 443 {
+            return false;
+        }
+    }
+
     // Check host is present
-    let Some(host) = parsed.host_str() else {
+    let Some(host) = parsed.host() else {
         return false;
     };
 
-    // Block localhost and loopback
-    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+    // Block localhost and loopback hostnames
+    if host == url::Host::Domain("localhost".to_string()) {
         return false;
     }
 
-    // Check if host is an IP address
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        // Block private IP ranges
-        match ip {
-            IpAddr::V4(v4) => {
-                let octets = v4.octets();
-                // 10.0.0.0/8
-                if octets[0] == 10 {
-                    return false;
-                }
-                // 172.16.0.0/12
-                if octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31 {
-                    return false;
-                }
-                // 192.168.0.0/16
-                if octets[0] == 192 && octets[1] == 168 {
-                    return false;
-                }
-                // 127.0.0.0/8 (loopback)
-                if octets[0] == 127 {
-                    return false;
-                }
-                // 169.254.0.0/16 (link-local/APIPA - includes cloud metadata)
-                if octets[0] == 169 && octets[1] == 254 {
-                    return false;
-                }
+    // Check if host is an IP address and reject unsafe ranges.
+    match host {
+        url::Host::Ipv4(ip) => {
+            if is_private_or_reserved_ip(IpAddr::V4(ip)) {
+                return false;
             }
-            IpAddr::V6(v6) => {
-                let segments = v6.segments();
-                // ::1 (loopback)
-                if segments == [0, 0, 0, 0, 0, 0, 0, 1] {
-                    return false;
-                }
-                // fe80::/10 (link-local)
-                if segments[0] & 0xffc0 == 0xfe80 {
-                    return false;
-                }
-                // fc00::/7 (unique local addresses)
-                if segments[0] & 0xfe00 == 0xfc00 {
-                    return false;
-                }
+        }
+        url::Host::Ipv6(ip) => {
+            if is_private_or_reserved_ip(IpAddr::V6(ip)) {
+                return false;
+            }
+        }
+        url::Host::Domain(host) => {
+            // Block cloud metadata endpoints by hostname
+            let host_lower = host.to_lowercase();
+            if host_lower == "169.254.169.254"
+                || host_lower.ends_with(".internal")
+                || host_lower == "metadata.google.internal"
+                || host_lower == "instance-data.ec2.internal"
+                || host_lower == "metadata.azure.internal"
+            {
+                return false;
             }
         }
     }
 
-    // Block cloud metadata endpoints by hostname
-    let host_lower = host.to_lowercase();
-    if host_lower == "169.254.169.254"
-        || host_lower.ends_with(".internal")
-        || host_lower == "metadata.google.internal"
-        || host_lower == "instance-data.ec2.internal"
-        || host_lower == "metadata.azure.internal"
-    {
-        return false;
+    true
+}
+
+/// Build a reqwest client that is bound to the validated IP addresses for `url`.
+///
+/// For IP-literal URLs this returns the shared no-redirect client after validating
+/// the address. For domain URLs it resolves the hostname once, verifies that every
+/// returned address is public, and then configures the client with `resolve` so
+/// reqwest connects to the vetted addresses instead of performing a second DNS lookup.
+/// This closes the DNS-rebinding SSRF window.
+pub(crate) async fn callback_http_client(url: &str) -> Option<(reqwest::Client, reqwest::Url)> {
+    let parsed: reqwest::Url = url.parse().ok()?;
+    if !is_valid_callback_url(url) {
+        return None;
     }
 
-    true
+    let parsed_return = parsed.clone();
+    let host = parsed.host()?;
+    let port = parsed.port_or_known_default().unwrap_or(80);
+
+    match host {
+        url::Host::Ipv4(ip) => {
+            if is_private_or_reserved_ip(IpAddr::V4(ip)) {
+                return None;
+            }
+            Some((shared_webhook_client(), parsed_return))
+        }
+        url::Host::Ipv6(ip) => {
+            if is_private_or_reserved_ip(IpAddr::V6(ip)) {
+                return None;
+            }
+            Some((shared_webhook_client(), parsed_return))
+        }
+        url::Host::Domain(hostname) => {
+            let lookup = tokio::time::timeout(
+                Duration::from_secs(5),
+                tokio::net::lookup_host((hostname, port)),
+            )
+            .await;
+            let Ok(Ok(addrs)) = lookup else {
+                return None;
+            };
+            let addrs: Vec<SocketAddr> = addrs.collect();
+            if !callback_addresses_are_safe(&addrs) {
+                return None;
+            }
+
+            let client = reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .timeout(Duration::from_secs(30))
+                // Bypass system proxies so the pinned addresses are the only route used.
+                // Without this, a proxy could re-resolve the hostname and defeat SSRF checks.
+                .no_proxy()
+                .resolve_to_addrs(hostname, &addrs)
+                .build()
+                .ok()?;
+            Some((client, parsed_return))
+        }
+    }
+}
+
+/// Returns true only when every resolved address is safe and at least one address exists.
+/// An empty resolution list is rejected because `Iterator::all` vacuously returns true.
+fn callback_addresses_are_safe(addrs: &[SocketAddr]) -> bool {
+    if addrs.is_empty() {
+        return false;
+    }
+    addrs
+        .iter()
+        .all(|socket_addr| !is_private_or_reserved_ip(socket_addr.ip()))
+}
+
+/// Shared no-redirect reqwest client for outgoing webhook delivery.
+///
+/// Building one client and cloning it per task avoids the overhead of
+/// reconstructing TLS state for every spawned webhook request.
+fn shared_webhook_client() -> reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                // Do not follow redirects for SSRF safety. A redirect target could resolve
+                // to an internal endpoint after the initial request passed validation.
+                .redirect(reqwest::redirect::Policy::none())
+                // Apply a safe default timeout for all requests; callers can still override
+                // per-request via `.timeout(...)` on individual RequestBuilders.
+                .timeout(Duration::from_secs(30))
+                // Bypass system proxies so outbound delivery uses only the validated IP.
+                // Without this, a proxy could re-resolve the hostname and defeat SSRF checks.
+                .no_proxy()
+                .build()
+                .expect("Failed to build shared no-redirect webhook client")
+        })
+        .clone()
 }
 
 /// Execute an incoming webhook - creates a post in the target channel
@@ -170,6 +303,8 @@ pub async fn check_outgoing_triggers(
     .fetch_all(&state.db)
     .await?;
 
+    let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_OUTGOING_WEBHOOKS));
+
     for hook in hooks {
         let matched_word = hook.trigger_words.iter().find(|tw| {
             let tw_lower = tw.to_lowercase();
@@ -205,10 +340,21 @@ pub async fn check_outgoing_triggers(
                     .clone()
                     .unwrap_or_else(|| "application/json".to_string());
 
+                let semaphore = semaphore.clone();
+
                 tokio::spawn(async move {
-                    let client = reqwest::Client::new();
+                    let Ok(permit) = semaphore.acquire_owned().await else {
+                        tracing::warn!("Outgoing webhook semaphore closed");
+                        return;
+                    };
+                    let _permit = permit;
+                    let Some((client, parsed_url)) = callback_http_client(&url).await else {
+                        tracing::warn!("Skipping outgoing webhook to unsafe URL: {}", url);
+                        return;
+                    };
+
                     let request = client
-                        .post(&url)
+                        .post(parsed_url.as_str())
                         .header("Content-Type", &content_type)
                         .json(&payload)
                         .timeout(Duration::from_secs(30));
@@ -241,4 +387,49 @@ pub async fn check_outgoing_triggers(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_resolution_is_rejected() {
+        let addrs: Vec<SocketAddr> = vec![];
+        assert!(!callback_addresses_are_safe(&addrs));
+    }
+
+    #[test]
+    fn only_public_addresses_are_accepted() {
+        let addrs = vec![
+            "1.1.1.1:443".parse::<SocketAddr>().unwrap(),
+            "9.9.9.9:443".parse::<SocketAddr>().unwrap(),
+        ];
+        assert!(callback_addresses_are_safe(&addrs));
+    }
+
+    #[test]
+    fn any_private_address_is_rejected() {
+        let addrs = vec![
+            "1.1.1.1:443".parse::<SocketAddr>().unwrap(),
+            "192.168.1.1:443".parse::<SocketAddr>().unwrap(),
+        ];
+        assert!(!callback_addresses_are_safe(&addrs));
+    }
+
+    #[test]
+    fn callback_url_allows_default_ports() {
+        assert!(is_valid_callback_url("http://example.com/path"));
+        assert!(is_valid_callback_url("https://example.com/path"));
+        assert!(is_valid_callback_url("http://example.com:80/path"));
+        assert!(is_valid_callback_url("https://example.com:443/path"));
+    }
+
+    #[test]
+    fn callback_url_rejects_arbitrary_ports() {
+        assert!(!is_valid_callback_url("http://example.com:8080/path"));
+        assert!(!is_valid_callback_url("https://example.com:8443/path"));
+        assert!(!is_valid_callback_url("http://1.1.1.1:25/path"));
+        assert!(!is_valid_callback_url("http://1.1.1.1:22/path"));
+    }
 }

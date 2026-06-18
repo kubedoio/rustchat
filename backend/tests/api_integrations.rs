@@ -137,7 +137,7 @@ async fn test_slash_command_lifecycle() {
     // 7. Create Custom Slash Command
     let new_cmd = CreateSlashCommand {
         trigger: "/custom".to_string(),
-        url: "http://localhost:12345/hook".to_string(),
+        url: "http://rustchat-test.invalid/hook".to_string(),
         method: "POST".to_string(),
         display_name: Some("Custom Cmd".to_string()),
         description: Some("A test command".to_string()),
@@ -189,4 +189,138 @@ async fn test_slash_command_lifecycle() {
         exec_body.text,
         "Command URL is not valid or points to an internal address"
     );
+}
+
+#[tokio::test]
+async fn test_slash_command_creation_rejects_invalid_urls() {
+    let app = spawn_app().await;
+
+    // 1. Register
+    let user_data = serde_json::json!({
+        "username": "cmduser2",
+        "email": "cmd2@example.com",
+        "password": "Password123!",
+        "display_name": "Cmd User 2"
+    });
+
+    app.api_client
+        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .json(&user_data)
+        .send()
+        .await
+        .expect("Failed to register");
+
+    // 2. Promote to org_admin BEFORE login
+    sqlx::query("UPDATE users SET role = 'org_admin' WHERE username = 'cmduser2'")
+        .execute(&app.db_pool)
+        .await
+        .expect("Failed to update user role");
+
+    // 3. Login
+    let login_data = serde_json::json!({
+        "email": "cmd2@example.com",
+        "password": "Password123!"
+    });
+
+    let login_res = app
+        .api_client
+        .post(&format!("{}/api/v1/auth/login", &app.address))
+        .json(&login_data)
+        .send()
+        .await
+        .expect("Failed to login");
+    assert_eq!(200, login_res.status().as_u16());
+    let login_body: serde_json::Value = login_res
+        .json()
+        .await
+        .expect("Failed to parse login response");
+    let token = login_body["token"]
+        .as_str()
+        .expect("Missing auth token")
+        .to_string();
+
+    // 4. Create Team
+    let team_data = serde_json::json!({
+        "name": "cmdteam2",
+        "display_name": "Command Team 2",
+        "description": "Team for testing command URL validation"
+    });
+
+    let team_res = app
+        .api_client
+        .post(&format!("{}/api/v1/teams", &app.address))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&team_data)
+        .send()
+        .await
+        .expect("Failed to create team");
+
+    assert_eq!(200, team_res.status().as_u16());
+    let team: Team = team_res.json().await.expect("Failed to parse team");
+
+    let invalid_urls = [
+        ("localhost", "http://localhost:12345/hook"),
+        ("loopback_v4", "http://127.0.0.1:12345/hook"),
+        ("loopback_v6", "http://[::1]:12345/hook"),
+        ("private_ip", "http://10.0.0.1/hook"),
+        ("metadata_ip", "http://169.254.169.254/hook"),
+        ("internal_host", "http://metadata.google.internal/hook"),
+        ("non_http_scheme", "ftp://example.com/hook"),
+        ("not_a_url", "not a valid url"),
+    ];
+
+    for (idx, (label, url)) in invalid_urls.iter().enumerate() {
+        let new_cmd = CreateSlashCommand {
+            trigger: format!("/invalid-{}", label),
+            url: url.to_string(),
+            method: "POST".to_string(),
+            display_name: Some(format!("Invalid {} command", label)),
+            description: Some("Should be rejected".to_string()),
+            hint: Some("args".to_string()),
+        };
+
+        let create_res = app
+            .api_client
+            .post(&format!(
+                "{}/api/v1/commands?team_id={}",
+                &app.address, team.id
+            ))
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&new_cmd)
+            .send()
+            .await
+            .unwrap_or_else(|_| panic!("Failed to send create command request for {}", label));
+
+        assert_eq!(
+            422,
+            create_res.status().as_u16(),
+            "Expected URL '{}' (case {}) to be rejected at creation time",
+            url,
+            idx
+        );
+    }
+
+    // A plain public http(s) URL should be accepted at creation time.
+    let valid_cmd = CreateSlashCommand {
+        trigger: "/valid".to_string(),
+        url: "https://example.com/hook".to_string(),
+        method: "POST".to_string(),
+        display_name: Some("Valid Cmd".to_string()),
+        description: Some("Should be accepted".to_string()),
+        hint: Some("args".to_string()),
+    };
+
+    let valid_res = app
+        .api_client
+        .post(&format!(
+            "{}/api/v1/commands?team_id={}",
+            &app.address, team.id
+        ))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&valid_cmd)
+        .send()
+        .await
+        .expect("Failed to create valid command");
+
+    assert_eq!(200, valid_res.status().as_u16());
 }

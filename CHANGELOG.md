@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Architecture, user, security, and runbook docs now describe the AI Agents phases and the optional runtime dependencies required to operate them safely.
 
+### Security
+- Default environment is now `production`; permissive development CORS is gated by `RUSTCHAT_ALLOW_DEV_CORS` and rejected in production.
+- Resumable file uploads now enforce the same extension/content-type allowlist as multipart uploads.
+- Channel call toggles now require channel-management permission.
+- Outgoing webhook and slash-command URLs are validated at creation time and resolved/validated at request time, with redirects disabled, to prevent DNS-rebinding SSRF.
+- Retention cleanup now deletes S3 objects and includes an optional orphan scanner configured by `RUSTCHAT_RETENTION_ORPHAN_SCAN_*` environment variables.
+- Frontend container now runs as the non-root `rustchat` user.
+
 ## [0.5.1] - 2026-06-12
 
 ### Fixed

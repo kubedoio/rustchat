@@ -55,7 +55,9 @@ server {
 | Variable | Minimum Length | Purpose |
 |----------|---------------|---------|
 | `RUSTCHAT_JWT_SECRET` | 32 chars | Signs all JWT tokens |
-| `RUSTCHAT_ENCRYPTION_KEY` | 32 bytes | Encrypts sensitive at-rest data |
+| `RUSTCHAT_ENCRYPTION_KEY` | 32 chars, high entropy | Encrypts sensitive at-rest data |
+| `RUSTCHAT_JWT_ISSUER` | Non-empty string | JWT `iss` claim; required in production |
+| `RUSTCHAT_JWT_AUDIENCE` | Non-empty string | JWT `aud` claim; required in production |
 | `RUSTCHAT_S3_SECRET_KEY` | Strong random | S3-compatible storage authentication |
 | `RUSTFS_SECRET_KEY` | Strong random | RustFS root credentials |
 | `PUSH_PROXY_AUTH_KEY` | 32 chars | Backend-to-push-proxy authentication |
@@ -63,11 +65,11 @@ server {
 ### Generating Secrets
 
 ```bash
-# JWT secret (high entropy)
+# JWT secret (high entropy, min 32 chars)
 openssl rand -base64 48
 
-# 32-byte encryption key (must be exactly 32 bytes for AES-256-GCM)
-openssl rand -base64 32
+# Encryption key (min 32 chars, high entropy)
+openssl rand -base64 48
 
 # S3 access/secret keys
 openssl rand -hex 16  # access key
@@ -104,7 +106,7 @@ RustChat validates secrets on startup:
 
 ## Environment-Based Security Constraints
 
-Set `RUSTCHAT_ENVIRONMENT=production` to enable strict validation:
+The default environment is `production`. Only override it to `development` on explicitly non-production hosts.
 
 ```bash
 RUSTCHAT_ENVIRONMENT=production
@@ -112,6 +114,7 @@ RUSTCHAT_ENVIRONMENT=production
 
 Effects in production mode:
 - HTTP origins in `RUSTCHAT_CORS_ALLOWED_ORIGINS` are rejected (HTTPS only).
+- `RUSTCHAT_ALLOW_DEV_CORS` is rejected; permissive CORS cannot be enabled in production.
 - Stricter request validation on authentication flows.
 - Error responses may omit internal details.
 
@@ -123,36 +126,47 @@ Enable rate limiting to protect against brute-force attacks:
 
 ```bash
 RUSTCHAT_SECURITY_RATE_LIMIT_ENABLED=true
+# Per-account login sliding window (default: 10 requests/min per account)
 RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE=10
-RUSTCHAT_SECURITY_RATE_LIMIT_WS_PER_MINUTE=30
 ```
 
-| Endpoint Class | Default | Guidance |
-|----------------|---------|----------|
-| Auth (login, register) | 10/min | Lower this if you do not expect high registration volume. |
-| WebSocket connections | 30/min | Tuned for mobile clients that may reconnect frequently. |
+RustChat applies two independent rate-limiting layers:
 
-If you run multiple backend instances behind a load balancer, ensure the rate limiter uses a shared Redis store (RustChat's existing Redis connection is used for this).
+1. **IP-based middleware limits** — hardcoded per-IP fixed windows for unauthenticated endpoints:
+
+   | Endpoint Class | Limit |
+   |----------------|-------|
+   | Auth endpoints (login, register, verification, password reset) | 10 requests per 15 minutes |
+   | WebSocket connections | 20 connections per minute |
+   | Registration | 5 requests per 15 minutes |
+   | Password reset | 3 requests per 15 minutes |
+   | File uploads | 30 requests per 15 minutes |
+   | Search | 60 requests per minute |
+
+2. **Per-account login sliding window** — configured by `RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE` and enforced inside the auth handlers. This throttles individual accounts independently of the IP-based limits.
+
+`RUSTCHAT_SECURITY_RATE_LIMIT_AUTH_PER_MINUTE` does **not** tune the IP-based middleware values; it only adjusts the per-account login sliding window.
+
+If you run multiple backend instances behind a load balancer, the Redis-backed counters are shared automatically through RustChat's existing Redis connection.
 
 ### Rate Limit Responses
 
-When rate limited, the API returns:
+When rate limited, the API returns a `429 Too Many Requests` status with a `Retry-After` header (when the backend knows the window length):
 
 ```http
 HTTP/1.1 429 Too Many Requests
-X-RateLimit-Limit: 10
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1704067200
-Retry-After: 45
+Retry-After: 900
 
 {
   "error": {
-    "code": "RATE_LIMIT_EXCEEDED",
-    "message": "Too many requests. Please try again later.",
-    "retry_after": 45
+    "code": "TOO_MANY_REQUESTS",
+    "message": "Too many authentication attempts. Please try again later.",
+    "details": null
   }
 }
 ```
+
+The exact `code` may be `TOO_MANY_REQUESTS` (IP-based middleware) or `RATE_LIMIT_EXCEEDED` (other rate-limit paths). Responses do not include `X-RateLimit-*` headers or a JSON `retry_after` field.
 
 ---
 
@@ -168,6 +182,15 @@ RUSTCHAT_CORS_ALLOWED_ORIGINS=https://chat.example.com,https://app.example.com
 - Never use `*` in production.
 - Do not include `http://` origins.
 - If you embed RustChat in an iframe or mobile app WebView, add those exact origins.
+
+### Permissive Development CORS
+
+`RUSTCHAT_ALLOW_DEV_CORS` enables permissive CORS (`Access-Control-Allow-Origin: *`) that bypasses `RUSTCHAT_CORS_ALLOWED_ORIGINS`. It must be explicitly set to `true` to enable this behavior, and it is rejected when `RUSTCHAT_ENVIRONMENT=production`.
+
+```bash
+# Only for local development
+RUSTCHAT_ALLOW_DEV_CORS=false
+```
 
 ---
 
@@ -235,12 +258,30 @@ Ensure your Redis server has `tls-port` and `tls-cert-file` configured.
 ## File Upload Security
 
 1. **Size Limits:** Set upload size limits at the reverse proxy level (nginx `client_max_body_size`) to prevent oversized uploads from reaching RustChat.
-2. **Type Validation:** RustChat validates file MIME types and extensions. Do not disable this.
-3. **Storage Isolation:** Uploaded files should reside in a dedicated S3 bucket, separate from other application data.
-4. **Malware Scanning:** Consider integrating a virus scanner (ClamAV, commercial API) at the S3 ingress or via Lambda-style triggers.
-5. **Content Security:** Serve uploaded files from a separate subdomain or with strict `Content-Disposition: attachment` headers to reduce XSS vectors.
+2. **Type Validation:** RustChat validates file MIME types and extensions for both multipart and resumable (TUS) uploads. Do not disable this.
+3. **Resumable Uploads:** Resumable uploads are validated against the same extension and content-type allowlist as multipart uploads.
+4. **Storage Isolation:** Uploaded files should reside in a dedicated S3 bucket, separate from other application data.
+5. **Malware Scanning:** Consider integrating a virus scanner (ClamAV, commercial API) at the S3 ingress or via Lambda-style triggers.
+6. **Content Security:** Serve uploaded files from a separate subdomain or with strict `Content-Disposition: attachment` headers to reduce XSS vectors.
 
 ---
+
+## Channel Call Permissions
+
+Toggling channel calls (enabling or disabling calls in a channel) requires channel-management permission. This prevents non-administrators from changing a channel's call configuration.
+
+## Outgoing Webhooks and Slash Commands
+
+Outgoing webhook and slash-command URLs are validated when created or updated and are re-validated at request time before any outbound request is issued.
+
+Validation behavior:
+
+- URLs must resolve to allowed IP families/ranges (loopback, link-local, and multicast addresses are blocked).
+- DNS resolution is performed at request time to prevent DNS-rebinding SSRF attacks.
+- HTTP redirects are disabled; a redirect response fails the request instead of following it.
+- Invalid or unsafe URLs are rejected with a clear error.
+
+Administrators should review configured webhook and slash-command URLs in the admin console and ensure they point only to trusted, production-owned endpoints.
 
 ## AI Agents and Knowledge Base Security
 
@@ -377,18 +418,36 @@ access_log /var/log/nginx/access.log security;
 
 ---
 
+## Frontend Container User
+
+The frontend container runs as the unprivileged `rustchat` user (UID/GID created in `docker/frontend.Dockerfile`). It does not run as `root`.
+
+Verify at runtime:
+
+```bash
+docker exec <frontend-container> id
+# Expected: uid=... rustchat gid=... rustchat
+```
+
+---
+
 ## Quick Production Checklist
 
 - [ ] `RUSTCHAT_ENVIRONMENT=production`
 - [ ] `RUSTCHAT_SITE_URL` uses `https://`
 - [ ] `RUSTCHAT_CORS_ALLOWED_ORIGINS` uses `https://` only
+- [ ] `RUSTCHAT_ALLOW_DEV_CORS` is `false` or unset in production
 - [ ] `RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=cookie`
 - [ ] `RUSTCHAT_SECURITY_RATE_LIMIT_ENABLED=true`
+- [ ] `RUSTCHAT_JWT_ISSUER` is set to a non-empty value
+- [ ] `RUSTCHAT_JWT_AUDIENCE` is set to a non-empty value
 - [ ] All secrets are unique, random, and >= 32 characters
 - [ ] Reverse proxy enforces TLS 1.3 and forwards real IPs
 - [ ] PostgreSQL uses SSL/TLS and dedicated user
 - [ ] Redis uses AUTH and TLS (if networked)
 - [ ] S3-compatible storage uses unique credentials and TLS
+- [ ] Outgoing webhook and slash-command URLs point only to trusted endpoints
+- [ ] Frontend container runs as the `rustchat` non-root user
 - [ ] AI provider and tool keys are stored as production secrets if agents are enabled
 - [ ] Agent channel assignments and knowledge base assignments have been reviewed
 - [ ] PostgreSQL `pgvector` is enabled before RAG knowledge bases are used
@@ -402,10 +461,8 @@ access_log /var/log/nginx/access.log security;
 
 If currently running with insecure defaults:
 
-1. **Immediate (P0):** Rotate to strong secrets
-2. **Week 1:** Update clients to use supported WebSocket authentication transports
-3. **Week 2:** Update frontend to support OAuth exchange codes
-4. **Week 3:** Deploy with `OAUTH_TOKEN_DELIVERY=cookie`
+1. **Immediate (P0):** Rotate to strong secrets and verify `RUSTCHAT_SECURITY_OAUTH_TOKEN_DELIVERY=cookie`.
+2. **Cleanup:** Query-string WebSocket tokens and URL/header OAuth token delivery are already rejected at startup. Treat any remaining client cleanup as removing unsupported behavior, not an optional rollout.
 
 Contact your security team if you need assistance with the migration.
 

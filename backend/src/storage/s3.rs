@@ -1,5 +1,6 @@
 //! S3-compatible storage client
 
+use async_trait::async_trait;
 use aws_config::Region;
 use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::error::SdkError;
@@ -13,6 +14,7 @@ use std::time::Duration;
 use tracing::error;
 
 use crate::error::AppError;
+use crate::storage::{ListObjectsResult, ListedObject, ObjectStorage};
 
 /// S3 storage client
 #[derive(Clone)]
@@ -308,6 +310,54 @@ impl S3Client {
         Ok(())
     }
 
+    /// List objects in the bucket.
+    pub async fn list_objects(
+        &self,
+        prefix: Option<&str>,
+        continuation_token: Option<&str>,
+        max_keys: i32,
+    ) -> Result<ListObjectsResult, AppError> {
+        let mut request = self
+            .client
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .max_keys(max_keys);
+
+        if let Some(prefix) = prefix {
+            request = request.prefix(prefix);
+        }
+        if let Some(token) = continuation_token {
+            request = request.continuation_token(token);
+        }
+
+        let response = request.send().await.map_err(|e| {
+            error!(error = ?e, bucket = %self.bucket, "S3 list objects failed");
+            AppError::ExternalService(format!("S3 list objects error: {}", e))
+        })?;
+
+        let objects: Vec<ListedObject> = response
+            .contents
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|obj| {
+                let key = obj.key?;
+                let last_modified = obj
+                    .last_modified
+                    .and_then(|dt| dt.to_millis().ok())
+                    .and_then(chrono::DateTime::from_timestamp_millis);
+                Some(ListedObject { key, last_modified })
+            })
+            .collect();
+
+        let keys = objects.iter().map(|o| o.key.clone()).collect();
+
+        Ok(ListObjectsResult {
+            keys,
+            objects,
+            next_continuation_token: response.next_continuation_token,
+        })
+    }
+
     /// Generate a presigned download URL
     pub async fn presigned_download_url(
         &self,
@@ -369,5 +419,49 @@ impl S3Client {
         } else {
             format!("https://{}.s3.amazonaws.com/{}", self.bucket, key)
         }
+    }
+}
+
+#[async_trait]
+impl ObjectStorage for S3Client {
+    /// Delete an object, treating "not found" as success so callers can be idempotent.
+    async fn delete_object(&self, key: &str) -> Result<(), AppError> {
+        let result = self
+            .client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(SdkError::ServiceError(service_error)) => {
+                let code = service_error.err().code().unwrap_or_default();
+                if matches!(code, "NoSuchKey" | "NotFound" | "NoSuchObject") {
+                    Ok(())
+                } else {
+                    error!(error = ?service_error, bucket = %self.bucket, key = %key, "S3 delete failed");
+                    Err(AppError::Internal(format!(
+                        "S3 delete error: {:?}",
+                        service_error
+                    )))
+                }
+            }
+            Err(e) => {
+                error!(error = ?e, bucket = %self.bucket, key = %key, "S3 delete failed");
+                Err(AppError::Internal(format!("S3 delete error: {}", e)))
+            }
+        }
+    }
+
+    async fn list_objects(
+        &self,
+        prefix: Option<&str>,
+        continuation_token: Option<&str>,
+        max_keys: i32,
+    ) -> Result<ListObjectsResult, AppError> {
+        self.list_objects(prefix, continuation_token, max_keys)
+            .await
     }
 }

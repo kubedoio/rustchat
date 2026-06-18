@@ -65,10 +65,15 @@ You can run the backend locally while keeping infrastructure services (DB, Redis
 
 ## Security Modes (Dev vs Prod)
 
-RustChat changes behavior based on `RUSTCHAT_ENVIRONMENT`.
+RustChat changes behavior based on `RUSTCHAT_ENVIRONMENT`. The default is `production`.
 
-- `development` (default): CORS is permissive unless you set `RUSTCHAT_CORS_ALLOWED_ORIGINS`.
-- `production`: CORS is deny-by-default unless `RUSTCHAT_CORS_ALLOWED_ORIGINS` is explicitly set.
+- `production` (default): CORS is deny-by-default unless `RUSTCHAT_CORS_ALLOWED_ORIGINS` is explicitly set.
+- `development`: CORS is still deny-by-default; set `RUSTCHAT_ALLOW_DEV_CORS=true` to enable permissive CORS for local development only.
+
+For local development, either:
+
+- Set `RUSTCHAT_ALLOW_DEV_CORS=true` (never enable this in production), or
+- Configure `RUSTCHAT_CORS_ALLOWED_ORIGINS` with the exact origins your frontend uses, for example `http://localhost:8080,http://localhost:5173`.
 
 Recommended production settings:
 

@@ -101,12 +101,18 @@ fn parse_cors_allowed_origins(raw: &str) -> Vec<HeaderValue> {
             if trimmed.is_empty() {
                 return None;
             }
-            HeaderValue::from_str(trimmed).ok()
+            match HeaderValue::from_str(trimmed) {
+                Ok(hv) => Some(hv),
+                Err(e) => {
+                    tracing::warn!(origin = %trimmed, error = %e, "Dropping invalid CORS allowed origin");
+                    None
+                }
+            }
         })
         .collect()
 }
 
-fn build_cors_layer(config: &Config) -> CorsLayer {
+pub(crate) fn build_cors_layer(config: &Config) -> CorsLayer {
     let cors = CorsLayer::new().allow_methods([
         Method::GET,
         Method::POST,
@@ -122,22 +128,21 @@ fn build_cors_layer(config: &Config) -> CorsLayer {
             return cors.allow_origin(origins).allow_headers(Any);
         }
 
-        if config.is_production() {
-            tracing::warn!(
-                "RUSTCHAT_CORS_ALLOWED_ORIGINS is set but no valid origins were parsed; CORS is restricted"
-            );
-            return cors;
-        }
-    }
-
-    if config.is_production() {
         tracing::warn!(
-            "No CORS allowlist configured in production mode; cross-origin browser requests are blocked"
+            "RUSTCHAT_CORS_ALLOWED_ORIGINS is set but no valid origins were parsed; CORS is restricted"
         );
         return cors;
     }
 
-    cors.allow_origin(Any).allow_headers(Any)
+    if config.allow_dev_cors {
+        tracing::warn!(
+            "No CORS allowlist configured; permissive Access-Control-Allow-Origin: * is enabled because allow_dev_cors is true"
+        );
+        return cors.allow_origin(Any).allow_headers(Any);
+    }
+
+    tracing::warn!("No CORS allowlist configured; cross-origin browser requests are blocked");
+    cors
 }
 
 pub use crate::state::AppState;

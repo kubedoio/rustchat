@@ -21,7 +21,7 @@ use crate::models::{
     SlashCommand, WebhookPayload,
 };
 use crate::repositories::{ChannelRepository, IntegrationRepository, UserRepository};
-use crate::services::webhooks::is_valid_callback_url;
+use crate::services::webhooks::{callback_http_client, is_valid_callback_url};
 use chrono::Utc;
 use std::time::Duration;
 
@@ -230,6 +230,15 @@ async fn create_outgoing_webhook(
         ));
     }
 
+    for url in &input.callback_urls {
+        if !is_valid_callback_url(url) {
+            return Err(AppError::Validation(format!(
+                "Invalid callback URL: {}",
+                url
+            )));
+        }
+    }
+
     let token = generate_token();
 
     let webhook = IntegrationRepository::new(&state.db)
@@ -317,6 +326,12 @@ async fn create_slash_command(
 ) -> ApiResult<Json<SlashCommand>> {
     if !input.trigger.starts_with('/') && input.trigger.len() < 2 {
         return Err(AppError::Validation("Invalid trigger format".to_string()));
+    }
+
+    if !is_valid_callback_url(&input.url) {
+        return Err(AppError::Validation(
+            "Invalid command callback URL: must use http(s) and must not point to internal, loopback, or reserved addresses".to_string(),
+        ));
     }
 
     let token = generate_token();
@@ -980,16 +995,14 @@ async fn execute_custom_slash_command(
             .flatten()
             .unwrap_or_else(|| "unknown".to_string());
 
-        if !is_valid_callback_url(&cmd.url) {
+        let Some((client, parsed_url)) = callback_http_client(&cmd.url).await else {
             return Ok(build_command_response(
                 "ephemeral",
                 "Command URL is not valid or points to an internal address",
                 None,
                 None,
             ));
-        }
-
-        let client = reqwest::Client::new();
+        };
 
         let payload_out = OutgoingWebhookPayload {
             token: cmd.token.clone(),
@@ -1002,16 +1015,22 @@ async fn execute_custom_slash_command(
             trigger_word: trigger.to_string(),
         };
 
+        // The HTTP client above enforces a 30-second per-request timeout. Use a
+        // single attempt so the total wall-clock time for slash-command execution
+        // stays at approximately 30 seconds.
         let retry_config = RetryConfig {
-            max_attempts: 3,
+            max_attempts: 1,
             initial_delay: Duration::from_millis(150),
             max_delay: Duration::from_secs(2),
             backoff_multiplier: 2.0,
             retry_if: RetryCondition::Default,
         };
 
+        // `client` is bound to the validated IP addresses for `cmd.url` by
+        // `callback_http_client`, so this request cannot be DNS-rebound to an
+        // internal address even though the URL still contains the original hostname.
         let res = send_reqwest_with_retry(
-            client.post(&cmd.url).json(&payload_out),
+            client.post(parsed_url.as_str()).json(&payload_out),
             &retry_config,
             |e| AppError::Internal(format!("Command execution failed: {}", e)),
             || {

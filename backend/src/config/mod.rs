@@ -14,6 +14,11 @@ pub struct Config {
     #[serde(default = "default_environment")]
     pub environment: String,
 
+    /// Allow permissive CORS (`Access-Control-Allow-Origin: *`) for local development.
+    /// Defaults to false; never enable in production.
+    #[serde(default = "default_allow_dev_cors")]
+    pub allow_dev_cors: bool,
+
     /// Server host address
     #[serde(default = "default_host")]
     pub server_host: String,
@@ -124,6 +129,48 @@ pub struct Config {
     /// Compatibility-oriented feature flags.
     #[serde(default)]
     pub compatibility: CompatibilityConfig,
+
+    /// Retention job configuration.
+    #[serde(default)]
+    pub retention: RetentionJobConfig,
+}
+
+/// Retention job configuration
+#[derive(Debug, Clone, Deserialize)]
+pub struct RetentionJobConfig {
+    /// Enable periodic orphan S3 object scanning.
+    #[serde(default = "default_orphan_scan_enabled")]
+    pub orphan_scan_enabled: bool,
+
+    /// How often to run the orphan scan, in hours.
+    #[serde(default = "default_orphan_scan_interval_hours")]
+    pub orphan_scan_interval_hours: u64,
+
+    /// Maximum number of S3 keys to fetch per list request.
+    #[serde(default = "default_orphan_scan_page_size")]
+    pub orphan_scan_page_size: u32,
+
+    /// Delay between orphan scan list pages, in milliseconds.
+    #[serde(default = "default_orphan_scan_page_delay_ms")]
+    pub orphan_scan_page_delay_ms: u64,
+
+    /// Minimum age of an object before it can be considered an orphan, in
+    /// seconds. This protects in-flight uploads where the S3 object is written
+    /// before the `files` row is committed.
+    #[serde(default = "default_orphan_scan_min_age_seconds")]
+    pub orphan_scan_min_age_seconds: u64,
+}
+
+impl Default for RetentionJobConfig {
+    fn default() -> Self {
+        Self {
+            orphan_scan_enabled: default_orphan_scan_enabled(),
+            orphan_scan_interval_hours: default_orphan_scan_interval_hours(),
+            orphan_scan_page_size: default_orphan_scan_page_size(),
+            orphan_scan_page_delay_ms: default_orphan_scan_page_delay_ms(),
+            orphan_scan_min_age_seconds: default_orphan_scan_min_age_seconds(),
+        }
+    }
 }
 
 /// Calls plugin configuration
@@ -561,7 +608,11 @@ fn default_host() -> String {
 }
 
 fn default_environment() -> String {
-    "development".to_string()
+    "production".to_string()
+}
+
+fn default_allow_dev_cors() -> bool {
+    false
 }
 
 fn default_port() -> u16 {
@@ -590,6 +641,29 @@ fn default_s3_bucket() -> String {
 
 fn default_s3_region() -> String {
     "us-east-1".to_string()
+}
+
+fn default_orphan_scan_enabled() -> bool {
+    false
+}
+
+fn default_orphan_scan_interval_hours() -> u64 {
+    24
+}
+
+fn default_orphan_scan_page_size() -> u32 {
+    1000
+}
+
+fn default_orphan_scan_page_delay_ms() -> u64 {
+    100
+}
+
+fn default_orphan_scan_min_age_seconds() -> u64 {
+    // Five minutes is long enough to cover the S3-write -> DB-commit window
+    // for resumable and simple uploads while still allowing scans to clean up
+    // stale objects promptly.
+    300
 }
 
 impl Config {
@@ -738,6 +812,10 @@ impl Config {
         Ok(())
     }
 
+    fn apply_retention_env_overrides(&mut self) -> anyhow::Result<()> {
+        apply_retention_env_overrides_to(&mut self.retention)
+    }
+
     /// Load configuration from environment variables
     pub fn load() -> anyhow::Result<Self> {
         let mut builder = config::Config::builder();
@@ -764,6 +842,7 @@ impl Config {
         settings.apply_keycloak_env_overrides()?;
         settings.apply_messaging_env_overrides()?;
         settings.apply_compatibility_env_overrides()?;
+        settings.apply_retention_env_overrides()?;
 
         // Validate security settings
         settings.validate_security()?;
@@ -778,6 +857,10 @@ impl Config {
         // Log all warnings
         for warning in &validation.warnings {
             tracing::warn!("Security configuration warning: {}", warning);
+        }
+
+        if self.is_production() && self.allow_dev_cors {
+            anyhow::bail!("allow_dev_cors (permissive CORS) must not be enabled in production.");
         }
 
         if self.is_production() {
@@ -894,6 +977,30 @@ impl Config {
     }
 }
 
+fn apply_retention_env_overrides_to(retention: &mut RetentionJobConfig) -> anyhow::Result<()> {
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_ENABLED") {
+        retention.orphan_scan_enabled =
+            parse_bool_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_ENABLED", &raw)?;
+    }
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS") {
+        retention.orphan_scan_interval_hours =
+            parse_u64_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_INTERVAL_HOURS", &raw)?;
+    }
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE") {
+        retention.orphan_scan_page_size =
+            parse_u32_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_SIZE", &raw)?;
+    }
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS") {
+        retention.orphan_scan_page_delay_ms =
+            parse_u64_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_PAGE_DELAY_MS", &raw)?;
+    }
+    if let Ok(raw) = std::env::var("RUSTCHAT_RETENTION_ORPHAN_SCAN_MIN_AGE_SECONDS") {
+        retention.orphan_scan_min_age_seconds =
+            parse_u64_env("RUSTCHAT_RETENTION_ORPHAN_SCAN_MIN_AGE_SECONDS", &raw)?;
+    }
+    Ok(())
+}
+
 fn parse_bool_env(name: &str, raw: &str) -> anyhow::Result<bool> {
     match raw.trim().to_ascii_lowercase().as_str() {
         "1" | "true" | "yes" | "on" => Ok(true),
@@ -906,6 +1013,12 @@ fn parse_u16_env(name: &str, raw: &str) -> anyhow::Result<u16> {
     raw.trim()
         .parse::<u16>()
         .map_err(|e| anyhow!("invalid u16 for {}: {} ({})", name, raw, e))
+}
+
+fn parse_u32_env(name: &str, raw: &str) -> anyhow::Result<u32> {
+    raw.trim()
+        .parse::<u32>()
+        .map_err(|e| anyhow!("invalid u32 for {}: {} ({})", name, raw, e))
 }
 
 fn parse_u64_env(name: &str, raw: &str) -> anyhow::Result<u64> {
@@ -923,13 +1036,4 @@ fn parse_csv_list(raw: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_default_values() {
-        assert_eq!(default_host(), "0.0.0.0");
-        assert_eq!(default_port(), 3000);
-        assert_eq!(default_log_level(), "info");
-    }
-}
+mod tests;

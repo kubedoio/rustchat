@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::api::v4::channels::ensure_channel_admin_or_system_manage;
 use crate::api::v4::extractors::MmAuthUser;
 use crate::api::AppState;
 use crate::error::ApiResult;
@@ -139,7 +140,7 @@ pub(crate) async fn set_channel_calls_enabled(
     Json(payload): Json<ChannelEnableRequest>,
 ) -> ApiResult<Json<CallChannelInfo>> {
     let channel_uuid = resolve_channel_id(&state, &channel_id).await?;
-    check_channel_permission(&state, auth.user_id, channel_uuid).await?;
+    ensure_channel_admin_or_system_manage(&state, channel_uuid, &auth).await?;
 
     CHANNEL_CALLS_ENABLED.insert(channel_uuid, payload.enabled);
 

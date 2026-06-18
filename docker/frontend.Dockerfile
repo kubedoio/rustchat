@@ -12,18 +12,25 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM openresty/openresty:alpine@sha256:0fa1fcd37f275fe91554b1934c0b23404d937bdee4d3aa55321023f8865dc77b
+FROM openresty/openresty:alpine@sha256:49db7235f2f94aa179c1242882619aea258c112b20f48ba45aefba010a1d0607
 
-# Create required directories
-RUN mkdir -p /var/log/nginx /var/run/openresty
+# Create a dedicated non-root user and group for running the frontend server.
+RUN addgroup -S rustchat && adduser -S rustchat -G rustchat
 
-# Copy built assets
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Create required directories and ensure the non-root user owns the paths
+# nginx needs to write to (logs, pid file, temp directories).
+RUN mkdir -p /var/log/nginx /tmp/nginx /usr/share/nginx/html && \
+    chown -R rustchat:rustchat /var/log/nginx /tmp/nginx /usr/share/nginx/html
 
-# Copy nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy built assets with non-root ownership.
+COPY --from=builder --chown=rustchat:rustchat /app/dist /usr/share/nginx/html
+
+# Copy the complete nginx main configuration (includes listen 8080 and pid /tmp/nginx.pid).
+COPY --chown=rustchat:rustchat nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
 EXPOSE 8080
+
+USER rustchat
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/ || exit 1

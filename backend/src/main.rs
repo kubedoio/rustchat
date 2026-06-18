@@ -118,7 +118,12 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Spawn background jobs
-    rustchat::jobs::spawn_retention_job(db_pool.clone(), shutdown_token.child_token());
+    rustchat::jobs::spawn_retention_job(
+        db_pool.clone(),
+        s3_client.clone(),
+        config.retention.clone(),
+        shutdown_token.child_token(),
+    );
 
     // Spawn email worker
     let email_worker_config = rustchat::jobs::EmailWorkerConfig::default();

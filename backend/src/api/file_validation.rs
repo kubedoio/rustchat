@@ -3,16 +3,22 @@
 use crate::constants::*;
 use crate::error::AppError;
 
-const ALLOWED_EXTENSIONS: &[&str] = &[
+pub const ALLOWED_EXTENSIONS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "md", "zip",
 ];
 
-/// Validate a file upload and return the canonical MIME type and lowercase extension.
-pub fn validate_file_upload(filename: &str, data: &[u8]) -> Result<(String, String), AppError> {
+/// Validate only that a filename has an allowed extension, returning the lowercase extension.
+pub fn validate_file_extension(filename: &str) -> Result<String, AppError> {
     let ext = filename
         .rsplit_once('.')
         .map(|(_, e)| e.to_ascii_lowercase())
         .unwrap_or_default();
+
+    if ext.is_empty() {
+        return Err(AppError::BadRequest(
+            "File must have an allowed extension".to_string(),
+        ));
+    }
 
     if !ALLOWED_EXTENSIONS.contains(&ext.as_str()) {
         return Err(AppError::BadRequest(format!(
@@ -20,6 +26,13 @@ pub fn validate_file_upload(filename: &str, data: &[u8]) -> Result<(String, Stri
             ext
         )));
     }
+
+    Ok(ext)
+}
+
+/// Validate a file upload and return the canonical MIME type and lowercase extension.
+pub fn validate_file_upload(filename: &str, data: &[u8]) -> Result<(String, String), AppError> {
+    let ext = validate_file_extension(filename)?;
 
     let max_size = match ext.as_str() {
         "png" | "jpg" | "jpeg" | "gif" | "webp" => MAX_IMAGE_SIZE,
@@ -158,17 +171,7 @@ pub fn validate_file_upload_head(
     head: &[u8],
     size: usize,
 ) -> Result<(String, String), AppError> {
-    let ext = filename
-        .rsplit_once('.')
-        .map(|(_, e)| e.to_ascii_lowercase())
-        .unwrap_or_default();
-
-    if !ALLOWED_EXTENSIONS.contains(&ext.as_str()) {
-        return Err(AppError::BadRequest(format!(
-            "File extension '.{}' is not allowed",
-            ext
-        )));
-    }
+    let ext = validate_file_extension(filename)?;
 
     let max_size = match ext.as_str() {
         "png" | "jpg" | "jpeg" | "gif" | "webp" => MAX_IMAGE_SIZE,
