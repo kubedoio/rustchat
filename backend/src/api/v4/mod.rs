@@ -88,7 +88,7 @@ pub fn router_with_body_limits(
         // Channels - medium limit for descriptions/settings
         .merge(channels::router(state.clone()).layer(DefaultBodyLimit::max(medium_limit)))
         // Emoji - small limit
-        .merge(emoji::router().layer(DefaultBodyLimit::max(small_limit)))
+        .merge(emoji::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
         // Commands - small limit
         .merge(commands::router().layer(DefaultBodyLimit::max(small_limit)))
         // Plugins - medium limit
@@ -128,13 +128,13 @@ pub fn router_with_body_limits(
         // LDAP - small limit
         .merge(ldap::router().layer(DefaultBodyLimit::max(small_limit)))
         // Access control - small limit
-        .merge(access_control::router().layer(DefaultBodyLimit::max(small_limit)))
+        .merge(access_control::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
         // Content flagging - small limit
-        .merge(content_flagging::router().layer(DefaultBodyLimit::max(small_limit)))
+        .merge(content_flagging::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
         // Usage - small limit
         .merge(usage::router().layer(DefaultBodyLimit::max(small_limit)))
         // Data retention - small limit
-        .merge(data_retention::router().layer(DefaultBodyLimit::max(small_limit)))
+        .merge(data_retention::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
         // Custom profile - medium limit
         .merge(custom_profile::router().layer(DefaultBodyLimit::max(medium_limit)))
         // Roles - small limit

@@ -62,6 +62,26 @@ pub async fn create_retention_policy(
         .insert_retention_policy(&input)
         .await?;
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    let policy_id = policy.id;
+    let retention_days = policy.retention_days;
+    let delete_files = policy.delete_files;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::RetentionPolicyCreate,
+            "retention_policy",
+            Some(policy_id),
+            serde_json::json!({
+                "retention_days": retention_days,
+                "delete_files": delete_files,
+            }),
+        )
+        .await;
+    });
+
     Ok(Json(policy))
 }
 
@@ -90,6 +110,20 @@ pub async fn delete_retention_policy(
     AdminRepository::new(&state.db)
         .delete_retention_policy(id)
         .await?;
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::RetentionPolicyDelete,
+            "retention_policy",
+            Some(id),
+            serde_json::Value::Null,
+        )
+        .await;
+    });
 
     Ok(Json(serde_json::json!({"status": "deleted"})))
 }

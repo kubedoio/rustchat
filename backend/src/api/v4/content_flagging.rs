@@ -2,12 +2,23 @@ use crate::api::AppState;
 use crate::error::ApiResult;
 use axum::{
     extract::{Path, State},
+    middleware,
     routing::{get, post},
     Json, Router,
 };
 use serde_json::json;
 
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
+        .route(
+            "/content_flagging/team/{team_id}/reviewers/search",
+            post(search_content_flagging_reviewers),
+        )
+        .layer(middleware::from_fn_with_state(
+            state,
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
     Router::new()
         .route(
             "/content_flagging/flag/config",
@@ -40,13 +51,10 @@ pub fn router() -> Router<AppState> {
         )
         .route("/content_flagging/config", get(get_content_flagging_config))
         .route(
-            "/content_flagging/team/{team_id}/reviewers/search",
-            post(search_content_flagging_reviewers),
-        )
-        .route(
             "/content_flagging/post/{post_id}/assign/{content_reviewer_id}",
             post(assign_content_flagging_post),
         )
+        .merge(search_routes)
 }
 
 /// GET /api/v4/content_flagging/flag/config

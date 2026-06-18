@@ -408,6 +408,20 @@ async fn set_default_provider(
     // Set this one as default
     let provider = repo.set_default_mail_provider(id).await?;
 
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::EmailProviderUpdate,
+            "email_provider",
+            Some(id),
+            serde_json::json!({ "is_default": true }),
+        )
+        .await;
+    });
+
     Ok(Json(provider.into()))
 }
 

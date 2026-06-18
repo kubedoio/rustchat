@@ -238,6 +238,10 @@ services:
 - Shared S3-compatible storage
 - Load balancer with sticky sessions for WebSocket (or use Redis pub/sub for stateless fan-out)
 
+### Realtime Recovery
+
+WebSocket replay is best-effort. Each backend keeps a short in-memory replay buffer for recently disconnected clients, while Redis pub/sub handles live cross-instance fan-out. The replay buffer is not a durable event log and is lost on process restart. Clients and mobile integrations must treat `resync_required`, reconnect after deploy, or a reconnect outside the replay window as a signal to refresh state from the REST APIs.
+
 ### Database
 
 Use a managed PostgreSQL service (AWS RDS, Google Cloud SQL, Azure Database) for high availability.

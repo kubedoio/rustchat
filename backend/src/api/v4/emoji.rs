@@ -11,21 +11,29 @@ use axum::{
     body::Body,
     extract::{Path, State},
     http::header,
+    middleware,
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
 use uuid::Uuid;
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/emoji", get(list_emoji).post(create_emoji))
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
         .route("/emoji/search", post(search_emoji))
         .route("/emoji/autocomplete", get(get_emoji_autocomplete))
+        .layer(middleware::from_fn_with_state(
+            state,
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
+    Router::new()
+        .route("/emoji", get(list_emoji).post(create_emoji))
         .route("/emoji/names", post(get_emojis_by_names))
         .route("/emoji/{emoji_id}", get(get_emoji).delete(delete_emoji))
         .route("/emoji/{emoji_id}/image", get(get_emoji_image))
         .route("/emoji/name/{name}", get(get_emoji_by_name))
+        .merge(search_routes)
 }
 
 #[derive(serde::Deserialize)]

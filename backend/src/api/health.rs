@@ -98,14 +98,23 @@ async fn readiness(State(state): State<AppState>) -> Result<Json<ReadinessRespon
         },
     );
 
-    // Check migration state
-    let migration_healthy = match sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM _sqlx_migrations WHERE success = false",
+    // Check migration state: no failed migrations and no pending migrations
+    // compared with the migrations embedded in this binary.
+    let expected_migrations = sqlx::migrate!("./migrations").iter().count() as i64;
+    let migration_healthy = match sqlx::query_as::<_, (i64, i64)>(
+        r#"
+        SELECT
+            COUNT(*) FILTER (WHERE success = true) AS applied_count,
+            COUNT(*) FILTER (WHERE success = false) AS failed_count
+        FROM _sqlx_migrations
+        "#,
     )
     .fetch_one(&state.db)
     .await
     {
-        Ok(failed_count) => failed_count == 0,
+        Ok((applied_count, failed_count)) => {
+            failed_count == 0 && applied_count >= expected_migrations
+        }
         Err(err) => {
             tracing::warn!(error = %err, "Failed to query migration state");
             false
@@ -114,7 +123,7 @@ async fn readiness(State(state): State<AppState>) -> Result<Json<ReadinessRespon
     checks.insert(
         "migrations".to_string(),
         if migration_healthy {
-            "ok".to_string()
+            format!("ok(applied={expected_migrations})")
         } else {
             "failed".to_string()
         },

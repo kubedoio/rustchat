@@ -3,12 +3,27 @@ use crate::auth::policy::permissions;
 use crate::error::ApiResult;
 use axum::{
     extract::{Path, State},
+    middleware,
     routing::{delete, get, post, put},
     Json, Router,
 };
 use serde_json::json;
 
-pub fn router() -> Router<AppState> {
+pub fn router(state: AppState) -> Router<AppState> {
+    let search_routes = Router::new()
+        .route(
+            "/access_control_policies/search",
+            post(search_access_control_policies),
+        )
+        .route(
+            "/access_control_policies/{policy_id}/resources/channels/search",
+            post(search_access_control_policy_channels),
+        )
+        .layer(middleware::from_fn_with_state(
+            state,
+            crate::middleware::rate_limit::search_ip_rate_limit,
+        ));
+
     Router::new()
         .route(
             "/access_control_policies",
@@ -25,10 +40,6 @@ pub fn router() -> Router<AppState> {
         .route(
             "/access_control_policies/cel/test",
             post(test_access_control_cel),
-        )
-        .route(
-            "/access_control_policies/search",
-            post(search_access_control_policies),
         )
         .route(
             "/access_control_policies/cel/autocomplete/fields",
@@ -56,10 +67,6 @@ pub fn router() -> Router<AppState> {
             get(get_access_control_policy_channels),
         )
         .route(
-            "/access_control_policies/{policy_id}/resources/channels/search",
-            post(search_access_control_policy_channels),
-        )
-        .route(
             "/access_control_policies/cel/visual_ast",
             post(get_access_control_cel_visual_ast).get(get_access_control_cel_visual_ast_legacy),
         )
@@ -67,6 +74,7 @@ pub fn router() -> Router<AppState> {
             "/access_control_policies/activate",
             put(activate_access_control_policies).post(activate_access_control_policies_legacy),
         )
+        .merge(search_routes)
 }
 
 fn ensure_manage_system(auth: &crate::api::v4::extractors::MmAuthUser) -> ApiResult<()> {
