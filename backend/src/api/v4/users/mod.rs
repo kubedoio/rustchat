@@ -156,6 +156,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 
     let search_routes = Router::new()
         .route("/users/search", post(search_users))
+        .route("/users/tokens/search", post(search_tokens))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             rate_limit::search_ip_rate_limit,
@@ -301,7 +302,6 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/users/tokens/{token_id}", get(get_token))
         .route("/users/tokens/disable", post(disable_token))
         .route("/users/tokens/enable", post(enable_token))
-        .route("/users/tokens/search", post(search_tokens))
         .route("/users/{user_id}/auth", put(update_user_auth))
         .route(
             "/users/{user_id}/terms_of_service",

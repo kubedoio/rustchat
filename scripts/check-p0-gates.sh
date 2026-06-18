@@ -85,6 +85,48 @@ else
   fail "backend/src/jobs/retention.rs must use delete_object"
 fi
 
+# 7. Secondary search/autocomplete surfaces are protected by the shared search limiter.
+for file in \
+  backend/src/api/v4/emoji.rs \
+  backend/src/api/v4/access_control.rs \
+  backend/src/api/v4/data_retention.rs \
+  backend/src/api/v4/content_flagging.rs \
+  backend/src/api/v4/teams/mod.rs \
+  backend/src/api/v4/users/mod.rs; do
+  if grep -qE 'search_ip_rate_limit' "${file}"; then
+    pass "${file} applies search_ip_rate_limit"
+  else
+    fail "${file} must apply search_ip_rate_limit to search-like routes"
+  fi
+done
+
+# 8. Readiness detects pending migrations, not just failed migrations.
+if grep -qE 'expected_migrations' backend/src/api/health.rs && \
+   grep -qE 'applied_count[[:space:]]*>?=[[:space:]]*expected_migrations' backend/src/api/health.rs; then
+  pass "backend/src/api/health.rs checks pending migrations"
+else
+  fail "backend/src/api/health.rs must compare applied migrations with embedded migrations"
+fi
+
+# 9. Security-sensitive admin mutations have audit hooks.
+for action in \
+  ConfigUpdate \
+  RetentionPolicyCreate \
+  RetentionPolicyDelete \
+  EmailProviderCreate \
+  EmailProviderUpdate \
+  EmailProviderDelete \
+  RolePermissionUpdate \
+  SsoConfigCreate \
+  SsoConfigUpdate \
+  SsoConfigDelete; do
+  if grep -qE "AuditAction::${action}" backend/src/api/*.rs backend/src/api/v4/*.rs; then
+    pass "audit hook exists for ${action}"
+  else
+    fail "missing audit hook for ${action}"
+  fi
+done
+
 if [[ "${ERRORS}" -eq 0 ]]; then
   echo ""
   echo "All P0 production-readiness gates passed."

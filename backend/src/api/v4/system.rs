@@ -463,6 +463,10 @@ async fn patch_config(
     // The patch format is { "SectionName": { "key": "value" } }
 
     let repo = crate::repositories::SystemRepository::new(&state.db);
+    let patched_sections: Vec<String> = patch
+        .as_object()
+        .map(|sections| sections.keys().cloned().collect())
+        .unwrap_or_default();
 
     // Handle TeamSettings -> site.site_name
     if let Some(team_settings) = patch.get("TeamSettings").and_then(|v| v.as_object()) {
@@ -522,6 +526,20 @@ async fn patch_config(
             repo.update_file_retention_days(days, auth.user_id).await?;
         }
     }
+
+    let db = state.db.clone();
+    let actor = auth.user_id;
+    tokio::spawn(async move {
+        let _ = crate::services::audit::audit(
+            &db,
+            Some(actor),
+            crate::services::audit::AuditAction::ConfigUpdate,
+            "server_config",
+            None,
+            serde_json::json!({ "sections": patched_sections }),
+        )
+        .await;
+    });
 
     // Return updated config
     get_config(State(state), auth).await

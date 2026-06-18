@@ -152,6 +152,10 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/teams/{team_id}/channels/search",
             post(search::search_channels),
         )
+        .route(
+            "/teams/{team_id}/channels/search_autocomplete",
+            get(channels::search_autocomplete_team_channels),
+        )
         .route("/teams/search", post(search::search_teams))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
@@ -254,10 +258,6 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route(
             "/teams/{team_id}/channels/autocomplete",
             get(channels::autocomplete_team_channels),
-        )
-        .route(
-            "/teams/{team_id}/channels/search_autocomplete",
-            get(channels::search_autocomplete_team_channels),
         )
         .route(
             "/teams/{team_id}/channels/name/{channel_name}",
