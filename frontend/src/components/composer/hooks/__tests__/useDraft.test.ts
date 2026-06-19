@@ -24,6 +24,12 @@ const localStorageMock = (() => {
 
 Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
+  configurable: true,
+})
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: localStorageMock,
+  configurable: true,
 })
 
 describe('useDraft', () => {
@@ -115,10 +121,31 @@ describe('useDraft', () => {
     expect(draft.value?.content).toBe('New content')
     expect(hasDraft.value).toBe(true)
   })
+
+  it('does not throw when localStorage is unavailable', () => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: undefined,
+      configurable: true,
+    })
+
+    const { saveDraft, clearDraft, loadDraft, draft, hasDraft } = useDraft('channel-no-storage')
+
+    expect(loadDraft()).toBeNull()
+    expect(() => saveDraft('Offline draft')).not.toThrow()
+    expect(draft.value?.content).toBe('Offline draft')
+    expect(hasDraft.value).toBe(true)
+    expect(() => clearDraft()).not.toThrow()
+    expect(draft.value).toBeNull()
+    expect(hasDraft.value).toBe(false)
+  })
 })
 
 describe('useDrafts (multiple drafts)', () => {
   beforeEach(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: localStorageMock,
+      configurable: true,
+    })
     localStorageMock.clear()
     vi.clearAllMocks()
   })
@@ -160,5 +187,18 @@ describe('useDrafts (multiple drafts)', () => {
     clearAllDrafts()
 
     expect(getDraftCount()).toBe(0)
+  })
+
+  it('returns empty results when localStorage is unavailable', () => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: undefined,
+      configurable: true,
+    })
+
+    const { getDraftCount, getChannelsWithDrafts, clearAllDrafts } = useDrafts()
+
+    expect(getDraftCount()).toBe(0)
+    expect(getChannelsWithDrafts()).toEqual([])
+    expect(() => clearAllDrafts()).not.toThrow()
   })
 })

@@ -16,6 +16,26 @@ export interface DraftData {
   attachments?: string[] // file_ids
 }
 
+function getStorage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null
+  } catch (e) {
+    log.warn('Draft storage is unavailable:', e)
+    return null
+  }
+}
+
+function getDraftKeys(storage: Storage): string[] {
+  const keys: string[] = []
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i)
+    if (key?.startsWith(STORAGE_KEY_PREFIX)) {
+      keys.push(key)
+    }
+  }
+  return keys
+}
+
 export function useDraft(channelId: string) {
   const draft = ref<DraftData | null>(null)
   const hasDraft = ref(false)
@@ -28,14 +48,17 @@ export function useDraft(channelId: string) {
    */
   function loadDraft(): DraftData | null {
     try {
-      const stored = localStorage.getItem(storageKey)
+      const storage = getStorage()
+      if (!storage) return null
+
+      const stored = storage.getItem(storageKey)
       if (!stored) return null
 
       const data: DraftData = JSON.parse(stored)
 
       // Check if draft is too old
       if (Date.now() - data.timestamp > MAX_DRAFT_AGE_MS) {
-        localStorage.removeItem(storageKey)
+        storage.removeItem(storageKey)
         return null
       }
 
@@ -57,13 +80,24 @@ export function useDraft(channelId: string) {
         return
       }
 
+      const storage = getStorage()
+      if (!storage) {
+        draft.value = {
+          content,
+          timestamp: Date.now(),
+          attachments,
+        }
+        hasDraft.value = true
+        return
+      }
+
       const data: DraftData = {
         content,
         timestamp: Date.now(),
         attachments,
       }
 
-      localStorage.setItem(storageKey, JSON.stringify(data))
+      storage.setItem(storageKey, JSON.stringify(data))
       draft.value = data
       hasDraft.value = true
     } catch (e) {
@@ -76,7 +110,7 @@ export function useDraft(channelId: string) {
    */
   function clearDraft() {
     try {
-      localStorage.removeItem(storageKey)
+      getStorage()?.removeItem(storageKey)
       draft.value = null
       hasDraft.value = false
     } catch (e) {
@@ -105,14 +139,8 @@ export function useDraft(channelId: string) {
    * Get all draft keys for cleanup
    */
   function getAllDraftKeys(): string[] {
-    const keys: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith(STORAGE_KEY_PREFIX)) {
-        keys.push(key)
-      }
-    }
-    return keys
+    const storage = getStorage()
+    return storage ? getDraftKeys(storage) : []
   }
 
   /**
@@ -124,16 +152,19 @@ export function useDraft(channelId: string) {
 
     for (const key of keys) {
       try {
-        const stored = localStorage.getItem(key)
+        const storage = getStorage()
+        if (!storage) return
+
+        const stored = storage.getItem(key)
         if (stored) {
           const data: DraftData = JSON.parse(stored)
           if (now - data.timestamp > MAX_DRAFT_AGE_MS) {
-            localStorage.removeItem(key)
+            storage.removeItem(key)
           }
         }
       } catch (e) {
         // Remove invalid entries
-        localStorage.removeItem(key)
+        getStorage()?.removeItem(key)
       }
     }
   }
@@ -171,29 +202,18 @@ export function useDrafts() {
    * Get count of all drafts
    */
   function getDraftCount(): number {
-    let count = 0
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith(STORAGE_KEY_PREFIX)) {
-        count++
-      }
-    }
-    return count
+    const storage = getStorage()
+    return storage ? getDraftKeys(storage).length : 0
   }
 
   /**
    * Get all channel IDs with drafts
    */
   function getChannelsWithDrafts(): string[] {
-    const channels: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith(STORAGE_KEY_PREFIX)) {
-        const channelId = key.substring(STORAGE_KEY_PREFIX.length)
-        channels.push(channelId)
-      }
-    }
-    return channels
+    const storage = getStorage()
+    if (!storage) return []
+
+    return getDraftKeys(storage).map(key => key.substring(STORAGE_KEY_PREFIX.length))
   }
 
   /**
@@ -201,8 +221,11 @@ export function useDrafts() {
    */
   function clearAllDrafts() {
     const keys = getChannelsWithDrafts()
+    const storage = getStorage()
+    if (!storage) return
+
     for (const key of keys) {
-      localStorage.removeItem(`${STORAGE_KEY_PREFIX}${key}`)
+      storage.removeItem(`${STORAGE_KEY_PREFIX}${key}`)
     }
   }
 
