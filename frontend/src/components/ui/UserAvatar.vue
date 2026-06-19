@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import md5 from 'md5'
+import { ref, watch, computed } from 'vue'
 
 interface Props {
   src?: string
@@ -13,11 +12,28 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const gravatarUrl = computed(() => {
-  if (!props.email) return null
-  const hash = md5(props.email.trim().toLowerCase())
-  return `https://www.gravatar.com/avatar/${hash}?d=404`
-})
+const gravatarUrl = ref<string | null>(null)
+
+watch(
+  () => props.email,
+  async (email) => {
+    if (!email) {
+      gravatarUrl.value = null
+      return
+    }
+    const cleanEmail = email.trim().toLowerCase()
+    try {
+      const msgBuffer = new TextEncoder().encode(cleanEmail)
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+      gravatarUrl.value = `https://www.gravatar.com/avatar/${hashHex}?d=404`
+    } catch (e) {
+      gravatarUrl.value = null
+    }
+  },
+  { immediate: true }
+)
 
 const githubAvatarUrl = computed(() => {
   if (!props.username) return null
@@ -73,7 +89,7 @@ function resetState() {
 }
 
 watch(
-  () => [props.src, props.email, props.username],
+  () => [props.src, props.email, gravatarUrl.value, props.username],
   () => {
     resetState()
   },
