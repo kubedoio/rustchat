@@ -87,8 +87,8 @@ use crate::middleware::reliability::ServiceCircuitBreakers;
 use crate::middleware::security_headers::{cors_compatible_config, SecurityHeadersLayer};
 use crate::realtime::{ConnectionStore, WsHub};
 use crate::services::agent_runtime::AgentRuntime;
-use crate::services::knowledge::embedder::{Embedder, OpenAiEmbedder};
-use crate::services::knowledge::vector_store::{PgVectorStore, VectorStore};
+use crate::services::knowledge::embedder::OpenAiEmbedder;
+use crate::services::knowledge::vector_store::PgVectorStore;
 use crate::services::llm::{OpenAiProvider, ProviderRegistry};
 use crate::storage::S3Client;
 use tokio::sync::mpsc;
@@ -199,9 +199,8 @@ pub fn router(
         }
 
         if has_provider {
-            let embedder = openai_api_key
-                .map(|key| Arc::new(OpenAiEmbedder::new(key, None, None)) as Arc<dyn Embedder>);
-            let vector_store = Some(Arc::new(PgVectorStore::new(&db)) as Arc<dyn VectorStore>);
+            let embedder = openai_api_key.map(|key| Arc::new(OpenAiEmbedder::new(key, None, None)));
+            let vector_store = Some(Arc::new(PgVectorStore::new(&db)));
 
             // Register tools if API keys are available
             let tool_registry = Arc::new(crate::services::tools::registry::ToolRegistry::new());

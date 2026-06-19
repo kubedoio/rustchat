@@ -9,21 +9,21 @@ use uuid::Uuid;
 use crate::models::knowledge::KnowledgeChunk;
 use crate::repositories::KnowledgeRepository;
 use crate::services::knowledge::chunker::{select_chunker, ChunkConfig};
-use crate::services::knowledge::embedder::Embedder;
-use crate::services::knowledge::vector_store::VectorStore;
+use crate::services::knowledge::embedder::OpenAiEmbedder;
+use crate::services::knowledge::vector_store::PgVectorStore;
 use crate::telemetry::metrics;
 
 pub struct IndexerService {
     pool: sqlx::PgPool,
-    embedder: Arc<dyn Embedder>,
-    vector_store: Arc<dyn VectorStore>,
+    embedder: Arc<OpenAiEmbedder>,
+    vector_store: Arc<PgVectorStore>,
 }
 
 impl IndexerService {
     pub fn new(
         pool: sqlx::PgPool,
-        embedder: Arc<dyn Embedder>,
-        vector_store: Arc<dyn VectorStore>,
+        embedder: Arc<OpenAiEmbedder>,
+        vector_store: Arc<PgVectorStore>,
     ) -> Self {
         Self {
             pool,

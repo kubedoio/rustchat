@@ -3,7 +3,6 @@
 //! Provides a trait-based abstraction for different email providers (SMTP, SES, SendGrid, etc.)
 //! with a concrete SMTP implementation using lettre.
 
-use async_trait::async_trait;
 use lettre::{
     message::Mailbox,
     transport::smtp::authentication::Credentials,
@@ -100,27 +99,6 @@ impl EmailAddress {
 pub struct SendResult {
     pub message_id: Option<String>,
     pub server_response: String,
-}
-
-/// Trait for email provider implementations
-#[async_trait]
-pub trait MailProvider: Send + Sync {
-    /// Test the connection to the mail server
-    async fn test_connection(&self) -> EmailProviderResult<()>;
-
-    /// Send an email
-    async fn send_email(
-        &self,
-        from: &EmailAddress,
-        to: &EmailAddress,
-        content: &EmailContent,
-    ) -> EmailProviderResult<SendResult>;
-
-    /// Get provider type name
-    fn provider_type(&self) -> &'static str;
-
-    /// Get provider identifier (for logging/debugging)
-    fn provider_id(&self) -> String;
 }
 
 // ============================================
@@ -340,11 +318,9 @@ impl SmtpProvider {
             EmailProviderError::Other(error.to_string())
         }
     }
-}
 
-#[async_trait]
-impl MailProvider for SmtpProvider {
-    async fn test_connection(&self) -> EmailProviderResult<()> {
+    /// Test the connection to the mail server
+    pub async fn test_connection(&self) -> EmailProviderResult<()> {
         debug!(
             "Testing SMTP connection to {}:{}",
             self.settings.host, self.settings.port
@@ -377,7 +353,8 @@ impl MailProvider for SmtpProvider {
         }
     }
 
-    async fn send_email(
+    /// Send an email
+    pub async fn send_email(
         &self,
         from: &EmailAddress,
         to: &EmailAddress,
@@ -436,11 +413,11 @@ impl MailProvider for SmtpProvider {
         }
     }
 
-    fn provider_type(&self) -> &'static str {
+    pub fn provider_type(&self) -> &'static str {
         "smtp"
     }
 
-    fn provider_id(&self) -> String {
+    pub fn provider_id(&self) -> String {
         format!("smtp:{}:{}", self.settings.host, self.settings.port)
     }
 }
@@ -457,11 +434,10 @@ impl MailProviderFactory {
     pub async fn create(
         settings: &MailProviderSettings,
         encryption_key: &str,
-    ) -> EmailProviderResult<Box<dyn MailProvider>> {
+    ) -> EmailProviderResult<SmtpProvider> {
         match settings.provider_type {
             crate::models::email::MailProviderType::Smtp => {
-                let provider = SmtpProvider::new(settings.clone(), encryption_key).await?;
-                Ok(Box::new(provider))
+                SmtpProvider::new(settings.clone(), encryption_key).await
             }
             crate::models::email::MailProviderType::Ses => {
                 // SES provider not yet implemented. Use SMTP provider with SES SMTP credentials
@@ -481,9 +457,6 @@ impl MailProviderFactory {
     }
 }
 
-/// Type alias for boxed mail provider
-pub type BoxedProvider = Box<dyn MailProvider>;
-
 // ============================================
 // Provider Pool / Manager
 // ============================================
@@ -493,7 +466,7 @@ use tokio::sync::RwLock;
 
 /// Manages mail provider instances
 pub struct MailProviderManager {
-    providers: RwLock<HashMap<uuid::Uuid, Box<dyn MailProvider>>>,
+    providers: RwLock<HashMap<uuid::Uuid, SmtpProvider>>,
 }
 
 impl MailProviderManager {
@@ -535,11 +508,9 @@ impl MailProviderManager {
     }
 
     /// Get a provider by ID
-    pub async fn get(&self, _id: uuid::Uuid) -> Option<Box<dyn MailProvider>> {
-        // Note: We can't easily clone Box<dyn Trait>, so this would need
-        // to be implemented differently for actual usage.
-        // For now, this is a placeholder.
-        None
+    pub async fn get(&self, _id: uuid::Uuid) -> Option<SmtpProvider> {
+        let providers = self.providers.read().await;
+        providers.get(&_id).cloned()
     }
 
     /// Remove a provider from the cache

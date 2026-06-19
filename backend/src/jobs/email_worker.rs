@@ -11,7 +11,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::models::email::{EmailEventType, EmailOutbox, EmailStatus, MailProviderSettings};
-use crate::services::email_provider::{EmailAddress, EmailContent, MailProvider, SmtpProvider};
+use crate::services::email_provider::{EmailAddress, EmailContent, SmtpProvider};
 
 /// Configuration for the email worker
 #[derive(Debug, Clone)]

@@ -21,7 +21,7 @@ use crate::api::{admin::require_admin, AppState};
 use crate::error::{ApiResult, AppError};
 use crate::models::email::*;
 use crate::repositories::AdminRepository;
-use crate::services::email_provider::{EmailAddress, EmailContent, MailProvider, SmtpProvider};
+use crate::services::email_provider::{EmailAddress, EmailContent, SmtpProvider};
 use crate::services::email_service::{EmailService, EnqueueOptions, OutboxFilters};
 use crate::services::template_renderer::TemplateRenderer;
 
