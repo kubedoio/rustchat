@@ -244,7 +244,8 @@ fn decrypt_config(encrypted: &str, encryption_key: &str) -> Result<RustShareSync
                 .decode(encrypted)
                 .map_err(|legacy_error| {
                     SyncError::Config(format!(
-                        "Encrypted config decrypt failed ({decrypt_error}); legacy base64 decode failed ({legacy_error})"
+                        "Encrypted config decrypt failed ({}); legacy base64 decode failed ({})",
+                        decrypt_error, legacy_error
                     ))
                 })?;
             String::from_utf8(decoded)
