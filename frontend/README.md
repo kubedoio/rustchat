@@ -2,6 +2,10 @@
 
 Vue 3 + TypeScript + Vite SPA for RustChat.
 
+## Prerequisites
+
+- **Node.js 24+** (and npm 10+) are required for local building and development.
+
 ## Commands
 
 ```bash

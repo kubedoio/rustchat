@@ -136,27 +136,42 @@ docker compose down -v
 
 ## Common First-Run Issues
 
-### "Backend container keeps restarting"
+### "Backend container keeps restarting" or fails to start
 
 Check logs: `docker compose logs backend`
 
-- **Missing secrets:** Ensure all `RUSTCHAT_JWT_SECRET`, `RUSTCHAT_ENCRYPTION_KEY`, and S3 credentials are set in `.env`
-- **Port conflict:** Something is already using port 3000, 8080, 5432, 6379, or 9000. Stop the conflicting service or edit `docker-compose.yml` ports.
+- **Missing or empty secrets:**
+  - **Symptom:** Docker Compose output shows `RUSTCHAT_JWT_SECRET is not set` or `RUSTCHAT_ENCRYPTION_KEY is not set`.
+  - **Cause:** `.env` file is missing or the keys are empty.
+  - **Fix:** Run `./scripts/dev-setup.sh` to initialize `.env` or run `cp .env.example .env` and edit `.env` to populate the secrets.
+- **Port conflicts:**
+  - **Symptom:** `Error starting userland proxy: listen tcp 0.0.0.0:3000: bind: address already in use` or similar for ports 8080, 5432, 6379, or 9000.
+  - **Cause:** Another local service (e.g. host Postgres, Redis, or Node.js) is already running and listening on that port.
+  - **Fix:** Identify and stop the conflicting service using `lsof -i :<port>` or edit the port mappings in `docker-compose.yml` (e.g. changing host port `3000:3000` to `3001:3000`).
 
 ### "Cannot log in — user not found"
 
 The admin user is created **only on first startup**. If you started without `RUSTCHAT_ADMIN_USER` set:
 
-1. Stop: `docker compose down -v`
+1. Stop and remove data volumes: `docker compose down -v`
 2. Set `RUSTCHAT_ADMIN_USER` and `RUSTCHAT_ADMIN_PASSWORD` in `.env`
 3. Start: `docker compose up -d --build`
 
-### "File uploads fail"
+### "File uploads fail" or S3 connection errors
 
-The backend creates the upload bucket automatically on startup. If uploads fail:
+- **Symptom:** Upload spinner spins indefinitely, or backend logs show `Connection refused (os error 111)` or `S3 connection failed`.
+- **Cause:** The `rustfs` object storage container is still starting, or credentials mismatch in `.env`.
+- **Fix:**
+  1. Check that RustFS is healthy: `docker compose ps rustfs`
+  2. Verify that the credentials in `.env` match:
+     - `RUSTCHAT_S3_ACCESS_KEY` must equal `RUSTFS_ACCESS_KEY`
+     - `RUSTCHAT_S3_SECRET_KEY` must equal `RUSTFS_SECRET_KEY`
 
-1. Check that RustFS is healthy: `docker compose ps rustfs`
-2. Ensure the RustFS credentials in `.env` match between `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` and `RUSTCHAT_S3_ACCESS_KEY`/`RUSTCHAT_S3_SECRET_KEY`
+### Frontend shows "Unable to connect to server"
+
+- **Symptom:** The Web UI displays a connection error/reconnecting message on first page load.
+- **Cause:** The frontend container has started but the backend is still running migrations or waiting for Postgres.
+- **Fix:** Check backend logs via `docker compose logs -f backend`. Once you see `Server running on 0.0.0.0:3000`, refresh your browser.
 
 ## Next Steps
 
