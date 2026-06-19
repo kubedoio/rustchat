@@ -81,6 +81,12 @@ RustChat gives your team everything needed for productive communication:
 - **Screen sharing** — Share your screen during calls
 - **Mobile ringing** — VoIP push notifications for incoming calls on mobile
 
+### AI Agents & Ecosystem
+- **AI Agents** — Custom AI assistants acting as native channel participants responding to mentions or all messages
+- **RAG Knowledge Bases** — Sync documents from S3 or external folders (via RustShare) with PGVector semantic search indexing
+- **Tavily Web Search Tool** — Operators can enable server-side web search tool capabilities for agents
+- **Agent Analytics & Feedback** — Detailed admin reporting on agent usage, cost, token volumes, and user-submitted feedback (thumbs up/down)
+
 ### Productivity
 - **Powerful search** — Find messages, files, and conversations instantly
 - **Keyboard shortcuts** — Navigate without leaving your keyboard (`Ctrl+K` for quick switcher)
@@ -113,13 +119,15 @@ RustChat is designed as three focused services working together:
       └──────────┘      └──────────┘      └──────────────┘
 ```
 
-**The Backend** — A Rust service handling REST APIs, WebSocket connections, and business logic. It speaks two protocols:
-- `/api/v1/*` — Native API for the web client
+**The Backend** — A Rust service handling REST APIs, WebSocket connections, business logic, and the **Agent Runtime** for processing AI assistant workflows (supporting LLM completions, Tavily tools, and analytics). It speaks two protocols:
+- `/api/v1/*` — Native API for the web client (including `/api/v1/agents` CRUD and analytics)
 - `/api/v4/*` — Mattermost-compatible API for mobile and desktop clients
 
-**The Frontend** — A Vue.js single-page application that works in any modern browser. No Electron, no desktop installers.
+**The Frontend** — A Vue.js single-page application that works in any modern browser. No Electron, no desktop installers. Includes the Admin Console configuration interface for managing agents, knowledge bases, and sync settings.
 
 **The Push Proxy** — A dedicated service for mobile push notifications (FCM for Android, APNS for iOS).
+
+**PostgreSQL** — Primary data store. Enabled with the `pgvector` extension, it performs semantic vector indexing and retrieval for agent RAG knowledge bases.
 
 ---
 
@@ -283,6 +291,13 @@ See [Development Guide](docs/development.md) for the full setup, testing, and tr
 - Mobile app support (Mattermost mobile apps)
 - Push notifications
 
+### AI Agents & Ecosystem ✅
+- AI Agent runtime with OpenAI (or custom model overrides) integration
+- Knowledge Bases synced via S3 or local folders (RustShare)
+- pgvector semantic search indexing and retrieval (RAG)
+- Server-side tool execution support (Tavily Web Search)
+- Detailed Admin analytics and user feedback collection (thumbs up/down)
+
 See [What rustchat Cannot (Yet) Do](#limitations) for known gaps.
 
 ---
@@ -297,7 +312,7 @@ We believe in honest communication about capabilities:
 - **Advanced post actions** — Some Mattermost compatibility actions return explicit `501` until RustChat implements matching behavior
 - **Custom Profile Attributes** — UI exists but backend is limited
 - **OAuth Apps** — Basic structure, not full marketplace
-- **Bots** — Framework present, limited bot management
+- **Bots** — Standard bot accounts with API tokens are fully supported; advanced bot management and marketplace integrations are limited
 
 ### Known Limits
 - **Calls** — Control plane scales via Redis; media plane is instance-local (no distributed SFU mesh)

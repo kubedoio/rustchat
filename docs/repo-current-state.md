@@ -1,7 +1,7 @@
 # Repo Current State
 
-**Last updated:** 2026-06-16
-**Version:** v0.5.0
+**Last updated:** 2026-06-19
+**Version:** v0.5.1
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
 
@@ -9,11 +9,12 @@
 
 ## 1. Version
 
-**Current:** v0.5.0
+**Current:** v0.5.1
 
-Version is synchronized across two files:
+Version is synchronized across three files:
 - `backend/Cargo.toml` → `[package] version`
 - `frontend/package.json` → `"version"`
+- `push-proxy/Cargo.toml` → `[package] version`
 
 To check: `grep '^version' backend/Cargo.toml` or `jq .version frontend/package.json`
 
@@ -73,6 +74,7 @@ For live in-flight work see [GitHub Issues](https://github.com/rustchatio/rustch
 | Governance Layer | `.governance/` policy files, CODEOWNERS, PR template, issue forms, branch protection, GitHub labels | 2026-03-22 |
 | Foundation Docs | 7 structured docs consolidating existing flat docs | 2026-03-22 |
 | P0 Production Readiness | Security/operations hardening alignment, runbook fixes, and doc/env alignment | 2026-06-16 |
+| AI Agents & Ecosystem | Introduce AI Agents runtime, RAG pgvector capabilities, Tavily web tools, feedback APIs, bot guide, and v0.5.1 alignment | 2026-06-19 |
 
 ---
 

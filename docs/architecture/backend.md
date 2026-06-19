@@ -14,20 +14,22 @@ The backend is built with:
 
 ```
 backend/src/
-├── api/              # HTTP handlers
+├── a2a/              # Agent-to-agent communication layer
+├── api/              # HTTP handlers (including v1/agents.rs)
 │   ├── v1/          # Native API
 │   └── v4/          # Mattermost-compatible API
 ├── auth/            # Authentication & JWT
 ├── config/          # Environment configuration
 ├── db/              # Database connection & migrations
 ├── error/           # Error types
-├── jobs/            # Background workers
+├── jobs/            # Background workers (including sync & RAG ingestion)
 ├── mattermost_compat/  # MM compatibility utilities
 ├── middleware/      # Axum middleware
-├── models/          # Data models
+├── models/          # Data models (User with entity_type='agent', AgentConfig, Knowledge, etc.)
 ├── realtime/        # WebSocket hub
-├── services/        # Business logic
-├── storage/         # S3 file storage
+├── repositories/    # Database access repositories (AgentRepository, AgentFeedbackRepository, etc.)
+├── services/        # Business logic (including llm/ completions and agents CRUD)
+├── storage/         # S3 file storage & knowledge ingestion
 └── telemetry/       # Logging & tracing
 ```
 
@@ -65,6 +67,8 @@ One service per domain:
 - `post_service` - Message operations
 - `file_service` - File uploads
 - `user_service` - User management
+- `agent_service` - AI Agents management and channel dispatcher logic
+- `llm_service` - OpenAI connection, RAG prompting, and context truncation logic
 
 ### Database Access
 

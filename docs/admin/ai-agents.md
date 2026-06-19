@@ -29,14 +29,42 @@ For RAG:
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-## Create an Agent
+## Create and Configure an Agent
 
-1. Open **Admin Console > AI Agents**.
-2. Create an agent with a display name, username, model, system prompt, temperature, and context limits.
-3. Review the generated API key if your deployment uses agent-to-agent or external agent calls.
-4. Save the agent.
+To create a new AI Agent, navigate to **Admin Console > AI Agents** and click **Create Agent**. The configuration is divided into four main tabs:
 
-Agents are stored as normal RustChat users with `entity_type = 'agent'`. They appear in channel membership and post authorship using their configured profile.
+### 1. Basic Details
+* **Username**: The unique handle for the agent (e.g. `support-bot`). The username must be unique, lowercase alphanumeric with dashes/underscores, and is used for `@mentions`.
+* **Email**: A valid email address mapped to this agent account.
+* **Display Name**: (Optional) The public-facing name shown in chat threads.
+* **Title**: A short title indicating the agent's role (e.g., *Customer Support AI*).
+* **Description**: (Optional) Admin-facing notes about the agent's purpose.
+
+### 2. LLM Provider Options
+* **Provider**: Select from `OpenAI`, `Anthropic`, or `Ollama`.
+* **Model**: Specify the target model ID (e.g., `gpt-4o-mini`, `claude-3-5-sonnet-20241022`, or local Ollama tags).
+* **API Token**: (Optional) Override credentials for this specific agent. If left blank, the system-wide environment variables (e.g., `RUSTCHAT_OPENAI_API_KEY`) are utilized.
+* **Temperature**: Controls response randomness (range `0.0` to `2.0`). Recommended `0.3` for grounded tasks and `0.7` for general conversation.
+* **Max Output Tokens**: Limits the response token length (e.g., `1024`).
+
+### 3. Behavior & Capabilities
+* **System Prompt**: Core instructions defining the agent's persona, boundaries, response style, and instructions.
+* **Max Context Messages**: The maximum number of historical messages in the conversation channel sent as context to the LLM (default `10`).
+* **Capabilities**:
+  * **Respond to Mentions**: When checked, the agent replies when explicitly `@mentioned` in channels.
+  * **Respond to All**: When checked, the agent processes and replies to *every* new message in assigned channels.
+  * **Use Memory**: Enables the agent to maintain basic message history/memory.
+  * **Use RAG**: Allows the agent to query assigned knowledge bases.
+* **RAG Settings**:
+  * **RAG Enabled**: (Toggle) Explicitly enable Retrieval-Augmented Generation.
+  * **RAG Top-K**: Number of relevant document chunks retrieved during semantic vector search queries (default `5`).
+
+### 4. Channels
+* Select which channels the agent is active in. Agents can only participate in, read, or reply to channels they are explicitly added to.
+
+---
+
+Agents are stored as normal RustChat users with `entity_type = 'agent'`. They appear in channel membership lists and post authorship using their configured profiles. If your deployment uses external agent calls or agent-to-agent (a2a) communication, you can retrieve the agent's generated API key from the agent detail view.
 
 ## Assign Agents to Channels
 
