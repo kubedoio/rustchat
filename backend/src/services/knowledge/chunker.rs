@@ -87,7 +87,6 @@ impl Chunker for SlidingWindowChunker {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,7 +135,6 @@ mod tests {
             );
         }
     }
-
 
     #[test]
     fn test_select_chunker() {
