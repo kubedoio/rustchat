@@ -89,7 +89,7 @@ fi
 for file in \
   backend/src/api/v4/emoji.rs \
   backend/src/api/v4/access_control.rs \
-  backend/src/api/v4/data_retention.rs \
+  backend/src/api/v4/stubs.rs \
   backend/src/api/v4/content_flagging.rs \
   backend/src/api/v4/teams/mod.rs \
   backend/src/api/v4/users/mod.rs; do
