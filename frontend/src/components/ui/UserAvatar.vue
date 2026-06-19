@@ -74,7 +74,6 @@ const computedSize = computed(() => {
 // To robustness, we can update to use event listeners or a composable.
 // Let's implement a simple `onError` handler.
 
-import { ref, watch } from 'vue'
 
 const currentSrc = ref<string | null>(null)
 const triedGravatar = ref(false)
