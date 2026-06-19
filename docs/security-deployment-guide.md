@@ -201,6 +201,7 @@ RUSTCHAT_ALLOW_DEV_CORS=false
 3. **Enable bucket versioning or object locking** if regulatory requirements apply.
 4. **Use separate credentials for RustFS and RustChat S3 access** when possible.
 5. **Enable TLS on S3 endpoints.** If using RustFS, run it with a valid TLS certificate or access it through an internal TLS-terminating proxy.
+6. **Configure the S3 bucket as private.** RustChat does not require a public bucket because all file access, downloads, and attachments are served via authenticated proxy endpoints or transient presigned URLs. The bucket itself must never be exposed directly to the public internet.
 
 ---
 

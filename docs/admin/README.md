@@ -18,6 +18,7 @@ This guide is for system administrators, DevOps engineers, and IT staff responsi
 ### Configuration
 - [Configuration Reference](./configuration.md) - All environment variables
 - [AI Agents](./ai-agents.md) - Agent runtime, knowledge bases, tools, feedback, and operations
+- [Bot Accounts](./bots.md) - Creating and using standard integration bot accounts and access tokens
 - [Email Setup](./email.md) - SMTP configuration for notifications
 - [SSO Configuration](./sso.md) - Single Sign-On setup (OAuth/SAML)
 - [Push Notifications](./push-notifications.md) - Mobile push setup
