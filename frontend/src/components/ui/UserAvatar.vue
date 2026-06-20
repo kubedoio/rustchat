@@ -16,7 +16,7 @@ const gravatarUrl = ref<string | null>(null)
 
 watch(
   () => props.email,
-  async (email) => {
+  async email => {
     if (!email) {
       gravatarUrl.value = null
       return
@@ -26,7 +26,7 @@ watch(
       const msgBuffer = new TextEncoder().encode(cleanEmail)
       const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer)
       const hashArray = Array.from(new Uint8Array(hashBuffer))
-      const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
       gravatarUrl.value = `https://www.gravatar.com/avatar/${hashHex}?d=404`
     } catch (e) {
       gravatarUrl.value = null
@@ -73,7 +73,6 @@ const computedSize = computed(() => {
 // Note: This naive logic doesn't handle 404s (e.g. user has email but no Gravatar).
 // To robustness, we can update to use event listeners or a composable.
 // Let's implement a simple `onError` handler.
-
 
 const currentSrc = ref<string | null>(null)
 const triedGravatar = ref(false)
