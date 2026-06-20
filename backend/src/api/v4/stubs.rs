@@ -192,13 +192,12 @@ pub fn router(state: AppState) -> Router<AppState> {
 }
 
 pub fn brand_router() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/brand/image",
-            get(get_brand_image)
-                .post(upload_brand_image)
-                .delete(delete_brand_image),
-        )
+    Router::new().route(
+        "/brand/image",
+        get(get_brand_image)
+            .post(upload_brand_image)
+            .delete(delete_brand_image),
+    )
 }
 
 // ==========================================

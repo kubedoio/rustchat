@@ -4025,7 +4025,6 @@ dependencies = [
  "libc",
  "mime",
  "mime_guess",
- "once_cell",
  "pdf-extract",
  "pgvector",
  "prometheus",

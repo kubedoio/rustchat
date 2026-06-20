@@ -2,7 +2,6 @@
 //!
 //! Provides bot protection for public forms like registration and password reset.
 
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, warn};
 
@@ -10,12 +9,14 @@ use crate::middleware::reliability::{
     with_resilience, CircuitBreaker, CircuitError, RetryCondition, RetryConfig,
 };
 
-static TURNSTILE_CIRCUIT_BREAKER: Lazy<std::sync::Arc<CircuitBreaker>> =
-    Lazy::new(|| CircuitBreaker::default_config("turnstile"));
-static TURNSTILE_RETRY_CONFIG: Lazy<RetryConfig> = Lazy::new(|| RetryConfig {
-    retry_if: RetryCondition::Default,
-    ..Default::default()
-});
+// ponytail: use standard library LazyLock instead of once_cell
+static TURNSTILE_CIRCUIT_BREAKER: std::sync::LazyLock<std::sync::Arc<CircuitBreaker>> =
+    std::sync::LazyLock::new(|| CircuitBreaker::default_config("turnstile"));
+static TURNSTILE_RETRY_CONFIG: std::sync::LazyLock<RetryConfig> =
+    std::sync::LazyLock::new(|| RetryConfig {
+        retry_if: RetryCondition::Default,
+        ..Default::default()
+    });
 
 /// Turnstile verification error
 #[derive(Debug, Clone, PartialEq)]

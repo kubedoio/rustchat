@@ -170,3 +170,4 @@ venv/
 ENV/
 env/
 dump.rdb
+test-results/
