@@ -16,7 +16,11 @@ const gravatarUrl = ref<string | null>(null)
 
 watch(
   () => props.email,
-  async email => {
+  async (email, _, onCleanup) => {
+    let active = true
+    onCleanup(() => {
+      active = false
+    })
     if (!email) {
       gravatarUrl.value = null
       return
@@ -25,11 +29,14 @@ watch(
     try {
       const msgBuffer = new TextEncoder().encode(cleanEmail)
       const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer)
+      if (!active) return
       const hashArray = Array.from(new Uint8Array(hashBuffer))
       const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
       gravatarUrl.value = `https://www.gravatar.com/avatar/${hashHex}?d=404`
     } catch (e) {
-      gravatarUrl.value = null
+      if (active) {
+        gravatarUrl.value = null
+      }
     }
   },
   { immediate: true }
