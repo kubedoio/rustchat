@@ -141,8 +141,9 @@ pub fn router_with_body_limits(
         .merge(image::router().layer(DefaultBodyLimit::max(medium_limit)))
         // Mattermost Calls plugin API - small limit
         .merge(calls_plugin::router().layer(DefaultBodyLimit::max(small_limit)))
-        // Mattermost API Compatibility Stubs
-        .merge(stubs::router(state.clone()))
+        // Mattermost API Compatibility Stubs - small limit for general endpoints, medium limit for brand image
+        .merge(stubs::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
+        .merge(stubs::brand_router().layer(DefaultBodyLimit::max(medium_limit)))
         // WebSocket - no body limit (upgrade request)
         .merge(websocket_router)
         .fallback(not_implemented)

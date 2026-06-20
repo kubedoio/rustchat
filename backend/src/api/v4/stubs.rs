@@ -23,13 +23,6 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/agents", get(get_agents))
         .route("/agents/status", get(get_agents_status))
         .route("/llmservices", get(get_llm_services))
-        // Brand stubs
-        .route(
-            "/brand/image",
-            get(get_brand_image)
-                .post(upload_brand_image)
-                .delete(delete_brand_image),
-        )
         // Cloud stubs
         .route("/cloud/limits", get(get_cloud_limits))
         .route("/cloud/products", get(get_cloud_products))
@@ -196,6 +189,16 @@ pub fn router(state: AppState) -> Router<AppState> {
             get(get_user_channel_policies),
         )
         .route("/nps", post(submit_nps))
+}
+
+pub fn brand_router() -> Router<AppState> {
+    Router::new()
+        .route(
+            "/brand/image",
+            get(get_brand_image)
+                .post(upload_brand_image)
+                .delete(delete_brand_image),
+        )
 }
 
 // ==========================================
