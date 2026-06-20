@@ -19,8 +19,8 @@ use crate::repositories::agent_usage_repository::AgentUsageRepository;
 use crate::repositories::{AgentRepository, PostRepository, UserRepository};
 use crate::services::agent_memory::AgentMemoryService;
 use crate::services::agent_rate_limiter::{AgentRateLimiter, RateLimitResult};
-use crate::services::knowledge::embedder::Embedder;
-use crate::services::knowledge::vector_store::VectorStore;
+use crate::services::knowledge::embedder::OpenAiEmbedder;
+use crate::services::knowledge::vector_store::PgVectorStore;
 use crate::services::llm::{ChatMessage, CompletionRequest, LlmError, ProviderRegistry};
 use crate::services::tools::executor::ToolExecutor;
 use crate::services::tools::registry::ToolRegistry;
@@ -29,8 +29,8 @@ pub struct AgentRuntime {
     db: sqlx::PgPool,
     ws_hub: Arc<WsHub>,
     provider_registry: Arc<ProviderRegistry>,
-    embedder: Option<Arc<dyn Embedder>>,
-    vector_store: Option<Arc<dyn VectorStore>>,
+    embedder: Option<Arc<OpenAiEmbedder>>,
+    vector_store: Option<Arc<PgVectorStore>>,
     tool_registry: Option<Arc<ToolRegistry>>,
     rate_limiter: Arc<AgentRateLimiter>,
     semaphores: DashMap<Uuid, Arc<Semaphore>>,
@@ -41,8 +41,8 @@ impl AgentRuntime {
         db: sqlx::PgPool,
         ws_hub: Arc<WsHub>,
         provider_registry: Arc<ProviderRegistry>,
-        embedder: Option<Arc<dyn Embedder>>,
-        vector_store: Option<Arc<dyn VectorStore>>,
+        embedder: Option<Arc<OpenAiEmbedder>>,
+        vector_store: Option<Arc<PgVectorStore>>,
         tool_registry: Option<Arc<ToolRegistry>>,
     ) -> Self {
         let rate_limiter = Arc::new(AgentRateLimiter::new(10, 100_000));
@@ -218,8 +218,8 @@ async fn run_agent_response(
     db: sqlx::PgPool,
     ws_hub: Arc<WsHub>,
     provider_registry: Arc<ProviderRegistry>,
-    embedder: Option<Arc<dyn Embedder>>,
-    vector_store: Option<Arc<dyn VectorStore>>,
+    embedder: Option<Arc<OpenAiEmbedder>>,
+    vector_store: Option<Arc<PgVectorStore>>,
     tool_registry: Option<Arc<ToolRegistry>>,
     rate_limiter: Arc<AgentRateLimiter>,
     agent_user_id: Uuid,

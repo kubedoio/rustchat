@@ -1,5 +1,4 @@
 use dashmap::DashMap;
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -12,7 +11,9 @@ use super::lifecycle::{CallSessionResponse, CallStateResponse};
 use super::posts::ensure_call_thread_id;
 use super::state::CallState;
 
-pub(crate) static CHANNEL_CALLS_ENABLED: Lazy<DashMap<Uuid, bool>> = Lazy::new(DashMap::new);
+// ponytail: use standard library LazyLock instead of once_cell
+pub(crate) static CHANNEL_CALLS_ENABLED: std::sync::LazyLock<DashMap<Uuid, bool>> =
+    std::sync::LazyLock::new(DashMap::new);
 
 pub(crate) fn channel_calls_enabled(channel_id: Uuid) -> bool {
     CHANNEL_CALLS_ENABLED

@@ -1,14 +1,14 @@
 #![allow(clippy::needless_borrows_for_generic_args)]
 #![allow(clippy::await_holding_lock)]
 use crate::common::spawn_app;
-use once_cell::sync::Lazy;
 use rustchat::models::Team;
 use std::sync::Mutex;
 use uuid::Uuid;
 
 mod common;
 
-static TEST_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+// ponytail: use standard library LazyLock instead of once_cell
+static TEST_MUTEX: std::sync::LazyLock<Mutex<()>> = std::sync::LazyLock::new(|| Mutex::new(()));
 
 async fn register_user(app: &common::TestApp, username: &str, email: &str, password: &str) {
     let payload = serde_json::json!({

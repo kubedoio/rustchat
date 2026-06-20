@@ -10,22 +10,15 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 pub mod access_control;
 pub mod admin;
-pub mod ai;
 pub mod bots;
-pub mod brand;
 pub mod calls_plugin;
 pub mod categories;
 pub mod channel_bookmarks;
 pub mod channels;
-pub mod cloud;
-pub mod cluster;
 pub mod commands;
-pub mod compliance;
 pub mod config_client;
 pub mod content_flagging;
 pub mod custom_profile;
-pub mod data_retention;
-pub mod dialogs;
 pub mod emoji;
 pub mod extractors;
 pub mod files;
@@ -33,20 +26,16 @@ pub mod groups;
 pub mod hooks;
 pub mod image;
 pub mod imports_exports;
-pub mod ip_filtering;
 pub mod jobs;
-pub mod ldap;
 pub mod oauth;
 pub mod plugins;
 pub mod posts;
 
-pub mod recaps;
 pub mod reports;
 pub mod roles;
-pub mod saml;
 pub mod schemes;
-pub mod shared_channels;
 pub mod status;
+pub mod stubs;
 pub mod system;
 pub mod teams;
 pub mod terms_of_service;
@@ -115,52 +104,28 @@ pub fn router_with_body_limits(
         .merge(crate::api::admin_email::router().layer(DefaultBodyLimit::max(small_limit)))
         // Admin - medium limit
         .merge(admin::router().layer(DefaultBodyLimit::max(medium_limit)))
-        // SAML - small limit
-        .merge(saml::router().layer(DefaultBodyLimit::max(small_limit)))
         // OAuth - small limit
         .merge(oauth::router().layer(DefaultBodyLimit::max(small_limit)))
         // Schemes - small limit
         .merge(schemes::router().layer(DefaultBodyLimit::max(small_limit)))
-        // Cluster - small limit
-        .merge(cluster::router().layer(DefaultBodyLimit::max(small_limit)))
-        // Brand - medium limit for images
-        .merge(brand::router().layer(DefaultBodyLimit::max(medium_limit)))
-        // LDAP - small limit
-        .merge(ldap::router().layer(DefaultBodyLimit::max(small_limit)))
         // Access control - small limit
         .merge(access_control::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
         // Content flagging - small limit
         .merge(content_flagging::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
         // Usage - small limit
         .merge(usage::router().layer(DefaultBodyLimit::max(small_limit)))
-        // Data retention - small limit
-        .merge(data_retention::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
         // Custom profile - medium limit
         .merge(custom_profile::router().layer(DefaultBodyLimit::max(medium_limit)))
         // Roles - small limit
         .merge(roles::router().layer(DefaultBodyLimit::max(small_limit)))
-        // Cloud - small limit
-        .merge(cloud::router().layer(DefaultBodyLimit::max(small_limit)))
         // Jobs - small limit
         .merge(jobs::router().layer(DefaultBodyLimit::max(small_limit)))
-        // Recaps - small limit
-        .merge(recaps::router().layer(DefaultBodyLimit::max(small_limit)))
-        // Compliance - small limit
-        .merge(compliance::router().layer(DefaultBodyLimit::max(small_limit)))
-        // Shared channels - small limit
-        .merge(shared_channels::router().layer(DefaultBodyLimit::max(small_limit)))
-        // AI - medium limit for prompts
-        .merge(ai::router().layer(DefaultBodyLimit::max(medium_limit)))
         // Reports - small limit
         .merge(reports::router().layer(DefaultBodyLimit::max(small_limit)))
-        // IP filtering - small limit
-        .merge(ip_filtering::router().layer(DefaultBodyLimit::max(small_limit)))
         // Imports/exports - large limit for data files
         .merge(imports_exports::router().layer(DefaultBodyLimit::max(large_limit)))
         // Terms of service - medium limit
         .merge(terms_of_service::router().layer(DefaultBodyLimit::max(medium_limit)))
-        // Dialogs - small limit
-        .merge(dialogs::router().layer(DefaultBodyLimit::max(small_limit)))
         // Uploads - large limit for file uploads
         .merge(
             uploads::router()
@@ -176,6 +141,9 @@ pub fn router_with_body_limits(
         .merge(image::router().layer(DefaultBodyLimit::max(medium_limit)))
         // Mattermost Calls plugin API - small limit
         .merge(calls_plugin::router().layer(DefaultBodyLimit::max(small_limit)))
+        // Mattermost API Compatibility Stubs - small limit for general endpoints, medium limit for brand image
+        .merge(stubs::router(state.clone()).layer(DefaultBodyLimit::max(small_limit)))
+        .merge(stubs::brand_router().layer(DefaultBodyLimit::max(medium_limit)))
         // WebSocket - no body limit (upgrade request)
         .merge(websocket_router)
         .fallback(not_implemented)

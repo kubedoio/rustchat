@@ -2,19 +2,7 @@
 //!
 //! Converts text chunks into dense vector embeddings via LLM APIs.
 
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-
-/// Trait for text embedders.
-#[async_trait]
-pub trait Embedder: Send + Sync {
-    /// Embed a batch of texts into vectors.
-    async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbedError>;
-    /// Dimensionality of produced embeddings.
-    fn dimensions(&self) -> usize;
-    /// Model name.
-    fn model_name(&self) -> &str;
-}
 
 /// Embedding error types.
 #[derive(Debug, thiserror::Error)]
@@ -50,28 +38,8 @@ impl OpenAiEmbedder {
             base_url: "https://api.openai.com/v1".to_string(),
         }
     }
-}
 
-#[derive(Serialize)]
-struct OpenAiEmbeddingRequest {
-    input: Vec<String>,
-    model: String,
-    dimensions: usize,
-}
-
-#[derive(Deserialize)]
-struct OpenAiEmbeddingResponse {
-    data: Vec<OpenAiEmbeddingData>,
-}
-
-#[derive(Deserialize)]
-struct OpenAiEmbeddingData {
-    embedding: Vec<f32>,
-}
-
-#[async_trait]
-impl Embedder for OpenAiEmbedder {
-    async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbedError> {
+    pub async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, EmbedError> {
         if texts.is_empty() {
             return Err(EmbedError::EmptyInput);
         }
@@ -113,11 +81,28 @@ impl Embedder for OpenAiEmbedder {
         Ok(all_embeddings)
     }
 
-    fn dimensions(&self) -> usize {
+    pub fn dimensions(&self) -> usize {
         self.dimensions
     }
 
-    fn model_name(&self) -> &str {
+    pub fn model_name(&self) -> &str {
         &self.model
     }
+}
+
+#[derive(Serialize)]
+struct OpenAiEmbeddingRequest {
+    input: Vec<String>,
+    model: String,
+    dimensions: usize,
+}
+
+#[derive(Deserialize)]
+struct OpenAiEmbeddingResponse {
+    data: Vec<OpenAiEmbeddingData>,
+}
+
+#[derive(Deserialize)]
+struct OpenAiEmbeddingData {
+    embedding: Vec<f32>,
 }

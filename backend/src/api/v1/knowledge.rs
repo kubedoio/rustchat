@@ -748,6 +748,7 @@ async fn trigger_sync(
         state.db.clone(),
         state.s3_client.clone(),
         state.config.s3_bucket.clone(),
+        state.config.encryption_key.clone(),
     );
     let report = orchestrator
         .full_sync(&source, kb_id, auth.user_id)

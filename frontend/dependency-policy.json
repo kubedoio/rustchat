@@ -22,10 +22,6 @@
       "category": "impossible-to-replace-economically",
       "reason": "Vue integration layer for the existing rich text composer."
     },
-    "@types/md5": {
-      "category": "editor-format-tooling-critical",
-      "reason": "Type coverage for the md5 package used in avatar hashing."
-    },
     "@vueuse/core": {
       "category": "impossible-to-replace-economically",
       "reason": "Shared reactive browser utilities already used for storage and breakpoint hooks."
@@ -53,10 +49,6 @@
     "match-sorter": {
       "category": "impossible-to-replace-economically",
       "reason": "Fuzzy ranking for quick-switcher search results."
-    },
-    "md5": {
-      "category": "impossible-to-replace-economically",
-      "reason": "Gravatar-compatible MD5 hashing for email-based avatar fallbacks."
     },
     "pinia": {
       "category": "framework-critical",

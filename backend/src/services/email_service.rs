@@ -174,7 +174,7 @@ impl EmailService {
     /// Send an email immediately (bypasses outbox)
     pub async fn send_immediate(
         &self,
-        provider: &crate::services::email_provider::BoxedProvider,
+        provider: &crate::services::email_provider::SmtpProvider,
         from: &EmailAddress,
         to: &EmailAddress,
         content: EmailContent,

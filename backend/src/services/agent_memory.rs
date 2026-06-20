@@ -8,8 +8,8 @@ use crate::error::{ApiResult, AppError};
 use crate::models::agent::AgentMemory;
 use crate::models::knowledge::SearchFilter;
 use crate::repositories::{AgentRepository, KnowledgeRepository};
-use crate::services::knowledge::embedder::Embedder;
-use crate::services::knowledge::vector_store::VectorStore;
+use crate::services::knowledge::embedder::OpenAiEmbedder;
+use crate::services::knowledge::vector_store::PgVectorStore;
 use crate::services::llm::ChatMessage;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
@@ -17,8 +17,8 @@ use uuid::Uuid;
 
 pub struct AgentMemoryService {
     db: PgPool,
-    embedder: Option<Arc<dyn Embedder>>,
-    vector_store: Option<Arc<dyn VectorStore>>,
+    embedder: Option<Arc<OpenAiEmbedder>>,
+    vector_store: Option<Arc<PgVectorStore>>,
 }
 
 impl AgentMemoryService {
@@ -32,8 +32,8 @@ impl AgentMemoryService {
 
     pub fn with_rag(
         mut self,
-        embedder: Arc<dyn Embedder>,
-        vector_store: Arc<dyn VectorStore>,
+        embedder: Arc<OpenAiEmbedder>,
+        vector_store: Arc<PgVectorStore>,
     ) -> Self {
         self.embedder = Some(embedder);
         self.vector_store = Some(vector_store);

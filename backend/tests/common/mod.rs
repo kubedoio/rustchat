@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-use once_cell::sync::Lazy;
 use rustchat::{
     api,
     config::{Config, RetentionJobConfig},
@@ -25,8 +24,8 @@ use tokio_tungstenite::{
 pub type WsStream =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-// Ensure tracing is initialized only once
-static TRACING: Lazy<()> = Lazy::new(|| {
+// ponytail: use standard library LazyLock instead of once_cell
+static TRACING: std::sync::LazyLock<()> = std::sync::LazyLock::new(|| {
     let log_level = "info";
     // We just call init regardless of TEST_LOG for now, as init() sets global default.
     // In a real scenario we might want to separate subscribers for stdout vs sink.
@@ -111,7 +110,7 @@ pub async fn spawn_app() -> TestApp {
 
 pub async fn spawn_app_with_config(config: Config) -> TestApp {
     dotenvy::dotenv().ok();
-    Lazy::force(&TRACING);
+    std::sync::LazyLock::force(&TRACING);
 
     // Configure database using explicit test URL first, then known local fallbacks.
     let db_pool = configure_database_with_fallback(&collect_test_database_urls()).await;

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use uuid::Uuid;
 
+use crate::crypto;
 use crate::models::knowledge::{CreateKnowledgeDocument, KnowledgeSyncSource, SyncStateUpdate};
 use crate::repositories::KnowledgeRepository;
 use crate::services::knowledge::extractor::ExtractorRegistry;
@@ -17,14 +18,21 @@ pub struct SyncOrchestrator {
     db: sqlx::PgPool,
     s3_client: S3Client,
     s3_bucket: String,
+    encryption_key: String,
 }
 
 impl SyncOrchestrator {
-    pub fn new(db: sqlx::PgPool, s3_client: S3Client, s3_bucket: String) -> Self {
+    pub fn new(
+        db: sqlx::PgPool,
+        s3_client: S3Client,
+        s3_bucket: String,
+        encryption_key: String,
+    ) -> Self {
         Self {
             db,
             s3_client,
             s3_bucket,
+            encryption_key,
         }
     }
 
@@ -35,7 +43,8 @@ impl SyncOrchestrator {
         kb_id: Uuid,
         created_by: Uuid,
     ) -> Result<SyncReport, SyncError> {
-        let config: RustShareSyncConfig = decrypt_config(&sync_source.config_encrypted)?;
+        let config: RustShareSyncConfig =
+            decrypt_config(&sync_source.config_encrypted, &self.encryption_key)?;
         let client = RustShareClient::new(config.base_url, config.auth_token);
         let repo = KnowledgeRepository::new(&self.db);
 
@@ -227,14 +236,23 @@ pub struct RustShareSyncConfig {
     pub recursive: bool,
 }
 
-fn decrypt_config(encrypted: &str) -> Result<RustShareSyncConfig, SyncError> {
-    // TODO: Use crate::crypto::decrypt when implemented
-    // For now, assume config is stored as base64-encoded JSON (not encrypted in dev)
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(encrypted)
-        .map_err(|e| SyncError::Config(format!("Base64 decode failed: {}", e)))?;
-    let json = String::from_utf8(decoded)
-        .map_err(|e| SyncError::Config(format!("UTF-8 decode failed: {}", e)))?;
+fn decrypt_config(encrypted: &str, encryption_key: &str) -> Result<RustShareSyncConfig, SyncError> {
+    let json = match crypto::decrypt(encrypted, encryption_key) {
+        Ok(config_json) => config_json,
+        Err(decrypt_error) => {
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(encrypted)
+                .map_err(|legacy_error| {
+                    SyncError::Config(format!(
+                        "Encrypted config decrypt failed ({}); legacy base64 decode failed ({})",
+                        decrypt_error, legacy_error
+                    ))
+                })?;
+            String::from_utf8(decoded)
+                .map_err(|e| SyncError::Config(format!("UTF-8 decode failed: {}", e)))?
+        }
+    };
+
     serde_json::from_str(&json).map_err(|e| SyncError::Config(format!("JSON parse failed: {}", e)))
 }
 
@@ -249,6 +267,47 @@ pub struct SyncReport {
 impl SyncReport {
     pub fn total(&self) -> usize {
         self.created + self.updated + self.unchanged + self.failed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config_json() -> String {
+        serde_json::json!({
+            "base_url": "https://share.example.com",
+            "auth_token": "secret-token",
+            "folder_id": "folder-123",
+            "knowledge_base_id": null,
+            "recursive": true
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn decrypt_config_reads_encrypted_json() {
+        let key = "test-encryption-key";
+        let encrypted = crypto::encrypt(&config_json(), key).expect("encrypt config");
+
+        let config = decrypt_config(&encrypted, key).expect("decrypt config");
+
+        assert_eq!(config.base_url, "https://share.example.com");
+        assert_eq!(config.auth_token, "secret-token");
+        assert_eq!(config.folder_id, "folder-123");
+        assert!(config.recursive);
+    }
+
+    #[test]
+    fn decrypt_config_preserves_legacy_base64_fallback() {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(config_json());
+
+        let config = decrypt_config(&encoded, "wrong-key").expect("decode legacy config");
+
+        assert_eq!(config.base_url, "https://share.example.com");
+        assert_eq!(config.auth_token, "secret-token");
+        assert_eq!(config.folder_id, "folder-123");
+        assert!(config.recursive);
     }
 }
 

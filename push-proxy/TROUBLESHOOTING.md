@@ -25,7 +25,7 @@ curl http://localhost:3000/health
 
 ```bash
 # Run the test script with your actual device token
-./push-proxy/test-push.sh android YOUR_DEVICE_TOKEN
+./scripts/test_push_notification.sh YOUR_DEVICE_TOKEN android
 
 # Or manually with verbose curl
 curl -v -X POST http://localhost:3000/send \
@@ -273,7 +273,7 @@ If you're still having issues:
 
 1. Collect the following information:
    - Push proxy logs (`docker-compose logs push-proxy`)
-   - Output of test script (`./test-push.sh android YOUR_TOKEN`)
+   - Output of test script (`./scripts/test_push_notification.sh YOUR_TOKEN android`)
    - Your environment variables (redact sensitive values)
 
 2. Verify your setup:
