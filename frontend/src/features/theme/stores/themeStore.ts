@@ -6,14 +6,7 @@ import { ref, computed } from 'vue'
 import { preferencesApi, type Preference } from '../../../api/preferences'
 
 export type Theme =
-  | 'light'
-  | 'dark'
-  | 'modern'
-  | 'metallic'
-  | 'futuristic'
-  | 'high-contrast'
-  | 'simple'
-  | 'dynamic'
+  'light' | 'dark' | 'modern' | 'metallic' | 'futuristic' | 'high-contrast' | 'simple' | 'dynamic'
 
 export interface ThemeColors {
   sidebarBg: string
