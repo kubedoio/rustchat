@@ -16,6 +16,10 @@ ignore = [
     # Severity: medium (5.9). JWT verification with trusted OIDC keys is not
     # exposed to network timing observation.
     "RUSTSEC-2023-0071",
+    # RUSTSEC-2026-0192: ttf-parser is unmaintained.
+    # Transitive dependency via pdf-extract -> lopdf; no fixed upgrade is
+    # available upstream. We do not parse untrusted fonts with this crate.
+    "RUSTSEC-2026-0192",
 ]
 
 [licenses]

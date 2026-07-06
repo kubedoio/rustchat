@@ -76,7 +76,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 pdf-extract = "0.12"
 html2text = "0.17"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
-quick-xml = "0.37"
+quick-xml = "0.41"
 
 # HTTP client for OAuth (rustls for musl compatibility)
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }

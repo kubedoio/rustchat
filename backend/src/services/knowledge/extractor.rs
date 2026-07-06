@@ -143,8 +143,10 @@ impl DocumentExtractor for DocxExtractor {
                 }
                 Ok(quick_xml::events::Event::Text(e)) => {
                     if in_text_element {
-                        if let Ok(text) = e.unescape() {
-                            texts.push(text.into_owned());
+                        if let Ok(text) = e.decode() {
+                            if let Ok(unescaped) = quick_xml::escape::unescape(&text) {
+                                texts.push(unescaped.into_owned());
+                            }
                         }
                     }
                 }
