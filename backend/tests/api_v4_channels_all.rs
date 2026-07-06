@@ -1,6 +1,6 @@
 #![allow(clippy::needless_borrows_for_generic_args)]
 use crate::common::spawn_app;
-use rustchat::mattermost_compat::id::parse_mm_or_uuid;
+use rustchat::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -276,4 +276,103 @@ async fn mm_get_all_channels_supports_filters_and_total_count() {
     assert!(names.contains(&"archived-private".to_string()));
     assert!(!names.contains(&"town-square".to_string()));
     assert!(!names.contains(&"off-topic".to_string()));
+}
+
+async fn setup_empty_team(ctx: &TestContext) -> Uuid {
+    let team_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO teams (id, org_id, name, display_name, allow_open_invite) VALUES ($1, $2, 'empty-team', 'Empty Team', true)",
+    )
+    .bind(team_id)
+    .bind(ctx.org_id)
+    .execute(&ctx.app.db_pool)
+    .await
+    .expect("failed to create team");
+
+    sqlx::query("INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'member')")
+        .bind(team_id)
+        .bind(ctx.admin.user_uuid)
+        .execute(&ctx.app.db_pool)
+        .await
+        .expect("failed to add team member");
+
+    team_id
+}
+
+#[tokio::test]
+async fn create_channel_rejects_invalid_names() {
+    let ctx = setup_context().await;
+    let team_id = setup_empty_team(&ctx).await;
+
+    let base_url = format!("{}/api/v4/channels", &ctx.app.address);
+
+    let send_create = |name: &str| {
+        ctx.app
+            .api_client
+            .post(&base_url)
+            .header("Authorization", format!("Bearer {}", ctx.admin.token))
+            .json(&json!({
+                "team_id": encode_mm_id(team_id),
+                "name": name,
+                "display_name": "Display Name",
+                "type": "O"
+            }))
+            .send()
+    };
+
+    // Empty name
+    let res = send_create("").await.expect("request failed");
+    assert_eq!(400, res.status().as_u16(), "empty name should be rejected");
+
+    // Whitespace-only name
+    let res = send_create("   ").await.expect("request failed");
+    assert_eq!(
+        400,
+        res.status().as_u16(),
+        "whitespace-only name should be rejected"
+    );
+
+    // Name exceeding 64 characters
+    let long_name = "a".repeat(65);
+    let res = send_create(&long_name).await.expect("request failed");
+    assert_eq!(
+        400,
+        res.status().as_u16(),
+        "name exceeding 64 characters should be rejected"
+    );
+
+    // Name with invalid characters
+    let res = send_create("bad name!").await.expect("request failed");
+    assert_eq!(
+        400,
+        res.status().as_u16(),
+        "name with invalid characters should be rejected"
+    );
+
+    // Valid name should succeed
+    let res = send_create("valid-channel").await.expect("request failed");
+    assert_eq!(
+        200,
+        res.status().as_u16(),
+        "valid channel name should be accepted"
+    );
+
+    // Whitespace-padded valid name should succeed and be stored trimmed
+    let res = send_create("  trimmed-channel  ")
+        .await
+        .expect("request failed");
+    assert_eq!(
+        200,
+        res.status().as_u16(),
+        "whitespace-padded valid channel name should be accepted"
+    );
+    let body = res
+        .json::<serde_json::Value>()
+        .await
+        .expect("failed to parse response");
+    assert_eq!(
+        Some("trimmed-channel"),
+        body["name"].as_str(),
+        "stored channel name should be trimmed"
+    );
 }

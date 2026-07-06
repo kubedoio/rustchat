@@ -144,6 +144,34 @@ fn default_channel_type() -> String {
     "O".to_string()
 }
 
+/// Validates a channel name. Channel names must be non-empty, at most 64
+/// characters, and contain only lowercase letters, digits, hyphens and
+/// underscores. This matches Mattermost URL-name conventions and keeps us
+/// safely under the 255-character database limit.
+fn validate_channel_name(name: &str) -> Result<(), AppError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::BadRequest(
+            "Channel name cannot be empty".to_string(),
+        ));
+    }
+    if trimmed.len() > 64 {
+        return Err(AppError::BadRequest(
+            "Channel name cannot exceed 64 characters".to_string(),
+        ));
+    }
+    if !trimmed
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+    {
+        return Err(AppError::BadRequest(
+            "Channel name may only contain lowercase letters, numbers, hyphens and underscores"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 pub async fn create_channel(
     State(state): State<AppState>,
     auth: MmAuthUser,
@@ -155,6 +183,9 @@ pub async fn create_channel(
 
     let team_id =
         parse_mm_or_uuid(&input.team_id).ok_or_else(|| crate::error::AppError::InvalidTeamId)?;
+
+    let name = input.name.trim();
+    validate_channel_name(name)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -175,7 +206,7 @@ pub async fn create_channel(
         .create(
             team_id,
             channel_type,
-            &input.name,
+            name,
             &input.display_name,
             &input.purpose,
             &input.header,

@@ -746,8 +746,11 @@ async function handleLeaveTeam() {
             </div>
 
             <!-- Empty Category State -->
-            <div v-if="cat.channels.length === 0" class="px-8 py-3 text-xs text-text-3 italic">
-              No channels
+            <div v-if="cat.channels.length === 0" class="px-4 py-3 text-xs text-text-3">
+              <p class="font-medium">No channels yet</p>
+              <p class="mt-0.5 text-text-4">
+                Create your first channel or browse existing ones to get started.
+              </p>
             </div>
           </div>
         </div>
