@@ -184,7 +184,8 @@ pub async fn create_channel(
     let team_id =
         parse_mm_or_uuid(&input.team_id).ok_or_else(|| crate::error::AppError::InvalidTeamId)?;
 
-    validate_channel_name(&input.name)?;
+    let name = input.name.trim();
+    validate_channel_name(name)?;
 
     let repo = ChannelRepository::new(&state.db);
 
@@ -205,7 +206,7 @@ pub async fn create_channel(
         .create(
             team_id,
             channel_type,
-            &input.name,
+            name,
             &input.display_name,
             &input.purpose,
             &input.header,

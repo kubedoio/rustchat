@@ -356,4 +356,23 @@ async fn create_channel_rejects_invalid_names() {
         res.status().as_u16(),
         "valid channel name should be accepted"
     );
+
+    // Whitespace-padded valid name should succeed and be stored trimmed
+    let res = send_create("  trimmed-channel  ")
+        .await
+        .expect("request failed");
+    assert_eq!(
+        200,
+        res.status().as_u16(),
+        "whitespace-padded valid channel name should be accepted"
+    );
+    let body = res
+        .json::<serde_json::Value>()
+        .await
+        .expect("failed to parse response");
+    assert_eq!(
+        Some("trimmed-channel"),
+        body["name"].as_str(),
+        "stored channel name should be trimmed"
+    );
 }
