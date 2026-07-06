@@ -35,7 +35,7 @@
     "marked": "^12.0.0",
     "match-sorter": "^8.3.0",
     "pinia": "^3.0.4",
-    "vue": "^3.5.38",
+    "vue": "^3.5.39",
     "vue-router": "^4.6.4"
   },
   "overrides": {
@@ -45,8 +45,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "@playwright/test": "^1.61.0",
-    "@tailwindcss/postcss": "^4.3.1",
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/postcss": "^4.3.2",
     "@types/dompurify": "^3.2.0",
     "@types/marked": "^5.0.2",
     "@types/node": "^24.13.2",
@@ -58,13 +58,13 @@
     "eslint-plugin-prettier": "^5.5.6",
     "eslint-plugin-vue": "^10.9.2",
     "jsdom": "^29.1.1",
-    "postcss": "^8.5.15",
-    "prettier": "^3.8.4",
+    "postcss": "^8.5.16",
+    "prettier": "^3.9.4",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.61.1",
-    "vite": "^8.0.16",
+    "typescript-eslint": "^8.62.1",
+    "vite": "^8.1.3",
     "vitest": "^4.1.9",
-    "vue-tsc": "^3.3.5"
+    "vue-tsc": "^3.3.6"
   }
 }
