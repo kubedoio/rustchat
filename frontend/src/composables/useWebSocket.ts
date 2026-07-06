@@ -220,8 +220,7 @@ function normalizeWsPost(data: unknown, envelopeChannelId?: string): Post | null
     created_at: createdAt,
     updated_at: updatedAt,
     client_msg_id: (normalizedRawPost.client_msg_id ?? normalizedRawPost.pending_post_id) as
-      | string
-      | undefined,
+      string | undefined,
     file_ids: Array.isArray(normalizedRawPost.file_ids)
       ? normalizedRawPost.file_ids.map((id: unknown) => normalizeEntityId(id) ?? id)
       : [],

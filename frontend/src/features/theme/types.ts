@@ -1,14 +1,7 @@
 // Theme Types
 
 export type Theme =
-  | 'light'
-  | 'dark'
-  | 'modern'
-  | 'metallic'
-  | 'futuristic'
-  | 'high-contrast'
-  | 'simple'
-  | 'dynamic'
+  'light' | 'dark' | 'modern' | 'metallic' | 'futuristic' | 'high-contrast' | 'simple' | 'dynamic'
 
 export type ChatFont =
   | 'inter'

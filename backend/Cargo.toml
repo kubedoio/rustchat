@@ -73,7 +73,7 @@ hex = "0.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 
 # Document text extraction
-pdf-extract = "0.10"
+pdf-extract = "0.12"
 html2text = "0.17"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
 quick-xml = "0.37"

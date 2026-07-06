@@ -7,13 +7,7 @@ import { normalizeSafeHttpUrl } from '../../../utils/safeUrl'
 export type RhsView = 'thread' | 'search' | 'info' | 'saved' | 'pinned' | 'members' | null
 export type Density = 'comfortable' | 'compact'
 export type SettingsTab =
-  | 'profile'
-  | 'notifications'
-  | 'display'
-  | 'sidebar'
-  | 'advanced'
-  | 'calls'
-  | 'security'
+  'profile' | 'notifications' | 'display' | 'sidebar' | 'advanced' | 'calls' | 'security'
 
 export const useUIStore = defineStore('uiStore', () => {
   // State

@@ -213,8 +213,7 @@ function handleRinging(event: WebSocketCallEvent) {
   const data = readEventData(event)
   const channelId = readEventChannelId(data)
   const callerId = (data.sender_id || data.sender_id_raw) as string | undefined as
-    | UserId
-    | undefined
+    UserId | undefined
   if (channelId && callerId) {
     callService.handleIncomingCall(channelId, callerId)
   }

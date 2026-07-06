@@ -93,9 +93,7 @@ export const useAuthStore = defineStore('authStore', () => {
     }
 
     const nextExpiresAt = (snapshot.expiresAt ?? snapshot.expires_at ?? null) as
-      | string
-      | number
-      | null
+      string | number | null
     user.value.status_text = snapshot.text ?? null
     user.value.status_emoji = snapshot.emoji ?? null
     user.value.status_expires_at = nextExpiresAt
