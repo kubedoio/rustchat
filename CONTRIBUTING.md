@@ -10,6 +10,8 @@ git commit -s -m "feat: describe your change"
 
 Pull requests will fail the required DCO check if any commit lacks this sign-off.
 
+AI agents and automated contributors should read [`AGENTS.md`](AGENTS.md) for the agent-specific workflow, allowed paths, scope boundaries, and validation commands before making any changes.
+
 For the detailed GitHub workflow (fork, branch, PR, reviews), see [docs/contributor-workflow.md](docs/contributor-workflow.md).
 
 ## Prerequisites
