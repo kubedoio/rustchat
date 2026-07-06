@@ -2,7 +2,7 @@
 
 This directory is the landing point for AI-agent-specific guidance in RustChat.
 
-For the canonical contributor and agent entry point, see the root [`AGENTS.md`](../../AGENTS.md).
+For the canonical contributor and agent entry point, see the root [`AGENTS.md`](https://github.com/kubedoio/rustchat/blob/main/AGENTS.md).
 
 ## References
 
