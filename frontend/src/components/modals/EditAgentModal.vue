@@ -736,7 +736,7 @@ async function handleUnassignKb(kbId: string) {
                 v-model.number="analyticsDays"
                 class="px-2 py-1.5 text-xs border border-border-1 rounded-lg bg-bg-surface-1 text-text-1 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
                 @change="
-                  props.agent && agentStore.fetchAgentAnalytics(props.agent.id, analyticsDays)
+                  props.agent && agentStore.fetchAgentAnalytics(props.agent!.id, analyticsDays)
                 "
               >
                 <option :value="7">Last 7 days</option>
