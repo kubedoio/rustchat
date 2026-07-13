@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM openresty/openresty:alpine@sha256:49db7235f2f94aa179c1242882619aea258c112b20f48ba45aefba010a1d0607
+FROM openresty/openresty:alpine@sha256:99b32fe3e411c98033114dd471440fb702992d0953ce8b6e6b5c016285ac2ab9
 
 # Create a dedicated non-root user and group for running the frontend server.
 RUN addgroup -S rustchat && adduser -S rustchat -G rustchat
