@@ -224,7 +224,7 @@ pub async fn request_password_reset(
                 .await
                 .ok()
                 .flatten()
-                .and_then(|url: String| if url.is_empty() { None } else { Some(url) });
+                .filter(|url: &String| !url.is_empty());
 
         if let Some(site_url) = site_url {
             let reset_link = format!("{}/reset-password?token={}", site_url, token);
@@ -523,7 +523,7 @@ pub async fn request_password_setup(
             .await
             .ok()
             .flatten()
-            .and_then(|url: String| if url.is_empty() { None } else { Some(url) });
+            .filter(|url: &String| !url.is_empty());
 
     let site_url = site_url.ok_or_else(|| {
         warn!("site_url not configured");
