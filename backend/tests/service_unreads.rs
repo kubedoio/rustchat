@@ -37,7 +37,7 @@ async fn setup_context() -> TestContext {
     // Register sender
     let sender_email = format!("sender_{}@example.com", Uuid::new_v4());
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&json!({
             "username": format!("sender_{}", &sender_email[..8]),
             "email": sender_email,
@@ -53,7 +53,7 @@ async fn setup_context() -> TestContext {
 
     let sender_login = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&json!({ "login_id": sender_email, "password": "Password123!" }))
         .send()
         .await
@@ -70,7 +70,7 @@ async fn setup_context() -> TestContext {
 
     let sender_me = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {sender_token}"))
         .send()
         .await
@@ -89,7 +89,7 @@ async fn setup_context() -> TestContext {
     // Register receiver
     let receiver_email = format!("receiver_{}@example.com", Uuid::new_v4());
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&json!({
             "username": format!("receiver_{}", &receiver_email[..8]),
             "email": receiver_email,
@@ -105,7 +105,7 @@ async fn setup_context() -> TestContext {
 
     let receiver_login = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&json!({ "login_id": receiver_email, "password": "Password123!" }))
         .send()
         .await
@@ -122,7 +122,7 @@ async fn setup_context() -> TestContext {
 
     let receiver_me = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {receiver_token}"))
         .send()
         .await
@@ -145,7 +145,7 @@ async fn setup_context() -> TestContext {
     // Register observer
     let observer_email = format!("observer_{}@example.com", Uuid::new_v4());
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&json!({
             "username": format!("observer_{}", &observer_email[..8]),
             "email": observer_email,
@@ -161,7 +161,7 @@ async fn setup_context() -> TestContext {
 
     let observer_login = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&json!({ "login_id": observer_email, "password": "Password123!" }))
         .send()
         .await
@@ -178,7 +178,7 @@ async fn setup_context() -> TestContext {
 
     let observer_me = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {observer_token}"))
         .send()
         .await
@@ -262,7 +262,7 @@ async fn get_channel_unread(
         .api_client
         .get(format!(
             "{}/api/v4/channels/{}/unread",
-            &app.address,
+            app.address,
             encode_mm_id(channel_id)
         ))
         .header("Authorization", format!("Bearer {token}"))
@@ -326,7 +326,7 @@ async fn create_post(
 ) -> serde_json::Value {
     let res = app
         .api_client
-        .post(format!("{}/api/v4/posts", &app.address))
+        .post(format!("{}/api/v4/posts", app.address))
         .header("Authorization", format!("Bearer {token}"))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -438,7 +438,7 @@ async fn get_unread_counts_returns_correct_values() {
         .api_client
         .post(format!(
             "{}/api/v4/channels/{}/members/me/read",
-            &ctx.app.address,
+            ctx.app.address,
             encode_mm_id(ctx.channel_id)
         ))
         .header("Authorization", format!("Bearer {}", ctx.receiver_token))

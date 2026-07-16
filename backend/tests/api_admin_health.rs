@@ -18,7 +18,7 @@ async fn test_admin_health_check() {
 
     let reg_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(&format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -44,7 +44,7 @@ async fn test_admin_health_check() {
 
     let login_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/login", &app.address))
+        .post(&format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -62,7 +62,7 @@ async fn test_admin_health_check() {
     // 4. Check admin health endpoint
     let health_res = app
         .api_client
-        .get(&format!("{}/api/v1/admin/health", &app.address))
+        .get(&format!("{}/api/v1/admin/health", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await

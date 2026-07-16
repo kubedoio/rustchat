@@ -37,7 +37,7 @@ async fn setup_mm_user_with_priority_enabled() -> TestContext {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -50,7 +50,7 @@ async fn setup_mm_user_with_priority_enabled() -> TestContext {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -67,7 +67,7 @@ async fn setup_mm_user_with_priority_enabled() -> TestContext {
 
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -130,7 +130,7 @@ async fn team_unread_includes_thread_urgent_mentions_when_enabled() {
     let root_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -157,7 +157,7 @@ async fn team_unread_includes_thread_urgent_mentions_when_enabled() {
     let reply_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -193,7 +193,7 @@ async fn team_unread_includes_thread_urgent_mentions_when_enabled() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/teams/{}/unread?include_collapsed_threads=true",
-            &ctx.app.address, ctx.user_id, team_id
+            ctx.app.address, ctx.user_id, team_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()

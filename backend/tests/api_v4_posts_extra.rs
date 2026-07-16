@@ -35,7 +35,7 @@ async fn setup_mm_user() -> TestContext {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -48,7 +48,7 @@ async fn setup_mm_user() -> TestContext {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -65,7 +65,7 @@ async fn setup_mm_user() -> TestContext {
 
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -125,7 +125,7 @@ async fn create_post(ctx: &TestContext, channel_id: Uuid) -> String {
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": "Hello" }))
         .send()
@@ -145,7 +145,7 @@ async fn mm_posts_extra_routes() {
     let ids_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts/ids", &ctx.app.address))
+        .post(format!("{}/api/v4/posts/ids", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!([post_id]))
         .send()
@@ -158,7 +158,7 @@ async fn mm_posts_extra_routes() {
     let reaction_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/reactions", &ctx.app.address))
+        .post(format!("{}/api/v4/reactions", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "user_id": ctx.user_id, "post_id": post_id, "emoji_name": "thumbsup" }))
         .send()
@@ -169,7 +169,7 @@ async fn mm_posts_extra_routes() {
     let bulk_reactions = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts/ids/reactions", &ctx.app.address))
+        .post(format!("{}/api/v4/posts/ids/reactions", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!([post_id]))
         .send()
@@ -182,7 +182,7 @@ async fn mm_posts_extra_routes() {
     let pin_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts/{}/pin", &ctx.app.address, post_id))
+        .post(format!("{}/api/v4/posts/{}/pin", ctx.app.address, post_id))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
         .await
@@ -201,7 +201,7 @@ async fn mm_posts_extra_routes() {
         .api_client
         .post(format!(
             "{}/api/v4/posts/{}/unpin",
-            &ctx.app.address, post_id
+            ctx.app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -214,7 +214,7 @@ async fn mm_posts_extra_routes() {
         .api_client
         .post(format!(
             "{}/api/v4/posts/{}/actions/123",
-            &ctx.app.address, post_id
+            ctx.app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "data": "ok" }))
@@ -226,7 +226,7 @@ async fn mm_posts_extra_routes() {
     let rewrite_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts/rewrite", &ctx.app.address))
+        .post(format!("{}/api/v4/posts/rewrite", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "message": "hello", "agent_id": "", "action": "summarize" }))
         .send()
@@ -237,7 +237,7 @@ async fn mm_posts_extra_routes() {
     let scheduled_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts/schedule", &ctx.app.address))
+        .post(format!("{}/api/v4/posts/schedule", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -256,7 +256,7 @@ async fn mm_posts_extra_routes() {
         .api_client
         .put(format!(
             "{}/api/v4/posts/schedule/{}",
-            &ctx.app.address, scheduled_id
+            ctx.app.address, scheduled_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
@@ -286,7 +286,7 @@ async fn scheduled_post_create_requires_channel_membership() {
     });
     ctx.app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &ctx.app.address))
+        .post(format!("{}/api/v1/auth/register", ctx.app.address))
         .json(&intruder_data)
         .send()
         .await
@@ -295,7 +295,7 @@ async fn scheduled_post_create_requires_channel_membership() {
     let login_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/users/login", &ctx.app.address))
+        .post(format!("{}/api/v4/users/login", ctx.app.address))
         .json(&json!({
             "login_id": "scheduledintruder@example.com",
             "password": "Password123!"
@@ -315,7 +315,7 @@ async fn scheduled_post_create_requires_channel_membership() {
     let scheduled_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts/schedule", &ctx.app.address))
+        .post(format!("{}/api/v4/posts/schedule", ctx.app.address))
         .header("Authorization", format!("Bearer {}", intruder_token))
         .json(&json!({
             "channel_id": channel_id.to_string(),

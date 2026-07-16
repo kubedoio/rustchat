@@ -34,7 +34,7 @@ async fn setup_mm_user() -> TestContext {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -47,7 +47,7 @@ async fn setup_mm_user() -> TestContext {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -64,7 +64,7 @@ async fn setup_mm_user() -> TestContext {
 
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -129,7 +129,7 @@ async fn mm_user_team_and_channel_routes() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/teams",
-            &ctx.app.address, ctx.user_id
+            ctx.app.address, ctx.user_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -145,7 +145,7 @@ async fn mm_user_team_and_channel_routes() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/channels",
-            &ctx.app.address, ctx.user_id
+            ctx.app.address, ctx.user_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -160,7 +160,7 @@ async fn mm_user_team_and_channel_routes() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/teams/{}/channels",
-            &ctx.app.address, ctx.user_id, team_id
+            ctx.app.address, ctx.user_id, team_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -188,7 +188,7 @@ async fn mm_list_users_team_filters() {
 
     ctx.app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &ctx.app.address))
+        .post(format!("{}/api/v1/auth/register", ctx.app.address))
         .json(&user_data_b)
         .send()
         .await
@@ -214,7 +214,7 @@ async fn mm_list_users_team_filters() {
         .api_client
         .get(format!(
             "{}/api/v4/users?in_team={}",
-            &ctx.app.address, team_id
+            ctx.app.address, team_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -246,7 +246,7 @@ async fn mm_list_users_team_filters() {
         .api_client
         .get(format!(
             "{}/api/v4/users?in_team={}&not_in_channel={}",
-            &ctx.app.address, team_id, channel_id
+            ctx.app.address, team_id, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()

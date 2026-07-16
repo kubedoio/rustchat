@@ -27,7 +27,7 @@ async fn mm_login_and_features() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -41,7 +41,7 @@ async fn mm_login_and_features() {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -59,7 +59,7 @@ async fn mm_login_and_features() {
     // --- Get Me ---
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -71,7 +71,7 @@ async fn mm_login_and_features() {
     // --- Device ---
     let device_res = app
         .api_client
-        .post(format!("{}/api/v4/users/sessions/device", &app.address))
+        .post(format!("{}/api/v4/users/sessions/device", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "device_id": "d1", "token": "push1", "platform": "ios" }))
         .send()
@@ -82,7 +82,7 @@ async fn mm_login_and_features() {
     // --- Preferences ---
     let pref_put = app
         .api_client
-        .put(format!("{}/api/v4/users/me/preferences", &app.address))
+        .put(format!("{}/api/v4/users/me/preferences", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!([
             { "user_id": user_id, "category": "display", "name": "theme", "value": "dark" }
@@ -94,7 +94,7 @@ async fn mm_login_and_features() {
 
     let pref_get = app
         .api_client
-        .get(format!("{}/api/v4/users/me/preferences", &app.address))
+        .get(format!("{}/api/v4/users/me/preferences", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -105,7 +105,7 @@ async fn mm_login_and_features() {
     // --- Status ---
     let status_put = app
         .api_client
-        .put(format!("{}/api/v4/users/me/status", &app.address))
+        .put(format!("{}/api/v4/users/me/status", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "user_id": user_id, "status": "dnd" }))
         .send()
@@ -143,7 +143,7 @@ async fn mm_login_and_features() {
     // --- Get Team ---
     let team_res = app
         .api_client
-        .get(format!("{}/api/v4/teams/{}", &app.address, team_id))
+        .get(format!("{}/api/v4/teams/{}", app.address, team_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -153,7 +153,7 @@ async fn mm_login_and_features() {
     // --- Get Channel ---
     let chan_res = app
         .api_client
-        .get(format!("{}/api/v4/channels/{}", &app.address, channel_id))
+        .get(format!("{}/api/v4/channels/{}", app.address, channel_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -163,7 +163,7 @@ async fn mm_login_and_features() {
     // --- View Channel ---
     let view_res = app
         .api_client
-        .post(format!("{}/api/v4/channels/members/me/view", &app.address))
+        .post(format!("{}/api/v4/channels/members/me/view", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "channel_id": channel_id.to_string() }))
         .send()
@@ -175,7 +175,7 @@ async fn mm_login_and_features() {
     // Create Post
     let post_res = app
         .api_client
-        .post(format!("{}/api/v4/posts", &app.address))
+        .post(format!("{}/api/v4/posts", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "channel_id": channel_id.to_string(), "message": "Test Post" }))
         .send()
@@ -186,7 +186,7 @@ async fn mm_login_and_features() {
     let post_id = post_body["id"].as_str().unwrap();
 
     // Create Reply
-    let reply_res = app.api_client.post(format!("{}/api/v4/posts", &app.address))
+    let reply_res = app.api_client.post(format!("{}/api/v4/posts", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "channel_id": channel_id.to_string(), "message": "Reply", "root_id": post_id }))
         .send().await.unwrap();
@@ -195,7 +195,7 @@ async fn mm_login_and_features() {
     // Get Thread
     let thread_res = app
         .api_client
-        .get(format!("{}/api/v4/posts/{}/thread", &app.address, post_id))
+        .get(format!("{}/api/v4/posts/{}/thread", app.address, post_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -207,7 +207,7 @@ async fn mm_login_and_features() {
     // Patch Post
     let patch_res = app
         .api_client
-        .put(format!("{}/api/v4/posts/{}/patch", &app.address, post_id))
+        .put(format!("{}/api/v4/posts/{}/patch", app.address, post_id))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "message": "Edited Post" }))
         .send()
@@ -220,7 +220,7 @@ async fn mm_login_and_features() {
     // Add Reaction
     let react_res = app
         .api_client
-        .post(format!("{}/api/v4/reactions", &app.address))
+        .post(format!("{}/api/v4/reactions", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "user_id": user_id, "post_id": post_id, "emoji_name": "smile" }))
         .send()
@@ -233,7 +233,7 @@ async fn mm_login_and_features() {
         .api_client
         .get(format!(
             "{}/api/v4/posts/{}/reactions",
-            &app.address, post_id
+            app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -247,7 +247,7 @@ async fn mm_login_and_features() {
         .api_client
         .delete(format!(
             "{}/api/v4/users/me/posts/{}/reactions/smile",
-            &app.address, post_id
+            app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -258,7 +258,7 @@ async fn mm_login_and_features() {
     // Delete Post
     let del_res = app
         .api_client
-        .delete(format!("{}/api/v4/posts/{}", &app.address, post_id))
+        .delete(format!("{}/api/v4/posts/{}", app.address, post_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -270,7 +270,7 @@ async fn mm_login_and_features() {
         .api_client
         .post(format!(
             "{}/api/v4/users/{}/channels/{}/typing",
-            &app.address, user_id, channel_id
+            app.address, user_id, channel_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -294,7 +294,7 @@ async fn mm_files_upload() {
     let user_data = serde_json::json!({ "username": "fuser", "email": "f@x.com", "password": "Password99", "org_id": org_id });
     let reg_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -352,7 +352,7 @@ async fn mm_files_upload() {
         .api_client
         .post(format!(
             "{}/api/v4/files?channel_id={}",
-            &app.address, channel_id
+            app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
@@ -372,7 +372,7 @@ async fn mm_files_upload() {
     // Get File Info
     let info_res = app
         .api_client
-        .get(format!("{}/api/v4/files/{}", &app.address, file_id))
+        .get(format!("{}/api/v4/files/{}", app.address, file_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -402,7 +402,7 @@ async fn mm_emoji_smoke() {
     });
     let reg_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -424,7 +424,7 @@ async fn mm_emoji_smoke() {
 
     let list_res = app
         .api_client
-        .get(format!("{}/api/v4/emoji", &app.address))
+        .get(format!("{}/api/v4/emoji", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -433,7 +433,7 @@ async fn mm_emoji_smoke() {
 
     let by_name_res = app
         .api_client
-        .get(format!("{}/api/v4/emoji/name/{}", &app.address, emoji_name))
+        .get(format!("{}/api/v4/emoji/name/{}", app.address, emoji_name))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -444,7 +444,7 @@ async fn mm_emoji_smoke() {
 
     let by_id_res = app
         .api_client
-        .get(format!("{}/api/v4/emoji/{}", &app.address, emoji_id))
+        .get(format!("{}/api/v4/emoji/{}", app.address, emoji_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -459,7 +459,7 @@ async fn mm_emoji_smoke() {
 
     let search_res = app
         .api_client
-        .post(format!("{}/api/v4/emoji/search", &app.address))
+        .post(format!("{}/api/v4/emoji/search", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "term": "emoji" }))
         .send()

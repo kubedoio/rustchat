@@ -18,7 +18,7 @@ async fn test_slash_command_lifecycle() {
     });
 
     app.api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(&format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -38,7 +38,7 @@ async fn test_slash_command_lifecycle() {
 
     let login_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/login", &app.address))
+        .post(&format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -63,7 +63,7 @@ async fn test_slash_command_lifecycle() {
 
     let team_res = app
         .api_client
-        .post(&format!("{}/api/v1/teams", &app.address))
+        .post(&format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&team_data)
         .send()
@@ -78,7 +78,7 @@ async fn test_slash_command_lifecycle() {
         .api_client
         .get(&format!(
             "{}/api/v1/teams/{}/channels",
-            &app.address, team.id
+            app.address, team.id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -97,7 +97,7 @@ async fn test_slash_command_lifecycle() {
         });
         let c_res = app
             .api_client
-            .post(&format!("{}/api/v1/channels", &app.address))
+            .post(&format!("{}/api/v1/channels", app.address))
             .header("Authorization", format!("Bearer {}", token))
             .json(&channel_data)
             .send()
@@ -120,7 +120,7 @@ async fn test_slash_command_lifecycle() {
 
     let echo_res = app
         .api_client
-        .post(&format!("{}/api/v1/commands/execute", &app.address))
+        .post(&format!("{}/api/v1/commands/execute", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&echo_cmd)
         .send()
@@ -148,7 +148,7 @@ async fn test_slash_command_lifecycle() {
         .api_client
         .post(&format!(
             "{}/api/v1/commands?team_id={}",
-            &app.address, team.id
+            app.address, team.id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&new_cmd)
@@ -172,7 +172,7 @@ async fn test_slash_command_lifecycle() {
 
     let exec_res = app
         .api_client
-        .post(&format!("{}/api/v1/commands/execute", &app.address))
+        .post(&format!("{}/api/v1/commands/execute", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&custom_exec)
         .send()
@@ -204,7 +204,7 @@ async fn test_slash_command_creation_rejects_invalid_urls() {
     });
 
     app.api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(&format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -224,7 +224,7 @@ async fn test_slash_command_creation_rejects_invalid_urls() {
 
     let login_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/login", &app.address))
+        .post(&format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -248,7 +248,7 @@ async fn test_slash_command_creation_rejects_invalid_urls() {
 
     let team_res = app
         .api_client
-        .post(&format!("{}/api/v1/teams", &app.address))
+        .post(&format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&team_data)
         .send()
@@ -283,7 +283,7 @@ async fn test_slash_command_creation_rejects_invalid_urls() {
             .api_client
             .post(&format!(
                 "{}/api/v1/commands?team_id={}",
-                &app.address, team.id
+                app.address, team.id
             ))
             .header("Authorization", format!("Bearer {}", token))
             .json(&new_cmd)
@@ -314,7 +314,7 @@ async fn test_slash_command_creation_rejects_invalid_urls() {
         .api_client
         .post(&format!(
             "{}/api/v1/commands?team_id={}",
-            &app.address, team.id
+            app.address, team.id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&valid_cmd)

@@ -38,7 +38,7 @@ async fn create_test_admin(app: &common::TestApp) -> (String, Uuid) {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -65,7 +65,7 @@ async fn create_test_admin(app: &common::TestApp) -> (String, Uuid) {
 
     let login_response = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -111,7 +111,7 @@ async fn create_test_user(app: &common::TestApp, role: &str) -> String {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -135,7 +135,7 @@ async fn create_test_user(app: &common::TestApp, role: &str) -> String {
 
     let login_response = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await

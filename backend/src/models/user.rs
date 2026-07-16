@@ -199,10 +199,9 @@ pub fn legacy_avatar_key_from_url(user_id: Uuid, avatar_url: &str) -> Option<Str
         &path_without_query[(idx + 1)..]
     } else if let Some(stripped) = path_without_query.strip_prefix("files/") {
         return Some(format!("files/{stripped}"));
-    } else if let Some(stripped) = path_without_query.strip_prefix("/files/") {
-        return Some(format!("files/{stripped}"));
     } else {
-        return None;
+        let stripped = path_without_query.strip_prefix("/files/")?;
+        return Some(format!("files/{stripped}"));
     };
 
     let expected_prefix = format!("files/{user_id}/");

@@ -20,7 +20,7 @@ async fn register_user(app: &common::TestApp, username: &str, email: &str, passw
 
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&payload)
         .send()
         .await
@@ -43,7 +43,7 @@ async fn login_token(app: &common::TestApp, email: &str, password: &str) -> Stri
 
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&payload)
         .send()
         .await
@@ -89,7 +89,7 @@ async fn add_team_member_succeeds_when_default_channel_autojoin_fails() {
     });
     let team_response = app
         .api_client
-        .post(format!("{}/api/v1/teams", &app.address))
+        .post(format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .json(&team_payload)
         .send()
@@ -117,7 +117,7 @@ async fn add_team_member_succeeds_when_default_channel_autojoin_fails() {
     });
     let add_member_response = app
         .api_client
-        .post(format!("{}/api/v1/teams/{}/members", &app.address, team.id))
+        .post(format!("{}/api/v1/teams/{}/members", app.address, team.id))
         .header("Authorization", format!("Bearer {}", owner_token))
         .json(&add_member_payload)
         .send()
@@ -202,7 +202,7 @@ async fn v4_add_team_member_succeeds_when_default_channel_autojoin_fails() {
     });
     let team_response = app
         .api_client
-        .post(format!("{}/api/v1/teams", &app.address))
+        .post(format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .json(&team_payload)
         .send()
@@ -229,7 +229,7 @@ async fn v4_add_team_member_succeeds_when_default_channel_autojoin_fails() {
     });
     let add_member_response = app
         .api_client
-        .post(format!("{}/api/v4/teams/{}/members", &app.address, team.id))
+        .post(format!("{}/api/v4/teams/{}/members", app.address, team.id))
         .header("Authorization", format!("Bearer {}", owner_token))
         .json(&add_member_payload)
         .send()
@@ -318,7 +318,7 @@ async fn v4_add_team_member_by_invite_succeeds_when_default_channel_autojoin_fai
     });
     let team_response = app
         .api_client
-        .post(format!("{}/api/v1/teams", &app.address))
+        .post(format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .json(&team_payload)
         .send()
@@ -349,7 +349,7 @@ async fn v4_add_team_member_by_invite_succeeds_when_default_channel_autojoin_fai
         .api_client
         .post(format!(
             "{}/api/v4/teams/members/invite?invite_id={}",
-            &app.address, team_invite_id
+            app.address, team_invite_id
         ))
         .header("Authorization", format!("Bearer {}", member_token))
         .send()
@@ -438,7 +438,7 @@ async fn v4_add_team_member_by_token_uses_one_time_token() {
     });
     let team_response = app
         .api_client
-        .post(format!("{}/api/v1/teams", &app.address))
+        .post(format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .json(&team_payload)
         .send()
@@ -472,7 +472,7 @@ async fn v4_add_team_member_by_token_uses_one_time_token() {
         .api_client
         .post(format!(
             "{}/api/v4/teams/members/invite?token={}",
-            &app.address, invite_token
+            app.address, invite_token
         ))
         .header("Authorization", format!("Bearer {}", member_token))
         .send()
@@ -510,7 +510,7 @@ async fn v4_add_team_member_by_token_uses_one_time_token() {
         .api_client
         .post(format!(
             "{}/api/v4/teams/members/invite?token={}",
-            &app.address, invite_token
+            app.address, invite_token
         ))
         .header("Authorization", format!("Bearer {}", member_token))
         .send()
@@ -567,7 +567,7 @@ async fn create_team_bootstraps_fallback_default_channels_and_joins_creator() {
     });
     let team_response = app
         .api_client
-        .post(format!("{}/api/v1/teams", &app.address))
+        .post(format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .json(&team_payload)
         .send()
@@ -667,7 +667,7 @@ async fn create_team_bootstraps_configured_default_channels_and_joins_creator() 
     });
     let team_response = app
         .api_client
-        .post(format!("{}/api/v1/teams", &app.address))
+        .post(format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", owner_token))
         .json(&team_payload)
         .send()

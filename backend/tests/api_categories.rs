@@ -20,7 +20,7 @@ async fn test_sidebar_categories() {
     });
 
     app.api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(&format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -40,7 +40,7 @@ async fn test_sidebar_categories() {
 
     let login_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/login", &app.address))
+        .post(&format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -64,7 +64,7 @@ async fn test_sidebar_categories() {
 
     let team_res = app
         .api_client
-        .post(&format!("{}/api/v1/teams", &app.address))
+        .post(&format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&team_data)
         .send()
@@ -80,7 +80,7 @@ async fn test_sidebar_categories() {
         .api_client
         .get(&format!(
             "{}/api/v4/users/me/teams/{}/channels/categories",
-            &app.address, team_id
+            app.address, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -102,7 +102,7 @@ async fn test_sidebar_categories() {
         .api_client
         .post(&format!(
             "{}/api/v4/users/me/teams/{}/channels/categories",
-            &app.address, team_id
+            app.address, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&create_cat_data)
@@ -127,7 +127,7 @@ async fn test_sidebar_categories() {
 
     let chan_res = app
         .api_client
-        .post(&format!("{}/api/v1/channels", &app.address))
+        .post(&format!("{}/api/v1/channels", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&channel_data_with_team)
         .send()
@@ -144,7 +144,7 @@ async fn test_sidebar_categories() {
         .api_client
         .put(&format!(
             "{}/api/v4/users/me/teams/{}/channels/categories",
-            &app.address, team_id
+            app.address, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!([updated_cat]))
@@ -163,7 +163,7 @@ async fn test_sidebar_categories() {
         .api_client
         .put(&format!(
             "{}/api/v4/users/me/teams/{}/channels/categories",
-            &app.address, team_id
+            app.address, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({ "categories": [wrapped_cat] }))
@@ -178,7 +178,7 @@ async fn test_sidebar_categories() {
         .api_client
         .put(&format!(
             "{}/api/v4/users/me/teams/{}/channels/categories/order",
-            &app.address, team_id
+            app.address, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&order_data)
@@ -192,7 +192,7 @@ async fn test_sidebar_categories() {
         .api_client
         .get(&format!(
             "{}/api/v4/users/me/teams/{}/channels/categories/order",
-            &app.address, team_id
+            app.address, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -216,7 +216,7 @@ async fn get_categories_backfills_orphaned_channels() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -236,7 +236,7 @@ async fn get_categories_backfills_orphaned_channels() {
 
     let login_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -259,7 +259,7 @@ async fn get_categories_backfills_orphaned_channels() {
     });
     let team_res = app
         .api_client
-        .post(format!("{}/api/v1/teams", &app.address))
+        .post(format!("{}/api/v1/teams", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&team_data)
         .send()
@@ -279,7 +279,7 @@ async fn get_categories_backfills_orphaned_channels() {
     });
     let channel_res = app
         .api_client
-        .post(format!("{}/api/v1/channels", &app.address))
+        .post(format!("{}/api/v1/channels", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&channel_data)
         .send()
@@ -313,7 +313,7 @@ async fn get_categories_backfills_orphaned_channels() {
         .api_client
         .get(format!(
             "{}/api/v4/users/me/teams/{}/channels/categories",
-            &app.address, team_id
+            app.address, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()

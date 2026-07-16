@@ -28,7 +28,7 @@ async fn test_get_thread_returns_parent_and_replies() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -41,7 +41,7 @@ async fn test_get_thread_returns_parent_and_replies() {
 
     let login_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -106,7 +106,7 @@ async fn test_get_thread_returns_parent_and_replies() {
         .api_client
         .post(format!(
             "{}/api/v1/channels/{}/posts",
-            &app.address, channel_id
+            app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&post_data)
@@ -128,7 +128,7 @@ async fn test_get_thread_returns_parent_and_replies() {
         .api_client
         .post(format!(
             "{}/api/v1/channels/{}/posts",
-            &app.address, channel_id
+            app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&reply_data)
@@ -141,10 +141,7 @@ async fn test_get_thread_returns_parent_and_replies() {
     // 7. Call get_thread endpoint
     let thread_res = app
         .api_client
-        .get(format!(
-            "{}/api/v1/posts/{}/thread",
-            &app.address, parent_id
-        ))
+        .get(format!("{}/api/v1/posts/{}/thread", app.address, parent_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await

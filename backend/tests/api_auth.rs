@@ -26,7 +26,7 @@ async fn register_user_success() {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -57,7 +57,7 @@ async fn register_user_success_sets_auth_cookie() {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -113,7 +113,7 @@ async fn login_user_success() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -127,7 +127,7 @@ async fn login_user_success() {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await

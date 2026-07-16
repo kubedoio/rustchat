@@ -11,7 +11,7 @@ async fn test_get_activity_feed_requires_auth() {
 
     let response = app
         .api_client
-        .get(format!("{}/api/v4/users/some-id/activity", &app.address))
+        .get(format!("{}/api/v4/users/some-id/activity", app.address))
         .send()
         .await
         .expect("Failed to send request");
@@ -47,7 +47,7 @@ async fn test_get_activity_feed_returns_activities() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user1_data)
         .send()
         .await
@@ -60,7 +60,7 @@ async fn test_get_activity_feed_returns_activities() {
 
     let login1_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login1_data)
         .send()
         .await
@@ -81,7 +81,7 @@ async fn test_get_activity_feed_returns_activities() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user2_data)
         .send()
         .await
@@ -94,7 +94,7 @@ async fn test_get_activity_feed_returns_activities() {
 
     let login2_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login2_data)
         .send()
         .await
@@ -185,7 +185,7 @@ async fn test_get_activity_feed_returns_activities() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/activity",
-            &app.address, user1_uuid
+            app.address, user1_uuid
         ))
         .header("Authorization", format!("Bearer {}", token1))
         .send()
@@ -234,7 +234,7 @@ async fn test_cannot_view_other_users_activity() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user1_data)
         .send()
         .await
@@ -247,7 +247,7 @@ async fn test_cannot_view_other_users_activity() {
 
     let login1_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login1_data)
         .send()
         .await
@@ -266,7 +266,7 @@ async fn test_cannot_view_other_users_activity() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user2_data)
         .send()
         .await
@@ -279,7 +279,7 @@ async fn test_cannot_view_other_users_activity() {
 
     let login2_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login2_data)
         .send()
         .await
@@ -293,7 +293,7 @@ async fn test_cannot_view_other_users_activity() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/activity",
-            &app.address, user2_uuid
+            app.address, user2_uuid
         ))
         .header("Authorization", format!("Bearer {}", token1))
         .send()
