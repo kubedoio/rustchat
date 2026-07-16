@@ -39,6 +39,6 @@ jobs:
       - name: Upload SARIF
         if: hashFiles('results.sarif') != ''
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3.36.3
+        uses: github/codeql-action/upload-sarif@b7351df727350dca84cb9d725d57dcf5bc82ba26 # v3.37.1
         with:
           sarif_file: results.sarif
