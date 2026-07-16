@@ -26,7 +26,7 @@ async fn setup_mm_user() -> (common::TestApp, String, String, Uuid, Uuid) {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -39,7 +39,7 @@ async fn setup_mm_user() -> (common::TestApp, String, String, Uuid, Uuid) {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -56,7 +56,7 @@ async fn setup_mm_user() -> (common::TestApp, String, String, Uuid, Uuid) {
 
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -107,7 +107,7 @@ async fn mm_threads_endpoints_smoke() {
 
     let post_res = app
         .api_client
-        .post(format!("{}/api/v4/posts", &app.address))
+        .post(format!("{}/api/v4/posts", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": "Root" }))
         .send()
@@ -119,7 +119,7 @@ async fn mm_threads_endpoints_smoke() {
 
     let reply_res = app
         .api_client
-        .post(format!("{}/api/v4/posts", &app.address))
+        .post(format!("{}/api/v4/posts", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": "Reply", "root_id": root_post_id }))
         .send()
@@ -133,7 +133,7 @@ async fn mm_threads_endpoints_smoke() {
         .api_client
         .put(format!(
             "{}/api/v4/users/{}/teams/{}/threads/{}/following",
-            &app.address, user_id, team_id, root_post_id
+            app.address, user_id, team_id, root_post_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -154,7 +154,7 @@ async fn mm_threads_endpoints_smoke() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/teams/{}/threads",
-            &app.address, user_id, team_id
+            app.address, user_id, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -173,7 +173,7 @@ async fn mm_threads_endpoints_smoke() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/teams/{}/threads/mention_counts",
-            &app.address, user_id, team_id
+            app.address, user_id, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -188,7 +188,7 @@ async fn mm_threads_endpoints_smoke() {
         .api_client
         .post(format!(
             "{}/api/v4/users/{}/teams/{}/threads/{}/set_unread/{}",
-            &app.address, user_id, team_id, root_post_id, reply_id
+            app.address, user_id, team_id, root_post_id, reply_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -202,7 +202,7 @@ async fn mm_threads_endpoints_smoke() {
         .api_client
         .put(format!(
             "{}/api/v4/users/{}/teams/{}/threads/read",
-            &app.address, user_id, team_id
+            app.address, user_id, team_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -221,7 +221,7 @@ async fn mm_preferences_endpoints_smoke() {
         .api_client
         .put(format!(
             "{}/api/v4/users/{}/preferences",
-            &app.address, user_id
+            app.address, user_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!([
@@ -237,7 +237,7 @@ async fn mm_preferences_endpoints_smoke() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/preferences",
-            &app.address, user_id
+            app.address, user_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -251,7 +251,7 @@ async fn mm_preferences_endpoints_smoke() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/preferences/display",
-            &app.address, user_id
+            app.address, user_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -265,7 +265,7 @@ async fn mm_preferences_endpoints_smoke() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/preferences/display/name/theme",
-            &app.address, user_id
+            app.address, user_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()
@@ -278,7 +278,7 @@ async fn mm_preferences_endpoints_smoke() {
         .api_client
         .post(format!(
             "{}/api/v4/users/{}/preferences/delete",
-            &app.address, user_id
+            app.address, user_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!([
@@ -293,7 +293,7 @@ async fn mm_preferences_endpoints_smoke() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/preferences",
-            &app.address, user_id
+            app.address, user_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()

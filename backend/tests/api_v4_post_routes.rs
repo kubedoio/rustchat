@@ -34,7 +34,7 @@ async fn setup_mm_user() -> TestContext {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -47,7 +47,7 @@ async fn setup_mm_user() -> TestContext {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -64,7 +64,7 @@ async fn setup_mm_user() -> TestContext {
 
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -124,7 +124,7 @@ async fn create_post(ctx: &TestContext, channel_id: Uuid, message: &str) -> Stri
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": message }))
         .send()
@@ -144,7 +144,7 @@ async fn mm_update_post_route_put_updates_post_message() {
     let update_res = ctx
         .app
         .api_client
-        .put(format!("{}/api/v4/posts/{}", &ctx.app.address, post_id))
+        .put(format!("{}/api/v4/posts/{}", ctx.app.address, post_id))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "id": post_id,
@@ -177,7 +177,7 @@ async fn mm_update_post_route_put_requires_matching_body_id() {
     let update_res = ctx
         .app
         .api_client
-        .put(format!("{}/api/v4/posts/{}", &ctx.app.address, post_id))
+        .put(format!("{}/api/v4/posts/{}", ctx.app.address, post_id))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "id": mismatch_id,
@@ -205,7 +205,7 @@ async fn mm_update_post_route_put_rejects_non_author() {
     });
     ctx.app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &ctx.app.address))
+        .post(format!("{}/api/v1/auth/register", ctx.app.address))
         .json(&intruder_data)
         .send()
         .await
@@ -214,7 +214,7 @@ async fn mm_update_post_route_put_rejects_non_author() {
     let intruder_login = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/users/login", &ctx.app.address))
+        .post(format!("{}/api/v4/users/login", ctx.app.address))
         .json(&json!({
             "login_id": "mmroutes_intruder@example.com",
             "password": "Password123!"
@@ -234,7 +234,7 @@ async fn mm_update_post_route_put_rejects_non_author() {
     let intruder_me = ctx
         .app
         .api_client
-        .get(format!("{}/api/v4/users/me", &ctx.app.address))
+        .get(format!("{}/api/v4/users/me", ctx.app.address))
         .header("Authorization", format!("Bearer {}", intruder_token))
         .send()
         .await
@@ -258,7 +258,7 @@ async fn mm_update_post_route_put_rejects_non_author() {
     let intruder_update = ctx
         .app
         .api_client
-        .put(format!("{}/api/v4/posts/{}", &ctx.app.address, post_id))
+        .put(format!("{}/api/v4/posts/{}", ctx.app.address, post_id))
         .header("Authorization", format!("Bearer {}", intruder_token))
         .json(&json!({
             "id": post_id,
@@ -281,7 +281,7 @@ async fn mm_burn_on_read_routes_return_explicit_not_implemented() {
         .api_client
         .get(format!(
             "{}/api/v4/posts/{}/reveal",
-            &ctx.app.address, post_id
+            ctx.app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -294,7 +294,7 @@ async fn mm_burn_on_read_routes_return_explicit_not_implemented() {
         .api_client
         .delete(format!(
             "{}/api/v4/posts/{}/burn",
-            &ctx.app.address, post_id
+            ctx.app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -307,7 +307,7 @@ async fn mm_burn_on_read_routes_return_explicit_not_implemented() {
         .api_client
         .post(format!(
             "{}/api/v4/posts/{}/reveal",
-            &ctx.app.address, post_id
+            ctx.app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -320,7 +320,7 @@ async fn mm_burn_on_read_routes_return_explicit_not_implemented() {
         .api_client
         .post(format!(
             "{}/api/v4/posts/{}/burn",
-            &ctx.app.address, post_id
+            ctx.app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -345,7 +345,7 @@ async fn mm_post_files_info_returns_files() {
         .api_client
         .post(format!(
             "{}/api/v4/files?channel_id={}",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .multipart(form)
@@ -367,7 +367,7 @@ async fn mm_post_files_info_returns_files() {
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -386,7 +386,7 @@ async fn mm_post_files_info_returns_files() {
         .api_client
         .get(format!(
             "{}/api/v4/posts/{}/files/info",
-            &ctx.app.address, post_id
+            ctx.app.address, post_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -401,7 +401,7 @@ async fn mm_post_files_info_returns_files() {
         .api_client
         .get(format!(
             "{}/api/v4/files/{}/link",
-            &ctx.app.address, file_id
+            ctx.app.address, file_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -430,7 +430,7 @@ async fn native_file_upload_rejects_non_member_channel_association() {
     });
     ctx.app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &ctx.app.address))
+        .post(format!("{}/api/v1/auth/register", ctx.app.address))
         .json(&intruder_data)
         .send()
         .await
@@ -439,7 +439,7 @@ async fn native_file_upload_rejects_non_member_channel_association() {
     let login_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/users/login", &ctx.app.address))
+        .post(format!("{}/api/v4/users/login", ctx.app.address))
         .json(&json!({
             "login_id": "nativefileintruder@example.com",
             "password": "Password123!"
@@ -467,7 +467,7 @@ async fn native_file_upload_rejects_non_member_channel_association() {
         .api_client
         .post(format!(
             "{}/api/v1/files?channel_id={}",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", intruder_token))
         .multipart(form)
@@ -502,7 +502,7 @@ async fn native_file_upload_returns_authenticated_api_url() {
         .api_client
         .post(format!(
             "{}/api/v1/files?channel_id={}",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .multipart(form)
@@ -524,7 +524,7 @@ async fn native_file_upload_returns_authenticated_api_url() {
         .api_client
         .get(format!(
             "{}/api/v1/files/{}/download",
-            &ctx.app.address, file_id
+            ctx.app.address, file_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -543,7 +543,7 @@ async fn native_presign_endpoint_is_explicitly_unsupported() {
     let presign_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v1/files/presign", &ctx.app.address))
+        .post(format!("{}/api/v1/files/presign", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "filename": "direct.txt",
@@ -567,7 +567,7 @@ async fn mm_flagged_posts_returns_saved_posts() {
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": "Saved" }))
         .send()
@@ -590,7 +590,7 @@ async fn mm_flagged_posts_returns_saved_posts() {
         .api_client
         .get(format!(
             "{}/api/v4/users/{}/posts/flagged",
-            &ctx.app.address, ctx.user_id
+            ctx.app.address, ctx.user_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -611,7 +611,7 @@ async fn mm_set_unread_returns_channel_unread_at() {
     let _first_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": "Before" }))
         .send()
@@ -622,7 +622,7 @@ async fn mm_set_unread_returns_channel_unread_at() {
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": "Anchor" }))
         .send()
@@ -636,7 +636,7 @@ async fn mm_set_unread_returns_channel_unread_at() {
     let _third_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": "After" }))
         .send()
@@ -672,7 +672,7 @@ async fn mm_set_unread_returns_channel_unread_at() {
         .api_client
         .post(format!(
             "{}/api/v4/users/{}/posts/{}/set_unread",
-            &ctx.app.address, ctx.user_id, post_id
+            ctx.app.address, ctx.user_id, post_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -705,7 +705,7 @@ async fn mm_set_unread_reply_when_crt_disabled_zeros_root_unread_and_updates_thr
     let root_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "channel_id": channel_id.to_string(), "message": "root" }))
         .send()
@@ -719,7 +719,7 @@ async fn mm_set_unread_reply_when_crt_disabled_zeros_root_unread_and_updates_thr
     let reply1_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -736,7 +736,7 @@ async fn mm_set_unread_reply_when_crt_disabled_zeros_root_unread_and_updates_thr
     let reply2_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -753,7 +753,7 @@ async fn mm_set_unread_reply_when_crt_disabled_zeros_root_unread_and_updates_thr
         .api_client
         .post(format!(
             "{}/api/v4/users/{}/posts/{}/set_unread",
-            &ctx.app.address, ctx.user_id, reply1_id
+            ctx.app.address, ctx.user_id, reply1_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "collapsed_threads_supported": true }))
@@ -806,7 +806,7 @@ async fn mm_channel_posts_include_file_metadata_for_mobile_history() {
         .api_client
         .post(format!(
             "{}/api/v4/files?channel_id={}",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .multipart(form)
@@ -823,7 +823,7 @@ async fn mm_channel_posts_include_file_metadata_for_mobile_history() {
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -840,7 +840,7 @@ async fn mm_channel_posts_include_file_metadata_for_mobile_history() {
     let reaction_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/reactions", &ctx.app.address))
+        .post(format!("{}/api/v4/reactions", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({
             "user_id": ctx.user_id,
@@ -861,7 +861,7 @@ async fn mm_channel_posts_include_file_metadata_for_mobile_history() {
         .api_client
         .get(format!(
             "{}/api/v4/channels/{}/posts?page=0&per_page=30",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()

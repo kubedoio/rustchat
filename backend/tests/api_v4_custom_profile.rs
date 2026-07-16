@@ -27,7 +27,7 @@ async fn custom_profile_fields_returns_200_and_mattermost_shape() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -40,7 +40,7 @@ async fn custom_profile_fields_returns_200_and_mattermost_shape() {
 
     let login_response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -77,7 +77,7 @@ async fn custom_profile_fields_returns_200_and_mattermost_shape() {
         .api_client
         .get(format!(
             "{}/api/v4/custom_profile_attributes/fields",
-            &app.address
+            app.address
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()

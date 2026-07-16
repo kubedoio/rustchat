@@ -11,7 +11,7 @@ async fn mm_compat_smoke_test() {
     // 1. Check Header
     let ping_res = app
         .api_client
-        .get(format!("{}/api/v4/system/ping", &app.address))
+        .get(format!("{}/api/v4/system/ping", app.address))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -27,7 +27,7 @@ async fn mm_compat_smoke_test() {
     // 3. Check License
     let lic_res = app
         .api_client
-        .get(format!("{}/api/v4/license/client?format=old", &app.address))
+        .get(format!("{}/api/v4/license/client?format=old", app.address))
         .send()
         .await
         .unwrap();
@@ -37,7 +37,7 @@ async fn mm_compat_smoke_test() {
     // 4. Check Config
     let conf_res = app
         .api_client
-        .get(format!("{}/api/v4/config/client?format=old", &app.address))
+        .get(format!("{}/api/v4/config/client?format=old", app.address))
         .send()
         .await
         .unwrap();

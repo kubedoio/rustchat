@@ -401,7 +401,7 @@ async fn test_passwordless_registration_stays_inactive_until_password_setup() {
 
     let register_response = app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&serde_json::json!({
             "username": "pending_setup_user",
             "email": email
@@ -545,7 +545,7 @@ async fn test_api_forgot_password_endpoint() {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/password/forgot", &app.address))
+        .post(format!("{}/api/v1/auth/password/forgot", app.address))
         .json(&serde_json::json!({
             "email": "test_api_forgot@example.com"
         }))
@@ -571,7 +571,7 @@ async fn test_api_forgot_password_anti_enumeration() {
     // Request for non-existent email should return same success response
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/password/forgot", &app.address))
+        .post(format!("{}/api/v1/auth/password/forgot", app.address))
         .json(&serde_json::json!({
             "email": "nonexistent_api@example.com"
         }))
@@ -613,7 +613,7 @@ async fn test_api_reset_password_endpoint() {
     // Reset password via API
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/password/reset", &app.address))
+        .post(format!("{}/api/v1/auth/password/reset", app.address))
         .json(&serde_json::json!({
             "token": test_token,
             "new_password": "NewStr0ng!Passw0rd123"
@@ -656,7 +656,7 @@ async fn test_api_validate_token_endpoint() {
     // Validate token via API
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/password/validate", &app.address))
+        .post(format!("{}/api/v1/auth/password/validate", app.address))
         .json(&serde_json::json!({
             "token": test_token
         }))
@@ -681,7 +681,7 @@ async fn test_api_validate_invalid_token() {
     // Validate invalid token
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/password/validate", &app.address))
+        .post(format!("{}/api/v1/auth/password/validate", app.address))
         .json(&serde_json::json!({
             "token": "invalid_token_xyz"
         }))
@@ -720,7 +720,7 @@ async fn test_api_reset_with_weak_password() {
     // Try to reset with weak password
     let response = app
         .api_client
-        .post(format!("{}/api/v1/auth/password/reset", &app.address))
+        .post(format!("{}/api/v1/auth/password/reset", app.address))
         .json(&serde_json::json!({
             "token": test_token,
             "new_password": "weak"

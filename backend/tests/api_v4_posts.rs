@@ -29,7 +29,7 @@ async fn get_channel_posts_returns_200() {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -42,7 +42,7 @@ async fn get_channel_posts_returns_200() {
 
     let login_res = app
         .api_client
-        .post(format!("{}/api/v1/auth/login", &app.address))
+        .post(format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -114,7 +114,7 @@ async fn get_channel_posts_returns_200() {
         .api_client
         .get(format!(
             "{}/api/v4/channels/{}/posts?page=0&per_page=30",
-            &app.address, channel_id
+            app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", token))
         .send()

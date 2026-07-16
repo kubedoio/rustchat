@@ -34,7 +34,7 @@ async fn register_and_login_user(
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -57,7 +57,7 @@ async fn register_and_login_user(
 
     let login_res = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&json!({
             "login_id": email,
             "password": "Password123!"
@@ -77,7 +77,7 @@ async fn register_and_login_user(
 
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -202,7 +202,7 @@ async fn mm_get_all_channels_requires_system_manage() {
         .api_client
         .get(format!(
             "{}/api/v4/channels?page=0&per_page=20",
-            &ctx.app.address
+            ctx.app.address
         ))
         .header("Authorization", format!("Bearer {}", ctx.member.token))
         .send()
@@ -223,7 +223,7 @@ async fn mm_get_all_channels_supports_filters_and_total_count() {
         .api_client
         .get(format!(
             "{}/api/v4/channels?page=0&per_page=100",
-            &ctx.app.address
+            ctx.app.address
         ))
         .header("Authorization", format!("Bearer {}", ctx.admin.token))
         .send()
@@ -249,7 +249,7 @@ async fn mm_get_all_channels_supports_filters_and_total_count() {
         .api_client
         .get(format!(
             "{}/api/v4/channels?include_deleted=true&exclude_default_channels=true&include_total_count=true&page=0&per_page=100",
-            &ctx.app.address
+            ctx.app.address
         ))
         .header("Authorization", format!("Bearer {}", ctx.admin.token))
         .send()
@@ -304,7 +304,7 @@ async fn create_channel_rejects_invalid_names() {
     let ctx = setup_context().await;
     let team_id = setup_empty_team(&ctx).await;
 
-    let base_url = format!("{}/api/v4/channels", &ctx.app.address);
+    let base_url = format!("{}/api/v4/channels", ctx.app.address);
 
     let send_create = |name: &str| {
         ctx.app

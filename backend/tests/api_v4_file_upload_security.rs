@@ -37,7 +37,7 @@ async fn setup_user() -> TestContext {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -50,7 +50,7 @@ async fn setup_user() -> TestContext {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -67,7 +67,7 @@ async fn setup_user() -> TestContext {
 
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -132,7 +132,7 @@ async fn register_intruder(ctx: &TestContext) -> String {
 
     ctx.app
         .api_client
-        .post(format!("{}/api/v1/auth/register", &ctx.app.address))
+        .post(format!("{}/api/v1/auth/register", ctx.app.address))
         .json(&intruder_data)
         .send()
         .await
@@ -141,7 +141,7 @@ async fn register_intruder(ctx: &TestContext) -> String {
     let login_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/users/login", &ctx.app.address))
+        .post(format!("{}/api/v4/users/login", ctx.app.address))
         .json(&json!({
             "login_id": "fileintruder@example.com",
             "password": "Password123!"
@@ -179,7 +179,7 @@ async fn file_field_before_channel_id_form_field_does_not_buffer_for_non_member(
     let upload_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/files", &ctx.app.address))
+        .post(format!("{}/api/v4/files", ctx.app.address))
         .header("Authorization", format!("Bearer {}", intruder_token))
         .multipart(form)
         .send()
@@ -212,7 +212,7 @@ async fn upload_without_channel_id_is_rejected() {
     let upload_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/files", &ctx.app.address))
+        .post(format!("{}/api/v4/files", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .multipart(form)
         .send()
@@ -245,7 +245,7 @@ async fn member_upload_with_channel_id_query_param_still_works() {
         .api_client
         .post(format!(
             "{}/api/v4/files?channel_id={}",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .multipart(form)
@@ -266,7 +266,7 @@ async fn member_upload_with_channel_id_query_param_still_works() {
     let info_res = ctx
         .app
         .api_client
-        .get(format!("{}/api/v4/files/{}", &ctx.app.address, file_id))
+        .get(format!("{}/api/v4/files/{}", ctx.app.address, file_id))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
         .await
@@ -291,7 +291,7 @@ async fn non_member_upload_with_channel_id_query_param_is_rejected() {
         .api_client
         .post(format!(
             "{}/api/v4/files?channel_id={}",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", intruder_token))
         .multipart(form)

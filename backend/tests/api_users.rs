@@ -20,7 +20,7 @@ async fn test_user_custom_status() {
 
     let _reg_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(&format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -38,7 +38,7 @@ async fn test_user_custom_status() {
 
     let login_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/login", &app.address))
+        .post(&format!("{}/api/v1/auth/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -71,7 +71,7 @@ async fn test_user_custom_status() {
 
     let update_res = app
         .api_client
-        .put(&format!("{}/api/v1/users/{}", &app.address, user_id))
+        .put(&format!("{}/api/v1/users/{}", app.address, user_id))
         .header("Authorization", format!("Bearer {}", token))
         .json(&update_data)
         .send()
@@ -89,7 +89,7 @@ async fn test_user_custom_status() {
     // 3. Verify Persistence (Get User)
     let get_res = app
         .api_client
-        .get(&format!("{}/api/v1/users/{}", &app.address, user_id))
+        .get(&format!("{}/api/v1/users/{}", app.address, user_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -114,7 +114,7 @@ async fn test_auth_me_normalizes_internal_presigned_avatar_urls() {
 
     let register_res = app
         .api_client
-        .post(&format!("{}/api/v1/auth/register", &app.address))
+        .post(&format!("{}/api/v1/auth/register", app.address))
         .json(&register_data)
         .send()
         .await
@@ -153,7 +153,7 @@ async fn test_auth_me_normalizes_internal_presigned_avatar_urls() {
 
     let me_res = app
         .api_client
-        .get(&format!("{}/api/v1/auth/me", &app.address))
+        .get(&format!("{}/api/v1/auth/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await

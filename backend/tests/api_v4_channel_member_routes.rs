@@ -34,7 +34,7 @@ async fn setup_mm_user() -> TestContext {
     });
 
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&user_data)
         .send()
         .await
@@ -47,7 +47,7 @@ async fn setup_mm_user() -> TestContext {
 
     let response = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&login_data)
         .send()
         .await
@@ -64,7 +64,7 @@ async fn setup_mm_user() -> TestContext {
 
     let me_res = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
@@ -130,7 +130,7 @@ async fn mm_channel_member_routes() {
         .api_client
         .post(format!(
             "{}/api/v4/channels/{}/members/ids",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "user_ids": [ctx.user_id.clone()] }))
@@ -146,7 +146,7 @@ async fn mm_channel_member_routes() {
         .api_client
         .get(format!(
             "{}/api/v4/channels/{}/members/{}",
-            &ctx.app.address, channel_id, ctx.user_id
+            ctx.app.address, channel_id, ctx.user_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -161,7 +161,7 @@ async fn mm_channel_member_routes() {
         .api_client
         .put(format!(
             "{}/api/v4/channels/{}/members/{}/roles",
-            &ctx.app.address, channel_id, ctx.user_id
+            ctx.app.address, channel_id, ctx.user_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "roles": "channel_admin channel_user" }))
@@ -180,7 +180,7 @@ async fn mm_channel_member_routes() {
         .api_client
         .put(format!(
             "{}/api/v4/channels/{}/members/{}/notify_props",
-            &ctx.app.address, channel_id, ctx.user_id
+            ctx.app.address, channel_id, ctx.user_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .json(&json!({ "desktop": "mention", "mark_unread": "all" }))
@@ -237,7 +237,7 @@ async fn mm_channel_member_routes_return_computed_counts() {
         .api_client
         .get(format!(
             "{}/api/v4/channels/{}/members/{}",
-            &ctx.app.address, channel_id, ctx.user_id
+            ctx.app.address, channel_id, ctx.user_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -296,7 +296,7 @@ async fn mm_channel_unread_returns_root_and_team_fields() {
         .api_client
         .get(format!(
             "{}/api/v4/channels/{}/unread",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -323,7 +323,7 @@ async fn mm_channel_member_leave_with_me() {
         .api_client
         .get(format!(
             "{}/api/v4/channels/{}/members/me",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -337,7 +337,7 @@ async fn mm_channel_member_leave_with_me() {
         .api_client
         .delete(format!(
             "{}/api/v4/channels/{}/members/me",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
@@ -351,7 +351,7 @@ async fn mm_channel_member_leave_with_me() {
         .api_client
         .get(format!(
             "{}/api/v4/channels/{}/members/me",
-            &ctx.app.address, channel_id
+            ctx.app.address, channel_id
         ))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()

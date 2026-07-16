@@ -44,7 +44,7 @@ async fn setup_context() -> TestContext {
     let sender_username = format!("sender_{}", &Uuid::new_v4().to_string()[..8]);
     let sender_email = format!("{sender_username}@example.com");
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&json!({
             "username": sender_username,
             "email": sender_email,
@@ -60,7 +60,7 @@ async fn setup_context() -> TestContext {
 
     let sender_login = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&json!({ "login_id": sender_email, "password": "Password123!" }))
         .send()
         .await
@@ -77,7 +77,7 @@ async fn setup_context() -> TestContext {
 
     let sender_me = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {sender_token}"))
         .send()
         .await
@@ -96,7 +96,7 @@ async fn setup_context() -> TestContext {
     let receiver_username = format!("receiver_{}", &Uuid::new_v4().to_string()[..8]);
     let receiver_email = format!("{receiver_username}@example.com");
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&json!({
             "username": receiver_username,
             "email": receiver_email,
@@ -112,7 +112,7 @@ async fn setup_context() -> TestContext {
 
     let receiver_login = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&json!({ "login_id": receiver_email, "password": "Password123!" }))
         .send()
         .await
@@ -129,7 +129,7 @@ async fn setup_context() -> TestContext {
 
     let receiver_me = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {receiver_token}"))
         .send()
         .await
@@ -260,7 +260,7 @@ async fn create_post_broadcasts_to_channel() {
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.sender_token))
         .json(&json!({
             "channel_id": ctx.channel_id.to_string(),
@@ -315,7 +315,7 @@ async fn create_post_mentions_triggers_notification() {
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.sender_token))
         .json(&json!({
             "channel_id": ctx.channel_id.to_string(),
@@ -356,7 +356,7 @@ async fn create_post_mentions_triggers_notification() {
     let activity_res = ctx
         .app
         .api_client
-        .get(format!("{}/api/v4/users/me/activity", &ctx.app.address))
+        .get(format!("{}/api/v4/users/me/activity", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.receiver_token))
         .send()
         .await
@@ -420,7 +420,7 @@ async fn create_post_reply_increments_reply_count_and_creates_activities() {
     let root_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.sender_token))
         .json(&json!({
             "channel_id": ctx.channel_id.to_string(),
@@ -443,7 +443,7 @@ async fn create_post_reply_increments_reply_count_and_creates_activities() {
     let reply_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.sender_token))
         .json(&json!({
             "channel_id": ctx.channel_id.to_string(),
@@ -561,7 +561,7 @@ async fn create_post_dm_remembers_removed_user() {
     let post_res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.sender_token))
         .json(&json!({
             "channel_id": dm_channel_id.to_string(),
@@ -609,7 +609,7 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
     let user_a_username = format!("user_a_{}", &Uuid::new_v4().to_string()[..8]);
     let user_a_email = format!("{user_a_username}@example.com");
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&json!({
             "username": user_a_username,
             "email": user_a_email,
@@ -625,7 +625,7 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
 
     let user_a_login = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&json!({ "login_id": user_a_email, "password": "Password123!" }))
         .send()
         .await
@@ -642,7 +642,7 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
 
     let user_a_me = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {user_a_token}"))
         .send()
         .await
@@ -692,7 +692,7 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
     // Create a parent post by user_a
     let parent_post = app
         .api_client
-        .post(format!("{}/api/v4/posts", &app.address))
+        .post(format!("{}/api/v4/posts", app.address))
         .header("Authorization", format!("Bearer {user_a_token}"))
         .json(&json!({
             "channel_id": channel_id.to_string(),
@@ -723,7 +723,7 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
     let user_b_username = format!("user_b_{}", &Uuid::new_v4().to_string()[..8]);
     let user_b_email = format!("{user_b_username}@example.com");
     app.api_client
-        .post(format!("{}/api/v1/auth/register", &app.address))
+        .post(format!("{}/api/v1/auth/register", app.address))
         .json(&json!({
             "username": user_b_username,
             "email": user_b_email,
@@ -739,7 +739,7 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
 
     let user_b_login = app
         .api_client
-        .post(format!("{}/api/v4/users/login", &app.address))
+        .post(format!("{}/api/v4/users/login", app.address))
         .json(&json!({ "login_id": user_b_email, "password": "Password123!" }))
         .send()
         .await
@@ -756,7 +756,7 @@ async fn tx_rolls_back_all_side_effects_on_late_failure() {
 
     let user_b_me = app
         .api_client
-        .get(format!("{}/api/v4/users/me", &app.address))
+        .get(format!("{}/api/v4/users/me", app.address))
         .header("Authorization", format!("Bearer {user_b_token}"))
         .send()
         .await
@@ -850,7 +850,7 @@ async fn create_post_rejects_oversized_message() {
     let res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.sender_token))
         .json(&json!({
             "channel_id": ctx.channel_id.to_string(),
@@ -869,7 +869,7 @@ async fn create_post_rejects_too_many_files() {
     let res = ctx
         .app
         .api_client
-        .post(format!("{}/api/v4/posts", &ctx.app.address))
+        .post(format!("{}/api/v4/posts", ctx.app.address))
         .header("Authorization", format!("Bearer {}", ctx.sender_token))
         .json(&json!({
             "channel_id": ctx.channel_id.to_string(),
