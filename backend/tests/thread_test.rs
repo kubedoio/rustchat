@@ -141,10 +141,7 @@ async fn test_get_thread_returns_parent_and_replies() {
     // 7. Call get_thread endpoint
     let thread_res = app
         .api_client
-        .get(format!(
-            "{}/api/v1/posts/{}/thread",
-            app.address, parent_id
-        ))
+        .get(format!("{}/api/v1/posts/{}/thread", app.address, parent_id))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await

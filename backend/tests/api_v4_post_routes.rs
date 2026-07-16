@@ -292,10 +292,7 @@ async fn mm_burn_on_read_routes_return_explicit_not_implemented() {
     let burn_delete = ctx
         .app
         .api_client
-        .delete(format!(
-            "{}/api/v4/posts/{}/burn",
-            ctx.app.address, post_id
-        ))
+        .delete(format!("{}/api/v4/posts/{}/burn", ctx.app.address, post_id))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
         .await
@@ -318,10 +315,7 @@ async fn mm_burn_on_read_routes_return_explicit_not_implemented() {
     let burn_post = ctx
         .app
         .api_client
-        .post(format!(
-            "{}/api/v4/posts/{}/burn",
-            ctx.app.address, post_id
-        ))
+        .post(format!("{}/api/v4/posts/{}/burn", ctx.app.address, post_id))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
         .await
@@ -399,10 +393,7 @@ async fn mm_post_files_info_returns_files() {
     let link_res = ctx
         .app
         .api_client
-        .get(format!(
-            "{}/api/v4/files/{}/link",
-            ctx.app.address, file_id
-        ))
+        .get(format!("{}/api/v4/files/{}/link", ctx.app.address, file_id))
         .header("Authorization", format!("Bearer {}", ctx.token))
         .send()
         .await
