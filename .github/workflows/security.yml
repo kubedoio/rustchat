@@ -83,7 +83,7 @@ jobs:
           key: ${{ runner.os }}-sqlx-cli-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Install SQLx CLI
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
         with:
           tool: sqlx-cli
 
@@ -126,7 +126,7 @@ jobs:
           key: ${{ runner.os }}-cargo-audit-v1
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
         with:
           tool: cargo-audit
 
@@ -153,7 +153,7 @@ jobs:
           key: ${{ runner.os }}-cargo-audit-v1
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
         with:
           tool: cargo-audit
 
@@ -180,7 +180,7 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-v1
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
         with:
           tool: cargo-deny
 
@@ -207,7 +207,7 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-v1
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
         with:
           tool: cargo-deny
 
