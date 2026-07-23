@@ -31,3 +31,17 @@
 # Docs and agent guidelines
 /docs/                           @senolcolak
 /AGENTS.md                       @senolcolak
+
+# Buzz pivot governance and enforcement (architectural tier).
+# Listed after /docs/ because the last matching pattern wins in CODEOWNERS.
+# These files define and police the upstream boundary; LLM agents must never
+# merge changes to them without architecture-owner review.
+/docs/adr/ADR-004-buzz-upstream-foundation.md  @senolcolak @zoorpha
+/docs/pivot/                     @senolcolak @zoorpha
+/scripts/pivot/                  @senolcolak @zoorpha
+/.github/workflows/pivot-architecture-guard.yml  @senolcolak @zoorpha
+
+# Pivot target layout (active from Phase D scaffold onward)
+/contracts/                      @senolcolak @zoorpha
+/distribution/versions.yaml      @senolcolak @zoorpha
+/services/                       @senolcolak

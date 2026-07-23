@@ -12,6 +12,8 @@ Buzz now provides a broader collaboration substrate with a Rust relay, signed ev
 
 Kubedo's intended differentiation is enterprise and sovereign operation rather than ownership of every chat primitive. The differentiated areas are identity lifecycle, Keycloak integration, policy, compliance, managed deployment, RustShare knowledge, permission-aware RAG, support, and EU-oriented operations.
 
+Buzz is built on the Nostr protocol: signed NIP-01 events, NIP-42/NIP-98 authentication, and `npub` public-key identity. Adopting Buzz is therefore a protocol-level commitment to the Nostr event and identity model, not an implementation detail. Enterprise reviewers must evaluate it on those terms.
+
 ## Decision
 
 RustChat will adopt `block/buzz` as its upstream collaboration foundation.
@@ -21,7 +23,7 @@ The following decisions are included:
 1. The original RustChat implementation will receive one final standalone release and then enter security-maintenance-only status.
 2. Mattermost compatibility is retired from the forward architecture.
 3. The Vue frontend is retired from forward development after the final standalone release.
-4. RustChat desktop, web, Android, and iOS clients will derive from Buzz clients and will be rebranded and tested as RustChat distributions.
+4. RustChat desktop, Android, and iOS clients will derive from Buzz clients and will be rebranded and tested as RustChat distributions. (Verified gap: the upstream `web/` tree is an invite/git companion, not a chat client — see [`docs/pivot/FEASIBILITY.md`](../pivot/FEASIBILITY.md). The web-client strategy is decided explicitly in Phase 4; it is not assumed to exist.)
 5. Kubedo will maintain a minimal fork of Buzz for branding, packaging, configuration hooks, and changes that cannot yet be accepted upstream.
 6. General-purpose fixes and features will be proposed upstream first.
 7. RustChat enterprise functionality will live outside Buzz core and communicate through documented contracts.
@@ -64,7 +66,7 @@ Rejected because copied source would make upstream synchronization difficult and
 
 ### Run RustChat and Buzz as permanent peer systems
 
-Rejected as the target architecture because it would create duplicated users, channels, messages, clients, and operational responsibility. A temporary bridge is allowed only during evaluation or staged bootstrap.
+Rejected as the target architecture because it would create duplicated users, channels, messages, clients, and operational responsibility. A temporary bridge is allowed only during evaluation or staged bootstrap and must carry an explicit expiry date recorded in the prompt ledger; an expired bridge is removed, not renewed by default.
 
 ## Consequences
 
@@ -89,8 +91,15 @@ Rejected as the target architecture because it would create duplicated users, ch
 - **Deep fork risk:** enforce a patch ledger, patch budget, architecture guard, and upstream-first policy.
 - **Upstream abandonment risk:** preserve the legal and technical ability to maintain the Apache-2.0 fork independently.
 - **Protocol divergence risk:** run upstream conformance tests unchanged and prohibit downstream event/schema changes without ADR approval.
-- **LLM-generated architecture drift:** require contracts, tests, and human architectural review for every generated change.
+- **LLM-generated architecture drift:** require contracts, tests, and human architectural review for every generated change, applied per [`docs/pivot/LLM-ALIGNMENT.md`](../pivot/LLM-ALIGNMENT.md).
 - **Mobile immaturity risk:** treat mobile as a gated product workstream, not an inherited finished feature.
+- **Upstream velocity risk:** upstream lands roughly 800 commits per month (verified 2026-07-23). The no-divergence strategy requires a staffed sync cadence; falling behind shows up in the patch budget, which forces re-evaluation.
+- **Integration-assumption risk:** the no-core-divergence strategy was verified against upstream source on 2026-07-23; the verified seams and the bounded upstream-PR backlog (FCM profile, NIP-46 remote signing, `AppProfile` variant) are recorded in [`docs/pivot/FEASIBILITY.md`](../pivot/FEASIBILITY.md) and re-verified at every phase gate.
+- **Client coverage risk:** no upstream web chat client exists; Android push requires an upstream FCM transport profile; organization-managed end-user keys require upstream NIP-46 support.
+
+## Feasibility evidence
+
+This decision was verified against the actual upstream codebase on 2026-07-23 (`block/buzz` @ `6a56c8b`), not against marketing claims. The verified integration seams, per-pillar verdicts, the bounded upstream-PR backlog, and the honest risk statement are recorded in [`docs/pivot/FEASIBILITY.md`](../pivot/FEASIBILITY.md). Summary: building the enterprise control plane outside Buzz core is feasible today for identity binding, attestation (NIP-OA), suspension/revocation, compliance export, and the RustShare bridge; Android push, managed end-user keys, rebranded iOS push, and any web chat client require upstream work. That file is re-verified at every phase gate; if a "feasible" claim fails in implementation, this ADR must be revisited.
 
 ## Acceptance criteria
 

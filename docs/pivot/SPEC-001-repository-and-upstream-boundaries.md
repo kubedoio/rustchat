@@ -90,6 +90,20 @@ rustchat/
 
 Buzz source must not exist as a normal tracked directory in this repository.
 
+## Mechanical enforcement
+
+The boundary is enforced by `scripts/pivot/check-architecture-boundaries.sh` running as a required CI status check on every PR. The guard verifies:
+
+- the governance documents exist and are not hollowed out (minimum content and title checks),
+- no copied Buzz source at known paths (`buzz/`, `vendor/buzz/`, `upstream/buzz/`) **and** no copied Buzz crate anywhere in the tree, detected by Cargo package name (`name = "buzz-*"`) so renamed directories do not bypass the check,
+- `core/buzz`, if present, is a git submodule whose own URL points to `kubedoio/buzz`,
+- no `buzz-db`/`buzz-relay` reference in any tracked `Cargo.toml` (including the workspace root, which member crates can inherit from) or Rust source outside `core/buzz`,
+- `distribution/versions.yaml` contains no mutable branch/tag references and pins a 40-character commit SHA.
+
+The guard script cannot protect itself. Its integrity comes from repository settings, which are mandatory launch requirements (LLM-ALIGNMENT rule A3): CODEOWNERS review for `scripts/pivot/`, the guard workflow, and `docs/pivot/`; the guard as a required status check; branch protection preventing agents from merging. A PR that weakens the guard is an architectural-tier change under `.governance/protected-paths.yml`.
+
+Known residual limits: the guard cannot judge semantics (a dependency renamed to avoid the string `buzz-relay` still requires review), and it does not inspect the `kubedoio/buzz` fork, which has its own divergence checks per the patch ledger rules below.
+
 Permitted references to the Kubedo Buzz fork:
 
 - immutable container digest
@@ -150,6 +164,8 @@ Patch classes:
 - `temporary-workaround`
 
 A `core-divergence` class is forbidden unless authorized by an accepted ADR.
+
+The initial `extension-hook` / `upstream-pending` entries are the verified upstream-PR backlog from `docs/pivot/FEASIBILITY.md`: FCM transport profile, NIP-46 remote signing, and the rebranded `AppProfile` variant. These are opened upstream in Phase 2, before Phase 3 depends on them.
 
 Patch budget:
 

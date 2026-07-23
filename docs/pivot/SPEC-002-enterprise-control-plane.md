@@ -125,7 +125,7 @@ The OIDC subject, not email, is the stable enterprise identifier.
 - Raw private keys are not returned to application services.
 - Rotation and offboarding policies are organization controlled.
 
-The first public preview may support only one custody mode, but the contract must not prevent the second.
+The first public preview supports **user-owned custody only**. Organization-managed signing for service identities (bridge publishing via `POST /events` + NIP-98 with KMS-held keys) may ship in the preview. Organization-managed custody for end users requires upstream NIP-46 remote-signer support in the clients (see `FEASIBILITY.md`); it is out of scope until that upstream PR lands. The contract must not prevent the managed mode later.
 
 ## Policy precedence
 
@@ -140,6 +140,16 @@ AND RustShare artifact authorization active, when knowledge is accessed
 ```
 
 No service may widen access granted by another service.
+
+## Upstream integration seams (verified 2026-07-23)
+
+The control plane integrates through these seams, verified against upstream source in [`FEASIBILITY.md`](./FEASIBILITY.md). Building a private alternative to any of them is a prohibited core divergence:
+
+- **Admission control:** the relay membership gate (`relay_members`), managed through the `buzz-admin` CLI (shipped in the relay image) or NIP-43 admin events; cross-pod revocation propagates over Redis pub/sub. Direct database writes are prohibited (SPEC-001); where only direct access exists for an operation today, that operation waits for an upstream API or becomes an upstream PR — it does not become a private shortcut.
+- **Attestation:** NIP-OA owner attestations issued by the identity controller's attester keypair (contract C3).
+- **Suspension/revocation:** `community_bans` with expiry and disconnect propagation; NIP-IA identity archive for retirement.
+- **Audit and export:** the `buzz-audit` hash-chained log and the NIP-98-authenticated `/query` HTTP bridge.
+- **Service publishing:** `POST /events` with NIP-98 auth for bridge/service identities.
 
 ## Failure behavior
 

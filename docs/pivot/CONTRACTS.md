@@ -3,7 +3,7 @@
 **Status:** Proposed
 **Versioning:** Semantic versioning per contract family
 
-These contracts are the only supported communication paths between RustChat enterprise services and the Buzz collaboration core. Implementations must generate machine-readable schemas from the normative definitions below before public preview.
+These contracts are the only supported communication paths between RustChat enterprise services and the Buzz collaboration core. Implementations must generate machine-readable schemas from the normative definitions below before public preview (LLM-ALIGNMENT rule A8: schemas under `contracts/` come first, and once they exist the JSON/YAML blocks in this document are illustrative, not normative).
 
 ## Contract principles
 
@@ -78,7 +78,7 @@ Delivery requirements:
 
 - At-least-once delivery.
 - Consumers deduplicate by `event_id` and `idempotency_key`.
-- Suspension and revocation have a documented maximum propagation SLA.
+- Suspension and revocation propagation SLA: target 60 seconds from Keycloak state change to relay enforcement; monitoring must alert at 300 seconds. This value is the initial commitment for the first preview and is tightened before enterprise pilot. Enforcement uses the verified seams in `FEASIBILITY.md` (membership-gate removal, `community_bans`, NIP-IA identity archive).
 - Historical Buzz events remain attributable to their original signing key.
 
 ## C3 — Organization membership attestation
@@ -102,7 +102,7 @@ Required claims:
 }
 ```
 
-The transport and signature format may follow a Buzz-supported owner-attestation mechanism or a generic upstream extension. RustChat must not introduce an incompatible private relay-auth protocol when an upstream-compatible mechanism is available.
+The transport and signature format use the verified upstream mechanism: **NIP-OA owner attestation** (`docs/nips/NIP-OA.md` in `block/buzz`, enforced at the relay membership gate). The identity controller holds an attester Nostr keypair and issues signed capability events the relay accepts natively. RustChat must not introduce an incompatible private relay-auth protocol — one is not needed, and building one is a prohibited core divergence.
 
 ## C4 — RustShare retrieval request
 

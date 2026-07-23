@@ -181,10 +181,13 @@ Code origin does not change the gate. For every LLM-generated change:
 
 - the prompt ID is recorded in `PROMPT-LEDGER.md`
 - generated assumptions are listed in the PR
-- tests are written from the contract/specification, not copied only from generated implementation
-- security-sensitive code receives human review
+- tests are written from the contract/specification, before and apart from the implementation, by a prompt that has not seen the implementation (LLM-ALIGNMENT rule A2)
+- security-sensitive code receives human review plus a context-free reviewer agent per LLM-ALIGNMENT rule A1
+- every claimed verification includes the exact command and raw output or a linked CI run (LLM-ALIGNMENT rule A4)
 - no generated migration may edit a previously released migration
 - no generated change may reduce test coverage or mark failures as expected merely to make CI green
+
+The full alignment rules, including the prohibited-agent-behavior list and the failure-mode map, are normative in [`LLM-ALIGNMENT.md`](./LLM-ALIGNMENT.md).
 
 ## Failure policy
 

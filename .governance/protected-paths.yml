@@ -46,3 +46,33 @@ paths:
   - pattern: "docs/superpowers/specs/**"
     min_tier: elevated
     reason: "Design record integrity"
+
+  # Buzz pivot (ADR-004): governance docs and enforcement tooling
+  - pattern: "docs/pivot/**"
+    min_tier: architectural
+    reason: "Pivot governance documents define the upstream boundary and LLM development rules"
+
+  - pattern: "docs/adr/ADR-004-buzz-upstream-foundation.md"
+    min_tier: architectural
+    reason: "Foundation architecture decision for the Buzz pivot"
+
+  - pattern: "scripts/pivot/**"
+    min_tier: architectural
+    reason: "Architecture-guard scripts enforce the upstream boundary; weakening them defeats the pivot controls"
+
+  - pattern: ".github/workflows/pivot-architecture-guard.yml"
+    min_tier: architectural
+    reason: "The pivot CI guard must not be edited or removed without architecture review"
+
+  # Pivot target layout (active from Phase D scaffold onward)
+  - pattern: "contracts/**"
+    min_tier: architectural
+    reason: "Cross-boundary contracts are the only legal communication paths with Buzz"
+
+  - pattern: "distribution/versions.yaml"
+    min_tier: elevated
+    reason: "Release version matrix must stay immutable and reproducible"
+
+  - pattern: "services/**"
+    min_tier: elevated
+    reason: "Enterprise control-plane services handle identity, authorization, and compliance"

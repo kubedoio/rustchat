@@ -71,7 +71,7 @@ Not allowed:
 6. Publish immutable artifacts and release notes.
 7. Create `legacy/0.5` from the same tagged commit.
 8. Protect `legacy/0.5` against force pushes and direct changes.
-9. Update the default branch documentation to announce the Buzz pivot only after the final release exists.
+9. Publish the public pivot announcement (release notes, project site, social channels) only after the final release exists. Governance documents marked "Proposed" (including this directory and ADR-004) may land on the default branch before the release as part of the review record, but they must carry their "Proposed" status and must not be presented externally as a committed direction until the ADR is accepted and the release is tagged.
 10. Record artifact digests and the final commit in this document or the release record.
 
 ## Legacy maintenance policy
@@ -89,7 +89,7 @@ After the final release:
 
 The release notes must clearly state:
 
-> RustChat 0.5.1 is the final release of the original standalone RustChat architecture, including the Rust/Axum backend, Vue client, and Mattermost compatibility layer. Future RustChat development will use Buzz as the upstream collaboration core and will focus on enterprise identity, sovereign deployment, RustShare integration, lifecycle management, and operational support. This release remains available as an historical and evaluation baseline; it is not being presented as a mature enterprise product.
+> RustChat 0.5.1 is the final release of the original standalone RustChat architecture, including the Rust/Axum backend, Vue client, Mattermost compatibility layer, and standalone push proxy. Future RustChat development will use Buzz as the upstream collaboration core and will focus on enterprise identity, sovereign deployment, RustShare integration, lifecycle management, and operational support. This release remains available as an historical and evaluation baseline; it is not being presented as a mature enterprise product.
 
 ## Rollback
 

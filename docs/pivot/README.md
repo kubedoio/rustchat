@@ -10,8 +10,8 @@ RustChat will:
 
 1. Publish one final pre-Buzz release from the existing codebase.
 2. Tag and preserve that code as the immutable legacy line.
-3. Stop developing the standalone chat backend, Vue client, and Mattermost compatibility layer.
-4. Adopt `block/buzz` as the upstream collaboration core.
+3. Stop developing the standalone chat backend, Vue client, Mattermost compatibility layer, and the standalone push proxy. Forward mobile push uses the upstream `buzz-push-gateway` (APNs today; Android/FCM requires an upstream transport profile — see [`FEASIBILITY.md`](./FEASIBILITY.md)).
+4. Adopt `block/buzz` as the upstream collaboration core, including its Nostr event and public-key identity model.
 5. Maintain a minimal Kubedo Buzz fork for branding, packaging, configuration hooks, and upstreamable fixes only.
 6. Build enterprise identity, lifecycle, policy, compliance, deployment, and RustShare integration outside Buzz core.
 7. Use the Buzz desktop and Flutter clients as the RustChat clients after rebranding and conformance testing.
@@ -26,7 +26,9 @@ RustChat will:
 - Enterprise services communicate with Buzz through documented contracts, events, MCP, CLI, or stable APIs.
 - Mattermost compatibility is retired and must not influence the new architecture.
 - The legacy code is security-maintenance-only after the final release.
-- LLM-generated changes require the same tests, review, and architectural checks as human-written changes.
+- LLM-generated changes require the same tests, review, and architectural checks as human-written changes, applied per [`LLM-ALIGNMENT.md`](./LLM-ALIGNMENT.md).
+- The enforcement layer is real before it is relied on: the architecture guard is a required status check, CODEOWNERS covers the governance and enforcement paths, and agents cannot merge (LLM-ALIGNMENT rule A3). Missing repository settings are launch blockers.
+- Feasibility claims are verified against upstream source and re-verified at every phase gate ([`FEASIBILITY.md`](./FEASIBILITY.md)); a failed "feasible" claim reopens ADR-004.
 
 ## Target repository model
 
@@ -64,14 +66,16 @@ Exit gate: signed release tag, immutable release artifacts, release notes, archi
 
 ### Phase 2 — Establish upstream discipline
 
-- Fork `block/buzz` into `kubedoio/buzz`.
+- Fork `block/buzz` into `kubedoio/buzz`. (Note: the fork was created on 2026-07-23 for evaluation, ahead of ADR-004 approval; this phase formalizes it with the discipline below. No downstream patches exist before this phase.)
 - Add `upstream` and `origin` remotes in contributor instructions.
 - Create an automated upstream-sync workflow.
 - Add the downstream patch ledger.
 - Create branding configuration that does not change protocol behavior.
 - Run upstream unit, integration, desktop, web, and mobile tests unchanged.
+- Enable the repository enforcement settings from [`LLM-ALIGNMENT.md`](./LLM-ALIGNMENT.md) rule A3 in both repositories (required status checks, branch protection, CODEOWNERS).
+- Open the planned upstream PRs from the feasibility backlog (FCM transport profile, NIP-46 remote signing, `AppProfile` variant) so they are in flight before Phase 3 needs them.
 
-Exit gate: two successful upstream synchronizations with no manual protocol or schema edits.
+Exit gate: two successful upstream synchronizations with no manual protocol or schema edits, and the A3 enforcement settings verified enabled.
 
 ### Phase 3 — Build the RustChat enterprise boundary
 
@@ -84,14 +88,18 @@ Implement external services and adapters for:
 - policy, retention, audit presentation, and export
 - deployment, backup, restore, observability, and managed operations
 
-Exit gate: all contracts in [`CONTRACTS.md`](./CONTRACTS.md) have executable conformance tests.
+Integrations use the verified upstream seams from [`FEASIBILITY.md`](./FEASIBILITY.md) (relay membership gate, NIP-OA attestation, NIP-IA identity archive, audit log, `/query` bridge). If a needed seam does not exist, the change goes upstream first — not into a private fork mechanism.
+
+Exit gate: all contracts in [`CONTRACTS.md`](./CONTRACTS.md) have executable conformance tests, generated from machine-readable schemas per [`LLM-ALIGNMENT.md`](./LLM-ALIGNMENT.md) rule A8.
 
 ### Phase 4 — Rebrand and release clients
 
-- Rebrand desktop, web, Android, and iOS applications.
+- Rebrand desktop, Android, and iOS applications.
+- Decide the web-client strategy explicitly: the upstream `web/` tree is a companion, not a chat client ([`FEASIBILITY.md`](./FEASIBILITY.md)). Options are contributing a web client upstream, shipping desktop/mobile only, or deferring web. "Buzz has a web chat client" must not appear in any plan or marketing material.
 - Change product identifiers, icons, update endpoints, privacy declarations, and store metadata.
-- Preserve license and attribution notices.
+- Preserve license and attribution notices. (Apache-2.0 grants no trademark rights to "Buzz"; rebranding is required for distribution.)
 - Run the upstream client test suite plus RustChat branding and enterprise-login tests.
+- iOS push requires a rebranded `AppProfile` variant upstream; Android push requires the upstream FCM transport profile. Neither is assumed complete until the upstream PRs land.
 
 Exit gate: desktop and mobile clients pass the release matrix in [`TEST-STRATEGY.md`](./TEST-STRATEGY.md).
 
@@ -110,6 +118,8 @@ Exit gate: two production-like upgrade cycles and at least 30 days of internal u
 - [`SPEC-002-enterprise-control-plane.md`](./SPEC-002-enterprise-control-plane.md)
 - [`CONTRACTS.md`](./CONTRACTS.md)
 - [`TEST-STRATEGY.md`](./TEST-STRATEGY.md)
+- [`FEASIBILITY.md`](./FEASIBILITY.md)
+- [`LLM-ALIGNMENT.md`](./LLM-ALIGNMENT.md)
 - [`PROMPT-LEDGER.md`](./PROMPT-LEDGER.md)
 - [`prompts/P001-final-release-and-buzz-pivot-bootstrap.md`](./prompts/P001-final-release-and-buzz-pivot-bootstrap.md)
 

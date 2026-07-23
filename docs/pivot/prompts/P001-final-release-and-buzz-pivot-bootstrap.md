@@ -17,9 +17,15 @@ You are the implementation agent for the RustChat architectural pivot. Work as a
 - `docs/pivot/SPEC-002-enterprise-control-plane.md`
 - `docs/pivot/CONTRACTS.md`
 - `docs/pivot/TEST-STRATEGY.md`
+- `docs/pivot/FEASIBILITY.md`
+- `docs/pivot/LLM-ALIGNMENT.md`
 - `docs/pivot/PROMPT-LEDGER.md`
 
-Never override them silently. When code and documents disagree, stop that slice and report the conflict.
+Never override them silently. When code and documents disagree, stop that slice and report the conflict. The alignment rules in `LLM-ALIGNMENT.md` (A1–A10) are binding on you; the prohibited-behavior list (A7) applies verbatim.
+
+This is a master prompt. Each phase below is executed through its own gated execution prompt (P002 onward) that inherits these constraints; do not attempt all phases in one session.
+
+Integration assumptions must come from `FEASIBILITY.md`, which names source-verified upstream seams (relay membership gate, NIP-OA attestation, NIP-IA archive, audit log, `/query` bridge) and known gaps (no web chat client, no FCM profile, no NIP-46). If you believe a new seam exists, cite the upstream file path that proves it before using it; an uncited assumption is treated as a hallucination.
 
 ### Goal
 
@@ -56,7 +62,7 @@ Before changing code:
 
 1. Inspect repository status, current versions, release workflows, tags, open PRs, and CI.
 2. Verify whether tag `v0.5.1` already exists.
-3. Identify version mismatches across backend, frontend, push proxy, images, and documentation.
+3. Identify version mismatches across backend, frontend, push proxy, images, and documentation. The push proxy is retired with the final release; note it in the release notes as end-of-life alongside the backend and Vue client.
 4. Identify release blockers only; do not propose new legacy features.
 5. Produce a written execution plan with separate PRs and rollback points.
 6. Record the planned execution under P001 in `PROMPT-LEDGER.md`.
