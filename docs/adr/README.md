@@ -38,4 +38,5 @@ Per `.governance/risk-tiers.yml`, an ADR is required for `architectural` tier ch
 - [ADR-002 Implementation Spec: RAG Knowledge Base](./ADR-002-rag-knowledge-base-implementation-spec.md) - Implementation details for knowledge base storage, chunking, embedding, sync sources, and agent assignments.
 - [ADR-003: Agents Phase 3 - Streaming, Tools, and Feedback](./ADR-003-agents-phase3.md) - Streaming responses, tool calling, feedback, analytics, and hybrid retrieval direction.
 - [ADR-003 Implementation Spec: Agents Phase 3](./ADR-003-agents-phase3-implementation-spec.md) - Implementation details for streaming, tools, message feedback, analytics, and frontend behavior.
+- [ADR-004: Adopt Buzz as the RustChat Upstream Foundation](./ADR-004-buzz-upstream-foundation.md) - Freeze the standalone architecture, retire Mattermost/Vue forward development, adopt Buzz as upstream, and keep enterprise functionality outside Buzz core.
 - [ADR: Frontend Supply-Chain Security Model](./ADR-frontend-supply-chain-security.md) - npm normalization, hardened CI installs, dependency governance, and override/patch policy for the Vue frontend.
