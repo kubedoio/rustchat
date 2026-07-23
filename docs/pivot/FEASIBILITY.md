@@ -24,7 +24,7 @@ Building an external enterprise control plane around Buzz without core divergenc
 | Android push (FCM) | FEASIBLE-WITH-UPSTREAM-PR | FCM is explicitly not yet a conforming profile (NIP-PL); new transport profile required upstream |
 | New event kinds | FEASIBLE-WITH-UPSTREAM-PR | the kind registry is closed — the relay rejects unknown kinds by design (`required_scope_for_kind`, with a `unknown_kind_rejected` test). Enterprise features should first ride existing generic kinds (30023, 30078 with d-tag namespacing, NIP-51 lists); genuinely new kinds go upstream |
 | Runtime fine-grained policy | FEASIBLE-WITH-UPSTREAM-PR | no runtime policy hook (OPA/plugin/webhook at the authz layer); membership-level gates exist. Only needed if membership gates prove too coarse |
-| Web chat client | **GAP** | upstream `web/` is a ~4k LOC companion (invite acceptance, git browser), **not** a chat client. The RustChat web-client story must be replanned: desktop + mobile first, or fund/contribute a web client upstream. Do not assume it exists |
+| Web chat client | **TRACK UPSTREAM** | upstream `web/` is a ~4k LOC companion (invite acceptance, git browser), **not** a chat client. **Decision (2026-07-23):** RustChat aligns with upstream on the web client — no separate Kubedo web-client effort. We track what `block/buzz` ships, rebrand it when it exists, and re-evaluate at the Phase 4 gate. Until then the supported RustChat surfaces are desktop and mobile. |
 
 ## Upstream PR backlog (planned, not blockers)
 
@@ -51,7 +51,7 @@ Names and identifiers are hardcoded but concentrated in config files: `desktop/s
 
 - **Youth:** the upstream is ~4.5 months old. The enterprise pilot gates (HA, RTO/RPO, pen test) depend partly on upstream maturation. There is no schedule fallback beyond maintaining the fork independently (legally clean, operationally expensive).
 - **Velocity:** ~800 commits/month cuts both ways. Upstream PRs land fast, but the no-divergence strategy requires a disciplined, staffed sync cadence. If sync falls behind, the patch budget in SPEC-001 is the tripwire that forces re-evaluation.
-- **Web client:** the largest product-surface gap. ADR-004 decision 4 assumed a derivable web client; one does not exist upstream. Phase 4 must explicitly decide: contribute a web client upstream, ship desktop/mobile only, or defer web.
+- **Web client:** the largest product-surface gap. ADR-004 decision 4 assumed a derivable web client; one does not exist upstream. Decision (2026-07-23): track upstream — RustChat adopts whatever web client `block/buzz` develops rather than funding a separate one, and re-evaluates at the Phase 4 gate.
 - **Nostr commitment:** adopting Buzz means adopting the Nostr event model, NIP authentication, and `npub` key identity. This is a protocol-level commitment, not an implementation detail; enterprise reviewers must evaluate it as such.
 
 ## Re-verification triggers

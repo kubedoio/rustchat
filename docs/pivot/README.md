@@ -95,7 +95,7 @@ Exit gate: all contracts in [`CONTRACTS.md`](./CONTRACTS.md) have executable con
 ### Phase 4 — Rebrand and release clients
 
 - Rebrand desktop, Android, and iOS applications.
-- Decide the web-client strategy explicitly: the upstream `web/` tree is a companion, not a chat client ([`FEASIBILITY.md`](./FEASIBILITY.md)). Options are contributing a web client upstream, shipping desktop/mobile only, or deferring web. "Buzz has a web chat client" must not appear in any plan or marketing material.
+- Web client: decided 2026-07-23 — RustChat tracks upstream. No separate web-client work; when `block/buzz` ships a web chat client it is rebranded and gated like the other clients ([`FEASIBILITY.md`](./FEASIBILITY.md)). Until then, supported surfaces are desktop and mobile, and no plan or marketing material may claim a RustChat web client.
 - Change product identifiers, icons, update endpoints, privacy declarations, and store metadata.
 - Preserve license and attribution notices. (Apache-2.0 grants no trademark rights to "Buzz"; rebranding is required for distribution.)
 - Run the upstream client test suite plus RustChat branding and enterprise-login tests.
