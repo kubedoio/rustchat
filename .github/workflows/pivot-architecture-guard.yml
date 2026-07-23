@@ -1,0 +1,25 @@
+name: Pivot Architecture Guard
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  architecture-boundaries:
+    name: Architecture Boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Validate pivot boundaries
+        run: bash scripts/pivot/check-architecture-boundaries.sh
