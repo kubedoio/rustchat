@@ -27,6 +27,23 @@ This ledger tracks prompts used to implement the Buzz-based RustChat architectur
 |---|---|---|---|---|
 | [P001](./prompts/P001-final-release-and-buzz-pivot-bootstrap.md) | Final legacy release and Buzz pivot bootstrap | draft | Freeze standalone RustChat and establish the clean Buzz-based structure | Release PRs, fork/bootstrap PRs, contracts, CI guards, and execution report |
 
+## Prompt creation records
+
+### P001 authored 2026-07-23
+
+- Prompt: `docs/pivot/prompts/P001-final-release-and-buzz-pivot-bootstrap.md`
+- Model/tool: GPT-5.6 Thinking with GitHub connector
+- Operator: Senol Colak / ChatGPT
+- Repository and branch: `kubedoio/rustchat`, `agent/freeze-legacy-and-plan-buzz-pivot`
+- Input commit: `73b7e566b2c4c31db0a4e7aa0e570f43de684ee0`
+- Governance PR: https://github.com/kubedoio/rustchat/pull/230
+- Scope created: legacy-release guide, ADR-004, repository boundaries, enterprise-control-plane spec, contracts, test strategy, prompt ledger, master prompt, and CI architecture guard
+- Runtime product code changed: none
+- Validation: branch compared with `main`; GitHub CI requested through the draft PR
+- Local validation limitation: outbound DNS prevented a fresh clone in the authoring environment
+- Architecture exceptions: none
+- Prompt execution status: not started; P001 remains draft until PR #230 is reviewed and ADR-004 is accepted
+
 ## Execution record template
 
 Copy this section when a prompt is executed:
