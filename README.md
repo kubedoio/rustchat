@@ -164,7 +164,7 @@ RustChat is designed as three focused services working together:
 
 ```bash
 # 1. Clone
-git clone https://github.com/rustchatio/rustchat.git
+git clone https://github.com/kubedoio/rustchat.git
 cd rustchat
 
 # 2. Configure (creates .env from template)
