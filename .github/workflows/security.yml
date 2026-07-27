@@ -41,13 +41,13 @@ jobs:
       CARGO_HTTP_TIMEOUT: 120
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Configure service endpoints
         run: echo "DATABASE_URL=postgres://rustchat:rustchat@localhost:${{ job.services.postgres.ports[5432] }}/rustchat" >> "$GITHUB_ENV"
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@b7351df727350dca84cb9d725d57dcf5bc82ba26 # v3.37.1
+        uses: github/codeql-action/init@4187e74d05793876e9989daffde9c3e66b4acd07 # v3.37.3
         with:
           languages: rust, javascript
           queries: security-extended,security-and-quality
@@ -83,7 +83,7 @@ jobs:
           key: ${{ runner.os }}-sqlx-cli-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Install SQLx CLI
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: sqlx-cli
 
@@ -104,7 +104,7 @@ jobs:
         run: cargo build --all-targets --all-features
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@b7351df727350dca84cb9d725d57dcf5bc82ba26 # v3.37.1
+        uses: github/codeql-action/analyze@4187e74d05793876e9989daffde9c3e66b4acd07 # v3.37.3
 
   cargo-audit-backend:
     name: Cargo Audit (Backend)
@@ -114,7 +114,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -126,7 +126,7 @@ jobs:
           key: ${{ runner.os }}-cargo-audit-v1
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: cargo-audit
 
@@ -141,7 +141,7 @@ jobs:
       run:
         working-directory: push-proxy
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -153,7 +153,7 @@ jobs:
           key: ${{ runner.os }}-cargo-audit-v1
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: cargo-audit
 
@@ -168,7 +168,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -180,7 +180,7 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-v1
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: cargo-deny
 
@@ -195,7 +195,7 @@ jobs:
       run:
         working-directory: push-proxy
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -207,7 +207,7 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-v1
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@ed67fa35ac944f3a9b33f12c4dd43b6f31a47e20 # v2.83.3
+        uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: cargo-deny
 
@@ -222,7 +222,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -260,7 +260,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Review dependency changes
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
