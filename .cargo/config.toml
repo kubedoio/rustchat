@@ -13,14 +13,6 @@
 # linker = "clang"
 # rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
-[target.x86_64-apple-darwin]
-# lld from LLVM (brew install lld)
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
-[target.aarch64-apple-darwin]
-# lld from LLVM (brew install lld)
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
 [env]
 # sccache configuration
 SCCACHE_CACHE_SIZE = "10G"

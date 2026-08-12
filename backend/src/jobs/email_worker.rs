@@ -61,7 +61,6 @@ pub struct EmailWorker {
     db: PgPool,
     config: EmailWorkerConfig,
     encryption_key: String,
-    provider_cache: tokio::sync::Mutex<std::collections::HashMap<Uuid, SmtpProvider>>,
 }
 
 impl EmailWorker {
@@ -71,7 +70,6 @@ impl EmailWorker {
             db,
             config,
             encryption_key,
-            provider_cache: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         }
     }
 
@@ -286,25 +284,10 @@ impl EmailWorker {
         let settings = settings
             .ok_or_else(|| WorkerError::Configuration("No mail provider available".to_string()))?;
 
-        // Check cache
-        {
-            let cache = self.provider_cache.lock().await;
-            if cache.contains_key(&settings.id) {
-                // In a real implementation, we'd need to clone the provider or use Arc
-                // For now, we'll create a new one each time (not optimal but works)
-            }
-        }
-
         // Create new provider
         let provider = SmtpProvider::new(settings.clone(), &self.encryption_key)
             .await
             .map_err(|e| WorkerError::Configuration(format!("Failed to create provider: {}", e)))?;
-
-        // Cache it
-        {
-            let mut cache = self.provider_cache.lock().await;
-            cache.insert(settings.id, provider.clone());
-        }
 
         Ok((provider, settings))
     }

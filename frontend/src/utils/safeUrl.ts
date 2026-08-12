@@ -21,7 +21,3 @@ export function normalizeSafeHttpUrl(value: unknown): string | null {
     return null
   }
 }
-
-export function isSafeHttpUrl(value: unknown): value is string {
-  return normalizeSafeHttpUrl(value) !== null
-}

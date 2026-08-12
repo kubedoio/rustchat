@@ -76,14 +76,6 @@
       "category": "build-tool-critical",
       "reason": "PostCSS integration for the Tailwind CSS build pipeline."
     },
-    "@types/dompurify": {
-      "category": "editor-format-tooling-critical",
-      "reason": "Pinned compatibility types for the current DOMPurify import shape."
-    },
-    "@types/marked": {
-      "category": "editor-format-tooling-critical",
-      "reason": "Pinned compatibility types for the current marked import shape."
-    },
     "@types/node": {
       "category": "build-tool-critical",
       "reason": "Node.js type definitions required by Vite, Vitest, and config files."

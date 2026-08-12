@@ -4,11 +4,6 @@ on:
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch:
-    inputs:
-      reason:
-        description: "Reason for manual nightly trigger"
-        required: false
-        default: "Manual trigger"
 
 permissions:
   contents: read

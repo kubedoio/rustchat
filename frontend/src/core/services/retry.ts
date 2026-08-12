@@ -54,16 +54,3 @@ export async function withRetry<T>(
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
-
-// Decorator for retry logic
-export function retryable(options: RetryOptions = {}) {
-  return function (_target: any, _propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalMethod = descriptor.value
-
-    descriptor.value = async function (...args: any[]) {
-      return withRetry(() => originalMethod.apply(this, args), options)
-    }
-
-    return descriptor
-  }
-}

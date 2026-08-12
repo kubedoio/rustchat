@@ -47,8 +47,6 @@
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.3.2",
-    "@types/dompurify": "^3.2.0",
-    "@types/marked": "^5.0.2",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/test-utils": "^2.4.11",
