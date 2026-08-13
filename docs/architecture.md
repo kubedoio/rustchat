@@ -20,7 +20,6 @@ RustChat is composed of three runtime services and four external dependencies:
 | FCM / APNS | Mobile push notifications | Optional |
 | SMTP | Email, password reset | Optional |
 | OAuth providers | SSO login | Optional |
-| Meilisearch | Full-text search | Optional (via `search` profile) |
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐

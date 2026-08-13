@@ -132,6 +132,10 @@ docker-compose.override.yml
 
 mattermost-mobile
 
+# Mattermost compatibility tooling (regenerated/downloaded artifacts)
+tools/mm-compat/openapi/mattermost-openapi-v4.yaml
+tools/mm-compat/output/
+
 # -----------------------------------------------------------------------------
 # Process IDs and temporary files
 # -----------------------------------------------------------------------------

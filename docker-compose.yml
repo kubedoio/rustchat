@@ -128,20 +128,6 @@ services:
       timeout: 5s
       retries: 5
 
-  meilisearch:
-    image: getmeili/meilisearch:v1.42.1
-    container_name: rustchat-meilisearch
-    environment:
-      MEILI_ENV: development
-      MEILI_NO_ANALYTICS: true
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
-    ports:
-      - "7700:7700"
-    volumes:
-      - meilisearch_data:/meili_data
-    profiles:
-      - search
-
   push-proxy:
     build:
       context: ./push-proxy
@@ -185,4 +171,3 @@ volumes:
   postgres_data:
   redis_data:
   rustfs_data:
-  meilisearch_data:

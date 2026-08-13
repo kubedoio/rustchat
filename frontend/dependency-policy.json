@@ -76,14 +76,6 @@
       "category": "build-tool-critical",
       "reason": "PostCSS integration for the Tailwind CSS build pipeline."
     },
-    "@types/dompurify": {
-      "category": "editor-format-tooling-critical",
-      "reason": "Pinned compatibility types for the current DOMPurify import shape."
-    },
-    "@types/marked": {
-      "category": "editor-format-tooling-critical",
-      "reason": "Pinned compatibility types for the current marked import shape."
-    },
     "@types/node": {
       "category": "build-tool-critical",
       "reason": "Node.js type definitions required by Vite, Vitest, and config files."
@@ -168,6 +160,16 @@
       "reason": "Pin the transitive HTTP client to the audited safe release required by the current Node 24 toolchain.",
       "removeWhen": "The frontend dependency tree no longer requires a local undici override to satisfy the audit policy.",
       "reviewedOn": "2026-06-19"
+    },
+    "brace-expansion@^1": {
+      "reason": "Force the transitive 1.x matcher (eslint's minimatch) to the patched 1.1.18 release.",
+      "removeWhen": "All upstream toolchain dependencies resolve to an equivalent or newer safe brace-expansion release without local forcing.",
+      "reviewedOn": "2026-08-12"
+    },
+    "brace-expansion@^2": {
+      "reason": "Force the transitive 2.x matcher (js-beautify/glob's minimatch) to the patched 2.1.4 release.",
+      "removeWhen": "All upstream toolchain dependencies resolve to an equivalent or newer safe brace-expansion release without local forcing.",
+      "reviewedOn": "2026-08-12"
     }
   },
   "trustedPostInstallSteps": [

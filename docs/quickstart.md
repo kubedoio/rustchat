@@ -108,16 +108,6 @@ docker compose logs -f backend
 docker compose logs -f
 ```
 
-## Enable Search (Optional)
-
-Search requires Meilisearch, which is behind a Docker Compose profile:
-
-```bash
-docker compose --profile search up -d
-```
-
-Access Meilisearch at http://localhost:7700.
-
 ## Stop the Environment
 
 ```bash

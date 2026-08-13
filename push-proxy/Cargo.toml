@@ -29,6 +29,5 @@ jsonwebtoken = { version = "10.4", features = ["rust_crypto"] }
 chrono = "0.4"
 
 [dev-dependencies]
-tokio-test = "0.4"
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
