@@ -1,0 +1,41 @@
+# Search/context exclusions for coding agents and ripgrep.
+# Keep production source, migrations, governance, and compatibility specs searchable.
+
+target/
+node_modules/
+frontend/dist/
+frontend/coverage/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+coverage/
+test-results/
+playwright-report/
+blob-report/
+frontend/test-results/
+frontend/playwright-report/
+
+# Local agent/tool state
+.claude/
+.codex/
+.kimi/
+.agents/
+.agent.workflows/
+.agent.history/
+.agent.cache/
+.gstack/
+.worktrees/
+.sccache/
+
+# Generated compatibility/local output
+mattermost-mobile/
+tools/mm-compat/output/
+logs/
+.cache/
+
+# Noisy local artifacts
+*.log
+*.tmp
+*.temp
+*.bak
+*.profraw
+.DS_Store
