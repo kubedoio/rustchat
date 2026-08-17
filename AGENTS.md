@@ -119,3 +119,47 @@ git commit -s -m "feat: add channel search endpoint"
 ```
 
 DCO is enforced in CI; PRs with unsigned commits will fail the required check.
+
+## Agent Context and Token Efficiency
+
+Treat planning and execution as separate context phases. A planning agent may inspect architecture and cross-service boundaries as needed; once it identifies the affected area, the implementation agent must start from that bounded scope instead of rediscovering the repository.
+
+### Search and reading discipline
+
+- Prefer `rg`, `git grep`, targeted directory listings, and bounded file reads over recursive filesystem scans or broad source dumps.
+- Respect `.gitignore` and `.rgignore`. Do not search Rust `target/`, `node_modules/`, frontend/docs build output, coverage/Playwright reports, caches, worktrees, local Mattermost checkouts, generated compatibility output, or agent-tool state unless explicitly required.
+- Keep `.governance/**`, migrations, architecture docs, and compatibility specs searchable; they can define mandatory behavior and review boundaries.
+- Do not re-read unchanged files just to recover context. Use targeted reads and `git diff` after edits.
+- Avoid streaming large compiler/test/docker logs into model context. Capture noisy output and inspect the relevant error lines or a bounded tail.
+
+### Scope before execution
+
+Before editing, identify:
+
+- runtime area: `backend`, `push-proxy`, `frontend`, or offline compatibility tooling;
+- gated paths or required human review from `.governance/agent-contracts.yml`;
+- files/symbols expected to change;
+- smallest test set that proves the behavior;
+- external services needed, if any.
+
+Do not make a backend executor re-scan frontend or compatibility tooling when the plan already established that they are out of scope. Expand only when implementation or test evidence requires it.
+
+### Validation ladder
+
+Validate the changed runtime independently first:
+
+```bash
+# Backend: start with the smallest relevant unit/test target.
+cd backend
+cargo check
+cargo test --lib <relevant-test-or-module-filter>
+
+# Push proxy is a separate Cargo workspace.
+cd push-proxy
+cargo check
+cargo test <relevant-test-filter>
+```
+
+For frontend work, begin with the affected unit tests/type/build checks rather than starting the full stack or E2E environment. Start PostgreSQL/Redis/S3 and run backend integration tests only when the behavior requires those boundaries.
+
+After targeted validation succeeds, run the complete checks required by the existing **Build, Test, and Validation** section for every area touched. Context efficiency changes the order and repetition of checks; it never weakens CI, governance, security, compatibility, or final validation requirements.
