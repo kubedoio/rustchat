@@ -258,7 +258,7 @@ cd backend && cargo run
 cd frontend && npm run dev
 ```
 
-See [Development Guide](docs/development.md) for the full setup, testing, and troubleshooting guide.
+See [Development Guide](docs/development/README.md) for the full setup, testing, and troubleshooting guide.
 
 Contributors and AI agents should also read [`AGENTS.md`](AGENTS.md) for the full workflow, allowed paths, and validation commands.
 

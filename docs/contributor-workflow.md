@@ -71,6 +71,6 @@ Look for issues labeled [`good-first-issue`](https://github.com/kubedoio/rustcha
 ## Getting Help
 
 - **Architecture questions**: [Architecture Guide](./architecture/overview.md)
-- **Development setup**: [Development Guide](development.md)
+- **Development setup**: [Development Guide](./development/README.md)
 - **Compatibility**: [Compatibility Scope](development/compatibility.md)
 - **General questions**: GitHub Discussions

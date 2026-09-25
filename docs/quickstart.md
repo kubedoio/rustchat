@@ -166,6 +166,6 @@ The admin user is created **only on first startup**. If you started without `RUS
 ## Next Steps
 
 - [Deployment Guide](./deployment.md) — Evaluation vs production deployment
-- [Development Guide](./development.md) — Running from source
+- [Development Guide](./development/README.md) — Running from source
 - [Architecture Overview](./architecture/overview.md) — How the system works
 - [Admin Configuration](./admin/configuration.md) — All environment variables

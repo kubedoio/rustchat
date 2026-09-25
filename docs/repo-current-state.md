@@ -33,7 +33,7 @@ Versioning follows semver. Releases are cut by pushing a `v*` tag — the `relea
 |---|---|---|---|
 | Backend API | `backend/` | 3000 | ✅ Active |
 | Frontend SPA | `frontend/` | 5173 (dev) / 8080 (via Nginx) | ✅ Active |
-| Push Proxy | `push-proxy/` | 8065 | ✅ Active |
+| Push Proxy | `push-proxy/` | 3000 (default; `RUSTCHAT_PUSH_PORT`) | ✅ Active |
 | Nginx proxy | `frontend/nginx.conf` | 8080 | ✅ Active (Docker) |
 
 **External services required:**
