@@ -4,8 +4,9 @@
 //! and business-critical operations.
 
 use prometheus::{
-    register_counter, register_gauge, register_histogram, register_int_counter_vec,
-    register_int_gauge, Counter, Gauge, Histogram, IntCounterVec, IntGauge,
+    register_counter, register_gauge, register_gauge_vec, register_histogram,
+    register_int_counter_vec, register_int_gauge, Counter, Gauge, Histogram, IntCounterVec,
+    IntGauge,
 };
 use std::sync::LazyLock;
 use std::time::Instant;
@@ -351,3 +352,31 @@ impl Drop for BroadcastTimer {
         WS_BROADCAST_DURATION.observe(self.start.elapsed().as_secs_f64());
     }
 }
+
+// ==================== Integration Outbox Metrics ====================
+// Bounded-cardinality labels only: `provider` and `outcome`/`status` come
+// from fixed code-defined vocabularies. Never add user, channel, message,
+// or relay-URL labels here.
+
+/// Integration outbox delivery outcomes (labels: provider, outcome).
+/// `outcome` ∈ {delivered, retry, dead_letter} — fixed vocabulary.
+pub static INTEGRATION_OUTBOX_EVENTS_TOTAL: LazyLock<prometheus::IntCounterVec> =
+    LazyLock::new(|| {
+        register_int_counter_vec!(
+            "rustchat_integration_outbox_events_total",
+            "Integration outbox delivery outcomes",
+            &["provider", "outcome"]
+        )
+        .expect("metric can be created")
+    });
+
+/// Integration outbox backlog (labels: provider, status).
+/// `status` ∈ {pending, dead_letter} — fixed vocabulary.
+pub static INTEGRATION_OUTBOX_PENDING: LazyLock<prometheus::GaugeVec> = LazyLock::new(|| {
+    register_gauge_vec!(
+        "rustchat_integration_outbox_pending",
+        "Integration outbox rows by status",
+        &["provider", "status"]
+    )
+    .expect("metric can be created")
+});

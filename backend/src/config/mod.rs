@@ -137,6 +137,90 @@ pub struct Config {
     /// AI agent runtime configuration (LLM providers and tools).
     #[serde(default)]
     pub agents: AgentRuntimeConfig,
+
+    /// Optional external integrations (Buzz bridge, ...).
+    #[serde(default)]
+    pub integrations: IntegrationsConfig,
+}
+
+/// Optional external integrations.
+///
+/// All integrations are disabled by default: RustChat runs as a fully
+/// independent product unless an operator explicitly enables a bridge.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct IntegrationsConfig {
+    /// Buzz relay bridge (optional, external).
+    #[serde(default)]
+    pub buzz: BuzzIntegrationConfig,
+}
+
+/// Buzz bridge configuration.
+///
+/// When disabled (the default) no Buzz worker is spawned, no mapping lookups
+/// run on the post-creation path, and the admin API returns a clear error —
+/// behavior is indistinguishable from a build without the integration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BuzzIntegrationConfig {
+    /// Master switch for the Buzz bridge (env: `RUSTCHAT_INTEGRATIONS_BUZZ_ENABLED`).
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Dispatcher poll interval for due outbox rows.
+    #[serde(default = "default_buzz_poll_interval_secs")]
+    pub poll_interval_secs: u64,
+
+    /// Maximum delivery attempts before a row is dead-lettered.
+    #[serde(default = "default_buzz_max_attempts")]
+    pub max_attempts: u32,
+
+    /// Base delay for bounded exponential backoff (seconds).
+    #[serde(default = "default_buzz_backoff_base_secs")]
+    pub backoff_base_secs: u64,
+
+    /// Maximum delay for bounded exponential backoff (seconds).
+    #[serde(default = "default_buzz_backoff_max_secs")]
+    pub backoff_max_secs: u64,
+
+    /// Outbox rows claimed per dispatch cycle.
+    #[serde(default = "default_buzz_batch_size")]
+    pub batch_size: u32,
+
+    /// Lease for in-flight rows; rows stuck longer are reclaimed (crash recovery).
+    #[serde(default = "default_buzz_in_flight_lease_secs")]
+    pub in_flight_lease_secs: u64,
+}
+
+impl Default for BuzzIntegrationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            poll_interval_secs: default_buzz_poll_interval_secs(),
+            max_attempts: default_buzz_max_attempts(),
+            backoff_base_secs: default_buzz_backoff_base_secs(),
+            backoff_max_secs: default_buzz_backoff_max_secs(),
+            batch_size: default_buzz_batch_size(),
+            in_flight_lease_secs: default_buzz_in_flight_lease_secs(),
+        }
+    }
+}
+
+fn default_buzz_poll_interval_secs() -> u64 {
+    5
+}
+fn default_buzz_max_attempts() -> u32 {
+    10
+}
+fn default_buzz_backoff_base_secs() -> u64 {
+    5
+}
+fn default_buzz_backoff_max_secs() -> u64 {
+    3600
+}
+fn default_buzz_batch_size() -> u32 {
+    20
+}
+fn default_buzz_in_flight_lease_secs() -> u64 {
+    300
 }
 
 /// AI agent runtime configuration.
@@ -707,6 +791,34 @@ fn default_orphan_scan_min_age_seconds() -> u64 {
 }
 
 impl Config {
+    fn apply_integrations_env_overrides(&mut self) -> anyhow::Result<()> {
+        if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_ENABLED") {
+            self.integrations.buzz.enabled =
+                parse_bool_env("RUSTCHAT_INTEGRATIONS_BUZZ_ENABLED", &raw)?;
+        }
+        if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_POLL_INTERVAL_SECS") {
+            self.integrations.buzz.poll_interval_secs =
+                parse_u64_env("RUSTCHAT_INTEGRATIONS_BUZZ_POLL_INTERVAL_SECS", &raw)?;
+        }
+        if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_MAX_ATTEMPTS") {
+            self.integrations.buzz.max_attempts =
+                parse_u32_env("RUSTCHAT_INTEGRATIONS_BUZZ_MAX_ATTEMPTS", &raw)?;
+        }
+        if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_BACKOFF_BASE_SECS") {
+            self.integrations.buzz.backoff_base_secs =
+                parse_u64_env("RUSTCHAT_INTEGRATIONS_BUZZ_BACKOFF_BASE_SECS", &raw)?;
+        }
+        if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_BACKOFF_MAX_SECS") {
+            self.integrations.buzz.backoff_max_secs =
+                parse_u64_env("RUSTCHAT_INTEGRATIONS_BUZZ_BACKOFF_MAX_SECS", &raw)?;
+        }
+        if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_IN_FLIGHT_LEASE_SECS") {
+            self.integrations.buzz.in_flight_lease_secs =
+                parse_u64_env("RUSTCHAT_INTEGRATIONS_BUZZ_IN_FLIGHT_LEASE_SECS", &raw)?;
+        }
+        Ok(())
+    }
+
     fn apply_calls_env_overrides(&mut self) -> anyhow::Result<()> {
         // Primary calls env vars used by local docker-compose.
         if let Ok(raw) = std::env::var("RUSTCHAT_CALLS_ENABLED") {
@@ -925,6 +1037,7 @@ impl Config {
         settings.apply_compatibility_env_overrides()?;
         settings.apply_retention_env_overrides()?;
         settings.apply_agent_env_overrides()?;
+        settings.apply_integrations_env_overrides()?;
 
         // Validate security settings
         settings.validate_security()?;

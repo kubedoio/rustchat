@@ -410,6 +410,25 @@ pub async fn create_post(
         }
     }
 
+    // Optional Buzz integration: resolve the author label up front (read-only)
+    // so the outbox enqueue inside the transaction stays cheap. When the
+    // integration is disabled this is a single boolean check — no queries.
+    let buzz_author_label = if state.config.integrations.buzz.enabled {
+        UserRepository::new(&state.db)
+            .get_by_id(user_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|u| {
+                u.display_name
+                    .filter(|d| !d.trim().is_empty())
+                    .unwrap_or(u.username)
+            })
+            .unwrap_or_else(|| "unknown".to_string())
+    } else {
+        String::new()
+    };
+
     // ========================================================================
     // SERVICE-LEVEL TRANSACTION: all DB side effects inside, external after.
     // ========================================================================
@@ -578,6 +597,22 @@ pub async fn create_post(
         &mut tx, channel_id, user_id, post.seq,
     )
     .await?;
+
+    // 7. Integration outbox (transactional): if this channel is bridged to a
+    // Buzz channel, enqueue the outbound event in the same transaction so
+    // the message and the delivery intent commit (or roll back) atomically.
+    // A single boolean check when the integration is disabled.
+    if state.config.integrations.buzz.enabled {
+        crate::integrations::buzz::dispatcher::enqueue_message_created_in_tx(
+            &mut tx,
+            channel_id,
+            post.id,
+            post.root_post_id,
+            &buzz_author_label,
+            &input.message,
+        )
+        .await?;
+    }
 
     // Commit
     tx.commit().await?;

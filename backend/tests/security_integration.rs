@@ -357,6 +357,7 @@ fn test_secret_entropy_validation() {
         },
         retention: Default::default(),
         agents: Default::default(),
+        integrations: Default::default(),
     };
 
     // Test: Weak secret with low entropy

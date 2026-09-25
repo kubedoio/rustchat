@@ -12,6 +12,7 @@ pub mod constants;
 pub mod crypto;
 pub mod db;
 pub mod error;
+pub mod integrations;
 pub mod jobs;
 pub mod mattermost_compat;
 pub mod middleware;
