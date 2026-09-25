@@ -2,16 +2,21 @@
 
 This guide is for developers contributing to RustChat.
 
-## Quick Start
+## Required Tools
 
-1. [Local Development Setup](./local-setup.md) - Get the dev environment running
-2. [Contributing Guidelines](./contributing.md) - How to contribute code
-3. [Code Style](./code-style.md) - Coding conventions
+| Tool | Version | Install | Check |
+|------|---------|---------|-------|
+| Rust | 1.95+ (MSRV, enforced by `rust-version` in `Cargo.toml`) | [rustup.rs](https://rustup.rs/) | `rustc --version` |
+| Node.js | 24+ (required by `frontend/package.json` engines) | [nodejs.org](https://nodejs.org/) | `node --version` |
+| Docker + Compose | 24.0+ / 2.20+ | [Docker Desktop](https://docs.docker.com/get-docker/) | `docker compose version` |
+| sqlx-cli | latest | `cargo install sqlx-cli --no-default-features --features postgres` | `sqlx --version` |
+
+> **Note:** The frontend requires Node.js 24+. If your system has an older version, use [nvm](https://github.com/nvm-sh/nvm) or [fnm](https://github.com/Schniz/fnm) to manage versions.
 
 ## Documentation Sections
 
 ### Getting Started
-- [Local Development Setup](./local-setup.md) - Docker-based development
+- [Local Setup](./local-setup.md) - Environment setup, daily commands, troubleshooting
 - [Contributing Guidelines](./contributing.md) - PR process, issue templates
 - [Agent Operating Model](./agent-model.md) - LLM agent workflows
 
@@ -41,8 +46,8 @@ rustchat/
 ## Key Technologies
 
 **Backend:**
-- Rust 1.80+ with Axum 0.8
-- PostgreSQL 16+ with SQLx
+- Rust 1.95+ with Axum 0.8
+- PostgreSQL 16+ (pgvector) with SQLx
 - Redis 7+ for pub/sub and caching
 - S3-compatible storage
 
@@ -51,6 +56,7 @@ rustchat/
 - TypeScript 5.9+
 - Pinia for state management
 - Vite for building
+- Vitest for unit tests, Playwright for E2E
 
 ---
 

@@ -62,7 +62,7 @@ cd frontend && npm ci --ignore-scripts && npm run apply:dependency-patches && np
 
 ## Good First Issues
 
-Look for issues labeled [`good-first-issue`](https://github.com/rustchatio/rustchat/labels/good-first-issue). These are:
+Look for issues labeled [`good-first-issue`](https://github.com/kubedoio/rustchat/labels/good-first-issue). These are:
 
 - Small and well-defined
 - Have clear acceptance criteria
@@ -70,7 +70,7 @@ Look for issues labeled [`good-first-issue`](https://github.com/rustchatio/rustc
 
 ## Getting Help
 
-- **Architecture questions**: [Architecture Guide](architecture.md)
+- **Architecture questions**: [Architecture Guide](./architecture/overview.md)
 - **Development setup**: [Development Guide](development.md)
 - **Compatibility**: [Compatibility Scope](development/compatibility.md)
 - **General questions**: GitHub Discussions

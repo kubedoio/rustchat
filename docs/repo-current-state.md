@@ -1,7 +1,7 @@
 # Repo Current State
 
-**Last updated:** 2026-06-19
-**Version:** v0.5.1
+**Last updated:** 2026-09-25
+**Version:** v0.5.1 (source)
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
 
@@ -9,7 +9,12 @@
 
 ## 1. Version
 
-**Current:** v0.5.1
+**Current source version:** v0.5.1
+
+> **Note:** The latest *published* GitHub release is currently `v0.4.1`
+> (2026-05-22). The `0.5.1` version in source has not been tagged or released
+> yet; publishing it is tracked in the release issue. Do not treat `0.5.1` as
+> a published release until a `v0.5.1` tag and GitHub release exist.
 
 Version is synchronized across three files:
 - `backend/Cargo.toml` → `[package] version`
@@ -57,14 +62,15 @@ For details see `docs/compatibility-scope.md`.
 | Advanced post search semantics beyond simple `ILIKE` | compat/search | Phase 2 |
 | Plugin upload/install/enable/disable/remove flows are compatibility stubs | compat/plugins | Phase 2 |
 | LDAP and SAML v4 endpoints are compatibility stubs | compat/enterprise | Phase 2 |
-| No unit/component test framework for frontend | testing | Low |
-| Approach C (CI enforcement) not implemented | governance | Deferred |
+| Realtime replay durability (in-memory, best-effort) and graceful WebSocket shutdown | realtime | Hardening |
+| Required status checks not yet enforced on `main` | governance | Tracked in the governance issue |
+| Compliance export and audit dashboard defects | admin | Tracked in open bug issues |
 
 ---
 
 ## 5. Active Work Streams
 
-For live in-flight work see [GitHub Issues](https://github.com/rustchatio/rustchat/issues).
+For live in-flight work see [GitHub Issues](https://github.com/kubedoio/rustchat/issues).
 
 **Recently completed:**
 
@@ -82,7 +88,7 @@ For live in-flight work see [GitHub Issues](https://github.com/rustchatio/rustch
 
 ```bash
 # Clone
-git clone https://github.com/rustchatio/rustchat
+git clone https://github.com/kubedoio/rustchat
 cd rustchat
 
 # Start infrastructure

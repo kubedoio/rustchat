@@ -133,7 +133,7 @@ When in doubt whether a change touches the compat surface, treat it as if it doe
 ## 6. Cross-References
 
 - Full agent workflow guide: [`AGENTS.md`](https://github.com/kubedoio/rustchat/blob/main/AGENTS.md)
-- Machine-readable contracts: [`.governance/agent-contracts.yml`](https://github.com/rustchatio/rustchat/blob/main/.governance/agent-contracts.yml)
-- Risk tier definitions: [`.governance/risk-tiers.yml`](https://github.com/rustchatio/rustchat/blob/main/.governance/risk-tiers.yml)
-- Protected paths: [`.governance/protected-paths.yml`](https://github.com/rustchatio/rustchat/blob/main/.governance/protected-paths.yml)
-- Code ownership: [`.github/CODEOWNERS`](https://github.com/rustchatio/rustchat/blob/main/.github/CODEOWNERS)
+- Machine-readable contracts: [`.governance/agent-contracts.yml`](https://github.com/kubedoio/rustchat/blob/main/.governance/agent-contracts.yml)
+- Risk tier definitions: [`.governance/risk-tiers.yml`](https://github.com/kubedoio/rustchat/blob/main/.governance/risk-tiers.yml)
+- Protected paths: [`.governance/protected-paths.yml`](https://github.com/kubedoio/rustchat/blob/main/.governance/protected-paths.yml)
+- Code ownership: [`.github/CODEOWNERS`](https://github.com/kubedoio/rustchat/blob/main/.github/CODEOWNERS)

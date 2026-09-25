@@ -1,65 +1,219 @@
-# Running the RustChat Environment
+# Local Development Setup
 
-> **Note:** For the comprehensive development guide (tools, commands, troubleshooting), see [Development Guide](../development.md). This page covers Docker-based setup specifically.
+This page covers running RustChat from source for daily development: quick
+setup, daily commands, the full local stack, integration tests, and
+troubleshooting.
 
-RustChat is containerized using Docker Compose for easy setup and development. The environment includes:
+## Quick Setup
+
+```bash
+# 1. Clone and enter
+git clone https://github.com/kubedoio/rustchat.git
+cd rustchat
+
+# 2. Run automated setup
+./scripts/dev-setup.sh
+
+# 3. Edit .env and set secrets
+# (see .env.example for required variables)
+```
+
+The setup script starts PostgreSQL, Redis, and RustFS in Docker, then prepares
+the backend and frontend for local development.
+
+## Docker Compose Environment
+
+RustChat is containerized using Docker Compose for easy setup and development.
+The environment includes:
 
 - **Backend**: Rust (Axum) API
-- **Frontend**: Vue 3 + Vite (Served via Nginx)
+- **Frontend**: Vue 3 + Vite (served via Nginx)
 - **Postgres**: Database
 - **Redis**: Caching
 - **RustFS**: S3-compatible object storage
 
-## Prerequisites
+```bash
+# Build and start all services
+docker compose up --build -d
 
-- [Docker](https://docs.docker.com/get-docker/) installed.
-- [Docker Compose](https://docs.docker.com/compose/install/) installed (usually included with Docker Desktop).
+# Verify
+docker compose ps
 
-## Quick Start
+# Access
+# Frontend:      http://localhost:8080
+# Backend API:   http://localhost:3000
+# RustFS console: http://localhost:9001 (RUSTFS_ACCESS_KEY / RUSTFS_SECRET_KEY)
+```
 
-1.  **Build and Start Services:**
-    Run the following command in the project root to build the backend and frontend images and start all services:
-    ```bash
-    docker compose up --build -d
-    ```
+## Backend Development
 
-    *The `-d` flag runs containers in detached mode (background).*
+### Start Dependencies
 
-2.  **Verify Services:**
-    Check the status of the containers:
-    ```bash
-    docker compose ps
-    ```
-    All services (`backend`, `frontend`, `postgres`, `redis`, `rustfs`) should be `Up`.
+```bash
+# Start only infrastructure services (no backend/frontend containers)
+docker compose up -d postgres redis rustfs
+```
 
-3.  **Access the Application:**
+### Database Setup
 
-    - **Frontend:** [http://localhost:8080](http://localhost:8080)
-    - **Backend API:** [http://localhost:3000](http://localhost:3000)
-    - **RustFS Console:** [http://localhost:9001](http://localhost:9001) (use your `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY`)
+```bash
+cd backend
 
-## Development Mode
+# Install sqlx-cli if you haven't already
+cargo install sqlx-cli --no-default-features --features postgres
 
-If you are actively developing code:
+# Run migrations
+sqlx migrate run
 
-### Backend Development
-You can run the backend locally while keeping infrastructure services (DB, Redis, RustFS) in Docker.
-1.  Stop the `backend` container if running: `docker compose stop backend`
-2.  Run cargo locally:
-    ```bash
-    cd backend
-    cargo run
-    ```
-    *Note: Ensure your local `.env` file points to localhost ports for DB/Redis/RustFS.*
+# Verify (optional)
+sqlx migrate info
+```
 
-### Frontend Development
-1.  Stop the `frontend` container if running: `docker compose stop frontend`
-2.  Run npm locally:
-    ```bash
-    cd frontend
-    npm run dev
-    ```
-    *Access at [http://localhost:5173](http://localhost:5173).*
+### Daily Commands
+
+```bash
+cd backend
+
+# Type check (fast)
+cargo check
+
+# Run library tests (no external services needed)
+cargo test --lib
+
+# Build release binary
+cargo build --release
+
+# Run the server (uses .env for configuration)
+cargo run
+```
+
+The backend will be available at http://localhost:3000.
+
+### Formatting and Linting
+
+These are enforced in CI. Run them before committing:
+
+```bash
+cd backend
+
+# Format code
+cargo fmt --all
+
+# Check formatting without writing
+cargo fmt --all -- --check
+
+# Run clippy (treat warnings as errors)
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+## Frontend Development
+
+### Install Dependencies
+
+```bash
+cd frontend
+npm ci --ignore-scripts
+npm run apply:dependency-patches
+```
+
+> **Why `--ignore-scripts`?** The project policy blocks install scripts in CI for security. Patches are applied explicitly via the separate command.
+
+### Daily Commands
+
+```bash
+cd frontend
+
+# Development server with hot reload
+npm run dev
+
+# Production build (with type checking)
+npm run build
+
+# Preview production build locally
+npm run preview
+```
+
+The dev server will be available at http://localhost:5173.
+
+### Tests
+
+```bash
+cd frontend
+
+# Unit tests (vitest)
+npm run test:unit
+
+# E2E tests (requires full stack running)
+npm run test:e2e
+
+# Update E2E snapshots after intentional UI changes
+npx playwright test --update-snapshots
+```
+
+### Dependency Policy
+
+- Use `npm` only in `frontend/`
+- Keep `frontend/package-lock.json` committed
+- Run `npm ci --ignore-scripts` in CI
+- See [Frontend Dependency Policy](../frontend-dependency-policy.md) before adding dependencies
+
+## Running the Full Stack Locally
+
+For active development, run three processes in separate terminals:
+
+**Terminal 1 — Backend:**
+```bash
+cd backend && cargo run
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend && npm run dev
+```
+
+**Terminal 3 — Push Proxy (optional):**
+```bash
+cd push-proxy && cargo run
+```
+
+**Access points:**
+| Service | URL | Notes |
+|---------|-----|-------|
+| Frontend (dev) | http://localhost:5173 | Hot reload, Vite dev server |
+| Frontend (prod build) | http://localhost:8080 | Nginx serving `dist/` |
+| Backend API | http://localhost:3000 | Direct API access |
+| Push Proxy | http://localhost:3001 | Mobile push notifications |
+
+> **Important:** When running the backend locally (not in Docker), ensure `.env` points to `localhost` for database and Redis:
+> ```bash
+> RUSTCHAT_DATABASE_URL=postgres://rustchat:rustchat@localhost:5432/rustchat
+> RUSTCHAT_REDIS_URL=redis://localhost:6379
+> RUSTCHAT_S3_ENDPOINT=http://localhost:9000
+> ```
+
+## Integration Tests
+
+Integration tests require all infrastructure services running:
+
+```bash
+# 1. Start test infrastructure
+docker compose -f docker-compose.integration.yml up -d
+
+# 2. Set test environment variables
+export RUSTCHAT_TEST_DATABASE_URL=postgres://rustchat:rustchat@127.0.0.1:55432/rustchat
+export RUSTCHAT_TEST_REDIS_URL=redis://127.0.0.1:56379/
+export RUSTCHAT_TEST_S3_ENDPOINT=http://127.0.0.1:59000
+export RUSTCHAT_TEST_S3_ACCESS_KEY=testaccesskey
+export RUSTCHAT_TEST_S3_SECRET_KEY=testsecretkey
+
+# 3. Run all integration tests
+cd backend && cargo test --no-fail-fast -- --nocapture
+
+# 4. Run a single test file
+cargo test --test channels_test
+```
+
+See [Testing](./testing.md) for the full test strategy and CI gates.
 
 ## Security Modes (Dev vs Prod)
 
@@ -73,22 +227,119 @@ For local development, either:
 - Set `RUSTCHAT_ALLOW_DEV_CORS=true` (never enable this in production), or
 - Configure `RUSTCHAT_CORS_ALLOWED_ORIGINS` with the exact origins your frontend uses, for example `http://localhost:8080,http://localhost:5173`.
 
-Recommended production settings:
+## Pre-Commit Checklist
 
-- Set `RUSTCHAT_ENVIRONMENT=production`
-- Set `RUSTCHAT_CORS_ALLOWED_ORIGINS` to your exact frontend origins (comma-separated)
-- Use strong secrets for `RUSTCHAT_JWT_SECRET` and `RUSTCHAT_ENCRYPTION_KEY`
-- Terminate TLS at the reverse proxy/load balancer (HTTPS at the edge)
-- Use encrypted SSO client secrets (stored via Admin UI/API)
-- Set TURN credentials explicitly if `TURN_SERVER_ENABLED=true`
-- Query-token compatibility is removed; URL/header OAuth token delivery and query-string WebSocket tokens are rejected at startup
-- If `RUSTCHAT_SITE_URL` is set in production, it must use `https://`; `RUSTCHAT_CORS_ALLOWED_ORIGINS` entries must also be `https://` only.
+Run these before opening a pull request:
 
-## Troubleshooting
+```bash
+# Backend
+cd backend && cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --lib
 
-- **Database Connection Errors:** Ensure the `postgres` container is healthy (`docker compose ps`).
-- **S3 Upload Failures:** The backend creates the upload bucket automatically on startup. If uploads still fail, check that the RustFS service is healthy and that the `RUSTFS_ACCESS_KEY` and `RUSTFS_SECRET_KEY` in `.env` match the `RUSTCHAT_S3_ACCESS_KEY` and `RUSTCHAT_S3_SECRET_KEY`.
-- **Rebuild:** If you change dependencies or Dockerfiles, force a rebuild:
-    ```bash
-    docker compose up --build -d
-    ```
+# Frontend
+cd frontend && npm run build && npm run test:unit
+
+# Smoke test (validates Docker configs and runs compat checks)
+./scripts/smoke-test.sh
+```
+
+## Common Troubleshooting
+
+### "Failed to connect to database"
+
+```bash
+# Check if PostgreSQL is running
+docker compose ps postgres
+
+# Check if it's ready
+docker compose exec postgres pg_isready -U rustchat
+
+# Restart if needed
+docker compose restart postgres
+```
+
+### "sqlx query validation failed" / "failed to find sqlx-data.json"
+
+```bash
+# Ensure DATABASE_URL is set and the database is running
+export DATABASE_URL=postgres://rustchat:rustchat@localhost:5432/rustchat
+
+# For offline builds (CI), prepare query data
+cd backend && cargo sqlx prepare
+```
+
+### "Port 3000 already in use"
+
+```bash
+# Find the process
+lsof -i :3000
+
+# Or use a different port
+RUSTCHAT_SERVER_PORT=3001 cargo run
+```
+
+### "Node version mismatch"
+
+```bash
+# Check version
+node --version
+
+# If older than 24, switch versions
+nvm use 24
+# or
+fnm use 24
+```
+
+### "Frontend build fails with TypeScript errors"
+
+```bash
+# Ensure patches are applied
+cd frontend && npm run apply:dependency-patches
+
+# Clear node_modules and reinstall
+rm -rf node_modules package-lock.json
+npm ci --ignore-scripts
+npm run apply:dependency-patches
+npm run build
+```
+
+### "WebSocket connection fails in dev"
+
+Ensure the backend is running and CORS allows the dev server origin:
+
+```bash
+# In .env
+RUSTCHAT_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
+```
+
+### "Push proxy fails to start"
+
+Push proxy is optional for local development. If you don't need mobile push notifications, you can skip it. If you do need it:
+
+```bash
+cd push-proxy
+RUSTCHAT_PUSH_PORT=3001 cargo run
+```
+
+## IDE Setup
+
+### VS Code
+
+Recommended extensions:
+- **Rust:** `rust-lang.rust-analyzer` — enable `cargo check` on save
+- **Vue:** Vue.volar (official Vue 3 + TypeScript support)
+- **Tailwind:** bradlc.vscode-tailwindcss
+- **Docker:** ms-azuretools.vscode-docker
+
+Settings for `settings.json`:
+```json
+{
+  "rust-analyzer.cargo.features": "all",
+  "rust-analyzer.check.command": "clippy",
+  "editor.formatOnSave": true
+}
+```
+
+### Vim / Neovim
+
+- Rust: `rust-analyzer` via `nvim-lspconfig`
+- Vue: `volar` language server

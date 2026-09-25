@@ -41,7 +41,12 @@ System architecture and design documentation.
 - [Frontend](./architecture/frontend.md) — Vue.js SPA architecture
 - [Data Model](./architecture/data-model.md) — Database schema and entities
 - [Calls Deployment](./architecture/calls-deployment.md) — Voice/video call architecture
-- [WebSocket](./architecture/websocket.md) — Real-time communication
+- [Realtime](./architecture/realtime.md) — WebSocket hub, wire formats, connection state
+- [Integrations](./architecture/integrations.md) — Integration surfaces and connector boundary
+
+### 🔌 [Integrations](./integrations/README.md)
+External system integrations.
+- [RustShare](./integrations/rustshare.md) — Knowledge-base document sync for RAG
 
 ### 👨‍💻 [Development](./development/README.md)
 Resources for contributors and developers.
@@ -84,9 +89,9 @@ Reference documentation.
 
 ## External Resources
 
-- [Main Repository](https://github.com/rustchatio/rustchat) — Source code and issues
-- [CHANGELOG](https://github.com/rustchatio/rustchat/blob/main/CHANGELOG.md) — Release history
-- [LICENSE](https://github.com/rustchatio/rustchat/blob/main/LICENSE) — Apache-2.0 License
+- [Main Repository](https://github.com/kubedoio/rustchat) — Source code and issues
+- [CHANGELOG](https://github.com/kubedoio/rustchat/blob/main/CHANGELOG.md) — Release history
+- [LICENSE](https://github.com/kubedoio/rustchat/blob/main/LICENSE) — Apache-2.0 License
 
 ---
 

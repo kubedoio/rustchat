@@ -1,13 +1,15 @@
 # Architecture Overview
 
-**Last updated:** 2026-03-22
-**Source docs consolidated:** `docs/architecture.md`, `docs/websocket_architecture.md`
+**Last updated:** 2026-09-25
+
+This is the canonical RustChat architecture overview. More detailed per-area
+documents live alongside it in `docs/architecture/`.
 
 ---
 
 ## 1. System Overview
 
-rustchat is a self-hosted team collaboration platform composed of 3 runtime services and 1 offline analysis tool:
+RustChat is a self-hosted team collaboration platform composed of 3 runtime services and 1 offline analysis tool:
 
 | Service | Language | Purpose |
 |---|---|---|
@@ -20,7 +22,7 @@ rustchat is a self-hosted team collaboration platform composed of 3 runtime serv
 
 | Dependency | Purpose | Required |
 |---|---|---|
-| PostgreSQL 16+ | Primary data store | Yes |
+| PostgreSQL 16+ (with pgvector) | Primary data store, vector search for RAG | Yes |
 | Redis 7+ | Pub/sub for cross-instance events, rate limiting, sessions | Yes |
 | S3-compatible (RustFS) | File storage | Yes |
 | FCM / APNS | Mobile push notifications (via push-proxy) | Optional |
@@ -35,7 +37,7 @@ rustchat is a self-hosted team collaboration platform composed of 3 runtime serv
                                │ REST + WebSocket
                                ▼
 ┌────────────────────────────────────────────────────────────────────┐
-│                      rustchat API Server                           │
+│                      RustChat API Server                           │
 │                      (Axum 0.8 + Tokio)                            │
 │                                                                    │
 │  /api/v1/*  ──── native API (internal clients)                     │
@@ -91,38 +93,35 @@ Note: `channels` and `posts` are sub-modules under `api/v1/` and `services/`, no
 **Request lifecycle:**
 ```
 Request → Middleware (auth, rate-limit, CORS) → Router → Handler → Service → DB/Storage
-                                                                           ↓
+                                                                            ↓
 Response ← JSON serialization ← Result<T, AppError>
 ```
 
 **Migrations:** `backend/migrations/` — SQLx numbered migrations, run automatically at startup. Irreversible — see `.governance/pr-size-limits.yml` for migration PR size constraints.
 
-### WebSocket Hub
+### Authentication Flow
 
-Two WebSocket endpoints share a common core (`api/websocket_core.rs`) but present different wire formats:
-
-| Endpoint | Clients | Wire format |
-|---|---|---|
-| `/api/v1/ws` | Internal clients and compatibility experiments | Internal envelope (`type`, `event`, `data`, `channel_id`) |
-| `/api/v4/websocket` | rustchat web app and Mattermost mobile/desktop clients | Mattermost framing (`event`, `data`, `broadcast`, `seq`) |
-
-**Shared core handles:**
-- Auth token normalization (header + `Sec-WebSocket-Protocol` fallback)
-- Connection limit enforcement
-- Default team/channel subscription bootstrap
-- Presence lifecycle: `online` on connect, `offline` when last connection drops
-- Shared commands: `subscribe_channel`, `unsubscribe_channel`, `typing`, `presence`, `ping`→`pong`
-
-**v4-specific behavior:**
-- Optional auth challenge exchange (`action=authentication_challenge`)
-- Session resumption (`connection_id`, `sequence_number`)
-- Mattermost event name mapping: `posted`, `typing`, `post_edited`, `status_change`, etc.
-
-**Event fan-out:**
 ```
-Service writes event → realtime::hub → broadcast to subscribed connections
-                                    → Redis pub/sub → other backend instances → their hubs
+┌─────────┐    POST /api/v1/auth/login    ┌──────────┐
+│  Client │ ─────────────────────────────▶│ Backend  │
+│         │                               │          │
+│         │◀──────────────────────────────│          │
+│         │    { access_token, refresh }  │          │
+│         │                               │          │
+│         │    WS /api/v1/ws              │          │
+│         │    Authorization: Bearer ...  │          │
+│         │ ─────────────────────────────▶│          │
+│         │                               │          │
+│         │◀──────────────────────────────│          │
+│         │    Real-time events           │          │
+└─────────┘                               └──────────┘
 ```
+
+1. Client POSTs credentials to `/api/v1/auth/login`
+2. Backend validates against PostgreSQL, issues JWT access + refresh tokens
+3. Client includes `Authorization: Bearer <token>` header on all API requests
+4. WebSocket connections authenticate with the same token via header (or `Sec-WebSocket-Protocol` fallback)
+5. Refresh token endpoint (`/api/v1/auth/refresh`) silently extends sessions
 
 ### AI Agent Runtime
 
@@ -180,7 +179,7 @@ Tool execution is mediated by the backend, not by the browser. The runtime expos
 ```
 frontend/src/
 ├── core/          # Shared primitives: entities, errors, websocket infrastructure
-├── features/      # 14 domain feature modules (auth, calls, channels, messages, …)
+├── features/      # Domain feature modules (auth, calls, channels, messages, …)
 ├── api/           # API client functions
 ├── components/    # Vue components
 ├── composables/   # Vue composables
@@ -218,7 +217,7 @@ The compatibility surface is the set of paths that external Mattermost clients d
 | `backend/compat/` | Contract JSON schemas + contract validation tests |
 | `backend/src/realtime/` | WebSocket hub (v4 event contracts) |
 
-For coverage details see `docs/compatibility-scope.md`.
+For coverage details see [Compatibility Scope](../compatibility-scope.md).
 
 ---
 
@@ -228,8 +227,8 @@ For coverage details see `docs/compatibility-scope.md`.
 
 ```
 Client → [Nginx proxy, port 8080 in Docker] → Axum Router (port 3000) → Middleware (auth, rate-limit, CORS)
-       → Handler → Service → DB / Storage
-       ← JSON response ← Result<T, AppError>
+        → Handler → Service → DB / Storage
+        ← JSON response ← Result<T, AppError>
 ```
 
 ### WebSocket Event Flow
@@ -241,6 +240,32 @@ Service writes event
   → Redis pub/sub → other backend instances → their hubs → their connections
 ```
 
+### File Upload Flow
+
+```
+┌─────────┐    POST /api/v1/files    ┌──────────┐    PUT      ┌─────────┐
+│  Client │ ───────────────────────▶│ Backend  │ ──────────▶│   S3    │
+│         │  multipart/form-data    │          │  internal  │ (RustFS)│
+│         │                         │          │  client    │         │
+│         │◀─────────────────────── │          │◀───────────│         │
+│         │  { file_id, api url }   │          │            │         │
+│         │                         │          │            │         │
+│         │    GET /api/v1/files/...│          │            │         │
+│         │ ───────────────────────▶│          │  proxy     │         │
+│         │◀─────────────────────── │          │◀───────────│         │
+│         │  file bytes (auth'd)    │          │            │         │
+└─────────┘                         └──────────┘            └─────────┘
+```
+
+1. Client uploads file via multipart POST to backend
+2. Backend validates channel membership before reading the upload body
+3. Backend uploads to S3-compatible storage through the server-side storage client
+4. Backend returns file metadata and an authenticated RustChat API URL to client
+5. Client requests file download through backend (authenticated)
+6. Backend proxies the file from S3 with auth check — no presigned URL leaks to end users
+
+The native presign endpoint is intentionally unsupported for end-user clients. Uploads should use multipart `POST /api/v1/files`, and reads should use the returned RustChat API URL. Mattermost-compatible file link responses and custom emoji image responses also return or stream through RustChat API URLs rather than direct S3 links.
+
 ### Frontend Data Flow
 
 ```
@@ -251,7 +276,67 @@ WebSocket → Handler → Service → Store update
 
 ---
 
-## 7. Key Design Decisions
+## 7. Deployment Topology
+
+### Single-Node (Evaluation / Small Team)
+
+```
+┌─────────────────────────────────────────────┐
+│                 Single Host                  │
+│  ┌─────────┐  ┌─────────┐  ┌─────────────┐ │
+│  │ Nginx   │  │Backend  │  │Frontend     │ │
+│  │(TLS)    │  │(Port   │  │(Port 8080)  │ │
+│  │(443)    │  │ 3000)   │  │             │ │
+│  └────┬────┘  └────┬────┘  └─────────────┘ │
+│       │            │                        │
+│       └────────────┘                        │
+│  ┌─────────┐  ┌─────────┐  ┌─────────────┐ │
+│  │PostgreSQL│  │  Redis  │  │S3 (RustFS)  │ │
+│  │(Port   │  │(Port   │  │(Port 9000)   │ │
+│  │ 5432)   │  │ 6379)   │  │             │ │
+│  └─────────┘  └─────────┘  └─────────────┘ │
+└─────────────────────────────────────────────┘
+```
+
+### Multi-Node (Production)
+
+```
+                        ┌─────────────┐
+                        │  Load Balancer│
+                        │   (TLS)       │
+                        └──────┬──────┘
+                               │
+              ┌────────────────┼────────────────┐
+              ▼                ▼                ▼
+        ┌──────────┐     ┌──────────┐     ┌──────────┐
+        │ Backend 1│     │ Backend 2│     │ Backend N│
+        │          │◄───►│          │◄───►│          │
+        └────┬─────┘     └────┬─────┘     └────┬─────┘
+             │                │                │
+             └────────────────┼────────────────┘
+                              │
+                    ┌─────────┴─────────┐
+                    ▼                   ▼
+              ┌──────────┐        ┌──────────┐
+              │ PostgreSQL│        │  Redis   │
+              │  (HA)     │        │ (Cluster)│
+              └──────────┘        └──────────┘
+                    │
+                    ▼
+              ┌──────────┐
+              │S3 (Cloud) │
+              └──────────┘
+```
+
+**Key differences:**
+- Load balancer distributes HTTP traffic (sticky sessions recommended for WebSocket)
+- Redis pub/sub synchronizes real-time events across backend instances
+- PostgreSQL and S3 are shared external services
+- Frontend is a static SPA that can be served by CDN or any static file server
+
+---
+
+## 8. Key Design Decisions
 
 - **Axum over Actix-web:** Tower middleware ecosystem, async-first, ergonomic extractors.
 - **Separate push-proxy service:** Isolates FCM/APNS credentials; can be scaled/deployed independently.
@@ -259,3 +344,15 @@ WebSocket → Handler → Service → Store update
 - **SQLx compile-time query checks:** Prevents schema/query drift at the cost of requiring a live DB at compile time (see `SQLX_OFFLINE` flag for CI).
 - **Two WebSocket endpoints (v1 + v4):** Avoids breaking the native web app while maintaining Mattermost client compatibility. Shared core prevents logic drift between them.
 - **Feature-based frontend structure:** Avoids the 960-line store antipattern; enforces single responsibility (avg 105 lines/file post-refactor).
+- **Authenticated file delivery:** Files flow through RustChat API URLs with authorization checks instead of presigned S3 URLs.
+
+---
+
+## Further Reading
+
+- [Realtime Architecture](./realtime.md) — WebSocket hub, wire formats, and client connection-state model
+- [Backend Architecture](./backend.md)
+- [Frontend Architecture](./frontend.md)
+- [Data Model](./data-model.md)
+- [Integrations](./integrations.md)
+- [Calls Deployment](./calls-deployment.md)

@@ -1,7 +1,7 @@
 # Ownership Map
 
 **Last updated:** 2026-03-22
-**Source of truth:** [`.github/CODEOWNERS`](https://github.com/rustchatio/rustchat/blob/main/.github/CODEOWNERS)
+**Source of truth:** [`.github/CODEOWNERS`](https://github.com/kubedoio/rustchat/blob/main/.github/CODEOWNERS)
 
 ---
 

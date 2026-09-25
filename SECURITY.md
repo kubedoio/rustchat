@@ -35,7 +35,7 @@ Nightly builds (`nightly` container tags) are built automatically from `main` an
 
 Use GitHub Private Vulnerability Reporting:
 
-1. [Open a private advisory](https://github.com/rustchatio/rustchat/security/advisories/new)
+1. [Open a private advisory](https://github.com/kubedoio/rustchat/security/advisories/new)
 2. Include enough detail for reproduction and impact assessment
 
 If private advisory submission is unavailable for you, contact the maintainers listed in [MAINTAINERS.md](MAINTAINERS.md) through a private channel on GitHub and include `SECURITY:` in the subject/title.
