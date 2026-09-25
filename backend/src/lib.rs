@@ -5,6 +5,7 @@
 
 pub mod api;
 pub mod auth;
+pub mod bootstrap;
 pub mod calls;
 pub mod config;
 pub mod constants;
@@ -21,3 +22,4 @@ pub mod services;
 pub mod state;
 pub mod storage;
 pub mod telemetry;
+pub mod testsupport;

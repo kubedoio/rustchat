@@ -45,6 +45,17 @@ impl ReconciliationWorker {
         (Self { state, rx }, tx)
     }
 
+    /// Create a new worker consuming a caller-provided receiver.
+    ///
+    /// The matching sender is embedded in [`AppState::reconciliation_tx`]
+    /// by the bootstrap layer before this worker starts.
+    fn with_receiver(
+        state: Arc<AppState>,
+        rx: async_channel::Receiver<ReconciliationTask>,
+    ) -> Self {
+        Self { state, rx }
+    }
+
     /// Run the worker loop, exiting cleanly when the shutdown token is cancelled.
     pub async fn run(self) {
         info!("Starting membership reconciliation worker");
@@ -419,6 +430,19 @@ pub fn spawn_reconciliation_worker(
     let (worker, tx) = ReconciliationWorker::new(state);
     let handle = tokio::spawn(worker.run());
     (handle, tx)
+}
+
+/// Spawn the reconciliation worker consuming a caller-provided receiver.
+///
+/// Used by the bootstrap runtime supervisor, which creates the channel up
+/// front so a single [`AppState`] can carry the sender before any worker
+/// starts (avoiding a temporary state during bootstrap).
+pub fn spawn_reconciliation_worker_with_receiver(
+    state: Arc<AppState>,
+    rx: async_channel::Receiver<ReconciliationTask>,
+) -> tokio::task::JoinHandle<()> {
+    let worker = ReconciliationWorker::with_receiver(state, rx);
+    tokio::spawn(worker.run())
 }
 
 /// Spawn periodic reconciliation tasks

@@ -340,8 +340,10 @@ pub async fn upload_document(
     let data_for_extraction = data.clone();
     let mime_for_extraction = mime_type.clone();
 
-    // Get OpenAI API key for embedder
-    let embedder_api_key = std::env::var("RUSTCHAT_OPENAI_API_KEY").ok();
+    // Get the configured embedder API key (parsed once by Config::load).
+    // The OPENAI_API_KEY fallback is intentionally not applied here: it is
+    // normalized into the typed config during bootstrap.
+    let embedder_api_key = state.config.agents.openai_api_key.clone();
 
     tokio::spawn(async move {
         let repo = KnowledgeRepository::new(&db_pool);
