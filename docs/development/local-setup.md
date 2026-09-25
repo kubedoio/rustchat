@@ -209,8 +209,8 @@ export RUSTCHAT_TEST_S3_SECRET_KEY=testsecretkey
 # 3. Run all integration tests
 cd backend && cargo test --no-fail-fast -- --nocapture
 
-# 4. Run a single test file
-cargo test --test channels_test
+# 4. Run a single test target
+cargo test --test api_v4_channels_all
 ```
 
 See [Testing](./testing.md) for the full test strategy and CI gates.

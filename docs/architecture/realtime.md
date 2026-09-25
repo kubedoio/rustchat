@@ -12,8 +12,8 @@ present different wire formats:
 
 | Endpoint | Clients | Wire format |
 |---|---|---|
-| `/api/v1/ws` | Internal clients and the native web app | Internal envelope (`type`, `event`, `data`, `channel_id`) |
-| `/api/v4/websocket` | Mattermost mobile/desktop clients | Mattermost framing (`event`, `data`, `broadcast`, `seq`) |
+| `/api/v1/ws` | Internal clients and integration tests | Internal envelope (`type`, `event`, `data`, `channel_id`) |
+| `/api/v4/websocket` | The native web app and Mattermost mobile/desktop clients | Mattermost framing (`event`, `data`, `broadcast`, `seq`) |
 
 The shared core handles:
 
