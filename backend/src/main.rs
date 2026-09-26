@@ -1,4 +1,4 @@
-use rustchat::{api, config::Config, db, realtime::WsHub, storage::S3Client, telemetry};
+use rustchat::{bootstrap, config::Config, db, realtime::WsHub, storage::S3Client, telemetry};
 use std::net::SocketAddr;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
@@ -117,34 +117,17 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    // Spawn background jobs
-    rustchat::jobs::spawn_retention_job(
-        db_pool.clone(),
-        s3_client.clone(),
-        config.retention.clone(),
-        shutdown_token.child_token(),
-    );
-
-    // Spawn email worker
-    let email_worker_config = rustchat::jobs::EmailWorkerConfig::default();
-    rustchat::jobs::spawn_email_worker(
-        db_pool.clone(),
-        email_worker_config,
-        config.encryption_key.clone(),
-        shutdown_token.child_token(),
-    );
-
-    // Build application router (spawns reconciliation worker internally)
-    let (app, state) = api::router(
-        db_pool.clone(),
-        redis_pool,
-        config.jwt_secret.clone(),
-        config.jwt_expiry_hours,
-        ws_hub,
+    // Build the application: shared dependencies, one AppState, supervised
+    // background workers, and the pure HTTP router.
+    let app = bootstrap::build_application(bootstrap::BootstrapInputs {
+        db: db_pool,
+        redis: redis_pool,
         s3_client,
-        config.clone(),
-        shutdown_token.clone(),
-    );
+        ws_hub,
+        config: config.clone(),
+        shutdown: shutdown_token.clone(),
+    });
+    let state = app.state.clone();
 
     // Start server
     let addr: SocketAddr = format!("{}:{}", config.server_host, config.server_port)
@@ -155,9 +138,11 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     let state_for_shutdown = state.clone();
+    let supervisor = app.supervisor;
     axum::serve(
         listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
+        app.router
+            .into_make_service_with_connect_info::<SocketAddr>(),
     )
     .with_graceful_shutdown(async move {
         shutdown_signal().await;
@@ -167,6 +152,8 @@ async fn main() -> anyhow::Result<()> {
             .ws_hub
             .close_all_with_code(1012, "Service restarting")
             .await;
+        // Wait (bounded) for the supervised background workers to finish.
+        supervisor.shutdown().await;
     })
     .await?;
 

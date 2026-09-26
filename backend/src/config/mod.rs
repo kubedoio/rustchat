@@ -133,6 +133,46 @@ pub struct Config {
     /// Retention job configuration.
     #[serde(default)]
     pub retention: RetentionJobConfig,
+
+    /// AI agent runtime configuration (LLM providers and tools).
+    #[serde(default)]
+    pub agents: AgentRuntimeConfig,
+}
+
+/// AI agent runtime configuration.
+///
+/// Provider and tool credentials are populated from the environment in
+/// [`Config::load`] (see `apply_agent_env_overrides`) and are redacted in
+/// `Debug` output so they cannot leak through logs.
+#[derive(Clone, Default, Deserialize)]
+pub struct AgentRuntimeConfig {
+    /// OpenAI API key used for LLM completions and embeddings.
+    ///
+    /// Populated from `RUSTCHAT_OPENAI_API_KEY`, falling back to
+    /// `OPENAI_API_KEY` for backward compatibility.
+    #[serde(default)]
+    pub openai_api_key: Option<String>,
+
+    /// Tavily API key that enables the server-side web search tool.
+    ///
+    /// Populated from `TAVILY_API_KEY`.
+    #[serde(default)]
+    pub tavily_api_key: Option<String>,
+}
+
+impl std::fmt::Debug for AgentRuntimeConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentRuntimeConfig")
+            .field(
+                "openai_api_key",
+                &self.openai_api_key.as_ref().map(|_| "<redacted>"),
+            )
+            .field(
+                "tavily_api_key",
+                &self.tavily_api_key.as_ref().map(|_| "<redacted>"),
+            )
+            .finish()
+    }
 }
 
 /// Retention job configuration
@@ -816,6 +856,47 @@ impl Config {
         apply_retention_env_overrides_to(&mut self.retention)
     }
 
+    /// Populate agent runtime credentials from the environment.
+    ///
+    /// Keeps the historically supported variable names:
+    /// `RUSTCHAT_OPENAI_API_KEY` (preferred), `OPENAI_API_KEY` (fallback),
+    /// and `TAVILY_API_KEY`. The environment is parsed exactly once, during
+    /// [`Config::load`]; runtime assembly must read these typed fields
+    /// instead of calling `std::env::var` directly.
+    fn apply_agent_env_overrides(&mut self) -> anyhow::Result<()> {
+        let openai_key = std::env::var("RUSTCHAT_OPENAI_API_KEY")
+            .ok()
+            .filter(|k| !k.trim().is_empty())
+            .or_else(|| {
+                std::env::var("OPENAI_API_KEY")
+                    .ok()
+                    .filter(|k| !k.trim().is_empty())
+            });
+        if openai_key.is_some() {
+            self.agents.openai_api_key = openai_key;
+        }
+
+        let tavily_key = std::env::var("TAVILY_API_KEY")
+            .ok()
+            .filter(|k| !k.trim().is_empty());
+        if tavily_key.is_some() {
+            self.agents.tavily_api_key = tavily_key;
+        }
+
+        Ok(())
+    }
+
+    /// Warn about contradictory agent configuration instead of failing
+    /// startup: the agent runtime is optional and must never block boot.
+    fn validate_agent_config(&self) {
+        if self.agents.tavily_api_key.is_some() && self.agents.openai_api_key.is_none() {
+            tracing::warn!(
+                "TAVILY_API_KEY is configured but no LLM provider key is set; \
+                 agent tools will not be registered until a provider is configured"
+            );
+        }
+    }
+
     /// Load configuration from environment variables
     pub fn load() -> anyhow::Result<Self> {
         let mut builder = config::Config::builder();
@@ -843,9 +924,11 @@ impl Config {
         settings.apply_messaging_env_overrides()?;
         settings.apply_compatibility_env_overrides()?;
         settings.apply_retention_env_overrides()?;
+        settings.apply_agent_env_overrides()?;
 
         // Validate security settings
         settings.validate_security()?;
+        settings.validate_agent_config();
 
         Ok(settings)
     }

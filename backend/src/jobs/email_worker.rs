@@ -629,13 +629,16 @@ fn classify_error(error: &str) -> String {
     }
 }
 
-/// Spawn the email worker as a background task
+/// Spawn the email worker as a background task.
+///
+/// Returns the task handle so the caller (the bootstrap runtime supervisor)
+/// can join it during shutdown instead of detaching it.
 pub fn spawn_email_worker(
     db: PgPool,
     config: EmailWorkerConfig,
     encryption_key: String,
     shutdown: CancellationToken,
-) {
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut restart_delay_secs = 1u64;
 
@@ -666,9 +669,7 @@ pub fn spawn_email_worker(
             }
             restart_delay_secs = (restart_delay_secs * 2).min(60);
         }
-    });
-
-    info!("Email worker supervisor started");
+    })
 }
 
 #[cfg(test)]
@@ -678,6 +679,11 @@ mod tests {
     #[test]
     fn spawn_email_worker_accepts_cancellation_token() {
         // Compile-time check that the public spawn API accepts a shutdown token.
-        let _: fn(PgPool, EmailWorkerConfig, String, CancellationToken) = spawn_email_worker;
+        let _: fn(
+            PgPool,
+            EmailWorkerConfig,
+            String,
+            CancellationToken,
+        ) -> tokio::task::JoinHandle<()> = spawn_email_worker;
     }
 }

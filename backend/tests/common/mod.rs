@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use rustchat::{
-    api,
     config::{Config, RetentionJobConfig},
     models::{
         AgentChannelSettings, AgentConfig, Channel, ChannelType, KnowledgeBase, KnowledgeDocument,
@@ -154,22 +153,21 @@ pub async fn spawn_app_with_config(config: Config) -> TestApp {
         );
     }
 
-    let jwt_secret = Uuid::new_v4().to_string();
-    let jwt_expiry_hours = 1;
-
     // Initialize Redis using explicit test URL first, then known local fallbacks.
     let redis_pool = configure_redis_with_fallback(&collect_test_redis_urls()).await;
 
-    let (app, _state) = api::router(
-        db_pool.clone(),
-        redis_pool.clone(),
-        jwt_secret,
-        jwt_expiry_hours,
-        ws_hub,
-        s3_client,
-        config,
-        tokio_util::sync::CancellationToken::new(),
-    );
+    // Assemble the application through the production bootstrap path so the
+    // test server exercises the same composition as `main`.
+    let application =
+        rustchat::bootstrap::build_application(rustchat::bootstrap::BootstrapInputs {
+            db: db_pool.clone(),
+            redis: redis_pool.clone(),
+            s3_client,
+            ws_hub,
+            config,
+            shutdown: tokio_util::sync::CancellationToken::new(),
+        });
+    let app = application.router;
 
     let server = axum::serve(
         listener,
@@ -229,6 +227,7 @@ pub fn test_config() -> Config {
             mobile_sso_code_exchange: true,
         },
         retention: RetentionJobConfig::default(),
+        agents: Default::default(),
     }
 }
 
@@ -436,59 +435,41 @@ pub async fn create_test_state(pool: PgPool) -> anyhow::Result<rustchat::api::Ap
 
     let jwt_secret = Uuid::new_v4().to_string();
     let jwt_expiry_hours = 1;
+    let shutdown = tokio_util::sync::CancellationToken::new();
 
-    // Build a temporary router to get properly initialized managers
-    // This is cleaner than trying to construct them directly
-    let (_temp_router, _temp_state) = rustchat::api::router(
-        pool.clone(),
-        redis_pool.clone(),
-        jwt_secret.clone(),
-        jwt_expiry_hours,
-        ws_hub.clone(),
-        s3_client.clone(),
-        config.clone(),
-        tokio_util::sync::CancellationToken::new(),
+    // Construct shared dependencies (connection store, calls runtime,
+    // circuit breakers) directly instead of building a throwaway router.
+    // Router construction no longer initializes runtime state.
+    let deps = rustchat::bootstrap::dependencies::AppDependencies::build(
+        &rustchat::bootstrap::BootstrapInputs {
+            db: pool.clone(),
+            redis: redis_pool.clone(),
+            s3_client: s3_client.clone(),
+            ws_hub: ws_hub.clone(),
+            config: config.clone(),
+            shutdown: shutdown.clone(),
+        },
     );
 
-    // Extract state from the router
-    // The router construction already created all the necessary managers
-    // We'll create a new state that matches what the router has
     Ok(rustchat::api::AppState {
         db: pool,
-        redis: redis_pool.clone(),
+        redis: redis_pool,
         jwt_secret,
         jwt_issuer: config.jwt_issuer.clone(),
         jwt_audience: config.jwt_audience.clone(),
         jwt_expiry_hours,
         ws_hub,
-        connection_store: rustchat::realtime::ConnectionStore::new(
-            tokio_util::sync::CancellationToken::new(),
-        ),
+        connection_store: deps.connection_store,
         s3_client,
-        http_client: reqwest::Client::new(),
+        http_client: deps.http_client,
         start_time: std::time::Instant::now(),
-        config: config.clone(),
-        // Extract from router's state - but since we can't access it directly,
-        // we'll just drop the router and create dummy managers that won't be used
-        // The extractor tests don't need SFU or call state functionality
-        sfu_manager: {
-            let (voice_tx, _) = tokio::sync::mpsc::channel(1);
-            use rustchat::api::v4::calls_plugin::sfu::SFUManager;
-            SFUManager::new(config.calls.clone(), voice_tx)
-        },
-        call_state_manager: {
-            use rustchat::api::v4::calls_plugin::state::{CallStateBackend, CallStateManager};
-            std::sync::Arc::new(CallStateManager::with_backend(
-                Some(redis_pool.clone()),
-                CallStateBackend::parse(&config.calls.state_backend),
-            ))
-        },
-        circuit_breakers: std::sync::Arc::new(
-            rustchat::middleware::reliability::ServiceCircuitBreakers::new(),
-        ),
+        config,
+        sfu_manager: deps.calls.sfu_manager,
+        call_state_manager: deps.calls.call_state_manager,
+        circuit_breakers: deps.circuit_breakers,
         reconciliation_tx: None,
         agent_runtime: None,
-        shutdown: tokio_util::sync::CancellationToken::new(),
+        shutdown,
     })
 }
 

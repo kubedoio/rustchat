@@ -356,6 +356,7 @@ fn test_secret_entropy_validation() {
             mobile_sso_code_exchange: true,
         },
         retention: Default::default(),
+        agents: Default::default(),
     };
 
     // Test: Weak secret with low entropy

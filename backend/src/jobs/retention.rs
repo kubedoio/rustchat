@@ -441,12 +441,15 @@ fn is_old_enough_for_orphan_scan(obj: &ListedObject, cutoff: DateTime<Utc>) -> b
 }
 
 /// Spawn the retention job as a background task.
+///
+/// Returns the task handle so the caller (the bootstrap runtime supervisor)
+/// can join it during shutdown instead of detaching it.
 pub fn spawn_retention_job(
     db: PgPool,
     storage: crate::storage::S3Client,
     job_config: RetentionJobConfig,
     shutdown: CancellationToken,
-) {
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut restart_delay_secs = 1u64;
 
@@ -484,9 +487,7 @@ pub fn spawn_retention_job(
             }
             restart_delay_secs = (restart_delay_secs * 2).min(60);
         }
-    });
-
-    info!("Retention worker supervisor started");
+    })
 }
 
 async fn run_retention_loop(
@@ -770,8 +771,12 @@ mod tests {
     #[test]
     fn spawn_retention_job_accepts_expected_arguments() {
         // Compile-time check that the public spawn API matches the expected signature.
-        let _: fn(PgPool, crate::storage::S3Client, RetentionJobConfig, CancellationToken) =
-            spawn_retention_job;
+        let _: fn(
+            PgPool,
+            crate::storage::S3Client,
+            RetentionJobConfig,
+            CancellationToken,
+        ) -> tokio::task::JoinHandle<()> = spawn_retention_job;
     }
 
     fn file_record(key: &str) -> ExpiredFileRecord {
