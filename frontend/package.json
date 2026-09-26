@@ -40,7 +40,7 @@
   },
   "overrides": {
     "picomatch": "4.0.4",
-    "js-yaml": "4.3.1",
+    "js-yaml": "4.3.2",
     "undici": "7.29.0",
     "brace-expansion@^1": "1.1.18",
     "brace-expansion@^2": "2.1.4"
