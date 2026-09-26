@@ -1,9 +1,9 @@
 # Ownership Map
 
 **Last updated:** 2026-09-26  
-**Sources of truth:** [`.github/CODEOWNERS`](../../.github/CODEOWNERS),
-[`.governance/risk-tiers.yml`](../../.governance/risk-tiers.yml), and
-[`.governance/protected-paths.yml`](../../.governance/protected-paths.yml)
+**Sources of truth:** [`.github/CODEOWNERS`](https://github.com/kubedoio/rustchat/blob/main/.github/CODEOWNERS),
+[`.governance/risk-tiers.yml`](https://github.com/kubedoio/rustchat/blob/main/.governance/risk-tiers.yml), and
+[`.governance/protected-paths.yml`](https://github.com/kubedoio/rustchat/blob/main/.governance/protected-paths.yml)
 
 ---
 
@@ -106,10 +106,10 @@ See `.governance/protected-paths.yml` for the complete list.
 | `compat-agent` | Read compat surface; write only configured analysis-output paths | All production code paths |
 
 For exact machine-readable boundaries see
-[`.governance/agent-contracts.yml`](../../.governance/agent-contracts.yml).
+[`.governance/agent-contracts.yml`](https://github.com/kubedoio/rustchat/blob/main/.governance/agent-contracts.yml).
 For the operating model see
 [`docs/development/operating-model.md`](./operating-model.md) and
-[`AGENTS.md`](../../AGENTS.md).
+[`AGENTS.md`](https://github.com/kubedoio/rustchat/blob/main/AGENTS.md).
 
 ---
 
