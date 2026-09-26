@@ -211,6 +211,9 @@ contracts:
     scope:
       include:
         - backend/src/integrations/buzz/**
+        - backend/src/integrations/outbox.rs
+        - backend/src/api/admin_integrations.rs
+        - backend/migrations/*buzz*.sql
         - backend/tests/buzz_integration.rs
         - docs/integrations/buzz.md
         - docs/adr/ADR-005-rustchat-core-and-buzz-integration.md

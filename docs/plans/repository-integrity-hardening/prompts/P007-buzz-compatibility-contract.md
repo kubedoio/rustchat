@@ -14,7 +14,9 @@ Read:
 - `docs/adr/ADR-005-rustchat-core-and-buzz-integration.md`;
 - `docs/integrations/buzz.md`;
 - `backend/src/integrations/buzz/**`;
-- integration outbox code and migrations;
+- `backend/src/integrations/outbox.rs`;
+- `backend/src/api/admin_integrations.rs`;
+- Buzz-owned RustChat migrations (`backend/migrations/*buzz*.sql`);
 - existing Buzz integration tests.
 
 Identify exactly which external Buzz behaviors RustChat relies on:
