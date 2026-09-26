@@ -47,7 +47,7 @@ in [CODEOWNERS](.github/CODEOWNERS).
   documented emergency process says otherwise.
 - Elevated and architectural changes additionally require maintainer
   sponsorship/sign-off and the evidence defined by the corresponding risk tier.
-- The PR author does not count as the independent reviewer.
+- The PR author does not count as the independent reviewer. A maintainer who authors the PR may satisfy the maintainer-sponsorship requirement, but still needs a separate independent human approval.
 - For the highest-risk architectural changes (authentication/security model,
   storage/data model, protocol compatibility, repository governance), seek a
   second independent review when the active reviewer pool permits. This is a
