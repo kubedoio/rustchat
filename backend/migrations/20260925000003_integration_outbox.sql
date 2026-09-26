@@ -5,7 +5,7 @@
 -- the RustChat state change they describe (transactional outbox pattern) and
 -- drained by the integration outbox dispatcher.
 
-CREATE TABLE integration_outbox (
+CREATE TABLE IF NOT EXISTS integration_outbox (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     -- Integration identifier ('buzz'). Fixed vocabulary, not free-form.
     provider VARCHAR(32) NOT NULL,
@@ -30,22 +30,22 @@ CREATE TABLE integration_outbox (
     next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_error TEXT,
     -- Remote event id (Nostr event id hex) once delivered.
-    remote_event_id CHAR(64),
+    remote_event_id VARCHAR(64),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (provider, idempotency_key)
 );
 
 -- Dispatch scan: due pending rows, oldest first.
-CREATE INDEX idx_integration_outbox_due
+CREATE INDEX IF NOT EXISTS idx_integration_outbox_due
     ON integration_outbox (next_attempt_at, id)
     WHERE status = 'pending';
 
 -- Crash recovery: reclaim in_flight rows whose lease (updated_at) expired.
-CREATE INDEX idx_integration_outbox_in_flight
+CREATE INDEX IF NOT EXISTS idx_integration_outbox_in_flight
     ON integration_outbox (updated_at)
     WHERE status = 'in_flight';
 
 -- Delivery history listing per connection.
-CREATE INDEX idx_integration_outbox_connection
+CREATE INDEX IF NOT EXISTS idx_integration_outbox_connection
     ON integration_outbox (connection_id, created_at DESC);

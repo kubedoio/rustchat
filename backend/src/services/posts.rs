@@ -602,8 +602,19 @@ pub async fn create_post(
     // Buzz channel, enqueue the outbound event in the same transaction so
     // the message and the delivery intent commit (or roll back) atomically.
     // A single boolean check when the integration is disabled.
+    //
+    // The integration is OPTIONAL and isolated: a failure to enqueue must
+    // never fail or roll back the RustChat post itself. Because any error in
+    // Postgres aborts the enclosing transaction, we guard the enqueue with a
+    // SAVEPOINT and, on failure, roll back only the enqueue's work — leaving
+    // the outer post transaction valid. The message is still created in
+    // RustChat; only the outbound bridge intent for that message is dropped,
+    // with an operator-visible warning.
     if state.config.integrations.buzz.enabled {
-        crate::integrations::buzz::dispatcher::enqueue_message_created_in_tx(
+        let _ = sqlx::query("SAVEPOINT rustchat_buzz_enqueue")
+            .execute(&mut *tx)
+            .await;
+        match crate::integrations::buzz::dispatcher::enqueue_message_created_in_tx(
             &mut tx,
             channel_id,
             post.id,
@@ -611,7 +622,27 @@ pub async fn create_post(
             &buzz_author_label,
             &input.message,
         )
-        .await?;
+        .await
+        {
+            Ok(()) => {
+                let _ = sqlx::query("RELEASE SAVEPOINT rustchat_buzz_enqueue")
+                    .execute(&mut *tx)
+                    .await;
+            }
+            Err(e) => {
+                tracing::warn!(
+                    post_id = %post.id,
+                    error = %e,
+                    "Buzz integration enqueue failed; RustChat message created without a bridge intent"
+                );
+                let _ = sqlx::query("ROLLBACK TO SAVEPOINT rustchat_buzz_enqueue")
+                    .execute(&mut *tx)
+                    .await;
+                let _ = sqlx::query("RELEASE SAVEPOINT rustchat_buzz_enqueue")
+                    .execute(&mut *tx)
+                    .await;
+            }
+        }
     }
 
     // Commit

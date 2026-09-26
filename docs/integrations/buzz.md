@@ -130,6 +130,13 @@ RUSTCHAT_INTEGRATIONS_BUZZ_MAX_ATTEMPTS=10
 RUSTCHAT_INTEGRATIONS_BUZZ_BACKOFF_BASE_SECS=5
 RUSTCHAT_INTEGRATIONS_BUZZ_BACKOFF_MAX_SECS=3600
 RUSTCHAT_INTEGRATIONS_BUZZ_IN_FLIGHT_LEASE_SECS=300
+RUSTCHAT_INTEGRATIONS_BUZZ_BATCH_SIZE=20
+
+# Run the outbox dispatcher worker in this process (default: true).
+# Multi-instance deployments set this to false on every process except one
+# designated drainer — claims are FOR UPDATE SKIP LOCKED, so delivery is safe
+# with a single active drainer.
+RUSTCHAT_INTEGRATIONS_BUZZ_RUN_DISPATCHER=true
 ```
 
 ## Admin API
@@ -168,6 +175,11 @@ All admin operations are audit-logged (`buzz.*` actions).
 * **Blast radius**: timeouts (15s) and response-size caps (64 KiB) on every
   relay call; malformed responses are treated as ambiguous and retried
   idempotently.
+* **Failure isolation**: the bridge is strictly optional. Enqueueing a
+  delivery intent is wrapped in a SAVEPOINT inside the post transaction — if
+  it ever fails (e.g. the connection is being deleted concurrently), only the
+  bridge intent is rolled back and logged; the RustChat message always
+  commits. A Buzz outage can never delay, fail, or roll back a RustChat post.
 * **Loop prevention**: origin markers on every bridged event (see above).
 * **Metrics**: bounded cardinality — counters/gauges are labeled only by
   fixed vocabularies (`provider`, `outcome`, `status`); no user, channel,
@@ -189,8 +201,11 @@ All admin operations are audit-logged (`buzz.*` actions).
    `GET .../connections/{id}/deliveries` and in the Buzz client.
 
 Key rotation: `POST .../connections/{id}/key` with the new key, then add
-the new pubkey on the Buzz side. In-flight deliveries continue under the
-old key until reclaimed.
+the new pubkey on the Buzz side. Because the Nostr event id hashes the
+signing pubkey, any undelivered rows for that connection are dead-lettered
+atomically on rotation (a redelivery under the new key could no longer
+deduplicate on the relay); review and requeue them via
+`POST .../deliveries/{outbox_id}/retry` once the new identity is ready.
 
 Rollback (feature off): set `RUSTCHAT_INTEGRATIONS_BUZZ_ENABLED=false` and
 restart; pending deliveries remain queued (and inspectable) in the outbox.

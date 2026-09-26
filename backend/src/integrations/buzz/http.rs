@@ -189,9 +189,17 @@ impl BuzzConnector for HttpBuzzConnector {
         // success.
         match Self::read_body_capped(response).await {
             Ok(body) => {
+                // The relay's `event_id` is relay-controlled data. Accept it
+                // only when it is a plausible short identifier (<=64 chars);
+                // otherwise fall back to the locally computed id (always a
+                // 64-char Nostr event id hex). This prevents a hostile/oversized
+                // relay value overflowing the stored column and livelocking a
+                // row (deliver -> store-fail -> reclaim -> redeliver).
                 let remote_id = body
                     .get("event_id")
                     .and_then(|v| v.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty() && s.len() <= 64)
                     .map(str::to_string);
                 DeliveryOutcome::Delivered {
                     // Prefer the relay's event id; fall back to the locally
@@ -313,6 +321,38 @@ mod tests {
         let connector = local_connector(&base);
         let outcome = connector.submit_event(&signed_event()).await;
         assert!(matches!(outcome, DeliveryOutcome::Delivered { .. }));
+    }
+
+    #[tokio::test]
+    async fn ignores_oversized_relay_event_id() {
+        // A relay-controlled event_id longer than the 64-char column must be
+        // dropped in favour of the locally computed id, so a hostile/oversized
+        // value can never overflow the store and livelock a row.
+        let app = Router::new().route(
+            "/events",
+            post(|| async {
+                axum::Json(serde_json::json!({
+                    "event_id": "x".repeat(200),
+                    "accepted": true
+                }))
+            }),
+        );
+        let (base, _tx) = spawn_relay(app).await;
+        let connector = local_connector(&base);
+        let ev = signed_event();
+        let outcome = connector.submit_event(&ev).await;
+        match outcome {
+            DeliveryOutcome::Delivered { remote_id } => {
+                let remote_id = remote_id.expect("delivered with a remote id");
+                assert_eq!(
+                    remote_id.len(),
+                    64,
+                    "must fall back to the 64-char local id"
+                );
+                assert_eq!(remote_id, ev.event_id);
+            }
+            other => panic!("expected Delivered, got {other:?}"),
+        }
     }
 
     #[tokio::test]

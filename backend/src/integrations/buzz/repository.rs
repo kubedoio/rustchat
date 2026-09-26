@@ -9,7 +9,7 @@ use crate::error::AppError;
 /// except through [`BuzzConnectionRecord::into_runtime`], which decrypts it
 /// into a [`BuzzConnectionRuntime`](crate::integrations::buzz::connector::BuzzConnectionRuntime)
 /// that exists only for the duration of a delivery cycle.
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Clone, sqlx::FromRow)]
 pub struct BuzzConnectionRecord {
     pub id: Uuid,
     pub name: String,
@@ -19,6 +19,22 @@ pub struct BuzzConnectionRecord {
     pub enabled: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl std::fmt::Debug for BuzzConnectionRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Never expose the encrypted key blob in logs/Debug output.
+        f.debug_struct("BuzzConnectionRecord")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("relay_url", &self.relay_url)
+            .field("bridge_pubkey", &self.bridge_pubkey)
+            .field("private_key_encrypted", &"<redacted>")
+            .field("enabled", &self.enabled)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
 }
 
 impl BuzzConnectionRecord {
@@ -137,6 +153,14 @@ impl<'a> BuzzRepository<'a> {
     }
 
     /// Rotate the signing key (and derived pubkey) of a connection.
+    ///
+    /// Retry idempotency relies on a *stable* Nostr event id, which hashes the
+    /// signing pubkey. Because rotation changes the pubkey, any rows that are
+    /// still `pending`/`in_flight` cannot be delivered with the old stable id.
+    /// We therefore dead-letter them (in the same transaction) and require an
+    /// operator to review/requeue them with the new key — otherwise a retry
+    /// would sign with the new key, produce a different event id, and the
+    /// relay could no longer deduplicate (double-delivery).
     pub async fn rotate_connection_key(
         &self,
         id: Uuid,
@@ -148,7 +172,22 @@ impl<'a> BuzzRepository<'a> {
         })?;
         let encrypted = crate::crypto::encrypt(private_key.trim(), encryption_key)
             .map_err(|e| AppError::Internal(format!("key encryption failed: {e}")))?;
-        sqlx::query_as::<_, BuzzConnectionRecord>(
+
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        // Drop undelivered rows: their event id is now unreproducible.
+        sqlx::query(
+            "UPDATE integration_outbox \
+             SET status = 'dead_letter', \
+                 last_error = 'connection key rotated; outstanding deliveries requeue with the new key', \
+                 updated_at = now() \
+             WHERE connection_id = $1 AND status IN ('pending', 'in_flight')",
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_err)?;
+
+        let record = sqlx::query_as::<_, BuzzConnectionRecord>(
             r#"
             UPDATE buzz_connections
             SET private_key_encrypted = $2, bridge_pubkey = $3, updated_at = now()
@@ -159,10 +198,11 @@ impl<'a> BuzzRepository<'a> {
         .bind(id)
         .bind(encrypted)
         .bind(keys.public_key().to_hex())
-        .fetch_optional(self.pool)
+        .fetch_optional(&mut *tx)
         .await
-        .map_err(db_err)?
-        .ok_or_else(|| AppError::Validation("connection not found".to_string()))
+        .map_err(db_err)?;
+        tx.commit().await.map_err(db_err)?;
+        record.ok_or_else(|| AppError::Validation("connection not found".to_string()))
     }
 
     pub async fn update_connection(
@@ -212,11 +252,7 @@ impl<'a> BuzzRepository<'a> {
     /// nothing is left in flight against a removed credential; delivered
     /// history is retained (connection_id set to NULL).
     pub async fn delete_connection(&self, id: Uuid) -> Result<(), AppError> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| AppError::Internal(format!("key encryption failed: {e}")))?;
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
         sqlx::query(
             r#"
             UPDATE integration_outbox
@@ -229,15 +265,13 @@ impl<'a> BuzzRepository<'a> {
         .bind(id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| AppError::Internal(format!("key encryption failed: {e}")))?;
+        .map_err(db_err)?;
         let result = sqlx::query("DELETE FROM buzz_connections WHERE id = $1")
             .bind(id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| AppError::Internal(format!("key encryption failed: {e}")))?;
-        tx.commit()
-            .await
-            .map_err(|e| AppError::Internal(format!("key encryption failed: {e}")))?;
+            .map_err(db_err)?;
+        tx.commit().await.map_err(db_err)?;
         if result.rows_affected() == 0 {
             return Err(AppError::Validation("connection not found".to_string()));
         }
@@ -308,7 +342,7 @@ impl<'a> BuzzRepository<'a> {
                 .bind(connection_id)
                 .execute(self.pool)
                 .await
-                .map_err(|e| AppError::Internal(format!("key encryption failed: {e}")))?;
+                .map_err(db_err)?;
         Ok(result.rows_affected() > 0)
     }
 

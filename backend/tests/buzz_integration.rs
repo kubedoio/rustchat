@@ -23,6 +23,10 @@ fn buzz_config() -> BuzzIntegrationConfig {
         backoff_max_secs: 2,
         batch_size: 10,
         in_flight_lease_secs: 0, // disable lease reclaim unless a test wants it
+        // Tests drive delivery deterministically via dispatch_cycle; never
+        // spawn the real production outbox dispatcher worker here (it would
+        // race the explicit cycles against the shared test DB).
+        run_dispatcher: false,
     }
 }
 
@@ -142,25 +146,86 @@ async fn buzz_admin_api_requires_admin_role() {
     let app = spawn_app_with_config(buzz_enabled_config()).await;
     let member = member_token(&app, "member@example.com").await;
 
-    for (method, path) in [
-        ("GET", "/api/v1/admin/integrations/buzz/connections"),
-        ("POST", "/api/v1/admin/integrations/buzz/connections"),
+    // Every admin endpoint must return 403 for a logged-in non-admin, before
+    // any data access. Path params are dummy ids: require_admin runs first, so
+    // non-existent resources still yield 403 (never 404 on a member request).
+    let id = "00000000-0000-0000-0000-000000000000";
+    let cases: Vec<(&str, String, serde_json::Value)> = vec![
         (
             "GET",
-            "/api/v1/admin/integrations/buzz/connections/00000000-0000-0000-0000-000000000000",
+            "/api/v1/admin/integrations/buzz/connections".to_string(),
+            json!({}),
         ),
-    ] {
-        // For POST the Json<CreateConnectionRequest> extractor must succeed so the
-        // request reaches require_admin; send a well-formed body for that method.
-        let body = if method == "POST" {
+        (
+            "POST",
+            "/api/v1/admin/integrations/buzz/connections".to_string(),
             json!({
                 "name": "member-forbidden",
                 "relay_url": "wss://buzz.example.com",
                 "private_key": test_key(),
-            })
-        } else {
-            json!({})
-        };
+            }),
+        ),
+        (
+            "GET",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}"),
+            json!({}),
+        ),
+        (
+            "PATCH",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}"),
+            json!({
+                "enabled": true,
+            }),
+        ),
+        (
+            "DELETE",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}"),
+            json!({}),
+        ),
+        (
+            "POST",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}/key"),
+            json!({
+                "private_key": test_key(),
+            }),
+        ),
+        (
+            "POST",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}/test"),
+            json!({}),
+        ),
+        (
+            "GET",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}/mappings"),
+            json!({}),
+        ),
+        (
+            "PUT",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}/mappings"),
+            json!({
+                "rustchat_channel_id": id,
+                "buzz_channel_id": id,
+                "outbound_enabled": true,
+            }),
+        ),
+        (
+            "DELETE",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}/mappings/{id}"),
+            json!({}),
+        ),
+        (
+            "GET",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}/deliveries"),
+            json!({}),
+        ),
+        (
+            "POST",
+            format!("/api/v1/admin/integrations/buzz/deliveries/{id}/retry"),
+            json!({}),
+        ),
+    ];
+
+    for (method, path, body) in cases {
         let res = app
             .api_client
             .request(method.parse().unwrap(), format!("{}{}", app.address, path))
@@ -193,25 +258,58 @@ async fn buzz_admin_api_fails_fast_when_integration_disabled() {
     let app = spawn_app().await; // default config: buzz disabled
     let admin = admin_token(&app, "admin@example.com").await;
 
-    let res = app
-        .api_client
-        .get(format!(
-            "{}/api/v1/admin/integrations/buzz/connections",
-            app.address
-        ))
-        .bearer_auth(&admin)
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(res.status(), 422);
-    let body: serde_json::Value = res.json().await.unwrap();
-    assert!(
-        body["error"]["message"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("disabled"),
-        "expected explicit disabled error, got {body}"
-    );
+    // Every buzz admin endpoint must fail fast (before touching the DB) with an
+    // explicit "disabled" error when the integration is off. require_admin runs
+    // first, then require_integration_enabled — so a valid admin gets 422.
+    let id = "00000000-0000-0000-0000-000000000000";
+    for (method, path, body) in [
+        (
+            "GET",
+            "/api/v1/admin/integrations/buzz/connections".to_string(),
+            json!({}),
+        ),
+        (
+            "POST",
+            "/api/v1/admin/integrations/buzz/connections".to_string(),
+            json!({
+                "name": "n",
+                "relay_url": "wss://buzz.example.com",
+                "private_key": test_key(),
+            }),
+        ),
+        (
+            "PUT",
+            format!("/api/v1/admin/integrations/buzz/connections/{id}/mappings"),
+            json!({
+                "rustchat_channel_id": id,
+                "buzz_channel_id": id,
+                "outbound_enabled": true,
+            }),
+        ),
+        (
+            "POST",
+            format!("/api/v1/admin/integrations/buzz/deliveries/{id}/retry"),
+            json!({}),
+        ),
+    ] {
+        let res = app
+            .api_client
+            .request(method.parse().unwrap(), format!("{}{}", app.address, path))
+            .bearer_auth(&admin)
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), 422, "{method} {path} must be disabled");
+        let body: serde_json::Value = res.json().await.unwrap();
+        assert!(
+            body["error"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("disabled"),
+            "expected explicit disabled error for {path}, got {body}"
+        );
+    }
 }
 
 // ===========================================================================
@@ -706,7 +804,15 @@ async fn transient_failures_retry_with_backoff_then_deliver() {
     assert_eq!(status, "pending");
     assert_eq!(attempts, 1);
 
-    // Not yet due: a second cycle must not deliver (backoff honored).
+    // Deterministic backoff: set next_attempt_at explicitly far in the future
+    // (not relying on elapsed wall clock) and assert the row is not claimed.
+    sqlx::query(
+        "UPDATE integration_outbox SET next_attempt_at = now() + interval '1 hour' WHERE id = $1",
+    )
+    .bind(p.outbox_id)
+    .execute(&app.db_pool)
+    .await
+    .unwrap();
     dispatch_cycle(&p.state, &provider, &buzz_config()).await;
     assert_eq!(mock.submit_count().await, 1, "backoff must delay the retry");
 
@@ -738,6 +844,63 @@ async fn transient_failures_retry_with_backoff_then_deliver() {
     // Ambiguous-retry idempotency: every attempt used identical event bytes.
     assert!(mock.all_submissions_identical().await);
     assert_eq!(mock.submit_count().await, 3);
+}
+
+#[tokio::test]
+async fn rotating_key_dead_letters_outstanding_deliveries() {
+    let app = spawn_app_with_config(buzz_enabled_config()).await;
+    let p = pipeline(app.db_pool.clone()).await;
+
+    // A pending row exists before rotation.
+    let (status, ..) = outbox_status(&app.db_pool, p.outbox_id).await;
+    assert_eq!(status, "pending");
+
+    // Rotate the connection key → outstanding undelivered rows are
+    // dead-lettered (their stable Nostr event id is key-dependent, so a
+    // retry under the new key could not deduplicate on the relay).
+    let new_key = nostr::key::Keys::generate().secret_key().to_secret_hex();
+    BuzzRepository::new(&app.db_pool)
+        .rotate_connection_key(p.connection_id, &new_key, &p.state.config.encryption_key)
+        .await
+        .unwrap();
+
+    let (status, ..) = outbox_status(&app.db_pool, p.outbox_id).await;
+    assert_eq!(
+        status, "dead_letter",
+        "rotation must dead-letter outstanding deliveries"
+    );
+
+    // Dead-lettered rows are not claimed: a dispatch cycle must not attempt
+    // a delivery under the new key.
+    let mock = MockBuzzConnector::new(vec![]);
+    let provider = MockBuzzConnectorProvider {
+        connector: mock.clone(),
+    };
+    dispatch_cycle(&p.state, &provider, &buzz_config()).await;
+    assert_eq!(mock.submit_count().await, 0);
+
+    // Admin requeue under the NEW key: the row stays connection-linked, is
+    // claimed with the new key, and delivers successfully (fresh event id).
+    let requeued = OutboxRepository::new(&app.db_pool)
+        .requeue_dead_letter("buzz", p.outbox_id)
+        .await
+        .unwrap();
+    assert!(requeued, "requeue must succeed for a dead-lettered row");
+
+    let mock = MockBuzzConnector::new(vec![DeliveryOutcome::Delivered {
+        remote_id: Some("aa".repeat(32)),
+    }]);
+    let provider = MockBuzzConnectorProvider {
+        connector: mock.clone(),
+    };
+    dispatch_cycle(&p.state, &provider, &buzz_config()).await;
+    assert_eq!(
+        mock.submit_count().await,
+        1,
+        "requeued row must be delivered under the new key"
+    );
+    let (status, ..) = outbox_status(&app.db_pool, p.outbox_id).await;
+    assert_eq!(status, "delivered");
 }
 
 #[tokio::test]
@@ -861,6 +1024,27 @@ async fn deleting_connection_dead_letters_and_retries_are_rejected() {
         .await
         .unwrap();
     assert_eq!(mappings, 0);
+
+    // "Retries are rejected": even if the dead-lettered row were requeued, a
+    // dispatch cycle cannot deliver it (its connection is gone), so no event
+    // is ever submitted.
+    let requeued = OutboxRepository::new(&app.db_pool)
+        .requeue_dead_letter("buzz", p.outbox_id)
+        .await
+        .unwrap();
+    assert!(requeued, "requeue of a dead-lettered row must succeed");
+    let mock = MockBuzzConnector::new(vec![DeliveryOutcome::Delivered {
+        remote_id: Some("aa".repeat(32)),
+    }]);
+    let provider = MockBuzzConnectorProvider {
+        connector: mock.clone(),
+    };
+    dispatch_cycle(&p.state, &provider, &buzz_config()).await;
+    assert_eq!(
+        mock.submit_count().await,
+        0,
+        "deleted connection cannot deliver"
+    );
 }
 
 // ===========================================================================

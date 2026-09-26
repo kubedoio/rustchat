@@ -201,6 +201,22 @@ impl<'a> OutboxRepository<'a> {
         id: Uuid,
         remote_event_id: Option<&str>,
     ) -> Result<(), sqlx::Error> {
+        // Defensive cap: the stored column is VARCHAR(64); a longer value
+        // would error and leave the row in_flight forever (relay-controlled
+        // data). Cap at 64 characters (char-boundary safe — VARCHAR counts
+        // characters, and byte-slicing could panic on a multi-byte char) and
+        // never store more than the column allows.
+        let remote_event_id: Option<String> = remote_event_id.and_then(|s| {
+            let t = s.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.chars().take(64).collect::<String>())
+            }
+        });
+        // A row that left `in_flight` (e.g. dead-lettered by a concurrent key
+        // rotation or connection deletion) must not be resurrected by a late
+        // outcome: guard on the in-flight state so the rotation/delete wins.
         sqlx::query(
             r#"
             UPDATE integration_outbox
@@ -208,7 +224,7 @@ impl<'a> OutboxRepository<'a> {
                 remote_event_id = $2,
                 last_error = NULL,
                 updated_at = now()
-            WHERE id = $1
+            WHERE id = $1 AND status = 'in_flight'
             "#,
         )
         .bind(id)
@@ -239,7 +255,7 @@ impl<'a> OutboxRepository<'a> {
                 next_attempt_at = $2,
                 last_error = $4,
                 updated_at = now()
-            WHERE id = $1
+            WHERE id = $1 AND status = 'in_flight'
             "#,
         )
         .bind(id)
@@ -319,13 +335,13 @@ mod tests {
     fn retry_delay_is_bounded_and_grows() {
         let policy = RetryPolicy::new(10, Duration::from_secs(5), Duration::from_secs(3600));
         let d1 = policy.delay_for_attempt(1);
-        // Base with jitter: [5s, 6s]
-        assert!(d1 >= Duration::from_secs(5) && d1 <= Duration::from_secs(7));
+        // Base with jitter: [5s, 6s) (uniform factor in [1, 1.2)).
+        assert!(d1 >= Duration::from_secs(5) && d1 <= Duration::from_secs(6));
         let d5 = policy.delay_for_attempt(5);
         assert!(d5 > d1, "backoff must grow with attempts");
         let d30 = policy.delay_for_attempt(30);
-        // Capped at max (+jitter)
-        assert!(d30 <= Duration::from_secs(3600 * 2));
+        // Capped at max + jitter: < 3600 * 1.2 = 4320s.
+        assert!(d30 <= Duration::from_secs(4320));
     }
 
     #[test]

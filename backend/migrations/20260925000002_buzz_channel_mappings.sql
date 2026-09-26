@@ -6,7 +6,7 @@
 -- admin with a kind 9000 add-member event). One RustChat channel may bridge
 -- to at most one Buzz channel per connection and vice versa.
 
-CREATE TABLE buzz_channel_mappings (
+CREATE TABLE IF NOT EXISTS buzz_channel_mappings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     connection_id UUID NOT NULL REFERENCES buzz_connections(id) ON DELETE CASCADE,
     rustchat_channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
@@ -20,6 +20,6 @@ CREATE TABLE buzz_channel_mappings (
 );
 
 -- Enqueue lookup: find mappings for a RustChat channel.
-CREATE INDEX idx_buzz_channel_mappings_rustchat
+CREATE INDEX IF NOT EXISTS idx_buzz_channel_mappings_rustchat
     ON buzz_channel_mappings (rustchat_channel_id)
     WHERE outbound_enabled;

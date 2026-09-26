@@ -188,6 +188,16 @@ pub struct BuzzIntegrationConfig {
     /// Lease for in-flight rows; rows stuck longer are reclaimed (crash recovery).
     #[serde(default = "default_buzz_in_flight_lease_secs")]
     pub in_flight_lease_secs: u64,
+
+    /// Whether this process runs the outbox dispatcher worker
+    /// (env: `RUSTCHAT_INTEGRATIONS_BUZZ_RUN_DISPATCHER`).
+    ///
+    /// Defaults to `true` so a single-instance deployment drains the outbox.
+    /// Multi-instance deployments set this to `false` on every process except
+    /// the designated drainer — delivery is `FOR UPDATE SKIP LOCKED` safe, so
+    /// only one instance claims each row regardless.
+    #[serde(default = "default_true")]
+    pub run_dispatcher: bool,
 }
 
 impl Default for BuzzIntegrationConfig {
@@ -200,8 +210,13 @@ impl Default for BuzzIntegrationConfig {
             backoff_max_secs: default_buzz_backoff_max_secs(),
             batch_size: default_buzz_batch_size(),
             in_flight_lease_secs: default_buzz_in_flight_lease_secs(),
+            run_dispatcher: true,
         }
     }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_buzz_poll_interval_secs() -> u64 {
@@ -815,6 +830,14 @@ impl Config {
         if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_IN_FLIGHT_LEASE_SECS") {
             self.integrations.buzz.in_flight_lease_secs =
                 parse_u64_env("RUSTCHAT_INTEGRATIONS_BUZZ_IN_FLIGHT_LEASE_SECS", &raw)?;
+        }
+        if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_BATCH_SIZE") {
+            self.integrations.buzz.batch_size =
+                parse_u32_env("RUSTCHAT_INTEGRATIONS_BUZZ_BATCH_SIZE", &raw)?;
+        }
+        if let Ok(raw) = std::env::var("RUSTCHAT_INTEGRATIONS_BUZZ_RUN_DISPATCHER") {
+            self.integrations.buzz.run_dispatcher =
+                parse_bool_env("RUSTCHAT_INTEGRATIONS_BUZZ_RUN_DISPATCHER", &raw)?;
         }
         Ok(())
     }

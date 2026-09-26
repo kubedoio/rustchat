@@ -393,8 +393,7 @@ async fn upsert_mapping(
         sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM channels WHERE id = $1")
             .bind(input.rustchat_channel_id)
             .fetch_one(&state.db)
-            .await
-            .unwrap_or(0);
+            .await?;
     if channel_exists == 0 {
         return Err(AppError::Validation(
             "rustchat_channel_id does not reference an existing channel".to_string(),

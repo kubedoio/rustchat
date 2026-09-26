@@ -221,7 +221,6 @@ async fn record_outcome(
                 .inc();
         }
     }
-    update_outbox_gauges(outbox).await;
 }
 
 /// Refresh the pending/dead-letter gauges (bounded cardinality: status only).
@@ -282,6 +281,9 @@ pub async fn dispatch_cycle(
         Ok(rows) => rows,
         Err(e) => {
             tracing::error!(error = %e, "buzz outbox claim failed");
+            // Still refresh gauges so a transient claim failure doesn't leave
+            // the backlog metrics stale until the next poll.
+            update_outbox_gauges(&outbox).await;
             return;
         }
     };
@@ -299,6 +301,9 @@ pub async fn dispatch_cycle(
         };
         record_outcome(&outbox, &policy, &record, &outcome, dead_letter).await;
     }
+
+    // Refresh backlog gauges once per cycle (not per row).
+    update_outbox_gauges(&outbox).await;
 }
 
 /// Spawn the outbox dispatcher worker (application lifetime).
