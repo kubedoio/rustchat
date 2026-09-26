@@ -43,12 +43,17 @@ in [CODEOWNERS](.github/CODEOWNERS).
 ### Day-to-Day Changes
 
 - Most changes are decided through pull request review.
-- Two approvals are required for architectural changes.
-- One approval is sufficient for standard changes such as docs, tests, and UI
-  polish unless a protected path or other policy elevates the change.
-- Elevated/architectural review requirements in
-  `.governance/risk-tiers.yml` remain authoritative even when GitHub can only
-  enforce a coarser repository-wide rule mechanically.
+- Every merged PR requires an independent human approval unless an explicitly
+  documented emergency process says otherwise.
+- Elevated and architectural changes additionally require maintainer
+  sponsorship/sign-off and the evidence defined by the corresponding risk tier.
+- The PR author does not count as the independent reviewer.
+- For the highest-risk architectural changes (authentication/security model,
+  storage/data model, protocol compatibility, repository governance), seek a
+  second independent review when the active reviewer pool permits. This is a
+  target, not a falsely unenforceable hard gate with the current small team.
+- `.governance/risk-tiers.yml` is the machine-readable source for the current
+  review/evidence policy.
 
 ### Architectural Decisions
 
@@ -87,8 +92,8 @@ elevated work so routine PRs remain reviewable.
 Architectural changes are different: `.governance/risk-tiers.yml` intentionally
 does not impose an arbitrary hard file/line ceiling. They still must be
 coherent, reviewable, and split when independent decisions can be separated.
-Large architectural PRs require the two-reviewer/design-review discipline rather
-than mechanical line slicing.
+Large architectural PRs require independent review, maintainer sponsorship, and
+design evidence rather than mechanical line slicing.
 
 A contributor must not relabel ordinary feature work as "architectural" merely
 to bypass standard/elevated size limits.

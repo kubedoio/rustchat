@@ -152,7 +152,7 @@ This ADR does not replace `GOVERNANCE.md`, `.governance/risk-tiers.yml`, CODEOWN
 
 Where existing documents conflict, the implementation program must reconcile them explicitly rather than silently choosing one. In particular:
 
-- architectural changes retain the existing two-approval requirement;
+- architectural changes require one independent approval plus maintainer sponsorship/sign-off; the highest-risk architectural changes should seek a second independent review when the active reviewer pool permits;
 - architectural changes are governed by human review rather than standard/elevated hard PR-size limits;
 - `docs/adr/**` is the canonical ADR location;
 - repository-integrity prompts are maintainer/architect campaigns, not authorization for a bounded backend/frontend agent to edit prohibited governance paths;

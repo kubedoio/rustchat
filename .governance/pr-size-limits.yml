@@ -17,9 +17,9 @@ applicability:
   architectural:
     hard_limits: false
     note: >-
-      Architectural work requires two reviewers, senior review, tests,
-      decision note, ADR, and design review. Split independent decisions, but
-      do not mechanically fragment one coherent architectural policy/design
+      Architectural work requires independent review, maintainer sponsorship,
+      tests, decision note, ADR, and design review. Split independent decisions,
+      but do not mechanically fragment one coherent architectural policy/design
       solely to meet standard/elevated line limits.
 
 default:

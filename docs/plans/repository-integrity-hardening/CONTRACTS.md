@@ -38,6 +38,11 @@ from the exact candidate commit.
 
 Release-only upgrade/recovery checks do not have to make every small PR expensive.
 
+A gate marked `required` applies repository-wide only when the contract is
+repository-wide. Path/domain-scoped contracts are required when their declared
+scope is implicated; unrelated changes must not inherit expensive domain-specific
+validation merely because the contract exists.
+
 ## RI-C01 — Authoritative repository state
 
 Do not create one mega-workflow merely to obtain a single green check.
@@ -119,7 +124,9 @@ Legacy `docs/decisions/**` may remain as redirects/indexes; new ADRs belong in
 ## RI-C07 — Migration upgrade proof
 
 For every release candidate, prove both a clean installation and an upgrade from
-the latest published stable schema state.
+the latest published stable schema state. RI-C07 is release-required; promotion
+may consume lighter current-schema health evidence without running the full
+historical-upgrade matrix on every moving development alias.
 
 If no immutable database snapshot exists, use a deterministic fixture generated
 from the exact published tag/migration history, record its provenance/checksum,
@@ -157,8 +164,8 @@ changes.
 
 Each implementation PR must have one primary invariant and evidence. Architectural
 program/spec PRs may be larger where needed for coherent review; existing
-architectural two-reviewer/human-judgment rules apply rather than standard change
-size ceilings.
+architectural independent-review/maintainer-signoff rules apply rather than
+standard change size ceilings.
 
 ## RI-C10 — Exception accountability
 

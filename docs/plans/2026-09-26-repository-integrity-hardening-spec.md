@@ -311,7 +311,7 @@ Preferred sequence:
 
 P001 and code-only portions of P002 may overlap only if review remains understandable. P003–P007 should remain independently reviewable.
 
-Architectural-tier PRs are governed by human judgment and the two-reviewer policy. Standard/elevated hard-size guidance must not be mechanically applied in contradiction with `risk-tiers.yml`.
+Architectural-tier PRs are governed by human judgment, one independent approval, and maintainer sponsorship/sign-off; the highest-risk changes should seek a second independent review when available. Standard/elevated hard-size guidance must not be mechanically applied in contradiction with `risk-tiers.yml`.
 
 ## 9. Validation requirements
 

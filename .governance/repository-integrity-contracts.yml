@@ -28,6 +28,11 @@ gate_model:
     - required
     - advisory
     - not-applicable
+  required_semantics: >-
+    required means required when the contract is repository-wide or when the
+    change/candidate implicates the contract's declared scope. Path-scoped
+    contracts must define their trigger and must not make unrelated changes run
+    expensive domain-specific validation.
 
 contracts:
   RI-C01:
@@ -175,7 +180,7 @@ contracts:
       state: planned
     gates:
       merge: advisory
-      promotion: required
+      promotion: advisory
       release: required
     statement: >-
       a release candidate must prove schema upgrade from an empty database and
@@ -201,6 +206,12 @@ contracts:
       merge: required
       promotion: required
       release: required
+    scope:
+      include:
+        - backend/src/integrations/buzz/**
+        - backend/tests/buzz_integration.rs
+        - docs/integrations/buzz.md
+        - docs/adr/ADR-005-rustchat-core-and-buzz-integration.md
     statement: >-
       Buzz remains an optional external integration; RustChat may depend on its
       documented external protocol but not on Buzz source crates, internal
