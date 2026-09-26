@@ -32,6 +32,13 @@ pub enum AuditAction {
     LoginFailed,
     ApiKeyCreated,
     ApiKeyRevoked,
+    BuzzConnectionCreate,
+    BuzzConnectionUpdate,
+    BuzzConnectionDelete,
+    BuzzConnectionKeyRotate,
+    BuzzMappingUpsert,
+    BuzzMappingDelete,
+    BuzzDeliveryRetry,
 }
 
 impl AuditAction {
@@ -62,6 +69,13 @@ impl AuditAction {
             AuditAction::LoginFailed => "auth.login_failed",
             AuditAction::ApiKeyCreated => "api_key.created",
             AuditAction::ApiKeyRevoked => "api_key.revoked",
+            AuditAction::BuzzConnectionCreate => "buzz.connection_create",
+            AuditAction::BuzzConnectionUpdate => "buzz.connection_update",
+            AuditAction::BuzzConnectionDelete => "buzz.connection_delete",
+            AuditAction::BuzzConnectionKeyRotate => "buzz.connection_key_rotate",
+            AuditAction::BuzzMappingUpsert => "buzz.mapping_upsert",
+            AuditAction::BuzzMappingDelete => "buzz.mapping_delete",
+            AuditAction::BuzzDeliveryRetry => "buzz.delivery_retry",
         }
     }
 }

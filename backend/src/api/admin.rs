@@ -44,6 +44,8 @@ pub fn router() -> Router<AppState> {
         .merge(super::admin_membership_policies::router())
         // Audit endpoints
         .merge(super::admin_audit::router())
+        // Integrations (Buzz bridge)
+        .merge(super::admin_integrations::router())
 }
 
 /// Check if user is admin

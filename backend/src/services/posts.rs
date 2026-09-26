@@ -410,6 +410,25 @@ pub async fn create_post(
         }
     }
 
+    // Optional Buzz integration: resolve the author label up front (read-only)
+    // so the outbox enqueue inside the transaction stays cheap. When the
+    // integration is disabled this is a single boolean check — no queries.
+    let buzz_author_label = if state.config.integrations.buzz.enabled {
+        UserRepository::new(&state.db)
+            .get_by_id(user_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|u| {
+                u.display_name
+                    .filter(|d| !d.trim().is_empty())
+                    .unwrap_or(u.username)
+            })
+            .unwrap_or_else(|| "unknown".to_string())
+    } else {
+        String::new()
+    };
+
     // ========================================================================
     // SERVICE-LEVEL TRANSACTION: all DB side effects inside, external after.
     // ========================================================================
@@ -578,6 +597,53 @@ pub async fn create_post(
         &mut tx, channel_id, user_id, post.seq,
     )
     .await?;
+
+    // 7. Integration outbox (transactional): if this channel is bridged to a
+    // Buzz channel, enqueue the outbound event in the same transaction so
+    // the message and the delivery intent commit (or roll back) atomically.
+    // A single boolean check when the integration is disabled.
+    //
+    // The integration is OPTIONAL and isolated: a failure to enqueue must
+    // never fail or roll back the RustChat post itself. Because any error in
+    // Postgres aborts the enclosing transaction, we guard the enqueue with a
+    // SAVEPOINT and, on failure, roll back only the enqueue's work — leaving
+    // the outer post transaction valid. The message is still created in
+    // RustChat; only the outbound bridge intent for that message is dropped,
+    // with an operator-visible warning.
+    if state.config.integrations.buzz.enabled {
+        let _ = sqlx::query("SAVEPOINT rustchat_buzz_enqueue")
+            .execute(&mut *tx)
+            .await;
+        match crate::integrations::buzz::dispatcher::enqueue_message_created_in_tx(
+            &mut tx,
+            channel_id,
+            post.id,
+            post.root_post_id,
+            &buzz_author_label,
+            &input.message,
+        )
+        .await
+        {
+            Ok(()) => {
+                let _ = sqlx::query("RELEASE SAVEPOINT rustchat_buzz_enqueue")
+                    .execute(&mut *tx)
+                    .await;
+            }
+            Err(e) => {
+                tracing::warn!(
+                    post_id = %post.id,
+                    error = %e,
+                    "Buzz integration enqueue failed; RustChat message created without a bridge intent"
+                );
+                let _ = sqlx::query("ROLLBACK TO SAVEPOINT rustchat_buzz_enqueue")
+                    .execute(&mut *tx)
+                    .await;
+                let _ = sqlx::query("RELEASE SAVEPOINT rustchat_buzz_enqueue")
+                    .execute(&mut *tx)
+                    .await;
+            }
+        }
+    }
 
     // Commit
     tx.commit().await?;

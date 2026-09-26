@@ -10,6 +10,7 @@
 pub mod admin;
 mod admin_audit;
 mod admin_email;
+mod admin_integrations;
 mod admin_membership_policies;
 mod admin_permissions;
 mod admin_plugins;

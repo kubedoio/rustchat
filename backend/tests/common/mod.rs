@@ -228,6 +228,7 @@ pub fn test_config() -> Config {
         },
         retention: RetentionJobConfig::default(),
         agents: Default::default(),
+        integrations: Default::default(),
     }
 }
 

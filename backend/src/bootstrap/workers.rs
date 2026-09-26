@@ -175,6 +175,22 @@ pub fn spawn_application_workers(
     );
     supervisor.track("email", email_handle);
 
+    // Integration outbox dispatcher (optional; only when a bridge is enabled
+    // in configuration AND this instance is designated to drain the outbox —
+    // default on, so a single-instance deployment drains it). Multi-instance
+    // deployments set RUSTCHAT_INTEGRATIONS_BUZZ_RUN_DISPATCHER=false on every
+    // process except the designated drainer. When off, behavior is
+    // indistinguishable from a build without the integration.
+    if state.config.integrations.buzz.enabled && state.config.integrations.buzz.run_dispatcher {
+        let dispatcher_state = (*state).clone();
+        let dispatcher_handle = crate::integrations::buzz::dispatcher::spawn_outbox_dispatcher(
+            dispatcher_state,
+            std::sync::Arc::new(crate::integrations::buzz::http::HttpBuzzConnectorProvider),
+            state.shutdown.clone(),
+        );
+        supervisor.track("buzz-outbox-dispatcher", dispatcher_handle);
+    }
+
     supervisor
 }
 

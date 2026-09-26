@@ -56,6 +56,10 @@ anyhow = "1.0"
 futures-util = "0.3"
 regex = "1.10"
 dashmap = "6.2"
+# Public Nostr protocol library (NIP-01 event signing, NIP-98 HTTP auth) used
+# by the optional Buzz integration. Third-party protocol crate — never a
+# dependency on any Buzz implementation crate.
+nostr = { version = "0.45", default-features = false, features = ["std", "os-rng"] }
 libc = "0.2"
 rand = "0.8"
 async-trait = "0.1"
