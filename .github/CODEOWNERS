@@ -25,9 +25,12 @@
 /docker/                         @senolcolak
 /scripts/                        @senolcolak
 
-# Governance (architectural tier — requires 2 reviewers per risk-tiers.yml)
+# Governance and architectural decisions
 /.governance/                    @senolcolak @zoorpha
+/GOVERNANCE.md                   @senolcolak @zoorpha
+/docs/adr/                       @senolcolak @zoorpha
 
 # Docs and agent guidelines
 /docs/                           @senolcolak
 /AGENTS.md                       @senolcolak
+/CLAUDE.md                       @senolcolak

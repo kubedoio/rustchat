@@ -1,5 +1,11 @@
 # Risk Tiers Configuration
 # Reference: docs/superpowers/specs/2026-03-22-governance-layer-design.md
+#
+# "required_reviewers" means independent approving reviewers; the PR author does
+# not count. Architectural work additionally requires maintainer sponsorship /
+# merge sign-off. With the current small reviewer pool, policy must remain
+# enforceable rather than claiming two independent approvals that cannot
+# consistently be obtained.
 
 tiers:
   standard:
@@ -7,6 +13,8 @@ tiers:
     max_files: 10
     max_lines: 300
     required_reviewers: 1
+    independent_review_required: true
+    maintainer_sponsorship_required: false
     senior_review: false
     tests_required: false
     decision_note_required: false
@@ -17,15 +25,32 @@ tiers:
     max_files: 10
     max_lines: 300
     required_reviewers: 1
+    independent_review_required: true
+    maintainer_sponsorship_required: true
     senior_review: true
     tests_required: true
     decision_note_required: true
     adr_required: false
 
   architectural:
-    description: "Architecture redesign, storage model, protocol, security model changes"
-    # No file/line hard limits — architectural changes require human judgment, not mechanical gates
-    required_reviewers: 2
+    description: "Architecture redesign, storage model, protocol, security/governance model changes"
+    # No file/line hard limits — architectural changes require human judgment,
+    # not mechanical fragmentation.
+    required_reviewers: 1
+    independent_review_required: true
+    maintainer_sponsorship_required: true
+    second_independent_review:
+      target_for:
+        - authentication/security model
+        - storage/data model
+        - protocol compatibility
+        - repository governance
+      required_when_available: false
+      note: >-
+        Seek a second independent reviewer for the highest-risk architectural
+        work when the reviewer pool permits. Do not represent it as a hard gate
+        until the project has enough active independent reviewers to satisfy it
+        reliably.
     senior_review: true
     tests_required: true
     decision_note_required: true

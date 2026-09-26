@@ -1,6 +1,6 @@
 # Repo Current State
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-26  
 **Version:** v0.5.1 (source)
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
@@ -23,7 +23,9 @@ Version is synchronized across three files:
 
 To check: `grep '^version' backend/Cargo.toml` or `jq .version frontend/package.json`
 
-Versioning follows semver. Releases are cut by pushing a `v*` tag — the `release.yml` workflow auto-generates a GitHub Release with changelog.
+Versioning follows semver. Releases are cut by pushing a `v*` tag — the
+`release.yml` workflow generates the GitHub Release after its configured
+validation succeeds.
 
 ---
 
@@ -45,46 +47,71 @@ For local setup see `docs/running_environment.md`.
 
 ---
 
-## 3. Compatibility Status
+## 3. Current Architecture
+
+Recent repository work clarified rather than replaced the core architecture.
+
+- Runtime composition is owned by `backend/src/bootstrap/**`.
+- Router construction is separated from long-lived worker/dependency startup.
+- RustChat remains an independently developed backend/frontend/data model.
+- Buzz is an optional external integration behind `backend/src/integrations/buzz/**`.
+- The phase-1 Buzz bridge is outbound and uses RustChat-owned mapping/outbox
+  state; Buzz availability is not part of the core post transaction.
+
+See:
+
+- `docs/architecture/overview.md`
+- `docs/adr/ADR-005-rustchat-core-and-buzz-integration.md`
+- `docs/adr/ADR-006-repository-integrity-and-maintainability.md`
+
+---
+
+## 4. Compatibility Status
 
 - **Mobile-critical endpoints:** 41/41 previously tracked endpoints implemented
-- **Last audited:** 2026-05-22 by repository inspection
-- **Notes:** `POST /api/v4/emoji` and `POST /api/v4/posts/search` are now implemented. Post search is currently a pragmatic `ILIKE` implementation, not full Mattermost advanced search parity.
+- **Last compatibility audit recorded:** 2026-05-22
+- **Notes:** `POST /api/v4/emoji` and `POST /api/v4/posts/search` are implemented. Post search is currently a pragmatic `ILIKE` implementation, not full Mattermost advanced search parity.
 
 For details see `docs/compatibility-scope.md`.
 
 ---
 
-## 4. Known Gaps
+## 5. Known Gaps
 
 | Gap | Area | Priority |
 |---|---|---|
+| Required/authoritative CI and live repository protections need convergence and evidence | governance/release | P0 |
+| Promoted artifact publication must be tied to complete release/security gates | release | P0 |
+| Compliance export and audit dashboard defects | admin | P0/release |
+| Realtime replay durability and graceful WebSocket shutdown | realtime | Hardening |
+| Direct SQL persistence remains widespread in API handlers | backend architecture | Incremental hardening |
+| Large backend modules need growth control and targeted decomposition | maintainability | Incremental hardening |
+| Release upgrade evidence does not yet cover the full supported migration/recovery matrix | database/release | Hardening |
 | Advanced post search semantics beyond simple `ILIKE` | compat/search | Phase 2 |
 | Plugin upload/install/enable/disable/remove flows are compatibility stubs | compat/plugins | Phase 2 |
 | LDAP and SAML v4 endpoints are compatibility stubs | compat/enterprise | Phase 2 |
-| Realtime replay durability (in-memory, best-effort) and graceful WebSocket shutdown | realtime | Hardening |
-| Required status checks not yet enforced on `main` | governance | Tracked in the governance issue |
-| Compliance export and audit dashboard defects | admin | Tracked in open bug issues |
+
+The repository-integrity work is specified in
+`docs/plans/2026-09-26-repository-integrity-hardening-spec.md`.
 
 ---
 
-## 5. Active Work Streams
-
-For live in-flight work see [GitHub Issues](https://github.com/kubedoio/rustchat/issues).
-
-**Recently completed:**
+## 6. Recently Completed Work
 
 | Phase | Description | Date |
 |---|---|---|
-| Phase 1: Entity Foundation | Entity registration, API keys, rate limiting, WebSocket JWT expiry, mobile compat audit | 2026-03-17 |
-| Governance Layer | `.governance/` policy files, CODEOWNERS, PR template, issue forms, branch protection, GitHub labels | 2026-03-22 |
-| Foundation Docs | 7 structured docs consolidating existing flat docs | 2026-03-22 |
-| P0 Production Readiness | Security/operations hardening alignment, runbook fixes, and doc/env alignment | 2026-06-16 |
-| AI Agents & Ecosystem | Introduce AI Agents runtime, RAG pgvector capabilities, Tavily web tools, feedback APIs, bot guide, and v0.5.1 alignment | 2026-06-19 |
+| Runtime/bootstrap cleanup | Single AppState, explicit dependency/runtime composition, supervised long-lived workers, pure router assembly | 2026-09 |
+| Buzz integration phase 1 | Optional outbound external bridge with durable outbox, retries, dead-letter handling, encrypted secrets, loop prevention, failure isolation | 2026-09 |
+| Documentation direction cleanup | Retired abandoned Buzz pivot program; restored RustChat continuation and ADR-005 | 2026-09 |
+| P0 Production Readiness | Security/operations hardening alignment, runbook fixes, and doc/env alignment | 2026-06 |
+| AI Agents & Ecosystem | Agent runtime, RAG pgvector capabilities, Tavily web tools, feedback APIs, bot guide, and v0.5.1 alignment | 2026-06 |
+| Governance Layer | `.governance/` policy files, CODEOWNERS, PR template, issue forms, branch protection documentation, GitHub labels | 2026-03 |
+| Foundation Docs | Structured audience-oriented documentation hierarchy | 2026-03 |
+| Entity Foundation | Entity registration, API keys, rate limiting, WebSocket JWT expiry, mobile compatibility audit | 2026-03 |
 
 ---
 
-## 6. Quick Start
+## 7. Quick Start
 
 ```bash
 # Clone

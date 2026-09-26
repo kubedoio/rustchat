@@ -1,8 +1,26 @@
 # PR Size Limits
 # Reference: docs/superpowers/specs/2026-03-22-governance-layer-design.md
 #
-# Exceptions are additive constraints on top of risk-tier limits.
-# A path subject to both must satisfy the stricter rule.
+# Standard/elevated changes use hard size guidance to keep routine work
+# reviewable. Architectural changes intentionally use human design review
+# instead of a universal hard line/file limit (see risk-tiers.yml).
+#
+# A change MUST NOT self-classify as architectural merely to bypass these
+# limits. Risk tier follows the substance/protected paths of the change.
+
+policy_version: 2
+
+applicability:
+  hard_limits_apply_to:
+    - standard
+    - elevated
+  architectural:
+    hard_limits: false
+    note: >-
+      Architectural work requires independent review, maintainer sponsorship,
+      tests, decision note, ADR, and design review. Split independent decisions,
+      but do not mechanically fragment one coherent architectural policy/design
+      solely to meet standard/elevated line limits.
 
 default:
   max_files: 10

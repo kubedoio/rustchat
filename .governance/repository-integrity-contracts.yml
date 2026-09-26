@@ -1,0 +1,259 @@
+version: 2
+policy: repository-integrity
+status: planned-rollout
+adr: docs/adr/ADR-006-repository-integrity-and-maintainability.md
+spec: docs/plans/2026-09-26-repository-integrity-hardening-spec.md
+
+# Contracts are targets until their activation state is changed to active by
+# an implementation PR with the required evidence. Merging ADR-006 therefore
+# does not claim the repository already satisfies RI-C01..RI-C10.
+lifecycle_states:
+  - planned
+  - active
+  - superseded
+
+gate_model:
+  merge:
+    meaning: >-
+      Checks/reviews required before a pull request may merge into main.
+  promotion:
+    meaning: >-
+      Checks required before a moving development alias/artifact may identify
+      a merged main commit as promoted/healthy.
+  release:
+    meaning: >-
+      Checks/evidence required before a stable or release-candidate artifact is
+      published from the exact candidate commit.
+  levels:
+    - required
+    - advisory
+    - not-applicable
+  required_semantics: >-
+    required means required when the contract is repository-wide or when the
+    change/candidate implicates the contract's declared scope. Path-scoped
+    contracts must define their trigger and must not make unrelated changes run
+    expensive domain-specific validation.
+
+contracts:
+  RI-C01:
+    title: authoritative-repository-state
+    activation:
+      phase: P001
+      state: planned
+    gates:
+      merge: required
+      promotion: required
+      release: required
+    statement: >-
+      Mergeability, promotable-main health, and release readiness must be
+      represented by explicit required-check sets. No unrelated green job may
+      hide a required failing check.
+    required_evidence:
+      - documented stable merge-gate check set
+      - documented promotion-gate check set
+      - documented release-gate check set
+      - negative tests proving required failures propagate to the relevant state
+
+  RI-C02:
+    title: protected-default-branch-and-release-tags
+    activation:
+      phase: P002
+      state: planned
+    gates:
+      merge: required
+      promotion: required
+      release: required
+    statement: >-
+      live GitHub protection must require reviewed, checked changes on the
+      default branch and protect release versions as tags rather than
+      version-looking branches.
+    required_evidence:
+      - exported or queried live ruleset/protection settings
+      - failing-check merge rejection proof
+      - release-tag update/delete rejection proof
+    manual_evidence_allowed: true
+
+  RI-C03:
+    title: verified-artifact-promotion
+    activation:
+      phase: P001
+      state: planned
+    gates:
+      merge: advisory
+      promotion: required
+      release: required
+    statement: >-
+      moving main aliases and release artifacts must identify only commits that
+      satisfied the corresponding promotion/release gate set. SHA-scoped
+      diagnostic artifacts may be produced earlier if they are clearly
+      non-promoted.
+    required_evidence:
+      - workflow dependency or equivalent commit-status verification
+      - dry-run or test proving failed gates prevent moving-alias/release promotion
+
+  RI-C04:
+    title: api-persistence-boundary
+    activation:
+      phase: P003
+      state: planned
+    gates:
+      merge: required
+      promotion: required
+      release: required
+    scope:
+      include:
+        - backend/src/api/**/*.rs
+    statement: >-
+      direct production persistence in API handlers is baseline debt and must
+      not grow silently; new business persistence belongs behind cohesive
+      repository/service boundaries unless explicitly excepted.
+    baseline:
+      strategy: normalized-per-file-direct-sql-inventory
+      artifact: tools/repository-integrity/baselines/api-direct-sql.txt
+      line_numbers_normative: false
+    tripwires:
+      - direct SQL in a new production API file
+      - increased normalized direct-SQL invocation count in an existing API file
+    exception:
+      requires:
+        - decision note
+        - focused tests
+        - reviewer justification
+
+  RI-C05:
+    title: module-growth-control
+    activation:
+      phase: P004
+      state: planned
+    gates:
+      merge: required
+      promotion: required
+      release: required
+    statement: >-
+      baseline-large production modules must not grow materially without
+      explicit responsibility justification, and newly monolithic production
+      modules require review.
+    baseline:
+      strategy: generated-source-size-baseline
+      artifact: tools/repository-integrity/baselines/large-production-modules.txt
+    initial_review_triggers:
+      existing_large_module_line_count: 1000
+      new_module_line_count: 1500
+      baseline_growth_percent: 5
+      baseline_growth_absolute_lines: 100
+    semantics: >-
+      these are review tripwires, not architecture targets. Cohesion and
+      invariant ownership determine decomposition; an RI-C10 exception may
+      retain a cohesive large module.
+
+  RI-C06:
+    title: canonical-documentation-and-drift
+    activation:
+      phase: P005
+      state: planned
+    gates:
+      merge: required
+      promotion: required
+      release: required
+    statement: >-
+      architecture decisions, maintainer-approved active plans, product/runtime
+      documentation, analysis output, and archive history must have unambiguous
+      roles; completed roadmap/current-state work must be updated in the same
+      change.
+    canonical:
+      adrs: docs/adr
+      active_plans: docs/plans
+      archive: docs/archive
+      agent_policy: AGENTS.md
+    analysis_output_compatibility:
+      - previous-analyses/**
+      - docs/superpowers/**
+    forbidden:
+      - new architectural decisions outside docs/adr
+      - exact duplicate active documents with competing authority
+      - harness-specific policy that silently contradicts AGENTS.md
+
+  RI-C07:
+    title: migration-upgrade-proof
+    activation:
+      phase: P006
+      state: planned
+    gates:
+      merge: advisory
+      promotion: advisory
+      release: required
+    statement: >-
+      a release candidate must prove schema upgrade from an empty database and
+      the latest published stable schema state, followed by healthy application
+      readiness.
+    required_paths:
+      - empty-to-head
+      - latest-stable-schema-to-head
+      - migrated-readiness
+    fixture_fallback: >-
+      when no immutable historical database snapshot exists, a deterministic
+      fixture may be reconstructed from the exact published tag and its
+      migrations with recorded provenance/checksums.
+    prohibited:
+      - rewriting previously applied migrations
+
+  RI-C08:
+    title: external-integration-isolation
+    activation:
+      phase: P007
+      state: planned
+    gates:
+      merge: required
+      promotion: required
+      release: required
+    scope:
+      include:
+        - backend/src/integrations/buzz/**
+        - backend/tests/buzz_integration.rs
+        - docs/integrations/buzz.md
+        - docs/adr/ADR-005-rustchat-core-and-buzz-integration.md
+    statement: >-
+      Buzz remains an optional external integration; RustChat may depend on its
+      documented external protocol but not on Buzz source crates, internal
+      schema, runtime internals, or repository layout.
+    compatibility:
+      verified_upstream_reference_required: true
+      verified_reference_is_runtime_pin: false
+      deterministic_local_contract_tests_required: true
+      latest_upstream_probe_merge_blocking: false
+
+  RI-C09:
+    title: bounded-hardening-prs
+    activation:
+      phase: P001
+      state: planned
+    gates:
+      merge: required
+      promotion: advisory
+      release: advisory
+    statement: >-
+      repository-hardening work must remain independently reviewable and may
+      not be used as a vehicle for unrelated product or architecture changes.
+    governed_by:
+      - .governance/risk-tiers.yml
+      - .governance/pr-size-limits.yml
+
+  RI-C10:
+    title: exception-accountability
+    activation:
+      phase: P001
+      state: planned
+    gates:
+      merge: required
+      promotion: required
+      release: required
+    statement: >-
+      any exception to a repository-integrity guard must identify the contract,
+      rationale, owner, scope, and removal condition; permanent silent
+      allowlists are prohibited.
+    exception_fields:
+      - contract_id
+      - rationale
+      - owner
+      - scope
+      - removal_condition
