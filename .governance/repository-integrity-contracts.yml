@@ -1,0 +1,139 @@
+version: 1
+policy: repository-integrity
+adr: docs/adr/ADR-006-repository-integrity-and-maintainability.md
+spec: docs/plans/2026-09-26-repository-integrity-hardening-spec.md
+
+contracts:
+  RI-C01:
+    title: authoritative-main
+    severity: blocker
+    statement: >-
+      main must not be treated as healthy, promotable, or releasable while any
+      required correctness, integration, security, dependency, or DCO gate is failing.
+    required_evidence:
+      - stable aggregate CI result
+      - stable aggregate security result or security jobs included in the aggregate
+      - negative test proving a required failure propagates to the aggregate
+
+  RI-C02:
+    title: protected-default-branch-and-release-tags
+    severity: blocker
+    statement: >-
+      live GitHub protection must require reviewed, checked changes on the default
+      branch and must protect release refs as tags rather than version-like branches.
+    required_evidence:
+      - exported or queried live ruleset/protection settings
+      - failing-check merge rejection proof
+      - release-tag update/delete rejection proof
+    manual_evidence_allowed: true
+
+  RI-C03:
+    title: verified-artifact-promotion
+    severity: blocker
+    statement: >-
+      promoted main aliases and release artifacts must originate from a commit that
+      satisfied the repository's required release gates.
+    required_evidence:
+      - workflow dependency or equivalent commit-status verification
+      - dry-run or test proving failed gates prevent promotion
+
+  RI-C04:
+    title: api-persistence-boundary
+    severity: high
+    scope:
+      include:
+        - backend/src/api/**/*.rs
+    statement: >-
+      direct production persistence in API handlers is baseline debt and must not
+      increase; new business persistence belongs behind repository/service boundaries.
+    baseline:
+      strategy: generated-callsite-baseline
+      artifact: .governance/baselines/api-direct-sql.txt
+    exception:
+      requires:
+        - decision note
+        - focused tests
+        - reviewer justification
+
+  RI-C05:
+    title: module-growth-control
+    severity: medium
+    statement: >-
+      baseline-large production modules must not grow materially without an explicit
+      responsibility justification, and new monolithic modules require review.
+    baseline:
+      strategy: generated-source-size-baseline
+      artifact: .governance/baselines/large-production-modules.txt
+    thresholds:
+      review_line_count: 1000
+      new_file_exception_line_count: 1500
+      baseline_growth_percent: 5
+      baseline_growth_absolute_lines: 100
+    semantics: >-
+      thresholds are review triggers, not instructions to mechanically split code.
+      Cohesion and invariant ownership determine decomposition.
+
+  RI-C06:
+    title: canonical-documentation-and-drift
+    severity: medium
+    statement: >-
+      architecture decisions, active plans, product/runtime documentation, and archive
+      history must use their canonical locations, and completed roadmap/current-state
+      work must be updated in the same change.
+    canonical:
+      adrs: docs/adr
+      active_plans: docs/plans
+      archive: docs/archive
+      agent_policy: AGENTS.md
+    forbidden:
+      - exact duplicate active documents in multiple categories
+      - new parallel decision-record directories
+
+  RI-C07:
+    title: migration-upgrade-proof
+    severity: blocker-for-release
+    statement: >-
+      a release candidate must prove schema upgrade from an empty database and the
+      latest published stable snapshot, followed by healthy application readiness.
+    required_paths:
+      - empty-to-head
+      - latest-stable-to-head
+      - migrated-readiness
+    prohibited:
+      - rewriting previously applied migrations
+
+  RI-C08:
+    title: external-integration-isolation
+    severity: high
+    statement: >-
+      Buzz remains an optional external integration; RustChat may depend on its
+      documented external protocol but not on Buzz source crates, internal schema,
+      runtime internals, or repository layout.
+    compatibility:
+      pinned_revision_required: true
+      deterministic_local_contract_tests_required: true
+      latest_upstream_probe_merge_blocking: false
+
+  RI-C09:
+    title: bounded-hardening-prs
+    severity: medium
+    statement: >-
+      repository-hardening work must remain independently reviewable and may not be
+      used as a vehicle for unrelated product or architecture changes.
+    governed_by:
+      - .governance/risk-tiers.yml
+      - .governance/pr-size-limits.yml
+
+  RI-C10:
+    title: exception-accountability
+    severity: high
+    statement: >-
+      any exception to a repository-integrity guard must identify the contract,
+      rationale, owner, scope, and removal condition; permanent silent allowlists
+      are prohibited.
+    exception_fields:
+      - contract_id
+      - rationale
+      - owner
+      - scope
+      - removal_condition

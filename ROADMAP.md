@@ -8,49 +8,60 @@ be updated as priorities evolve.
 > self-hosted collaboration product. It is not yet production-ready for all
 > organizations.
 
-## Current Phase — Production-Readiness and Correctness
+## Current Phase — Production-Readiness and Repository Integrity
 
-**Theme**: Close the known production blockers, keep the existing
-architecture, and publish the pending `v0.5.1` release as a normal continuing
+**Theme**: Close the known production blockers, make repository/release signals
+authoritative, and publish the pending `v0.5.1` release as a normal continuing
 RustChat release.
 
 Priorities:
 
+- [ ] **Repository integrity hardening** — Implement
+      [ADR-006](docs/adr/ADR-006-repository-integrity-and-maintainability.md):
+      authoritative green-main/security aggregation, verified artifact
+      promotion, GitHub protection, release-tag enforcement, and bounded
+      maintainability guards.
 - [ ] **Publish v0.5.1** — Version metadata is already at `0.5.1` in source;
       validate release gates (backend, frontend, push-proxy, Docker Compose,
-      smoke tests) and publish the tagged release.
+      migration/recovery evidence, smoke tests) and publish the tagged release.
 - [ ] **Realtime durability** — Durable event replay/outbox for reconnecting
       clients, graceful WebSocket shutdown, and explicit resync signaling
       instead of silent event drops.
 - [ ] **Authorization completeness** — Close remaining membership-revocation
       and scheduled-post authorization gaps.
 - [ ] **Audit and observability** — Broaden audit-log coverage beyond the
-      current minimal set; add migration state to the readiness probe.
+      current minimal set and keep readiness/migration state accurate.
 - [ ] **Message validation and pagination** — `client_msg_id` idempotency,
       cursor pagination on hot channel-history paths.
 - [ ] **Rate limiting coverage** — File upload and search endpoints.
 - [ ] **Defects** — Resolve the open compliance-export and audit-dashboard
       bugs honestly (working behavior or explicitly unsupported).
 
-## Next — Operational Hardening and Architecture Cleanup
+## Next — Operational Hardening and Incremental Architecture Cleanup
 
-- [ ] **Runtime composition cleanup** — Extract application bootstrap
-      (dependencies, agent runtime, background workers) from the API router
-      into a supervised bootstrap layer.
+- [ ] **Persistence-boundary guard** — Prevent new direct SQL persistence from
+      accumulating in API handlers; migrate existing debt only in bounded,
+      tested slices.
+- [ ] **Module growth control** — Add responsibility/growth baselines and
+      decompose only the highest-value oversized modules.
 - [ ] **Test coverage** — Expand backend integration tests and frontend E2E
-      coverage; migration upgrade tests (empty→latest, snapshot→latest).
+      coverage.
+- [ ] **Migration upgrade matrix** — Prove empty→latest and latest published
+      stable→latest upgrades with application readiness evidence.
 - [ ] **Backup & restore** — Documented and tested data protection procedures.
 - [ ] **Observability** — Structured metrics, health checks, and alerting
       guides.
 - [ ] **Search improvements** — Better indexing, filtering, and performance.
 
-## Then — Integration Ecosystem
+## Integration Ecosystem
 
-- [ ] **Buzz integration (optional)** — An isolated, opt-in connector that
-      bridges configured RustChat channels with a Buzz relay over its
-      documented external protocol. RustChat remains authoritative; Buzz
-      availability never affects RustChat core (see
-      [ADR-005](docs/adr/ADR-005-rustchat-core-and-buzz-integration.md)).
+- [x] **Buzz integration phase 1 (optional outbound bridge)** — Isolated,
+      opt-in connector with a durable outbox; RustChat remains authoritative and
+      Buzz availability does not affect core posting
+      ([ADR-005](docs/adr/ADR-005-rustchat-core-and-buzz-integration.md)).
+- [ ] **Buzz compatibility verification** — Pin and test the external protocol
+      contract used by RustChat without depending on Buzz internals or latest
+      upstream HEAD.
 - [ ] **Plugin framework** — Move beyond compatibility stubs to a working
       plugin model.
 - [ ] **RustShare deepening** — Richer permission-aware knowledge sync for
@@ -94,6 +105,8 @@ explicitly changed by a future ADR.
 
 | Date | Milestone |
 |------|-----------|
+| 2026-09 | Runtime/bootstrap architecture cleanup — single AppState, supervised workers, typed runtime composition |
+| 2026-09 | Buzz phase-1 external integration — optional outbound bridge with durable outbox and isolated failure semantics |
 | 2026-06 | AI Agents & Ecosystem — agent runtime, RAG with pgvector, Tavily tools, analytics and feedback |
 | 2026-03 | Entity Foundation Complete — API keys, rate limiting, mobile compatibility (95.1%) |
 | 2026-02 | VoIP Push Notifications — Mobile call ringing for Android and iOS |
