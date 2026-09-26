@@ -34,18 +34,23 @@ Do not rank only by line count.
 
 ## Required work
 
-1. Generate `.governance/baselines/large-production-modules.txt` with a stable,
-   documented algorithm.
-2. Add a fast check implementing RI-C05:
-   - identify new production modules crossing the review threshold;
-   - detect material growth of baseline-large modules;
+1. Generate
+   `tools/repository-integrity/baselines/large-production-modules.txt` with a
+   stable documented algorithm.
+2. Add a fast review tripwire implementing RI-C05:
+   - flag new production modules crossing the initial review threshold;
+   - flag material growth of baseline-large modules;
    - print actionable diagnostics;
    - support explicit RI-C10 exceptions.
-3. Choose at most **two** modules for decomposition in this phase.
-4. Split by cohesive capability while preserving public interfaces where that
+3. Treat the thresholds in RI-C05 as **initial review triggers**, not a target
+   architecture or permanent universal truth.
+4. Choose at most **two** modules for decomposition in this phase.
+5. Split by cohesive capability while preserving public interfaces where that
    minimizes caller churn.
-5. Keep tests close to the responsibilities they prove.
-6. Update module documentation only where ownership changed.
+6. Keep tests close to the responsibilities they prove.
+7. Update module documentation only where ownership changed.
+8. Activate RI-C05 only after the tripwire has tests and a documented exception
+   path.
 
 ## Good decomposition examples
 
@@ -78,11 +83,12 @@ only if the existing code demonstrates those responsibilities.
 - moving tests away only to reduce measured size;
 - duplicated private helpers in each new module;
 - changing API behavior under the label "cleanup";
-- decomposing every candidate in one PR.
+- decomposing every candidate in one PR;
+- treating a lower LOC number as proof of better design.
 
 ## Acceptance evidence
 
-- baseline and guard tests;
+- baseline and tripwire tests;
 - responsibility map before/after for each decomposed module;
 - relevant test suite unchanged or improved;
 - no public behavior change unless separately specified;

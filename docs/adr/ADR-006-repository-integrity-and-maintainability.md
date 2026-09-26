@@ -1,7 +1,7 @@
 # ADR-006: Repository Integrity and Incremental Maintainability
 
 **Date:** 2026-09-26  
-**Status:** Proposed  
+**Status:** Proposed — becomes Accepted when PR #269 is approved and merged  
 **Risk tier:** architectural
 
 ## Context
@@ -13,35 +13,43 @@ RustChat has recently completed two important architectural corrections:
 
 Those decisions reduced structural risk, but the repository audit on 2026-09-26 found a different class of problems:
 
-- the current `main` branch can contain red dependency/security checks while other production-readiness checks remain green;
+- security/dependency failures can exist independently from other green checks, so a single green job does not necessarily describe repository health;
 - repository protection and release-tag enforcement are not yet aligned with the governance documents;
-- container publication from `main` is not coupled to the complete security/CI result;
+- moving container aliases from `main` are not coupled to the complete promotion/release evidence;
 - direct SQL access is still widespread in API handler modules despite an existing repository/service layer;
 - several backend modules are already large enough to create review and ownership pressure;
 - roadmap and current-state documentation drifted immediately after recently completed work;
 - migration history is large enough that upgrade behavior needs explicit release evidence;
-- historical plans, audits, internal notes, and archives still overlap;
-- Buzz changes quickly, so the integration needs a pinned, externally verifiable compatibility contract.
+- historical plans, audits, analysis output, decision notes, and archives overlap;
+- Buzz changes quickly, so the integration needs an explicit externally verified compatibility record.
 
-The repository is not in need of another broad rewrite. The primary risk is now **entropy**: new code can continue to bypass intended boundaries, documentation can become stale, and release/governance signals can disagree with the actual state of the branch.
+The repository is not in need of another broad rewrite. The primary risk is now **entropy**: new code can continue to bypass intended boundaries, documentation can become stale, and merge/release signals can disagree with the actual state of the branch.
 
 ## Decision
 
 RustChat will adopt repository integrity as a first-class engineering and release property.
 
-### 1. A green authoritative branch is a hard invariant
+### 1. Separate merge integrity, promotable-main health, and release integrity
 
-`main` must not be considered healthy, releasable, or promotable while a required CI, security, dependency, DCO, or integration gate is failing.
+RustChat has three distinct states:
 
-A "production-readiness" or aggregate check must not report success while a required security gate is red. Stable and promoted container aliases must only be produced from a commit that has satisfied the release contract.
+1. **Mergeable** — the pull request satisfies the protected merge-gate set.
+2. **Promotable main** — the merged commit has also satisfied required post-merge health checks used for moving development aliases/artifacts.
+3. **Releasable** — the exact release candidate satisfies the release-gate set, including release-only migration/recovery evidence.
+
+These states must not be collapsed into one misleading "green" job.
+
+A stable **required-check set** is authoritative. Per-workflow aggregate jobs may be used to keep branch protection manageable, but unrelated workflows do not need to be coupled into one mega-aggregate.
+
+A post-merge integration/recovery failure may not retroactively make a merged PR "unmerged"; instead it marks `main` degraded and blocks moving promotion aliases and releases until repaired.
 
 ### 2. GitHub enforcement must match documented governance
 
 The live repository settings are part of the system.
 
-The default branch must enforce the documented review and status-check policy. Release tags must be protected as tags. Any bypass must be narrow, documented, and auditable.
+The default branch must enforce the documented review and status-check policy. Release versions must be protected as **tags**. Any break-glass bypass must be narrow, documented, and auditable.
 
-Repository documentation must describe **verified** settings, not desired settings.
+Repository documentation must describe **verified** settings, not merely desired settings.
 
 ### 3. Preserve the current product architecture; do not perform a broad rewrite
 
@@ -59,7 +67,7 @@ This ADR does not authorize a conversion into a large Rust workspace, microservi
 
 Existing direct `sqlx::query*` usage in `backend/src/api/**` is treated as baseline technical debt, not as the preferred architecture.
 
-New or materially expanded business persistence must flow through a repository or service boundary. A baseline guard will prevent the number of handler-layer SQL call sites from increasing.
+New business persistence should flow through a cohesive repository or service boundary. Mechanical checks are a **tripwire**, not proof of architecture: they must detect new API files containing direct SQL and net growth of normalized direct-SQL call sites, while human review remains responsible for materially expanding existing queries.
 
 When an existing handler is substantially modified, extraction should be performed only when it reduces responsibility without creating a large unrelated refactor.
 
@@ -71,37 +79,39 @@ Large modules are not rejected purely by line count, but source growth must rema
 
 The repository will:
 
-- record a baseline of oversized production modules;
-- prevent unexplained growth of those modules;
-- reject new production modules that become monolithic without a documented exception;
+- record a baseline of oversized production modules outside the protected governance-policy tree;
+- use line-count/growth thresholds as review tripwires rather than architectural goals;
+- require explanation for material growth or a newly monolithic production module;
 - decompose by domain responsibility and invariant, not by mechanical line slicing.
 
 Large-scale "split every file" campaigns are explicitly out of scope.
 
-### 6. Documentation must have clear sources of truth
+### 6. Documentation must have clear sources of truth without breaking analysis workflows
 
-Canonical documentation classes are:
+Canonical current decision and plan locations are:
 
 - architecture decisions: `docs/adr/**`;
-- active implementation plans/specifications: `docs/plans/**`;
+- maintainer-approved active implementation plans/specifications: `docs/plans/**`;
 - product/runtime documentation: the existing audience-oriented `docs/**` hierarchy;
 - completed or obsolete implementation history: `docs/archive/**`.
 
-New parallel categories for the same purpose should not be created.
+Existing analysis/tooling output locations such as `previous-analyses/**` and `docs/superpowers/**` may continue to exist where current agent contracts require them. They are **not** alternate canonical ADR locations and must not silently become product architecture sources of truth.
+
+Legacy compatibility directories such as `docs/decisions/**` may retain redirect/index material, but new architectural decisions belong in `docs/adr/**`.
 
 A change that completes or invalidates a roadmap/current-state item must update the corresponding canonical document in the same PR.
-
-Exact duplicate historical documents should not remain in multiple active locations.
 
 ### 7. Migration compatibility is a release contract
 
 Every release candidate must prove, at minimum:
 
 - empty database → current schema;
-- latest published stable database snapshot → current schema;
+- latest published stable schema state → current schema;
 - application startup/readiness after migration.
 
-Backup/restore verification is required for release-readiness evidence once the release process declares production support for that path.
+If no immutable database snapshot exists for the latest stable release, the first implementation may construct a deterministic fixture from the **exact published tag and its migration history**, record provenance/checksums, and clearly distinguish that schema-upgrade fixture from a real production backup.
+
+Backup/restore verification becomes release-required once RustChat claims that path as supported production recovery evidence.
 
 Applied migrations must never be rewritten to make history look cleaner.
 
@@ -109,37 +119,58 @@ Applied migrations must never be rewritten to make history look cleaner.
 
 ADR-005 remains authoritative for Buzz.
 
-RustChat must not import Buzz source crates, schema, internal database layout, or runtime components. Compatibility must be verified against the documented external protocol and a pinned upstream revision.
+RustChat must not import Buzz source crates, schema, internal database layout, or runtime components. Compatibility must be verified against the documented external protocol.
 
-Upstream Buzz HEAD is not a merge-time dependency. Periodic compatibility verification may report drift without making unrelated RustChat work non-deterministic.
+The compatibility record stores the exact Buzz revision most recently **verified against**; this is evidence, not a RustChat runtime/source dependency pin. RustChat should model the external protocol it needs and may be compatible with more than one upstream commit.
 
-### 9. Improvements must be delivered as bounded, evidence-producing PRs
+Buzz HEAD is not a merge-time dependency. Periodic compatibility verification may report drift without making unrelated RustChat work non-deterministic.
+
+### 9. Contract rollout is explicit
+
+The contracts introduced with this ADR begin in **planned** state.
+
+Merging this ADR does not pretend the repository already satisfies them. Each implementation phase activates only the contracts for which objective evidence exists. Activation is itself a governance change and requires the review level defined by existing governance policy.
+
+### 10. Improvements must be delivered as bounded, evidence-producing PRs
 
 The repository-integrity program is split into independent changes:
 
-1. restore green `main` and correct security aggregation;
+1. restore security/check integrity and promotion semantics;
 2. enforce repository/release governance;
 3. prevent new handler-layer persistence leakage;
-4. decompose only the highest-value oversized modules;
+4. control and selectively reduce oversized modules;
 5. consolidate documentation/repository hygiene;
 6. add migration and recovery evidence;
-7. formalize the Buzz compatibility baseline;
-8. perform final convergence and release-readiness review.
+7. formalize the Buzz compatibility record;
+8. perform final convergence and release-readiness evidence review.
 
 Each phase must be reviewable and independently revertible.
+
+## Alignment with existing governance
+
+This ADR does not replace `GOVERNANCE.md`, `.governance/risk-tiers.yml`, CODEOWNERS, DCO, or agent boundary contracts.
+
+Where existing documents conflict, the implementation program must reconcile them explicitly rather than silently choosing one. In particular:
+
+- architectural changes retain the existing two-approval requirement;
+- architectural changes are governed by human review rather than standard/elevated hard PR-size limits;
+- `docs/adr/**` is the canonical ADR location;
+- repository-integrity prompts are maintainer/architect campaigns, not authorization for a bounded backend/frontend agent to edit prohibited governance paths;
+- issue #258 remains the canonical live-work item for GitHub protection;
+- issue #259 remains the canonical release work item;
+- product defects #88 and #89 remain separate release blockers and are not implicitly fixed by this program.
 
 ## Consequences
 
 ### Positive
 
-- Repository state becomes a trustworthy signal rather than an approximation.
-- Security failures cannot coexist with a misleading green release signal.
+- Mergeability, post-merge health, and release readiness become distinct and honest signals.
+- Security failures cannot hide behind an unrelated green job.
 - Architectural debt stops increasing before a costly rewrite becomes necessary.
 - Large modules can be reduced where there is demonstrated value.
-- LLM and human contributors receive explicit mechanical boundaries.
+- LLM and human contributors receive explicit mechanical boundaries without turning heuristics into architecture.
 - Documentation drift becomes detectable.
-- Upgrade safety and integration compatibility become evidence-based.
-- RustChat remains substantially simpler than Buzz while borrowing Buzz's stronger enforcement discipline.
+- Upgrade safety and external-integration compatibility become evidence-based.
 
 ### Negative
 
@@ -151,25 +182,33 @@ Each phase must be reviewable and independently revertible.
 
 ## Rejected Alternatives
 
+### One global mega-aggregate check
+
+Rejected. Stable per-workflow aggregate checks plus an authoritative required-check set preserve failure isolation and avoid unnecessary cross-workflow coupling.
+
 ### Broad clean-architecture rewrite
 
 Rejected because it would create large review surfaces and high regression risk without solving the immediate governance and release-integrity failures.
 
-### Adopt Buzz's monorepo/crate structure
+### Adopt Buzz's repository structure
 
-Rejected because RustChat's smaller architecture is an advantage. Buzz is an external integration target, not a template for repository scale.
+Rejected. Buzz is an external integration target, not a template for RustChat repository scale.
 
 ### Enforce a universal small-file limit
 
-Rejected because file length alone does not identify poor responsibility boundaries. Baseline growth control plus targeted decomposition is safer.
+Rejected because file length alone does not identify poor responsibility boundaries. Growth tripwires plus targeted decomposition are safer.
 
 ### Ignore red security checks until release time
 
-Rejected because a default branch that knowingly carries failed security policy is not an authoritative integration branch.
+Rejected because required merge security failures must block merge, and post-merge release blockers must block promotion/release.
+
+### Treat the compatibility-tested Buzz SHA as a dependency pin
+
+Rejected. The SHA is verification evidence only; RustChat depends on an external protocol contract, not on Buzz source identity.
 
 ### Track these rules only in prose
 
-Rejected because the audit showed that documented intent can diverge from live repository behavior. The critical invariants must have machine-checkable contracts and evidence.
+Rejected because the audit showed that documented intent can diverge from live repository behavior. Critical invariants need machine-readable contracts and objective evidence.
 
 ## Follow-up
 

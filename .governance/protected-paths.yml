@@ -39,13 +39,29 @@ paths:
     min_tier: elevated
     reason: "Ownership changes affect review routing"
 
+  - pattern: ".github/pull_request_template.md"
+    min_tier: elevated
+    reason: "Pull request policy and contributor evidence requirements"
+
+  - pattern: "docs/github-protection.md"
+    min_tier: elevated
+    reason: "Documents live merge/release protection requirements"
+
   - pattern: ".governance/**"
     min_tier: architectural
     reason: "Policy changes affect the entire development model"
 
+  - pattern: "GOVERNANCE.md"
+    min_tier: architectural
+    reason: "Top-level governance and review policy"
+
+  - pattern: "docs/adr/**"
+    min_tier: architectural
+    reason: "Architecture Decision Records define project-wide technical policy"
+
   - pattern: "docs/superpowers/specs/**"
     min_tier: elevated
-    reason: "Design record integrity"
+    reason: "Design/analysis output used by compatibility workflows"
 
   # External integration boundary (ADR-005): connectors for optional external
   # systems own delivery state and credentials; changes need architecture review.

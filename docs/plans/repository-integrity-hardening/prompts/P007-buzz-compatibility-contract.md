@@ -1,4 +1,4 @@
-# P007 — Formalize the Buzz External Compatibility Contract
+# P007 — Formalize the Buzz External Compatibility Record
 
 ## Mission
 
@@ -25,26 +25,32 @@ Identify exactly which external Buzz behaviors RustChat relies on:
 - success/error semantics;
 - idempotency/deduplication expectations;
 - loop-prevention markers;
-- any remote ID constraints.
+- remote ID constraints.
 
-Do not use Buzz database or internal Rust code as the contract.
+Do not use Buzz database layout or internal Rust modules as the contract.
 
 ## Required work
 
-1. Create a machine-readable or tightly structured compatibility manifest owned
-   by RustChat.
-2. Record the exact upstream Buzz revision most recently verified.
-3. Add deterministic local tests/fixtures for every RustChat-required contract
+1. Create a RustChat-owned machine-readable or tightly structured compatibility
+   manifest describing the **external protocol surface** RustChat requires.
+2. Record the exact upstream Buzz commit most recently tested against.
+   - Name it `verified_against`, `tested_upstream_sha`, or equivalent.
+   - Do **not** call it a source/runtime dependency pin.
+3. Record when/how it was verified and, where useful, external protocol/version
+   identifiers independent from repository SHA.
+4. Add deterministic local tests/fixtures for every RustChat-required contract
    element.
-4. Add a manual or scheduled upstream verification job/script that can test a
+5. Add a manual or scheduled upstream verification job/script that can test a
    selected newer Buzz revision/environment.
-5. Ensure the scheduled/latest-upstream probe reports drift without making
-   unrelated RustChat PRs non-deterministic.
-6. Document the upgrade procedure:
-   - detect upstream drift;
+6. Ensure latest-upstream probing reports drift without making unrelated
+   RustChat PRs non-deterministic.
+7. Document the compatibility update procedure:
+   - detect external drift;
    - classify breaking/non-breaking;
-   - update connector/fixtures;
-   - move the pinned verified revision only after evidence passes.
+   - update connector/fixtures if needed;
+   - update `verified_against` only after evidence passes.
+8. Activate RI-C08 only after deterministic local contract tests and the first
+   explicit compatibility record exist.
 
 ## Hard boundaries
 
@@ -55,15 +61,17 @@ Do not:
 - copy Buzz database schema;
 - rely on private/internal endpoints;
 - change RustChat core posting semantics to satisfy Buzz;
-- add inbound/federation features in this phase.
+- add inbound/federation features in this phase;
+- claim the recorded Buzz SHA is the only compatible version unless tested
+  evidence establishes such a constraint.
 
 ## Acceptance evidence
 
-- manifest/record with pinned revision;
+- compatibility manifest/record with exact tested upstream revision;
 - deterministic connector contract tests;
 - proof that disabled/unavailable Buzz cannot break core RustChat posting;
-- proof of idempotency/loop-prevention behavior already promised by the bridge;
-- sample upstream compatibility report showing the revision tested.
+- proof of idempotency/loop-prevention behavior promised by the bridge;
+- sample upstream compatibility report identifying the revision/environment tested.
 
-If current Buzz has changed incompatibly, report the exact external contract
+If current Buzz changed incompatibly, report the exact **external contract**
 break. Do not reach into Buzz internals as a workaround.

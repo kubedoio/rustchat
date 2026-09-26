@@ -6,11 +6,31 @@ This directory contains execution prompts for
 
 ## Master implementation goal
 
-> Make RustChat's repository state trustworthy enough that a maintainer can use
-> `main`, CI, GitHub protections, release artifacts, architecture boundaries,
-> migration evidence, and canonical documentation as consistent sources of
-> truth — while reducing maintainability debt incrementally and without a broad
-> rewrite or expansion of product scope.
+> Make RustChat's repository state trustworthy enough that maintainers can use
+> protected merge checks, post-merge health, release gates, GitHub protections,
+> architecture boundaries, migration evidence, and canonical documentation as
+> consistent sources of truth — while reducing maintainability debt incrementally
+> and without a broad rewrite or expansion of product scope.
+
+## Existing work alignment
+
+This program does not replace existing issue ownership:
+
+- #258 owns live GitHub protection/required-check remediation.
+- #259 owns the v0.5.1 release.
+- #88 and #89 remain product release blockers unless fixed independently.
+
+The program should add implementation evidence to those work items rather than
+creating competing umbrella issues.
+
+## Execution authority
+
+These are maintainer/architect campaign prompts. They do not override
+`.governance/agent-contracts.yml`.
+
+A bounded coding agent may change only paths already permitted by its contract.
+Governance/workflow/settings work requires maintainer-supervised execution and
+the existing human-review policy.
 
 ## Execution order
 
@@ -38,7 +58,9 @@ Before editing:
 3. inspect current `main` and relevant open issues/PRs;
 4. revalidate the prompt's baseline facts;
 5. identify the smallest affected runtime/repository scope;
-6. identify the tests/evidence that will prove completion.
+6. identify the tests/evidence that will prove completion;
+7. confirm the executing agent/session is authorized for every path it intends
+   to edit.
 
 During implementation:
 
@@ -48,13 +70,15 @@ During implementation:
 - do not rewrite applied migration history;
 - do not import Buzz internals;
 - do not perform opportunistic unrelated refactors;
-- keep exceptions explicit under RI-C10.
+- keep exceptions explicit under RI-C10;
+- do not activate a contract until its evidence exists.
 
 At completion report:
 
 - exact base and head SHA;
 - files changed;
-- contracts addressed;
+- contracts addressed and lifecycle changes;
+- merge/promotion/release gates affected;
 - tests/checks run and results;
 - live GitHub evidence where required;
 - remaining blockers;
