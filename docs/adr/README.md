@@ -6,10 +6,14 @@ An ADR documents a significant architectural decision: the context, the options 
 
 ## When to create an ADR
 
-Per `.governance/risk-tiers.yml`, an ADR is required for `architectural` tier changes, and for specific elevated changes involving:
-- Auth or permission model changes
-- API contract changes
-- Storage model changes
+Per `.governance/risk-tiers.yml`, an ADR is required for `architectural` tier changes.
+
+An elevated change does not require an ADR merely because it touches auth, APIs,
+or storage. If the change **alters the authentication/permission model,
+storage/data model, protocol/public contract, deployment model, or other
+project-wide architecture**, classify it as architectural and create/update an
+ADR. Small fixes inside those areas may remain elevated with a decision note and
+tests.
 
 ## Format
 
