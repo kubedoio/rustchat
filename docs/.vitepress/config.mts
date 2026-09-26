@@ -87,9 +87,19 @@ export default defineConfig({
             { text: "Overview", link: "/architecture/overview" },
             { text: "Backend", link: "/architecture/backend" },
             { text: "Frontend", link: "/architecture/frontend" },
-            { text: "WebSocket", link: "/architecture/websocket" },
+            { text: "Realtime", link: "/architecture/realtime" },
             { text: "Data Model", link: "/architecture/data-model" },
             { text: "Calls Deployment", link: "/architecture/calls-deployment" },
+            { text: "Integrations", link: "/architecture/integrations" },
+          ],
+        },
+      ],
+      "/integrations/": [
+        {
+          text: "Integrations",
+          items: [
+            { text: "Overview", link: "/integrations/README" },
+            { text: "RustShare", link: "/integrations/rustshare" },
           ],
         },
       ],

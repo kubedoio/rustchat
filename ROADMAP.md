@@ -1,67 +1,100 @@
 # RustChat Roadmap
 
-This roadmap describes the direction of RustChat. It is a living document and will be updated as priorities evolve.
+This roadmap describes the direction of RustChat as a continuing, independently
+developed self-hosted collaboration platform. It is a living document and will
+be updated as priorities evolve.
 
-> RustChat is under active development and moving toward a supported self-hosted collaboration product. It is not yet production-ready for all organizations.
+> RustChat is under active development and moving toward a supported
+> self-hosted collaboration product. It is not yet production-ready for all
+> organizations.
 
-## Current Phase: Foundation Hardening
+## Current Phase — Production-Readiness and Correctness
 
-**Theme**: Stabilize core functionality, improve compatibility, and make the project approachable for operators and contributors.
+**Theme**: Close the known production blockers, keep the existing
+architecture, and publish the pending `v0.5.1` release as a normal continuing
+RustChat release.
 
-### Public Preview Gate
+Priorities:
 
-RustChat can move to public preview only when the preview contract is explicit and the critical reliability checks pass in CI. The current gate is:
+- [ ] **Publish v0.5.1** — Version metadata is already at `0.5.1` in source;
+      validate release gates (backend, frontend, push-proxy, Docker Compose,
+      smoke tests) and publish the tagged release.
+- [ ] **Realtime durability** — Durable event replay/outbox for reconnecting
+      clients, graceful WebSocket shutdown, and explicit resync signaling
+      instead of silent event drops.
+- [ ] **Authorization completeness** — Close remaining membership-revocation
+      and scheduled-post authorization gaps.
+- [ ] **Audit and observability** — Broaden audit-log coverage beyond the
+      current minimal set; add migration state to the readiness probe.
+- [ ] **Message validation and pagination** — `client_msg_id` idempotency,
+      cursor pagination on hot channel-history paths.
+- [ ] **Rate limiting coverage** — File upload and search endpoints.
+- [ ] **Defects** — Resolve the open compliance-export and audit-dashboard
+      bugs honestly (working behavior or explicitly unsupported).
 
-| Area | Preview status | Requirement before public preview |
-|------|----------------|-----------------------------------|
-| File uploads and downloads | Blocker until verified | Unauthorized users cannot attach files to channels they cannot access; file responses use RustChat-authenticated URLs; CI covers member and non-member flows. |
-| Unsupported compatibility actions | Blocker until verified | Unsupported Mattermost-compatible mutations return explicit `501` responses and frontend surfaces do not expose controls that imply support. |
-| Configuration and deployment docs | Blocker until guarded | Public docs and deployment templates must not reintroduce removed query-token or retired S3 public URL settings; docs CI runs the config drift check. |
-| Mention and unread semantics | Preview caveat | Current unread paths use token-boundary matching; persisted mention-target storage remains a post-preview hardening item unless scale testing proves it blocks preview. |
-| SAML/LDAP, plugins, advanced admin/compliance | Preview caveat | README and compatibility docs must state these are unsupported, stubbed, or future work. |
-| Session revocation and audit completeness | Post-preview hardening | Token/session revocation and broader audit coverage require separate design and migration work before stable release. |
+## Next — Operational Hardening and Architecture Cleanup
 
-### Near-Term (Next 1–3 Months)
+- [ ] **Runtime composition cleanup** — Extract application bootstrap
+      (dependencies, agent runtime, background workers) from the API router
+      into a supervised bootstrap layer.
+- [ ] **Test coverage** — Expand backend integration tests and frontend E2E
+      coverage; migration upgrade tests (empty→latest, snapshot→latest).
+- [ ] **Backup & restore** — Documented and tested data protection procedures.
+- [ ] **Observability** — Structured metrics, health checks, and alerting
+      guides.
+- [ ] **Search improvements** — Better indexing, filtering, and performance.
 
-- [ ] **Mattermost API v4 Parity** — Expand mobile client compatibility coverage
-- [ ] **WebSocket Reliability** — Improve reconnection handling and state synchronization
-- [ ] **Call Stability** — Harden SFU signaling and media plane edge cases
-- [x] **Repository Polish** — Open-source readiness: docs, CI, security pipeline, governance
-- [ ] **Test Coverage** — Expand backend integration tests and frontend E2E coverage
+## Then — Integration Ecosystem
 
-### Medium-Term (3–6 Months)
+- [ ] **Buzz integration (optional)** — An isolated, opt-in connector that
+      bridges configured RustChat channels with a Buzz relay over its
+      documented external protocol. RustChat remains authoritative; Buzz
+      availability never affects RustChat core (see
+      [ADR-005](docs/adr/ADR-005-rustchat-core-and-buzz-integration.md)).
+- [ ] **Plugin framework** — Move beyond compatibility stubs to a working
+      plugin model.
+- [ ] **RustShare deepening** — Richer permission-aware knowledge sync for
+      agents.
+- [ ] **Mattermost API v4 parity** — Continue expanding mobile client
+      compatibility coverage where it serves users.
 
-- [ ] **Plugin Framework** — Move beyond stubs to a working plugin model
-- [ ] **Search Improvements** — Better indexing, filtering, and performance
-- [ ] **Backup & Restore** — Documented and tested data protection procedures
-- [ ] **Observability** — Structured metrics, health checks, and alerting guides
-- [ ] **Multi-Team Support** — Harden team isolation and cross-team features
+## Later — Scaling, Compliance, and 1.0
 
-### Long-Term (6–12 Months)
-
-- [ ] **Federation Research** — Evaluate server-to-server messaging protocols
-- [ ] **Advanced Admin Tools** — Bulk user management, compliance exports
-- [ ] **Performance at Scale** — Database query optimization, caching strategy
-- [ ] **1.0 Stable Release** — Declare production readiness with LTS support policy
+- [ ] **Multi-team hardening** — Team isolation and cross-team features.
+- [ ] **Compliance** — Working compliance export, retention policy
+      enforcement, and audit completeness.
+- [ ] **Federation research** — Evaluate server-to-server messaging
+      protocols and interoperability options.
+- [ ] **Performance at scale** — Database query optimization, caching
+      strategy, distributed SFU mesh for calls.
+- [ ] **1.0 stable release** — Declare production readiness with an LTS
+      support policy.
 
 ## What We Are Not Planning
 
 To set clear expectations, the following are not on the current roadmap:
 
 - SaaS hosting by the core team (RustChat is strictly self-hosted)
-- Native desktop or mobile apps (we target Mattermost mobile app compatibility instead)
+- Native desktop or mobile apps (we target Mattermost mobile app
+  compatibility instead)
 - Commercial plugin marketplace
+- Replacing the RustChat backend, frontend, or data model with any external
+  collaboration system
+
+Mattermost compatibility remains a supported RustChat strategy unless
+explicitly changed by a future ADR.
 
 ## How to Influence the Roadmap
 
-- Open a [feature request](https://github.com/rustchatio/rustchat/issues/new/choose)
-- Start a [discussion](https://github.com/rustchatio/rustchat/discussions)
+- Open a [feature request](https://github.com/kubedoio/rustchat/issues/new/choose)
+- Start a [discussion](https://github.com/kubedoio/rustchat/discussions)
 - For significant architectural proposals, write an ADR and open a PR
 
 ## Completed Milestones
 
 | Date | Milestone |
 |------|-----------|
+| 2026-06 | AI Agents & Ecosystem — agent runtime, RAG with pgvector, Tavily tools, analytics and feedback |
 | 2026-03 | Entity Foundation Complete — API keys, rate limiting, mobile compatibility (95.1%) |
 | 2026-02 | VoIP Push Notifications — Mobile call ringing for Android and iOS |
 | 2026-01 | V4 API Coverage — Broad Mattermost compatibility for mobile clients |

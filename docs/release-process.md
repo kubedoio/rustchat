@@ -119,7 +119,7 @@ git push origin main
 git push origin v0.4.0
 
 # 7. The Release workflow triggers automatically
-# Verify at: https://github.com/rustchatio/rustchat/actions
+# Verify at: https://github.com/kubedoio/rustchat/actions
 ```
 
 ## Verifying Published Images
@@ -128,14 +128,14 @@ After a release completes, verify the images:
 
 ```bash
 # List available tags for the backend image
-skopeo list-tags docker://ghcr.io/rustchatio/rustchat-backend
+skopeo list-tags docker://ghcr.io/kubedoio/rustchat-backend
 
 # Pull and inspect a specific version
-docker pull ghcr.io/rustchatio/rustchat-backend:v0.3.6
-docker pull ghcr.io/rustchatio/rustchat-frontend:v0.3.6
+docker pull ghcr.io/kubedoio/rustchat-backend:v0.3.6
+docker pull ghcr.io/kubedoio/rustchat-frontend:v0.3.6
 
 # Verify multi-arch support
-docker manifest inspect ghcr.io/rustchatio/rustchat-backend:v0.3.6
+docker manifest inspect ghcr.io/kubedoio/rustchat-backend:v0.3.6
 ```
 
 ## Rollback Procedure
@@ -201,7 +201,7 @@ Repository maintainers can clean up old images manually:
 
 ```bash
 # List all tags for the backend image
-skopeo list-tags docker://ghcr.io/rustchatio/rustchat-backend
+skopeo list-tags docker://ghcr.io/kubedoio/rustchat-backend
 
 # Delete a specific untagged manifest (requires GHCR delete permission)
 # Note: GitHub Packages does not support deleting via CLI for multi-arch images easily.

@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Questions & Support
-    url: https://github.com/rustchatio/rustchat/discussions
+    url: https://github.com/kubedoio/rustchat/discussions
     about: Ask questions and get help in GitHub Discussions

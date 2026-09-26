@@ -204,7 +204,7 @@ If your change affects API v4 contracts, mobile/desktop client compatibility, we
 
 ## Good First Issues
 
-Issues labeled [`good-first-issue`](https://github.com/rustchatio/rustchat/labels/good-first-issue) are small, well-defined, and do not touch risky behavior (auth, permissions, payment-like flows). They are the best place to start if you are new to the project.
+Issues labeled [`good-first-issue`](https://github.com/kubedoio/rustchat/labels/good-first-issue) are small, well-defined, and do not touch risky behavior (auth, permissions, payment-like flows). They are the best place to start if you are new to the project.
 
 If no `good-first-issue` issues are currently open, look for `help-wanted`, documentation improvements, or small test coverage improvements.
 
@@ -230,6 +230,6 @@ We use the following labels to organize work:
 
 ## Questions
 
-- **General questions**: [GitHub Discussions](https://github.com/rustchatio/rustchat/discussions)
-- **Bug reports / feature requests**: Use the [issue templates](https://github.com/rustchatio/rustchat/issues/new/choose)
+- **General questions**: [GitHub Discussions](https://github.com/kubedoio/rustchat/discussions)
+- **Bug reports / feature requests**: Use the [issue templates](https://github.com/kubedoio/rustchat/issues/new/choose)
 - **Security issues**: See [SECURITY.md](SECURITY.md) — do not open public issues for vulnerabilities

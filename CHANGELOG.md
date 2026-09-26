@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Retired the abandoned Buzz-pivot program: removed `docs/pivot/`, ADR-004, `scripts/pivot/`, and the pivot architecture-guard workflow; ADR-005 now records that RustChat continues as an independent product with Buzz as an optional external integration target.
+- Consolidated the documentation hierarchy: single canonical architecture overview, substantive realtime and integrations documentation, new `docs/integrations/` section (RustShare), and merged development guides (`docs/development.md` folded into `docs/development/`).
+- Rewrote the roadmap around the continuing product.
+- Fixed repository identity drift: active project links and container registry references now point to `kubedoio/rustchat`.
+- Corrected stale documented facts: Rust MSRV (1.95+), Node.js requirement (24+), push-proxy default port, and the distinction between source version (0.5.1) and the latest published release (v0.4.1).
+
+### Removed
+- Duplicate/pointer documents: `docs/architecture.md`, `docs/architecture/architecture-overview.md`, `docs/architecture/websocket.md`, `docs/MATTERMOST_CLIENTS.md`.
+
 ## [0.5.1] - 2026-06-19
 
 ### Added

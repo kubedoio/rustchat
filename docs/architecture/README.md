@@ -17,8 +17,9 @@ RustChat is a self-hosted team collaboration platform built with:
 - [Overview](./overview.md) - High-level system design and data flow
 - [Backend Architecture](./backend.md) - Rust backend deep dive
 - [Frontend Architecture](./frontend.md) - Vue.js frontend structure
-- [WebSocket Architecture](./websocket.md) - Real-time communication
+- [Realtime Architecture](./realtime.md) - WebSocket hub, wire formats, and connection-state model
 - [Calls Deployment](./calls-deployment.md) - Voice/video calls infrastructure
+- [Integrations](./integrations.md) - Integration surfaces and the external connector boundary
 
 ### Data Model
 - [Database Schema](./data-model.md) - PostgreSQL schema overview

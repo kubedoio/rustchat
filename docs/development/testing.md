@@ -221,4 +221,4 @@ cd frontend
 npx playwright test
 ```
 
-For environment setup details see `docs/development/development.md`.
+For environment setup details see [Local Setup](./local-setup.md).
