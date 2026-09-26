@@ -5,7 +5,7 @@
 # not count. Architectural work additionally requires maintainer sponsorship /
 # merge sign-off. With the current small reviewer pool, policy must remain
 # enforceable rather than claiming two independent approvals that cannot
-# consistently be obtained.
+# consistently be obtained. A maintainer author may satisfy maintainer\n# sponsorship, but never the independent-review requirement.
 
 tiers:
   standard:
