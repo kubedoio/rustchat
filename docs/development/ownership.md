@@ -24,7 +24,7 @@ listed user must approve. The repository review policy is defined by
 - every merged PR requires at least one independent human approval;
 - elevated and architectural changes also require maintainer
   sponsorship/sign-off;
-- the PR author does not count as the independent reviewer;
+- the PR author does not count as the independent reviewer; a maintainer author may satisfy maintainer sponsorship but still needs a separate independent approval;
 - for the highest-risk architectural changes, seek a second independent review
   when the active reviewer pool permits.
 
