@@ -110,6 +110,8 @@ Use:
 
 - `docs/adr/**` for new architectural decisions;
 - `docs/plans/**` for maintainer-approved active specifications/plans;
+- `docs/decision-notes/**` for short-form elevated decisions below ADR scope;
+- `docs/audits/**` for dated evidence/review reports (not normative architecture);
 - audience-oriented docs for current behavior;
 - `docs/archive/**` for completed historical implementation material;
 - `AGENTS.md` as canonical agent/contributor policy.

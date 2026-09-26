@@ -44,6 +44,8 @@ delete similarly named documents merely because they look redundant.
 2. Enforce the authority model from ADR-006:
    - new ADRs -> `docs/adr/**`;
    - maintainer-approved current plans -> `docs/plans/**`;
+   - short-form elevated decisions below ADR scope -> `docs/decision-notes/**`;
+   - dated audit/evidence reports -> `docs/audits/**`;
    - current behavior -> audience-oriented docs;
    - completed/superseded history -> `docs/archive/**`.
 3. Preserve analysis/tooling paths required by active agent contracts:
@@ -52,26 +54,28 @@ delete similarly named documents merely because they look redundant.
    Do not move/delete them unless `.governance/agent-contracts.yml`,
    AGENTS/docs references, and the tooling workflow are intentionally updated in
    the same architectural change.
-4. Legacy `docs/decisions/**` may keep backward-compatible redirect/index
+4. Treat `docs/audits/**` as evidence/history, not as a competing source of
+   current architecture or product behavior.
+5. Legacy `docs/decisions/**` may keep backward-compatible redirect/index
    material; do not add new ADRs there.
-5. Remove one side of exact duplicate documents only when authority/history is
+6. Remove one side of exact duplicate documents only when authority/history is
    unambiguous; repair every reference.
-6. Move root-level historical review material into the proper history area.
-7. Keep `AGENTS.md` canonical.
+7. Move root-level historical review material into the proper history area.
+8. Keep `AGENTS.md` canonical.
    - A harness-specific file such as `CLAUDE.md` may contain bootstrap hints,
      but must link to AGENTS.md and must not define contradictory policy.
-8. Add deterministic repository-hygiene checks for:
+9. Add deterministic repository-hygiene checks for:
    - broken internal documentation links;
    - exact duplicates with competing active authority;
    - new ADRs outside `docs/adr/**`;
    - selected tracked generated/build/cache artifacts where detection is reliable.
-9. Add/maintain a PR-template obligation to consider updates to:
+10. Add/maintain a PR-template obligation to consider updates to:
    - ROADMAP;
    - repo-current-state;
    - ADRs;
    - compatibility documentation;
    - repository-integrity contracts when applicable.
-10. Activate RI-C06 only when checks and authority documentation are in place.
+11. Activate RI-C06 only when checks and authority documentation are in place.
 
 ## Scope discipline
 

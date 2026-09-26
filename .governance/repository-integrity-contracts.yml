@@ -163,6 +163,8 @@ contracts:
     canonical:
       adrs: docs/adr
       active_plans: docs/plans
+      decision_notes: docs/decision-notes
+      audit_evidence: docs/audits
       archive: docs/archive
       agent_policy: AGENTS.md
     analysis_output_compatibility:

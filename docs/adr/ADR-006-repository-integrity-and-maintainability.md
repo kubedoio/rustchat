@@ -1,7 +1,8 @@
 # ADR-006: Repository Integrity and Incremental Maintainability
 
 **Date:** 2026-09-26  
-**Status:** Proposed — becomes Accepted when PR #269 is approved and merged  
+**Status:** Proposed  
+**Acceptance condition:** PR #269 is approved and merged  
 **Risk tier:** architectural
 
 ## Context
@@ -92,6 +93,8 @@ Canonical current decision and plan locations are:
 
 - architecture decisions: `docs/adr/**`;
 - maintainer-approved active implementation plans/specifications: `docs/plans/**`;
+- short-form elevated-change decision notes that do not require an ADR: `docs/decision-notes/**`;
+- dated audit/evidence reports: `docs/audits/**` (evidence, not normative architecture);
 - product/runtime documentation: the existing audience-oriented `docs/**` hierarchy;
 - completed or obsolete implementation history: `docs/archive/**`.
 
