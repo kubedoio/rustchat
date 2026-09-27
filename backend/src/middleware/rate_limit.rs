@@ -83,7 +83,10 @@ fn ip_matches(ip: std::net::IpAddr, entry: &str) -> bool {
             _ => false,
         }
     } else {
-        entry.parse::<std::net::IpAddr>().map(|e| e == ip).unwrap_or(false)
+        entry
+            .parse::<std::net::IpAddr>()
+            .map(|e| e == ip)
+            .unwrap_or(false)
     }
 }
 
