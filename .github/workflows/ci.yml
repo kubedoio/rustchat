@@ -431,10 +431,21 @@ jobs:
   # This job always runs so branch protection can require a single stable
   # check name regardless of which individual jobs are conditionally skipped.
 
+  repo-integrity:
+    name: Repository Integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Check API persistence boundary (RI-C04)
+        run: python3 tools/repository-integrity/check_api_direct_sql.py
+
   ci-complete:
     name: CI Complete
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
+    needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release, repo-integrity]
     if: always()
     timeout-minutes: 5
     steps:
@@ -451,6 +462,7 @@ jobs:
           PUSH_PROXY_CHECK_RESULT: ${{ needs.push-proxy-check.result }}
           DOCKER_VALIDATE_RESULT: ${{ needs.docker-validate.result }}
           BUILD_RELEASE_RESULT: ${{ needs.build-release.result }}
+          REPO_INTEGRITY_RESULT: ${{ needs.repo-integrity.result }}
         run: >-
           scripts/ci-aggregate.sh
           DETECT_CHANGES_RESULT
@@ -461,3 +473,4 @@ jobs:
           PUSH_PROXY_CHECK_RESULT
           DOCKER_VALIDATE_RESULT
           BUILD_RELEASE_RESULT
+          REPO_INTEGRITY_RESULT
