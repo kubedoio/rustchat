@@ -1,6 +1,6 @@
 # Repo Current State
 
-**Last updated:** 2026-09-26  
+**Last updated:** 2026-09-27  
 **Version:** v0.5.1 (source)
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
@@ -12,9 +12,11 @@
 **Current source version:** v0.5.1
 
 > **Note:** The latest *published* GitHub release is currently `v0.4.1`
-> (2026-05-22). The `0.5.1` version in source has not been tagged or released
-> yet; publishing it is tracked in the release issue. Do not treat `0.5.1` as
-> a published release until a `v0.5.1` tag and GitHub release exist.
+> (2026-05-22). A `v0.5.0` tag exists in the repository (with `v0.5.0-rc.*`
+> prerelease tags) but no `v0.5.0` GitHub Release has been published. The
+> `0.5.1` version in source has not been tagged or released yet; publishing
+> it is tracked in the release issue. Do not treat `0.5.1` (or `0.5.0`) as a
+> published release until a `v0.5.x` tag and GitHub release exist.
 
 Version is synchronized across three files:
 - `backend/Cargo.toml` → `[package] version`
@@ -80,13 +82,13 @@ For details see `docs/compatibility-scope.md`.
 
 | Gap | Area | Priority |
 |---|---|---|
-| Required/authoritative CI and live repository protections need convergence and evidence | governance/release | P0 |
-| Promoted artifact publication must be tied to complete release/security gates | release | P0 |
+| ~~Required/authoritative CI and live repository protections need convergence and evidence~~ — resolved (RI-C01/C02) | governance/release | P0 |
+| ~~Promoted artifact publication must be tied to complete release/security gates~~ — resolved (RI-C03 promotion gate) | release | P0 |
 | Compliance export and audit dashboard defects | admin | P0/release |
 | Realtime replay durability and graceful WebSocket shutdown | realtime | Hardening |
-| Direct SQL persistence remains widespread in API handlers | backend architecture | Incremental hardening |
-| Large backend modules need growth control and targeted decomposition | maintainability | Incremental hardening |
-| Release upgrade evidence does not yet cover the full supported migration/recovery matrix | database/release | Hardening |
+| Direct SQL persistence in API handlers: baselined and guarded (RI-C04); bounded migration ongoing | backend architecture | Incremental hardening |
+| Large backend modules: baselined and guarded (RI-C05); targeted decomposition ongoing | maintainability | Incremental hardening |
+| Release upgrade evidence does not yet cover the full supported migration/recovery matrix (P006) | database/release | Hardening |
 | Advanced post search semantics beyond simple `ILIKE` | compat/search | Phase 2 |
 | Plugin upload/install/enable/disable/remove flows are compatibility stubs | compat/plugins | Phase 2 |
 | LDAP and SAML v4 endpoints are compatibility stubs | compat/enterprise | Phase 2 |
@@ -100,6 +102,11 @@ The repository-integrity work is specified in
 
 | Phase | Description | Date |
 |---|---|---|
+| Repository integrity P001 | Authoritative green-main/security aggregates, promotion-gated artifacts, verified protection, dependency fixes | 2026-09 |
+| Repository integrity P002 | Live GitHub protection verified + documented (RI-C02) | 2026-09 |
+| Repository integrity P003 | API persistence-boundary baseline + guard (RI-C04); site pilot extraction | 2026-09 |
+| Repository integrity P004 | Module-growth baseline + guard (RI-C05); posts-service decomposition | 2026-09 |
+| Repository integrity P005 | Docs/repository hygiene: release-doc collapse, archive moves, roadmap/current-state update, hygiene CI checks | 2026-09 |
 | Runtime/bootstrap cleanup | Single AppState, explicit dependency/runtime composition, supervised long-lived workers, pure router assembly | 2026-09 |
 | Buzz integration phase 1 | Optional outbound external bridge with durable outbox, retries, dead-letter handling, encrypted secrets, loop prevention, failure isolation | 2026-09 |
 | Documentation direction cleanup | Retired abandoned Buzz pivot program; restored RustChat continuation and ADR-005 | 2026-09 |

@@ -76,7 +76,7 @@ export default defineConfig({
             { text: "Ownership", link: "/development/ownership" },
             { text: "Agent Model", link: "/development/agent-model" },
             { text: "Operating Model", link: "/development/operating-model" },
-            { text: "Releasing", link: "/development/releasing" },
+            { text: "Releasing", link: "/release-process" },
           ],
         },
       ],

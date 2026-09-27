@@ -1,8 +1,9 @@
 # ADR-006: Repository Integrity and Incremental Maintainability
 
 **Date:** 2026-09-26  
-**Status:** Proposed  
-**Acceptance condition:** PR #269 is approved and merged  
+**Status:** Accepted  
+**Implemented:** incrementally via repository-integrity hardening P001–P005 (merged 2026-09)  
+**Acceptance condition:** PR #269 approved and merged (acceptance met 2026-09-27; contracts RI-C01..C05, C09, C10 active)  
 **Risk tier:** architectural
 
 ## Context

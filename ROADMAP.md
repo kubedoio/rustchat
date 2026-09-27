@@ -16,14 +16,19 @@ RustChat release.
 
 Priorities:
 
-- [ ] **Repository integrity hardening** — Implement
+- [~] **Repository integrity hardening** — Implement
       [ADR-006](docs/adr/ADR-006-repository-integrity-and-maintainability.md):
       authoritative green-main/security aggregation, verified artifact
       promotion, GitHub protection, release-tag enforcement, and bounded
-      maintainability guards.
+      maintainability guards. — **In progress:** P001–P005 (green-main gates,
+      verified protection, persistence-boundary guard, module-growth guard,
+      docs/repository hygiene) are merged; P006 (migration/recovery evidence),
+      P007 (Buzz compatibility record), and P008 (release verdict) remain.
 - [ ] **Publish v0.5.1** — Version metadata is already at `0.5.1` in source;
       validate release gates (backend, frontend, push-proxy, Docker Compose,
       migration/recovery evidence, smoke tests) and publish the tagged release.
+      (A `v0.5.0` tag exists but no `v0.5.0` GitHub Release has been published;
+      the latest published release is `v0.4.1`.)
 - [ ] **Realtime durability** — Durable event replay/outbox for reconnecting
       clients, graceful WebSocket shutdown, and explicit resync signaling
       instead of silent event drops.
@@ -39,11 +44,12 @@ Priorities:
 
 ## Next — Operational Hardening and Incremental Architecture Cleanup
 
-- [ ] **Persistence-boundary guard** — Prevent new direct SQL persistence from
+- [x] **Persistence-boundary guard** — Prevent new direct SQL persistence from
       accumulating in API handlers; migrate existing debt only in bounded,
-      tested slices.
-- [ ] **Module growth control** — Add responsibility/growth baselines and
-      decompose only the highest-value oversized modules.
+      tested slices. (RI-C04 active; pilot: `backend/src/api/site.rs`.)
+- [x] **Module growth control** — Add responsibility/growth baselines and
+      decompose only the highest-value oversized modules. (RI-C05 active;
+      pilot: `backend/src/services/posts.rs`.)
 - [ ] **Test coverage** — Expand backend integration tests and frontend E2E
       coverage.
 - [ ] **Migration upgrade matrix** — Prove empty→latest and latest published
