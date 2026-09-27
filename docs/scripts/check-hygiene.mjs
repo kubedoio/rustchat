@@ -105,7 +105,6 @@ function checkADRPlacement() {
     path.join(repoRoot, "docs"),
     path.join(repoRoot),
   ];
-  const adrPattern = /(^|\/)(ADR-|adr-)?\d+-?.*\.md$/i;
   const adrDir = path.resolve(docsRoot, "adr");
   const excludeAbs = new Set([
     ...excludedDirectories,
