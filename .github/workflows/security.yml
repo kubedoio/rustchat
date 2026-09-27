@@ -279,6 +279,9 @@ jobs:
     if: always()
     timeout-minutes: 5
     steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
       - name: Verify all security aggregate members passed
         env:
           CODEQL_RESULT: ${{ needs.codeql.result }}
