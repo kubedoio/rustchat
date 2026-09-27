@@ -10,10 +10,39 @@ use uuid::Uuid;
 use crate::api::admin::{insert_admin_audit_log, require_admin, require_global_admin};
 use crate::api::AppState;
 use crate::auth::AuthUser;
+use crate::constants::{
+    ROLE_ADMIN, ROLE_CHANNEL_ADMIN, ROLE_GUEST, ROLE_MEMBER, ROLE_ORG_ADMIN, ROLE_OWNER,
+    ROLE_SYSTEM_ADMIN, ROLE_TEAM_ADMIN,
+};
 use crate::error::{ApiResult, AppError};
 use crate::models::validate_username_token;
 use crate::repositories::AdminRepository;
 use crate::services::membership_policies::apply_auto_membership_for_new_user;
+
+/// Roles accepted by admin user endpoints (the canonical role set). Rejects
+/// arbitrary role strings that could otherwise be stored and later interpreted
+/// with unexpected permissions.
+const VALID_USER_ROLES: &[&str] = &[
+    ROLE_ADMIN,
+    ROLE_MEMBER,
+    ROLE_GUEST,
+    ROLE_OWNER,
+    ROLE_SYSTEM_ADMIN,
+    ROLE_TEAM_ADMIN,
+    ROLE_CHANNEL_ADMIN,
+    ROLE_ORG_ADMIN,
+];
+
+fn validate_role(role: &str) -> Result<(), AppError> {
+    if VALID_USER_ROLES.contains(&role) {
+        Ok(())
+    } else {
+        Err(AppError::BadRequest(format!(
+            "Invalid role '{role}'. Allowed roles: {}",
+            VALID_USER_ROLES.join(", ")
+        )))
+    }
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -110,6 +139,7 @@ pub async fn create_admin_user(
 
     let password_hash = crate::auth::hash_password(&input.password)?;
     let role = input.role.unwrap_or_else(|| "member".to_string());
+    validate_role(&role)?;
 
     let user = AdminRepository::new(&state.db)
         .insert_user(
@@ -157,6 +187,10 @@ pub async fn update_admin_user(
     Json(input): Json<UpdateUserInput>,
 ) -> ApiResult<Json<crate::models::User>> {
     require_admin(&auth)?;
+
+    if let Some(role) = &input.role {
+        validate_role(role)?;
+    }
 
     let user = AdminRepository::new(&state.db)
         .update_user(id, input.role.as_deref(), input.display_name.as_deref())
