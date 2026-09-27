@@ -58,7 +58,7 @@ contracts:
     title: protected-default-branch-and-release-tags
     activation:
       phase: P002
-      state: planned
+      state: active
     gates:
       merge: required
       promotion: required
