@@ -10,13 +10,13 @@ on:
       runner:
         description: 'GitHub runner label to run the jobs on'
         type: string
-        default: 'self-hosted'
+        default: 'ubuntu-latest'
   workflow_call:
     inputs:
       runner:
         description: 'GitHub runner label to run the jobs on'
         type: string
-        default: 'self-hosted'
+        default: 'ubuntu-latest'
 
 permissions:
   contents: read
@@ -27,7 +27,7 @@ env:
 jobs:
   detect-changes:
     name: Detect Changes
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -211,7 +211,7 @@ jobs:
     name: Frontend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 60
     defaults:
       run:
@@ -274,7 +274,7 @@ jobs:
     name: Push Proxy Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 60
     defaults:
       run:
@@ -402,7 +402,7 @@ jobs:
     name: Build Release
     needs: [detect-changes, backend-check]
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 60
 
     env:
@@ -433,7 +433,7 @@ jobs:
 
   ci-complete:
     name: CI Complete
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
     if: always()
     timeout-minutes: 5
