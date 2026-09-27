@@ -254,7 +254,9 @@ pub async fn run_retention_cleanup_with_store<S: ObjectStorage, R: RetentionStor
         // removed as they are processed, so re-fetching from the cutoff is a
         // stable keyset and never loads the whole backlog into memory.
         loop {
-            let records = store.fetch_expired_file_records(cutoff, RETENTION_FILE_BATCH).await?;
+            let records = store
+                .fetch_expired_file_records(cutoff, RETENTION_FILE_BATCH)
+                .await?;
             if records.is_empty() {
                 break;
             }

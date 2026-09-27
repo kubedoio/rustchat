@@ -427,7 +427,8 @@ async fn login_inner(
             let config =
                 RateLimitConfig::auth_per_minute(state.config.security.rate_limit_auth_per_minute);
             let user_key = format!("user:{}", user.id);
-            let user_result = rate_limit::check_rate_limit(&state.redis, &config, &user_key).await?;
+            let user_result =
+                rate_limit::check_rate_limit(&state.redis, &config, &user_key).await?;
             if !user_result.allowed {
                 tracing::warn!(user_id = %user.id, "Too many failed login attempts for user");
                 return Err(AppError::TooManyRequests(
