@@ -1,6 +1,31 @@
 # GitHub Protection Settings
 
-This repository uses files to enforce as much as possible, but several settings must be configured manually in the GitHub UI.
+This repository uses files to enforce as much as possible, but several settings
+must be configured manually in the GitHub UI (or via the API).
+
+## Verified Settings (2026-09-27)
+
+The following reflect the **verified, live** configuration — not merely desired
+settings (RI-C02). Reproduce with:
+
+```bash
+gh api repos/kubedoio/rustchat/branches/main/protection
+gh api repos/kubedoio/rustchat/rulesets
+```
+
+### `main` branch protection (verified)
+
+- **Require a pull request before merging** — 1 approving review, CODEOWNERS review for affected paths, dismiss stale approvals on new commits.
+- **Require status checks** — required contexts `CI Complete`, `Security Complete`, `dco-check`; require branches to be up to date (`strict`).
+- **Require conversation resolution** — enabled.
+- **No bypass** — `enforce_admins` on; force push and deletion blocked for ordinary contributors.
+
+### Release tags (verified)
+
+The repository ruleset **"Protect release tags"** (active) targets **`refs/tags/v*`**
+and blocks creation, update, deletion, and non-fast-forward for ordinary
+contributors. Release versions are protected as **tags**, not version-looking
+branches.
 
 ## Branch Protection
 
@@ -41,7 +66,7 @@ If using GitHub rulesets instead of classic branch protection:
 
 Protect version tags to prevent accidental deletion or overwrite:
 
-- Pattern: `v*`
+- Pattern: `v*` — **verified** via the "Protect release tags" ruleset targeting `refs/tags/v*` (create/update/delete/non-fast-forward blocked for ordinary contributors)
 - Restrict create, update, and delete to maintainers
 
 ## CODEOWNERS
