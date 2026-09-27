@@ -1,5 +1,8 @@
 # CODEOWNERS
 # Reference: docs/superpowers/specs/2026-03-22-governance-layer-design.md
+#
+# GitHub uses the LAST matching pattern. Keep broad rules before their more
+# specific overrides.
 
 # Default owner for all unmatched paths
 *                                @senolcolak
@@ -13,7 +16,7 @@
 # Frontend (Vue 3 SPA)
 /frontend/                       @senolcolak
 
-# Mattermost Compatibility (always requires compat reviewer co-approval)
+# Mattermost Compatibility (specific overrides after broad backend ownership)
 /backend/compat/                 @senolcolak @zoorpha
 /backend/src/api/v4/             @senolcolak @zoorpha
 /backend/src/mattermost_compat/  @senolcolak @zoorpha
@@ -25,9 +28,12 @@
 /docker/                         @senolcolak
 /scripts/                        @senolcolak
 
-# Governance (architectural tier — requires 2 reviewers per risk-tiers.yml)
-/.governance/                    @senolcolak @zoorpha
-
-# Docs and agent guidelines
+# Docs and agent guidelines — broad rule first
 /docs/                           @senolcolak
 /AGENTS.md                       @senolcolak
+/CLAUDE.md                       @senolcolak
+
+# Governance and architectural decisions — specific overrides last
+/.governance/                    @senolcolak @zoorpha
+/GOVERNANCE.md                   @senolcolak @zoorpha
+/docs/adr/                       @senolcolak @zoorpha

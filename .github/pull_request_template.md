@@ -9,6 +9,7 @@
 - [ ] compat
 - [ ] infra
 - [ ] docs
+- [ ] governance
 
 ## Does this change public behavior or API contracts?
 
@@ -19,19 +20,34 @@
 
 - [ ] standard — typos, UI polish, test additions, internal refactors
 - [ ] elevated — auth, permissions, API behavior, schema, compat paths
-- [ ] architectural — architecture redesign, storage, protocol, security model
+- [ ] architectural — architecture redesign, storage, protocol, security/governance model
 
-## Tests
+## Tests / evidence
 
 - [ ] Added
 - [ ] Updated
+- [ ] Live/manual evidence required — describe: <!-- GitHub settings, release proof, etc. -->
 - [ ] Not applicable — reason: <!-- explain -->
 
 ## Docs / ADR
 
 - [ ] Updated
-- [ ] ADR created — link: <!-- link -->
+- [ ] ADR created/updated — link: <!-- link -->
 - [ ] Not needed
+
+## Source-of-truth alignment
+
+Does this PR complete, invalidate, or materially change anything documented in
+ROADMAP.md, docs/repo-current-state.md, compatibility docs, release docs, or an
+ADR?
+
+- [ ] No
+- [ ] Yes — updated the affected canonical docs in this PR
+
+## Repository integrity contracts
+
+- [ ] No RI-Cxx contract is affected
+- [ ] Contract(s) affected — IDs and evidence: <!-- RI-C01, RI-C02, ... -->
 
 ## Dependency Changes
 
