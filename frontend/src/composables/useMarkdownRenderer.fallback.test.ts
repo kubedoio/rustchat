@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 describe('useMarkdownRenderer fallback path', () => {
   it('fallback path escapes HTML when markdown libs are not loaded', async () => {
     vi.resetModules()
-    vi.doMock('marked', () => ({ marked: undefined }))
+    vi.doMock('marked', () => ({ marked: undefined, default: undefined }))
     vi.doMock('highlight.js/lib/common', () => ({ default: undefined }))
 
     const { renderMarkdown: fallbackRender } = await import('./useMarkdownRenderer')
