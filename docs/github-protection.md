@@ -14,22 +14,14 @@ For the `main` branch, enable:
 
 - [ ] **Require status checks to pass before merging**
   - [ ] Require branches to be up to date before merging
-  - Required checks (from `ci.yml`):
-    - `backend-check`
-    - `frontend-check`
-    - `push-proxy-check`
-    - `docker-validate`
-    - `build-release`
-  - Required checks (from `security.yml`):
-    - `codeql`
-    - `cargo-audit-backend`
-    - `cargo-audit-push-proxy`
-    - `cargo-deny`
-    - `npm-audit`
-    - `dependency-review`
-  - Required checks (from `dco.yml`):
-    - `dco-check`
-  - **Note:** The `cargo-deny` and `codeql` checks may be slow. They can be marked as "not required" initially while the project stabilizes.
+  - Required checks are the stable **merge gate** set defined in
+    [`docs/development/ci-gates.md`](development/ci-gates.md):
+    - `CI Complete` (from `ci.yml`)
+    - `Security Complete` (from `security.yml`)
+    - `dco-check` (from `dco.yml`)
+  - **Note:** These are per-workflow aggregate contexts, not individual jobs.
+    Individual CI/Security jobs may be conditional/skipped; the aggregate
+    propagates any required failure (RI-C01).
 
 - [ ] **Require conversation resolution before merging**
 

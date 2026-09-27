@@ -63,6 +63,20 @@ Nightly images are built automatically from the `main` branch.
 
 Nightly builds **do not** create GitHub Releases and **do not** update the `latest` tag.
 
+**Moving-alias promotion gate:** the `main`, `nightly`, and `nightly-*` moving
+aliases are advanced by `.github/workflows/promote.yml` **only** after the
+[promotion-gate check set](development/ci-gates.md) (which includes the
+post-merge `Backend Integration Tests`) is green for the exact `main` commit
+(RI-C03). A commit that fails a required post-merge integration check is not
+promoted; only its non-promoted, SHA-scoped diagnostic image exists.
+
+## Release Gate
+
+A `v*.*.*` tag publishes only the **exact** tagged commit, and only after the
+[release-gate set](development/ci-gates.md) is satisfied for that commit
+(CI Complete, Security Complete, dco-check, Backend Integration Tests, plus
+version/changelog validation, the migration matrix, and Buzz compatibility).
+
 ## Maintainer Release Checklist
 
 Before cutting a release, run the readiness check:

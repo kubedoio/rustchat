@@ -10,13 +10,13 @@ on:
       runner:
         description: 'GitHub runner label to run the jobs on'
         type: string
-        default: 'self-hosted'
+        default: 'ubuntu-latest'
   workflow_call:
     inputs:
       runner:
         description: 'GitHub runner label to run the jobs on'
         type: string
-        default: 'self-hosted'
+        default: 'ubuntu-latest'
 
 permissions:
   contents: read
@@ -27,7 +27,7 @@ env:
 jobs:
   detect-changes:
     name: Detect Changes
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -211,7 +211,7 @@ jobs:
     name: Frontend Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.frontend == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 60
     defaults:
       run:
@@ -259,22 +259,22 @@ jobs:
           path: frontend/dependency-inventory.json
           if-no-files-found: ignore
 
-  p0-gates:
-    name: P0 Production-Readiness Gates
+  security-regression-guards:
+    name: Security Regression Guards
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Run P0 production-readiness gates
+      - name: Run security regression guards
         run: scripts/check-p0-gates.sh
 
   push-proxy-check:
     name: Push Proxy Check
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.push-proxy == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 60
     defaults:
       run:
@@ -402,7 +402,7 @@ jobs:
     name: Build Release
     needs: [detect-changes, backend-check]
     if: ${{ needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.scripts == 'true' }}
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 60
 
     env:
@@ -433,32 +433,31 @@ jobs:
 
   ci-complete:
     name: CI Complete
-    runs-on: ${{ inputs.runner || 'self-hosted' }}
-    needs: [detect-changes, p0-gates, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release]
     if: always()
     timeout-minutes: 5
     steps:
-      - name: Check change detection
-        if: needs.detect-changes.result == 'failure'
-        run: echo "Change detection failed" >&2 && exit 1
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Verify all checks passed
+      - name: Verify all CI aggregate members passed
         env:
-          P0_GATES_RESULT: ${{ needs.p0-gates.result }}
+          DETECT_CHANGES_RESULT: ${{ needs.detect-changes.result }}
+          SECURITY_REGRESSION_GUARDS_RESULT: ${{ needs.security-regression-guards.result }}
           BACKEND_CHECK_RESULT: ${{ needs.backend-check.result }}
           FRONTEND_CHECK_RESULT: ${{ needs.frontend-check.result }}
           FRONTEND_E2E_RESULT: ${{ needs.frontend-e2e.result }}
           PUSH_PROXY_CHECK_RESULT: ${{ needs.push-proxy-check.result }}
           DOCKER_VALIDATE_RESULT: ${{ needs.docker-validate.result }}
           BUILD_RELEASE_RESULT: ${{ needs.build-release.result }}
-        run: |
-          for job in P0_GATES BACKEND_CHECK FRONTEND_CHECK FRONTEND_E2E PUSH_PROXY_CHECK DOCKER_VALIDATE BUILD_RELEASE; do
-            result_var="${job}_RESULT"
-            result="${!result_var}"
-            echo "$job: $result"
-            if [ "$result" = "failure" ]; then
-              echo "$job failed" >&2
-              exit 1
-            fi
-          done
-          echo "All checks passed or were skipped."
+        run: >-
+          scripts/ci-aggregate.sh
+          DETECT_CHANGES_RESULT
+          SECURITY_REGRESSION_GUARDS_RESULT
+          BACKEND_CHECK_RESULT
+          FRONTEND_CHECK_RESULT
+          FRONTEND_E2E_RESULT
+          PUSH_PROXY_CHECK_RESULT
+          DOCKER_VALIDATE_RESULT
+          BUILD_RELEASE_RESULT

@@ -1,0 +1,88 @@
+name: Promote Moving Aliases
+
+# RI-C03: moving development aliases (`main`, `nightly`, `nightly-*`) must only
+# identify a merged `main` commit whose promotion-gate check set is green.
+# A commit that passes the merge gate but fails a required post-merge health
+# check is merged but marked degraded / not promotable; its moving alias must
+# not advance (ADR-006 §1). SHA-scoped diagnostic images are produced by
+# `docker-publish.yml` on push and are clearly non-promoted.
+#
+# This workflow is triggered when the post-merge Integration Tests workflow
+# completes for `main`, so the moving aliases advance only after the full
+# promotion-gate set is verified for the exact commit.
+
+on:
+  workflow_run:
+    workflows: ["Integration Tests"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit SHA to promote (default: current main head)'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Promotion Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      allowed: ${{ steps.gate.outputs.allowed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Resolve target commit
+        id: resolve
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.sha }}" ]]; then
+            echo "sha=${{ inputs.sha }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run promotion gate
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROMOTE_SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          if scripts/promotion-gate.sh \
+              --repo "${{ github.repository }}" \
+              --sha "${PROMOTE_SHA}" \
+              --token "${GITHUB_TOKEN}" \
+              --required "CI Complete" \
+              --required "Security Complete" \
+              --required "dco-check" \
+              --required "Backend Integration Tests"; then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            echo "Promotion gate not satisfied; moving aliases must NOT advance." >&2
+            exit 1
+          fi
+
+  build-and-push:
+    name: Promote moving aliases
+    needs: gate
+    if: needs.gate.outputs.allowed == 'true'
+    uses: ./.github/workflows/docker-build-push.yml
+    with:
+      push: true
+      runner: ubuntu-latest
+      platforms: linux/amd64,linux/arm64
+      timeout-minutes: 120
+      tags: |
+        type=raw,value=main
+        type=raw,value=nightly
+        type=raw,value=nightly-${{ needs.gate.outputs.sha }}
+    permissions:
+      contents: read
+      packages: write

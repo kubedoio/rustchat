@@ -266,3 +266,37 @@ jobs:
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: high
+
+  # ============ Status Check Aggregator ============
+  # Stable single security context for branch protection. Individual security
+  # checks may be conditional, so a stable aggregate context is required.
+  # A required security/dependency failure must propagate to this aggregate
+  # (RI-C01); it must never be masked by an unrelated green job.
+  security-complete:
+    name: Security Complete
+    runs-on: ubuntu-latest
+    needs: [codeql, cargo-audit-backend, cargo-audit-push-proxy, cargo-deny-backend, cargo-deny-push-proxy, npm-audit, dependency-review]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Verify all security aggregate members passed
+        env:
+          CODEQL_RESULT: ${{ needs.codeql.result }}
+          CARGO_AUDIT_BACKEND_RESULT: ${{ needs.cargo-audit-backend.result }}
+          CARGO_AUDIT_PUSH_PROXY_RESULT: ${{ needs.cargo-audit-push-proxy.result }}
+          CARGO_DENY_BACKEND_RESULT: ${{ needs.cargo-deny-backend.result }}
+          CARGO_DENY_PUSH_PROXY_RESULT: ${{ needs.cargo-deny-push-proxy.result }}
+          NPM_AUDIT_RESULT: ${{ needs.npm-audit.result }}
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+        run: >-
+          scripts/ci-aggregate.sh
+          CODEQL_RESULT
+          CARGO_AUDIT_BACKEND_RESULT
+          CARGO_AUDIT_PUSH_PROXY_RESULT
+          CARGO_DENY_BACKEND_RESULT
+          CARGO_DENY_PUSH_PROXY_RESULT
+          NPM_AUDIT_RESULT
+          DEPENDENCY_REVIEW_RESULT
