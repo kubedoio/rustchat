@@ -442,6 +442,9 @@ jobs:
       - name: Check API persistence boundary (RI-C04)
         run: python3 tools/repository-integrity/check_api_direct_sql.py
 
+      - name: Check module growth control (RI-C05)
+        run: python3 tools/repository-integrity/check_module_size.py
+
   ci-complete:
     name: CI Complete
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}

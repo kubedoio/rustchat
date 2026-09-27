@@ -129,7 +129,7 @@ contracts:
     title: module-growth-control
     activation:
       phase: P004
-      state: planned
+      state: active
     gates:
       merge: required
       promotion: required
@@ -146,6 +146,12 @@ contracts:
       new_module_line_count: 1500
       baseline_growth_percent: 5
       baseline_growth_absolute_lines: 100
+    required_evidence:
+      - deterministic generated source-size baseline
+      - a newly monolithic module fails the guard
+      - a large module growing beyond the triggers fails the guard
+      - an RI-C10/RI-C05 exception relaxes the guard for a justified path
+      - one high-value module decomposed into cohesive submodules with unchanged public behavior
     semantics: >-
       these are review tripwires, not architecture targets. Cohesion and
       invariant ownership determine decomposition; an RI-C10 exception may
