@@ -44,10 +44,19 @@ ADR?
 - [ ] No
 - [ ] Yes — updated the affected canonical docs in this PR
 
+If this PR changes documentation structure (moves/removes a doc, changes a
+canonical author location, or creates a duplicate), run the docs hygiene and
+link checks locally and confirm the docs CI gate is green:
+
+```bash
+cd docs && npm ci --ignore-scripts && npm run ci
+```
+
 ## Repository integrity contracts
 
 - [ ] No RI-Cxx contract is affected
 - [ ] Contract(s) affected — IDs and evidence: <!-- RI-C01, RI-C02, ... -->
+- [ ] Roadmap/current-state considered — checked `ROADMAP.md` / `docs/repo-current-state.md` for items this PR completes or invalidates
 
 ## Dependency Changes
 

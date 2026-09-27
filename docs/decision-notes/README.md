@@ -30,4 +30,9 @@ File naming: `YYYY-MM-DD-<short-description>.md`
 
 ## Index
 
-_(No decision notes yet. Add entries here as notes are created.)_
+_(No decision notes available yet — add entries here as notes are created.)_
+
+The directory currently holds one historical artifact retained for continuity:
+- `code-quality-audit-2026-05.md` — a dated code-quality audit (evidence, not a
+  decision note); dated audits also live under `docs/internal/` and
+  `docs/audits/`.

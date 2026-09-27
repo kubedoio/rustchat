@@ -30,7 +30,7 @@ This guide is for developers contributing to RustChat.
 - [Target Operating Model](./operating-model.md) - Project goals and deferred items
 
 ### Release Process
-- [Releasing](./releasing.md) - Version bumping and release checklist
+- [Releasing](../release-process.md) - Version bumping and release checklist
 
 ## Project Structure
 

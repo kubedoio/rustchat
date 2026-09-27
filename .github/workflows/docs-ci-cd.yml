@@ -45,5 +45,8 @@ jobs:
       - name: Validate config documentation drift
         run: npm run docs:check-config
 
+      - name: Validate repository/documentation hygiene
+        run: npm run docs:check-hygiene
+
       - name: Build docs site
         run: npm run docs:build

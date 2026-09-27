@@ -56,7 +56,7 @@ Resources for contributors and developers.
 - [Testing](./development/testing.md) — Test layers and requirements
 - [Compatibility](./development/compatibility.md) — Mattermost API compatibility
 - [Agent Model](./development/agent-model.md) — LLM agent workflows
-- [Releasing](./development/releasing.md) — Release process
+- [Releasing](./release-process.md) — Release process
 
 ### 🚨 [Operations](./operations/README.md)
 Operational runbooks and procedures.
