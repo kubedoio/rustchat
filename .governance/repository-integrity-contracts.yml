@@ -39,7 +39,7 @@ contracts:
     title: authoritative-repository-state
     activation:
       phase: P001
-      state: planned
+      state: active
     gates:
       merge: required
       promotion: required
@@ -77,7 +77,7 @@ contracts:
     title: verified-artifact-promotion
     activation:
       phase: P001
-      state: planned
+      state: active
     gates:
       merge: advisory
       promotion: required
@@ -231,7 +231,7 @@ contracts:
     title: bounded-hardening-prs
     activation:
       phase: P001
-      state: planned
+      state: active
     gates:
       merge: required
       promotion: advisory
@@ -247,7 +247,7 @@ contracts:
     title: exception-accountability
     activation:
       phase: P001
-      state: planned
+      state: active
     gates:
       merge: required
       promotion: required
@@ -262,3 +262,33 @@ contracts:
       - owner
       - scope
       - removal_condition
+
+# RI-C10 exception register.
+# Every exception to a repository-integrity guard must be explicit, removable,
+# owned, and scoped. This is the canonical register for the hardening program.
+# "Existing code does it" is not a valid rationale.
+exceptions:
+  - contract_id: RI-C01
+    id: backend-rsa-ignore
+    rationale: >-
+      backend/.cargo configuration ignores RUSTSEC-2023-0071 (Marvin Attack on
+      rsa). The rsa crate is required by jsonwebtoken for OIDC RS256 validation;
+      no fixed version is available upstream; HS256 is used for internal JWTs.
+      This pre-dates ADR-006 and is recorded here for accountability.
+    owner: backend maintainers
+    scope: backend cargo-audit configuration only
+    removal_condition: >-
+      Remove when the rsa crate releases a fixed version or the RSA256 OIDC path
+      is dropped.
+  - contract_id: RI-C01
+    id: backend-lru-warnings
+    rationale: >-
+      backend cargo-audit reports two non-blocking informational warnings for
+      lru 0.16.4 (RUSTSEC-2026-0192 unmaintained, RUSTSEC-2026-0253 unsound),
+      pulled transitively by aws-sdk-s3. They are monitored, NOT ignored: they
+      remain visible in `cargo audit` output and do not pass silently.
+    owner: backend maintainers
+    scope: backend Cargo.lock (aws-sdk-s3 transitive lru)
+    removal_condition: >-
+      Audit exits clean with no lru warnings once aws-sdk-s3 drops or upgrades
+      the affected lru, or the advisory is withdrawn.

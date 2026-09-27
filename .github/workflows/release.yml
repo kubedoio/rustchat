@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  gate:
+    name: Release Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Verify release-gate check set for the exact tagged commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GATE_SHA: ${{ github.sha }}
+        run: |
+          scripts/promotion-gate.sh \
+            --repo "${{ github.repository }}" \
+            --sha "${GATE_SHA}" \
+            --token "${GITHUB_TOKEN}" \
+            --required "CI Complete" \
+            --required "Security Complete" \
+            --required "dco-check" \
+            --required "Backend Integration Tests"
+
   validate:
     name: Validate release
     runs-on: ubuntu-latest
@@ -79,7 +102,7 @@ jobs:
 
   docker-release:
     name: Build and push release images
-    needs: validate
+    needs: [validate, gate]
     uses: ./.github/workflows/docker-build-push.yml
     with:
       push: true
@@ -98,7 +121,7 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [validate, docker-release]
+    needs: [validate, gate, docker-release]
     permissions:
       contents: write
     steps:

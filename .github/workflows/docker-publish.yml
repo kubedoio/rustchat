@@ -18,6 +18,15 @@ on:
         default: 'linux/amd64'
 
 jobs:
+  # Diagnostic (non-promoted) images.
+  #
+  # On every push to `main` this builds and publishes immutable, SHA-scoped
+  # diagnostic images. These are NOT moving aliases and are clearly
+  # non-promoted: users must not treat a commit-SHA image as "the healthy main".
+  #
+  # Moving development aliases (`main`, `nightly`, `nightly-*`) are advanced
+  # only by the separate `promote.yml` workflow after the promotion gate is
+  # satisfied for the exact commit (RI-C03).
   build-and-push:
     uses: ./.github/workflows/docker-build-push.yml
     with:
@@ -26,7 +35,6 @@ jobs:
       platforms: ${{ github.event_name == 'workflow_dispatch' && inputs.platforms || 'linux/amd64' }}
       timeout-minutes: 120
       tags: |
-        type=ref,event=branch
         type=sha,format=long
     permissions:
       contents: read
