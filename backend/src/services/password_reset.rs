@@ -342,7 +342,18 @@ pub async fn reset_password(
 
     let token_hash = hash_token(token);
 
-    // Find and validate token (with row lock to prevent race conditions)
+    // Begin the transaction before reading the token so the row lock is held
+    // for the whole consume operation. Running SELECT ... FOR UPDATE directly
+    // on the pool would autocommit and release the lock immediately, allowing
+    // two concurrent requests with the same token to both pass the used_at
+    // check and both reset the password.
+    let mut tx = db.begin().await.map_err(|e| {
+        error!("Transaction start failed: {}", e);
+        PasswordResetError::Internal("Database error".to_string())
+    })?;
+
+    // Find and validate token (row lock held for the entire transaction to
+    // prevent race conditions on a single-use token).
     #[allow(clippy::type_complexity)]
     let result: Option<(
         Uuid,
@@ -354,13 +365,13 @@ pub async fn reset_password(
     )> = sqlx::query_as(
         r#"
         SELECT user_id, email, token_hash, used_at, expires_at, purpose
-        FROM password_reset_tokens 
+        FROM password_reset_tokens
         WHERE token_hash = $1
         FOR UPDATE
         "#,
     )
     .bind(&token_hash)
-    .fetch_optional(db)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(|e| {
         error!("Token fetch failed: {}", e);
@@ -393,18 +404,14 @@ pub async fn reset_password(
         PasswordResetError::Internal("Failed to hash password".to_string())
     })?;
 
-    // Update user password and mark token as used in a transaction
-    let mut tx = db.begin().await.map_err(|e| {
-        error!("Transaction start failed: {}", e);
-        PasswordResetError::Internal("Database error".to_string())
-    })?;
-
-    // Mark token as used
-    sqlx::query(
+    // Guarded consume: only succeeds while the token is still unused. The
+    // FOR UPDATE lock above serializes concurrent requests, and this WHERE
+    // clause is a second line of defense, so a double-use can never commit.
+    let consumed = sqlx::query(
         r#"
-        UPDATE password_reset_tokens 
-        SET used_at = NOW() 
-        WHERE token_hash = $1
+        UPDATE password_reset_tokens
+        SET used_at = NOW()
+        WHERE token_hash = $1 AND used_at IS NULL
         "#,
     )
     .bind(&token_hash)
@@ -415,11 +422,15 @@ pub async fn reset_password(
         PasswordResetError::Internal("Failed to consume token".to_string())
     })?;
 
+    if consumed.rows_affected() != 1 {
+        return Err(PasswordResetError::TokenAlreadyUsed);
+    }
+
     // Update user password
     sqlx::query(
         r#"
-        UPDATE users 
-        SET password_hash = $1, 
+        UPDATE users
+        SET password_hash = $1,
             updated_at = NOW(),
             email_verified = true,
             email_verified_at = COALESCE(email_verified_at, NOW()),
