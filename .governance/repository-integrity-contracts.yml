@@ -95,7 +95,7 @@ contracts:
     title: api-persistence-boundary
     activation:
       phase: P003
-      state: planned
+      state: active
     gates:
       merge: required
       promotion: required
@@ -114,6 +114,11 @@ contracts:
     tripwires:
       - direct SQL in a new production API file
       - increased normalized direct-SQL invocation count in an existing API file
+    required_evidence:
+      - deterministic baseline generation (regenerating twice yields identical output)
+      - a synthetic new call site fails the guard
+      - moving line numbers without changing call sites creates no false debt
+      - one pilot path moved behind a cohesive repository/service boundary with focused coverage
     exception:
       requires:
         - decision note

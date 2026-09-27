@@ -1,0 +1,15 @@
+# RI-C04 api-persistence-boundary exception register.
+#
+# A path may only be exempted from the api-persistence-boundary tripwires
+# (new production API file with direct SQL; increased normalized direct-SQL
+# count in an existing file) when all of the following are true and recorded:
+#   * a decision note explains why the direct SQL must remain in the handler;
+#   * focused tests cover the affected behavior; and
+#   * the exception was accepted by a reviewer in the pull request.
+#
+# Format (tab- or space-separated, path first, no spaces inside a path):
+#   <path> <reason> <decision_note> <tests>
+#
+# "Existing code does it" is not a valid rationale.
+
+# (none currently registered)

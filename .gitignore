@@ -175,3 +175,4 @@ ENV/
 env/
 dump.rdb
 test-results/
+__pycache__/
