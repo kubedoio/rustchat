@@ -73,6 +73,7 @@ impl SyncOrchestrator {
                         SyncAction::Created => report.created += 1,
                         SyncAction::Updated => report.updated += 1,
                         SyncAction::Unchanged => report.unchanged += 1,
+                        SyncAction::Skipped => report.skipped += 1,
                     },
                     Err(e) => {
                         tracing::error!(error = %e, file_id = %file.id, "File sync failed");
@@ -137,6 +138,21 @@ impl SyncOrchestrator {
             repo.delete_document(doc.id, team_id)
                 .await
                 .map_err(SyncError::Database)?;
+        }
+
+        // Skip files that would exceed the download cap instead of failing
+        // the whole sync (or OOMing the process) on one huge remote file.
+        // The remote-declared size is advisory; the client enforces the real
+        // cap while streaming.
+        if file.size_bytes > crate::services::sync::rustshare::client::MAX_DOWNLOAD_BYTES {
+            tracing::warn!(
+                file_id = %file.id,
+                file_name = %file.name,
+                size_bytes = file.size_bytes,
+                limit = crate::services::sync::rustshare::client::MAX_DOWNLOAD_BYTES,
+                "Skipping RustShare file: exceeds sync size cap"
+            );
+            return Ok(SyncAction::Skipped);
         }
 
         // Download file
@@ -261,12 +277,13 @@ pub struct SyncReport {
     pub created: usize,
     pub updated: usize,
     pub unchanged: usize,
+    pub skipped: usize,
     pub failed: usize,
 }
 
 impl SyncReport {
     pub fn total(&self) -> usize {
-        self.created + self.updated + self.unchanged + self.failed
+        self.created + self.updated + self.unchanged + self.skipped + self.failed
     }
 }
 
@@ -316,6 +333,8 @@ pub enum SyncAction {
     Created,
     Updated,
     Unchanged,
+    /// File was intentionally not synced (e.g. exceeds the size cap).
+    Skipped,
 }
 
 #[derive(Debug, thiserror::Error)]

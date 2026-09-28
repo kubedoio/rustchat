@@ -45,10 +45,19 @@ pub struct SlidingWindowChunker;
 impl Chunker for SlidingWindowChunker {
     fn chunk(&self, text: &str, config: &ChunkConfig) -> Vec<Chunk> {
         let mut chunks = Vec::new();
-        let char_count = text.chars().count();
-        if char_count == 0 {
+        if text.is_empty() {
             return chunks;
         }
+
+        // Precompute byte offset + UTF-8 length per character once so chunk
+        // slicing is O(1) per chunk. Scanning `char_indices().nth(n)` from
+        // the start per chunk made this O(n^2) and pinned a worker for
+        // minutes on large documents.
+        let char_data: Vec<(usize, usize)> = text
+            .char_indices()
+            .map(|(i, c)| (i, c.len_utf8()))
+            .collect();
+        let char_count = char_data.len();
 
         let step = if config.chunk_size > config.chunk_overlap {
             config.chunk_size - config.chunk_overlap
@@ -60,12 +69,9 @@ impl Chunker for SlidingWindowChunker {
         while start < char_count {
             let end = (start + config.chunk_size).min(char_count);
 
-            let start_byte = text.char_indices().nth(start).map(|(i, _)| i).unwrap_or(0);
-            let end_byte = text
-                .char_indices()
-                .nth(end.saturating_sub(1))
-                .map(|(i, c)| i + c.len_utf8())
-                .unwrap_or(text.len());
+            let (start_byte, _) = char_data[start];
+            let (end_char_byte, end_char_len) = char_data[end - 1];
+            let end_byte = end_char_byte + end_char_len;
 
             let chunk_text: String = text[start_byte..end_byte].to_string();
 
@@ -144,5 +150,41 @@ mod tests {
         assert!(!select_chunker("text/plain")
             .chunk("Hello", &ChunkConfig::default())
             .is_empty());
+    }
+
+    #[test]
+    fn test_sliding_window_multibyte_boundaries() {
+        // Chunks must split on character boundaries for multi-byte text.
+        let chunker = SlidingWindowChunker;
+        let config = ChunkConfig {
+            chunk_size: 3,
+            chunk_overlap: 1,
+        };
+        let text = "👍中文消息内容测试"; // 4-byte emoji + 8 CJK chars
+        let chunks = chunker.chunk(text, &config);
+        assert!(!chunks.is_empty());
+        for chunk in &chunks {
+            // If slicing ever landed inside a character, from_utf8 would
+            // have already panicked on to_string(); additionally assert the
+            // text round-trips.
+            assert_eq!(chunk.text.chars().count(), chunk.token_count);
+        }
+        // First chunk starts at the emoji.
+        assert!(chunks[0].text.starts_with('👍'));
+    }
+
+    #[test]
+    fn test_sliding_window_large_input_is_linear() {
+        // 200k chars with a small step would take minutes with the old
+        // per-chunk `char_indices().nth(n)` rescan. Completing quickly here
+        // is the regression guard.
+        let chunker = SlidingWindowChunker;
+        let config = ChunkConfig {
+            chunk_size: 64,
+            chunk_overlap: 8,
+        };
+        let text: String = "abcdefghij".repeat(20_000);
+        let chunks = chunker.chunk(&text, &config);
+        assert!(chunks.len() > 1_000);
     }
 }

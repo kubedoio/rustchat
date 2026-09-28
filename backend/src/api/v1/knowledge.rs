@@ -104,6 +104,44 @@ fn require_admin(auth: &AuthUser) -> ApiResult<()> {
     Ok(())
 }
 
+/// Bounds for knowledge-base chunking configuration.
+///
+/// Unvalidated values allowed pathological inputs (e.g. `chunk_size = 1`
+/// making the sliding window step 1 and producing one chunk per character).
+const CHUNK_SIZE_MIN: i32 = 64;
+const CHUNK_SIZE_MAX: i32 = 8192;
+const CHUNK_OVERLAP_MAX: i32 = 1024;
+
+fn validate_chunk_config(
+    chunk_size: Option<i32>,
+    chunk_overlap: Option<i32>,
+) -> ApiResult<(Option<i32>, Option<i32>)> {
+    if let Some(size) = chunk_size {
+        if !(CHUNK_SIZE_MIN..=CHUNK_SIZE_MAX).contains(&size) {
+            return Err(AppError::Validation(format!(
+                "chunk_size must be between {CHUNK_SIZE_MIN} and {CHUNK_SIZE_MAX}"
+            )));
+        }
+    }
+    if let Some(overlap) = chunk_overlap {
+        if !(0..=CHUNK_OVERLAP_MAX).contains(&overlap) {
+            return Err(AppError::Validation(format!(
+                "chunk_overlap must be between 0 and {CHUNK_OVERLAP_MAX}"
+            )));
+        }
+    }
+    // The combination must keep a positive step; the chunker clamps overlap
+    // below size, but reject it explicitly so clients get a clear error.
+    let effective_size = chunk_size.unwrap_or(512);
+    let effective_overlap = chunk_overlap.unwrap_or(50);
+    if effective_overlap >= effective_size {
+        return Err(AppError::Validation(
+            "chunk_overlap must be smaller than chunk_size".to_string(),
+        ));
+    }
+    Ok((chunk_size, chunk_overlap))
+}
+
 // ------------------------------------------------------------------
 // Knowledge Base Handlers
 // ------------------------------------------------------------------
@@ -117,6 +155,8 @@ async fn create_knowledge_base(
 
     let team_id = resolve_user_team_id(&state.db, auth.user_id).await?;
 
+    let (chunk_size, chunk_overlap) = validate_chunk_config(req.chunk_size, req.chunk_overlap)?;
+
     let repo = KnowledgeRepository::new(&state.db);
     let kb = repo
         .create_knowledge_base(
@@ -127,8 +167,8 @@ async fn create_knowledge_base(
                 .as_deref()
                 .unwrap_or("text-embedding-3-small"),
             req.embedding_dimensions.unwrap_or(1536),
-            req.chunk_size.unwrap_or(512),
-            req.chunk_overlap.unwrap_or(50),
+            chunk_size.unwrap_or(512),
+            chunk_overlap.unwrap_or(50),
             auth.user_id,
         )
         .await
@@ -186,6 +226,18 @@ async fn update_knowledge_base(
         None => None,
     };
 
+    // Validate the effective config: an update may set only one of the two
+    // values, so combine with the stored values before checking the pair.
+    let current = repo
+        .get_knowledge_base(id, team_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Knowledge base not found".to_string()))?;
+    let (chunk_size, chunk_overlap) = validate_chunk_config(
+        req.chunk_size.or(Some(current.chunk_size)),
+        req.chunk_overlap.or(Some(current.chunk_overlap)),
+    )?;
+
     let kb = repo
         .update_knowledge_base(
             id,
@@ -194,8 +246,8 @@ async fn update_knowledge_base(
             description,
             req.embedding_model.as_deref(),
             req.embedding_dimensions,
-            req.chunk_size,
-            req.chunk_overlap,
+            chunk_size,
+            chunk_overlap,
             req.is_active,
         )
         .await
