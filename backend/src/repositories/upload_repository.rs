@@ -54,6 +54,21 @@ impl<'a> UploadRepository<'a> {
         Ok(())
     }
 
+    /// Count the user's live (unexpired, unfinalized) upload sessions.
+    pub async fn count_active_sessions_by_user(&self, user_id: Uuid) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*)
+            FROM upload_sessions
+            WHERE user_id = $1
+              AND expires_at > NOW()
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(self.pool)
+        .await
+    }
+
     /// Get an active upload session by ID.
     pub async fn get_session(&self, id: Uuid) -> Result<Option<UploadSessionRow>, sqlx::Error> {
         sqlx::query_as(

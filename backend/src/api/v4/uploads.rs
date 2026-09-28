@@ -32,6 +32,14 @@ use crate::repositories::{ChannelRepository, UploadRepository};
 /// member can commit by starting (and never finishing) an upload.
 pub const MAX_UPLOAD_SESSION_FILE_SIZE: i64 = 100 * 1024 * 1024;
 
+/// Maximum number of live (unexpired, unfinalized) upload sessions a single
+/// user may hold. Each session can buffer up to
+/// [`MAX_UPLOAD_SESSION_FILE_SIZE`] in the database, so without a
+/// concurrency cap the aggregate commitment scales with the request rate
+/// instead of being bounded per user. Finalizing (or letting expire) a
+/// session frees its slot.
+pub const MAX_LIVE_UPLOAD_SESSIONS_PER_USER: i64 = 10;
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/uploads", post(create_upload))
@@ -80,6 +88,22 @@ async fn create_upload(
     let _ = ChannelRepository::new(&state.db)
         .require_member(channel_id, auth.user_id)
         .await?;
+
+    // Cap concurrent live sessions per user: each buffers up to the session
+    // file-size cap in the database, so the aggregate commitment must be
+    // bounded by session count, not just per-session size.
+    let live_sessions = UploadRepository::new(&state.db)
+        .count_active_sessions_by_user(auth.user_id)
+        .await?;
+    if live_sessions >= MAX_LIVE_UPLOAD_SESSIONS_PER_USER {
+        return Err(AppError::TooManyRequests(
+            format!(
+                "upload session limit reached ({MAX_LIVE_UPLOAD_SESSIONS_PER_USER} live \
+                 sessions): finalize or let expire an existing session"
+            ),
+            None,
+        ));
+    }
 
     // Create upload session
     let session_id = Uuid::new_v4();
