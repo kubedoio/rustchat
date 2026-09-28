@@ -107,6 +107,13 @@ pub(crate) struct LegacyOAuthMobileLoginQuery {
 /// User info extracted from OAuth provider
 pub(crate) struct UserInfo {
     pub(crate) email: String,
+    /// Whether the provider explicitly asserted the email as verified.
+    ///
+    /// `Some(true)` is required before the email may be used to link an
+    /// existing RustChat account (OIDC Core: `email_verified`). `None`
+    /// means the provider did not assert it; `Some(false)` rejects the
+    /// login outright.
+    pub(crate) email_verified: Option<bool>,
     pub(crate) name: Option<String>,
     pub(crate) preferred_username: Option<String>,
     pub(crate) groups: Vec<String>,
