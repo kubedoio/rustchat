@@ -73,4 +73,27 @@ describe('useMarkdownRenderer XSS corpus', () => {
     expect(html).not.toContain('<script')
     expect(html).not.toContain('alert(1)')
   })
+
+  it('does not corrupt mailto links containing @ (mention regex regression)', () => {
+    const html = renderMarkdown('<a href="mailto:user@example.com" target="_blank">mail me</a>')
+    expect(html).toContain('href="mailto:user@example.com"')
+    expect(html).not.toContain('data-username="example"')
+  })
+
+  it('does not insert mention spans inside code blocks', () => {
+    const html = renderMarkdown('`contact admin@server now`')
+    expect(html).not.toContain('class="mention')
+  })
+
+  it('still highlights plain-text mentions outside code and links', () => {
+    const html = renderMarkdown('hello @alice and @bob')
+    expect(html).toContain('data-username="alice"')
+    expect(html).toContain('data-username="bob"')
+    expect(html).toContain('@alice')
+  })
+
+  it('highlights the mentioned me user differently', () => {
+    const html = renderMarkdown('hey @alice', 'alice')
+    expect(html).toContain('bg-warning/20')
+  })
 })

@@ -85,6 +85,69 @@ async function loadMarkdownLibs(): Promise<void> {
 loadMarkdownLibs()
 
 /**
+ * Wrap @mentions in interactive spans, operating only on text nodes of the
+ * already-sanitized HTML.
+ *
+ * The previous implementation ran the `@(\w+)` regex over the whole HTML
+ * string, which also matched inside attribute values and mangled real URIs
+ * (e.g. `mailto:user@example.com` links or code samples). Walking text nodes
+ * (and skipping code/pre/links) cannot corrupt markup by construction.
+ */
+function highlightMentionsInTextNodes(html: string, highlightMe?: string): string {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = (node as Text).parentElement
+      if (!parent) return NodeFilter.FILTER_REJECT
+      // Never highlight inside code blocks, links, or existing mentions:
+      // an `@` there is usually an email address or literal code, not a
+      // mention.
+      return parent.closest('code, pre, a, span.mention')
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT
+    },
+  })
+
+  const textNodes: Text[] = []
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const text = (n as Text).nodeValue ?? ''
+    if (text.includes('@')) textNodes.push(n as Text)
+  }
+
+  for (const node of textNodes) {
+    const text = node.nodeValue ?? ''
+    const fragment = doc.createDocumentFragment()
+    let lastIndex = 0
+    const mentionRegex = /@(\w+)/g
+    let match: RegExpExecArray | null
+    while ((match = mentionRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        fragment.appendChild(doc.createTextNode(text.slice(lastIndex, match.index)))
+      }
+      const username = match[1]
+      const isMe = highlightMe !== undefined && username === highlightMe
+      const highlightClass = isMe
+        ? 'bg-warning/20 text-warning font-bold px-0.5 rounded border border-warning/30'
+        : 'text-brand font-semibold hover:underline cursor-pointer'
+      const span = doc.createElement('span')
+      span.className = `mention ${highlightClass}`
+      span.dataset.username = username
+      span.textContent = `@${username}`
+      fragment.appendChild(span)
+      lastIndex = match.index + match[0].length
+    }
+    if (lastIndex < text.length) {
+      fragment.appendChild(doc.createTextNode(text.slice(lastIndex)))
+    }
+    node.replaceWith(fragment)
+  }
+
+  return doc.body.innerHTML
+}
+
+/**
  * Render markdown to HTML (synchronous with basic fallback)
  */
 function renderMarkdownSync(markdown: string, highlightMentions?: string): string {
@@ -109,21 +172,12 @@ function renderMarkdownSync(markdown: string, highlightMentions?: string): strin
   // Step 2: Sanitize HTML
   const sanitizedHtml = DOMPurify.sanitize(html, markdownSanitizeConfig)
 
-  // Step 3: Post-process for Mentions (Interactive)
-  // We use a strict \w+ regex and wrap in a safe span.
-  // We also ensure external links have noopener noreferrer.
-  const processedHtml = sanitizedHtml
-    .replace(/@(\w+)/g, (_match, username) => {
-      const isMe = highlightMentions && username === highlightMentions
-      const highlightClass = isMe
-        ? 'bg-warning/20 text-warning font-bold px-0.5 rounded border border-warning/30'
-        : 'text-brand font-semibold hover:underline cursor-pointer'
-      return `<span class="mention ${highlightClass}" data-username="${username}">@${username}</span>`
-    })
-    .replace(
-      /<a href="([^"]+)" target="_blank">/g,
-      '<a href="$1" target="_blank" rel="noopener noreferrer">'
-    )
+  // Step 3: Post-process for Mentions (Interactive, text nodes only) and
+  // ensure external links have noopener noreferrer.
+  const processedHtml = highlightMentionsInTextNodes(sanitizedHtml, highlightMentions).replace(
+    /<a href="([^"]+)" target="_blank">/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer">'
+  )
 
   return DOMPurify.sanitize(processedHtml, markdownSanitizeConfig)
 }
