@@ -90,7 +90,14 @@ pub struct RenderedEmail {
 
 /// Template renderer using Handlebars
 pub struct TemplateRenderer {
+    /// Plain-text rendering (subject, body_text): variables are interpolated
+    /// raw because the output is not interpreted as HTML.
     handlebars: Handlebars<'static>,
+    /// HTML rendering (body_html): variables are HTML-escaped so user
+    /// content (chat excerpts, display names) cannot inject markup into
+    /// emails. Templates that intentionally embed markup in a variable can
+    /// use a triple-stash `{{{var}}}`, which bypasses escaping.
+    handlebars_html: Handlebars<'static>,
     mjml_enabled: bool,
 }
 
@@ -103,11 +110,17 @@ impl TemplateRenderer {
         handlebars.set_strict_mode(true);
         handlebars.register_escape_fn(handlebars::no_escape);
 
-        // Register built-in helpers
+        // HTML instance: strict mode + the default handlebars HTML escape.
+        let mut handlebars_html = Handlebars::new();
+        handlebars_html.set_strict_mode(true);
+
+        // Register built-in helpers on both instances
         Self::register_helpers(&mut handlebars);
+        Self::register_helpers(&mut handlebars_html);
 
         Self {
             handlebars,
+            handlebars_html,
             mjml_enabled: false, // MJML compilation would require additional setup
         }
     }
@@ -245,11 +258,30 @@ impl TemplateRenderer {
         template: &str,
         context: &RenderContext,
     ) -> TemplateResult<String> {
-        // Create a temporary template
+        Self::render_on(&self.handlebars, template, context)
+    }
+
+    /// Render a template whose output is HTML: every `{{variable}}` is
+    /// HTML-escaped (see `handlebars_html`). Use this for `body_html`.
+    pub fn render_html_template(
+        &self,
+        template: &str,
+        context: &RenderContext,
+    ) -> TemplateResult<String> {
+        Self::render_on(&self.handlebars_html, template, context)
+    }
+
+    /// Shared render implementation: registers the template under a
+    /// throwaway name on the given (pre-configured) instance and renders it.
+    fn render_on(
+        hb: &Handlebars<'static>,
+        template: &str,
+        context: &RenderContext,
+    ) -> TemplateResult<String> {
         let template_name = "__temp__";
 
         // Register the template (this is inefficient for single renders, but works)
-        let mut hb = self.handlebars.clone();
+        let mut hb = hb.clone();
         hb.register_template_string(template_name, template)
             .map_err(|e| TemplateError::InvalidTemplate(e.to_string()))?;
 
@@ -285,11 +317,13 @@ impl TemplateRenderer {
         // Render text body
         let body_text = self.render_template(&template.body_text, context)?;
 
-        // Render HTML body if present
+        // Render HTML body if present — with HTML escaping so user content
+        // (chat excerpts, display names, channel names) cannot inject
+        // markup into notification emails.
         let body_html = if template.body_html.is_empty() {
             None
         } else {
-            Some(self.render_template(&template.body_html, context)?)
+            Some(self.render_html_template(&template.body_html, context)?)
         };
 
         Ok(RenderedEmail {
@@ -696,5 +730,59 @@ mod truncate_tests {
         assert_eq!(rendered, "中...");
         // Byte 4 lands inside the second CJK char: only the first survives.
         assert_eq!(render_truncate("中文消息", 4), "中...");
+    }
+}
+
+#[cfg(test)]
+mod escape_tests {
+    use super::*;
+
+    fn context_with(value: &str) -> RenderContext {
+        RenderContext::new()
+            .with_variables(serde_json::json!({ "value": value }))
+            .expect("variables should serialize")
+    }
+
+    #[test]
+    fn html_body_escapes_user_content() {
+        let renderer = TemplateRenderer::new();
+        let context = context_with("<script>alert(1)</script>");
+        let rendered = renderer
+            .render_html_template("<p>{{value}}</p>", &context)
+            .expect("template should render");
+        assert_eq!(rendered, "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>");
+    }
+
+    #[test]
+    fn html_body_escapes_attribute_breakout() {
+        let renderer = TemplateRenderer::new();
+        let context = context_with("\" onmouseover=\"alert(1)");
+        let rendered = renderer
+            .render_html_template("<a href=\"#\" title=\"{{value}}\">x</a>", &context)
+            .expect("template should render");
+        assert!(
+            !rendered.contains("\" onmouseover=\""),
+            "attribute must not break out: {rendered}"
+        );
+    }
+
+    #[test]
+    fn html_body_triple_stash_allows_intentional_markup() {
+        let renderer = TemplateRenderer::new();
+        let context = context_with("<b>bold</b>");
+        let rendered = renderer
+            .render_html_template("<p>{{{value}}}</p>", &context)
+            .expect("template should render");
+        assert_eq!(rendered, "<p><b>bold</b></p>");
+    }
+
+    #[test]
+    fn text_body_is_not_html_escaped() {
+        let renderer = TemplateRenderer::new();
+        let context = context_with("fish & chips");
+        let rendered = renderer
+            .render_template("You ate: {{value}}", &context)
+            .expect("template should render");
+        assert_eq!(rendered, "You ate: fish & chips");
     }
 }
