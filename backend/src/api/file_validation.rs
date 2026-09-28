@@ -214,6 +214,30 @@ pub fn validate_file_upload_head(
 
 #[allow(dead_code)]
 fn validate_svg(data: &[u8]) -> Result<(), AppError> {
+    use regex::Regex;
+    use std::sync::LazyLock;
+
+    /// Any `on*= ` event-handler attribute (onclick, onbegin, onanimationstart,
+    /// whitespace variants like `onload =`). An allowlist of specific handler
+    /// names is trivially bypassed by lesser-known or future event names.
+    static EVENT_HANDLER_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#"(?i)\bon[a-z]+\s*="#).unwrap());
+    /// Active-content URI schemes anywhere in the document (SMIL `values=`,
+    /// `<style>` url(), attribute values): `javascript:` / `vbscript:` payloads
+    /// and `data:` URIs that can carry nested active documents.
+    static ACTIVE_URI_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)(javascript|vbscript)\s*:|data\s*:\s*(text/html|image/svg\+xml)").unwrap()
+    });
+    /// SMIL animation that rewrites the `href`/`xlink:href` attribute at runtime
+    /// (bypasses the static `href=` screening below).
+    static SMIL_HREF_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?i)attributename\s*=\s*["'](href|xlink:href)["']"#).unwrap()
+    });
+    /// CSS that fetches remote resources from a `style` attribute.
+    static STYLE_FETCH_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?i)style\s*=\s*["'][^"']*\b(url|expression)\s*\("#).unwrap()
+    });
+
     let text = std::str::from_utf8(data)
         .map_err(|_| AppError::BadRequest("SVG must be valid UTF-8".to_string()))?;
 
@@ -236,16 +260,10 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
         ));
     }
 
-    // Reject event handlers
-    if lower.contains("onload=")
-        || lower.contains("onerror=")
-        || lower.contains("onclick=")
-        || lower.contains("onmouseover=")
-        || lower.contains("onfocus=")
-        || lower.contains("onblur=")
-    {
+    // Reject event handlers (any on* attribute, not a fixed allowlist)
+    if EVENT_HANDLER_RE.is_match(text) {
         return Err(AppError::BadRequest(
-            "SVG contains forbidden event handlers".to_string(),
+            "SVG contains forbidden event handler attributes".to_string(),
         ));
     }
 
@@ -260,6 +278,43 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
     if lower.contains("xlink:href") || lower.contains("href=") {
         return Err(AppError::BadRequest(
             "SVG contains forbidden external references".to_string(),
+        ));
+    }
+
+    // Reject active-content URI schemes anywhere (javascript:, vbscript:,
+    // data:text/html, data:image/svg+xml) — e.g. inside SMIL animation values.
+    if ACTIVE_URI_RE.is_match(text) {
+        return Err(AppError::BadRequest(
+            "SVG contains forbidden active-content URI schemes".to_string(),
+        ));
+    }
+
+    // Reject <style> elements (CSS-based exfiltration / CSP interaction)
+    if lower.contains("<style") || lower.contains("</style>") {
+        return Err(AppError::BadRequest(
+            "SVG contains forbidden style elements".to_string(),
+        ));
+    }
+
+    // Reject style attributes that fetch remote resources
+    if STYLE_FETCH_RE.is_match(text) {
+        return Err(AppError::BadRequest(
+            "SVG contains a style attribute with a forbidden fetch".to_string(),
+        ));
+    }
+
+    // Reject SMIL animations that rewrite href/xlink:href at runtime
+    if SMIL_HREF_RE.is_match(text) {
+        return Err(AppError::BadRequest(
+            "SVG contains forbidden SMIL href animation".to_string(),
+        ));
+    }
+
+    // Reject entity declarations (XXE / billion-laughs expansion). The XML
+    // preamble check above still admits plain <!DOCTYPE svg ...> documents.
+    if lower.contains("<!entity") {
+        return Err(AppError::BadRequest(
+            "SVG contains forbidden entity declarations".to_string(),
         ));
     }
 
@@ -308,5 +363,90 @@ mod tests {
         let svg = b"<svg xmlns='http://www.w3.org/2000/svg'><circle r='10'/></svg>";
         let result = validate_svg(svg);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn benign_svg_with_smil_and_style_attribute_is_accepted_by_validator() {
+        // Common icon patterns must keep passing: benign SMIL animation and
+        // inline style attributes without remote fetches.
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg">
+            <rect style="fill:#00ff00" width="10" height="10">
+                <animate attributeName="opacity" values="0;1" dur="2s"/>
+            </rect>
+        </svg>"#;
+        let result = validate_svg(svg);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn malicious_svg_with_uncommon_event_handler_is_rejected() {
+        // The old allowlist only knew onload/onerror/onclick/onmouseover/
+        // onfocus/onblur; these bypassed it.
+        let cases: [&[u8]; 4] = [
+            b"<svg><rect onanimationstart='alert(1)'/></svg>",
+            b"<svg><rect onbegin='alert(1)'/></svg>",
+            b"<svg><rect onpointerenter='alert(1)'/></svg>",
+            b"<svg onload = 'alert(1)'></svg>", // whitespace variant
+        ];
+        for svg in cases {
+            assert!(
+                validate_svg(svg).is_err(),
+                "expected rejection of: {}",
+                String::from_utf8_lossy(svg)
+            );
+        }
+    }
+
+    #[test]
+    fn malicious_svg_with_javascript_uri_in_smil_values_is_rejected() {
+        // SMIL <animate> can rewrite attributes at runtime; the old filter
+        // only screened static href= attributes.
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg">
+            <a><animate attributeName="href" values="javascript:alert(1)"/></a>
+        </svg>"#;
+        assert!(validate_svg(svg).is_err());
+    }
+
+    #[test]
+    fn malicious_svg_with_smil_href_animation_to_external_url_is_rejected() {
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg">
+            <a><animate attributeName="href" values="https://evil.example"/></a>
+        </svg>"#;
+        assert!(validate_svg(svg).is_err());
+    }
+
+    #[test]
+    fn malicious_svg_with_data_uri_active_content_is_rejected() {
+        let cases: [&[u8]; 2] = [
+            b"<svg><text>%3Csvg%3E</text><set attributeName='x' to='data:text/html,<svg/>'/></svg>",
+            b"<svg><use xlink:href='data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='/></svg>",
+        ];
+        for svg in cases {
+            assert!(
+                validate_svg(svg).is_err(),
+                "expected rejection of: {}",
+                String::from_utf8_lossy(svg)
+            );
+        }
+    }
+
+    #[test]
+    fn malicious_svg_with_style_element_is_rejected() {
+        let svg = b"<svg><style>@import url('https://evil.example/x.css')</style></svg>";
+        assert!(validate_svg(svg).is_err());
+    }
+
+    #[test]
+    fn malicious_svg_with_style_attribute_fetch_is_rejected() {
+        let svg = br#"<svg><rect style="background:url('https://evil.example/x')"/></svg>"#;
+        assert!(validate_svg(svg).is_err());
+    }
+
+    #[test]
+    fn malicious_svg_with_entity_declaration_is_rejected() {
+        // XXE / billion-laughs vector.
+        let svg = br#"<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+            <svg xmlns="http://www.w3.org/2000/svg"><text>&xxe;</text></svg>"#;
+        assert!(validate_svg(svg).is_err());
     }
 }
