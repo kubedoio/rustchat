@@ -766,19 +766,11 @@ async fn unlink_group_syncable_by_kind(
         return Err(AppError::NotFound("Group syncable not found".to_string()));
     }
 
-    let state_clone = state.clone();
-    tokio::spawn(async move {
-        if let Err(err) = cleanup_unlinked_syncable(&state_clone, group_id, kind, syncable_id).await
-        {
-            tracing::warn!(
-                group_id = %group_id,
-                syncable_id = %syncable_id,
-                syncable_type = %kind.as_db_str(),
-                error = %err,
-                "Group syncable unlink cleanup failed"
-            );
-        }
-    });
+    // Revoke the memberships this syncable granted before responding: the
+    // syncable row is already deleted, so nothing would ever retry a
+    // failed spawned cleanup (reconcile only iterates live syncables) and
+    // members would silently keep the access the group no longer grants.
+    cleanup_unlinked_syncable(&state, group_id, kind, syncable_id).await?;
 
     emit_group_syncable_event(&state, kind, syncable_id, group_id, false).await;
 

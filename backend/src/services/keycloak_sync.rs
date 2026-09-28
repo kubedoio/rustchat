@@ -114,44 +114,14 @@ pub async fn run_full_sync(state: &AppState) -> ApiResult<KeycloakSyncReport> {
         desired_remote_ids.insert(kc_group.id.clone());
         report.groups_processed += 1;
 
-        let group_id = upsert_group(state, kc_group).await?;
-        report.groups_upserted += 1;
-
-        let kc_members = fetch_group_members(state, &token, &kc_group.id).await?;
-        let desired_user_ids =
-            resolve_rustchat_users_for_keycloak_members(state, provider_key, &kc_members).await?;
-        report.users_mapped += desired_user_ids.len();
-
-        let (added_users, removed_users) =
-            sync_group_members(state, group_id, &desired_user_ids).await?;
-        report.group_members_added += added_users.len();
-        report.group_members_removed += removed_users.len();
-        for (user_id, created_at) in added_users {
-            emit_group_member_event(state, group_id, user_id, created_at, 0, true).await;
-        }
-        let delete_at = Utc::now().timestamp_millis();
-        for (user_id, created_at) in removed_users {
-            emit_group_member_event(state, group_id, user_id, created_at, delete_at, false).await;
-        }
-
-        let dm_acl_enabled =
-            parse_bool_attribute(&kc_group.attributes, "rustchat_dm_acl").unwrap_or(false);
-        sync_group_dm_acl_flag(state, group_id, dm_acl_enabled).await?;
-
-        let (syncables_upserted, syncables_removed, changed_syncables) =
-            sync_group_syncables_from_attributes(state, group_id, kc_group).await?;
-        report.syncables_upserted += syncables_upserted;
-        report.syncables_removed += syncables_removed;
-
-        reconcile_group_syncables(state, group_id).await?;
-        for (kind, syncable_id, removed_link) in changed_syncables {
-            if removed_link {
-                cleanup_unlinked_syncable(state, group_id, kind, syncable_id).await?;
-                emit_group_syncable_event(state, group_id, kind, syncable_id, false).await;
-            } else {
-                reconcile_group_syncable(state, group_id, kind, syncable_id).await?;
-                emit_group_syncable_event(state, group_id, kind, syncable_id, true).await;
-            }
+        // One failing group must not abort the whole cycle: every later
+        // group would stop converging and groups removed from the IdP
+        // would never be deactivated (ex-members keeping synced access).
+        // Failures are logged and retried on the next cycle.
+        if let Err(err) =
+            sync_keycloak_group(state, &token, provider_key, kc_group, &mut report).await
+        {
+            warn!(kc_group = %kc_group.id, error = %err, "Keycloak group sync failed");
         }
     }
 
@@ -168,6 +138,58 @@ pub async fn run_full_sync(state: &AppState) -> ApiResult<KeycloakSyncReport> {
     );
 
     Ok(report)
+}
+
+/// Sync one Keycloak group (members, syncables, reconciliation). Errors
+/// propagate to the caller, which logs and continues with the next group.
+async fn sync_keycloak_group(
+    state: &AppState,
+    token: &str,
+    provider_key: &str,
+    kc_group: &KeycloakGroup,
+    report: &mut KeycloakSyncReport,
+) -> ApiResult<()> {
+    let group_id = upsert_group(state, kc_group).await?;
+    report.groups_upserted += 1;
+
+    let kc_members = fetch_group_members(state, token, &kc_group.id).await?;
+    let desired_user_ids =
+        resolve_rustchat_users_for_keycloak_members(state, provider_key, &kc_members).await?;
+    report.users_mapped += desired_user_ids.len();
+
+    let (added_users, removed_users) =
+        sync_group_members(state, group_id, &desired_user_ids).await?;
+    report.group_members_added += added_users.len();
+    report.group_members_removed += removed_users.len();
+    for (user_id, created_at) in added_users {
+        emit_group_member_event(state, group_id, user_id, created_at, 0, true).await;
+    }
+    let delete_at = Utc::now().timestamp_millis();
+    for (user_id, created_at) in removed_users {
+        emit_group_member_event(state, group_id, user_id, created_at, delete_at, false).await;
+    }
+
+    let dm_acl_enabled =
+        parse_bool_attribute(&kc_group.attributes, "rustchat_dm_acl").unwrap_or(false);
+    sync_group_dm_acl_flag(state, group_id, dm_acl_enabled).await?;
+
+    let (syncables_upserted, syncables_removed, changed_syncables) =
+        sync_group_syncables_from_attributes(state, group_id, kc_group).await?;
+    report.syncables_upserted += syncables_upserted;
+    report.syncables_removed += syncables_removed;
+
+    reconcile_group_syncables(state, group_id).await?;
+    for (kind, syncable_id, removed_link) in changed_syncables {
+        if removed_link {
+            cleanup_unlinked_syncable(state, group_id, kind, syncable_id).await?;
+            emit_group_syncable_event(state, group_id, kind, syncable_id, false).await;
+        } else {
+            reconcile_group_syncable(state, group_id, kind, syncable_id).await?;
+            emit_group_syncable_event(state, group_id, kind, syncable_id, true).await;
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn resync_user(state: &AppState, user_id: Uuid) -> ApiResult<KeycloakSyncReport> {

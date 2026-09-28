@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::models::{Channel, Team, TeamMember, TeamMemberResponse};
+use crate::services::group_membership_sync::purge_team_syncables;
 
 pub struct TeamRepository<'a> {
     pool: &'a PgPool,
@@ -93,10 +94,15 @@ impl<'a> TeamRepository<'a> {
 
     /// Delete a team.
     pub async fn delete_team(&self, id: Uuid) -> Result<(), sqlx::Error> {
+        // Single transaction: purge the group-syncable links pointing at
+        // the team before deleting it, so they cannot dangle.
+        let mut tx = self.pool.begin().await?;
+        purge_team_syncables(&mut tx, id).await?;
         sqlx::query("DELETE FROM teams WHERE id = $1")
             .bind(id)
-            .execute(self.pool)
+            .execute(&mut *tx)
             .await?;
+        tx.commit().await?;
         Ok(())
     }
 
