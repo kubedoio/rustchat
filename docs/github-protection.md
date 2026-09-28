@@ -3,29 +3,45 @@
 This repository uses files to enforce as much as possible, but several settings
 must be configured manually in the GitHub UI (or via the API).
 
-## Verified Settings (2026-09-27)
+## Verified Settings
 
-The following reflect the **verified, live** configuration — not merely desired
-settings (RI-C02). Reproduce with:
+> **⚠ 2026-09-28 re-verification FAILED — issue #258 remains open.**
+> Running `scripts/verify-protection.sh` on 2026-09-28 showed that live
+> `main` does **not** currently enforce the merge gate:
+>
+> - `required_status_checks` is **empty** — `CI Complete`, `Security Complete`,
+>   and `dco-check` are *not* required contexts.
+> - `required_pull_request_reviews` is **null** — no approving-review or
+>   CODEOWNERS requirement is enforced.
+>
+> What *is* live and verified on 2026-09-28: `enforce_admins` on; force pushes
+> and deletion blocked; conversation resolution required; the release-tag
+> ruleset (below). The configuration below is therefore the **intended**
+> state, not the current state, until a maintainer applies the required
+> checks and review policy on `main` (tracked in #258).
+
+The following reflects the **verified, live** configuration as last fully
+verified — **2026-09-27**; see the re-verification warning above for the
+current delta (RI-C02). Reproduce with:
 
 ```bash
 gh api repos/kubedoio/rustchat/branches/main/protection
 gh api repos/kubedoio/rustchat/rulesets
 ```
 
-### `main` branch protection (verified)
+### `main` branch protection (verified 2026-09-27; merge gate found missing 2026-09-28)
 
 - **Require a pull request before merging** — 1 approving review, CODEOWNERS review for affected paths, dismiss stale approvals on new commits.
 - **Require status checks** — required contexts `CI Complete`, `Security Complete`, `dco-check`; require branches to be up to date (`strict`).
 - **Require conversation resolution** — enabled.
 - **No bypass** — `enforce_admins` on; force push and deletion blocked for ordinary contributors.
 
-### Release tags (verified)
+### Release tags (verified 2026-09-28)
 
-The repository ruleset **"Protect release tags"** (active) targets **`refs/tags/v*`**
-and blocks creation, update, deletion, and non-fast-forward for ordinary
-contributors. Release versions are protected as **tags**, not version-looking
-branches.
+The repository ruleset **"Protect release tags"** (active, id 14126218) targets
+**`refs/tags/v*`** and blocks creation, update, deletion, and non-fast-forward
+for ordinary contributors. Release versions are protected as **tags**, not
+version-looking branches.
 
 ## Branch Protection
 
