@@ -352,4 +352,15 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    #[should_panic(expected = "invalid security header value for csp")]
+    fn test_invalid_config_value_fails_at_construction_with_field_name() {
+        // A malformed header value must fail loudly at construction
+        // (startup / router assembly), naming the offending field — never
+        // per request.
+        let mut config = SecurityHeadersConfig::strict();
+        config.csp = "default-src 'self';\nscript-src 'self'".to_string(); // \n is invalid in a HeaderValue
+        let _ = ParsedSecurityHeaders::from_config(&config);
+    }
 }
