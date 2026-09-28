@@ -42,10 +42,6 @@ pub struct ConnectionState {
     pub connection_id: String,
     /// User ID associated with this connection
     pub user_id: Uuid,
-    /// Team IDs the user is subscribed to
-    pub team_ids: Vec<Uuid>,
-    /// Channel IDs the user is subscribed to
-    pub channel_ids: Vec<Uuid>,
     /// Current sequence number (next message will use this value)
     pub sequence: AtomicI64,
     /// Ring buffer of recent messages
@@ -62,8 +58,6 @@ impl ConnectionState {
         Arc::new(Self {
             connection_id,
             user_id,
-            team_ids: Vec::new(),
-            channel_ids: Vec::new(),
             sequence: AtomicI64::new(initial_seq),
             message_buffer: std::sync::Mutex::new(VecDeque::with_capacity(MESSAGE_BUFFER_SIZE)),
             last_activity: std::sync::Mutex::new(Instant::now()),
@@ -153,14 +147,6 @@ impl ConnectionState {
         }
         let last_activity = *self.last_activity.lock().expect("mutex poisoned");
         Instant::now().duration_since(last_activity) > CONNECTION_TTL
-    }
-
-    /// Update team subscriptions
-    pub fn update_teams(&self, _team_ids: Vec<Uuid>) {
-        // This is a simple implementation - in production you might want to
-        // compute deltas and handle subscribe/unsubscribe accordingly
-        // For now, we just store the team IDs
-        // Note: team_ids should be stored with proper synchronization
     }
 }
 
@@ -299,12 +285,13 @@ impl ConnectionStore {
         if let Some((_, state)) = self.connections.remove(connection_id) {
             state.mark_inactive();
 
-            // Remove from user index
+            // Remove from user index and drop the index entry entirely once it
+            // is empty, so per-user Vec entries cannot accumulate forever.
+            if let Some(mut conns) = self.user_connections.get_mut(&state.user_id) {
+                conns.retain(|id| id != connection_id);
+            }
             self.user_connections
-                .entry(state.user_id)
-                .and_modify(|conns| {
-                    conns.retain(|id| id != connection_id);
-                });
+                .remove_if(&state.user_id, |_, conns| conns.is_empty());
 
             debug!(
                 connection_id = %connection_id,
@@ -345,26 +332,6 @@ impl ConnectionStore {
             .unwrap_or_default()
     }
 
-    /// Update subscriptions for a connection
-    pub fn update_subscriptions(
-        &self,
-        connection_id: &str,
-        team_ids: Vec<Uuid>,
-        channel_ids: Vec<Uuid>,
-    ) {
-        if let Some(_state) = self.connections.get(connection_id) {
-            // We need to store these - since ConnectionState uses simple Vec,
-            // we need to add proper synchronization
-            // For now, just log the update
-            debug!(
-                connection_id = %connection_id,
-                teams = team_ids.len(),
-                channels = channel_ids.len(),
-                "Subscriptions updated"
-            );
-        }
-    }
-
     /// Clean up expired connections
     async fn cleanup_expired(&self) {
         let mut expired = Vec::new();
@@ -377,12 +344,13 @@ impl ConnectionStore {
 
         for conn_id in &expired {
             if let Some((_, state)) = self.connections.remove(conn_id) {
-                // Remove from user index
+                // Remove from user index and drop the index entry entirely
+                // once it is empty (prevents unbounded index growth).
+                if let Some(mut conns) = self.user_connections.get_mut(&state.user_id) {
+                    conns.retain(|id| id != conn_id);
+                }
                 self.user_connections
-                    .entry(state.user_id)
-                    .and_modify(|conns| {
-                        conns.retain(|id| id != conn_id);
-                    });
+                    .remove_if(&state.user_id, |_, conns| conns.is_empty());
 
                 debug!(
                     connection_id = %conn_id,
@@ -522,6 +490,26 @@ mod tests {
             .expect("message should be queued");
 
         assert_eq!(first, 1);
+    }
+
+    #[tokio::test]
+    async fn test_remove_connection_drops_empty_user_index_entry() {
+        let store = ConnectionStore::new(tokio_util::sync::CancellationToken::new());
+        let user_id = Uuid::new_v4();
+
+        let (state_a, _, _) = store.resume_or_create(None, user_id, None);
+        let (state_b, _, _) = store.resume_or_create(None, user_id, None);
+
+        store.remove_connection(&state_a.connection_id);
+        // Entry survives while another connection for the user remains.
+        assert!(store.user_connections.get(&user_id).is_some());
+        assert_eq!(store.get_user_connections(user_id).len(), 1);
+
+        store.remove_connection(&state_b.connection_id);
+        // The per-user index entry must be removed entirely once empty, so
+        // per-user Vec entries cannot accumulate unboundedly.
+        assert!(store.user_connections.get(&user_id).is_none());
+        assert!(store.get_user_connections(user_id).is_empty());
     }
 
     #[tokio::test]

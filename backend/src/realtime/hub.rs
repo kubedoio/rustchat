@@ -26,6 +26,21 @@ struct ConnectionHandles {
     cmd_tx: mpsc::Sender<WsCommand>,
 }
 
+/// Send a serialized envelope to one connection's broadcast channel.
+///
+/// A `broadcast::Sender::send` failure means no receiver is attached: the
+/// socket task has ended but its handles are still registered until
+/// `remove_connection` reaps them. A lagging receiver never fails the send —
+/// it observes `Lagged` on receive — so this is a staleness signal, not
+/// message loss. Record it so stale handles are diagnosable instead of
+/// silently dropped.
+fn send_to_connection(handles: &ConnectionHandles, message: &str) {
+    if handles.broadcast_tx.send(message.to_string()).is_err() {
+        metrics::record_ws_dropped("no_receiver", 1);
+        tracing::trace!("broadcast send skipped: connection has no active receiver");
+    }
+}
+
 /// WebSocket Hub manages all active connections
 pub struct WsHub {
     /// Active connections: user_id -> connection_id -> handles
@@ -291,7 +306,7 @@ impl WsHub {
 
                         if let Some(user_connections) = connections.get(user_id) {
                             for handles in user_connections.values() {
-                                let _ = handles.broadcast_tx.send(message.clone());
+                                send_to_connection(handles, &message);
                             }
                         }
                     }
@@ -310,7 +325,7 @@ impl WsHub {
 
                         if let Some(user_connections) = connections.get(user_id) {
                             for tx in user_connections.values() {
-                                let _ = tx.broadcast_tx.send(message.clone());
+                                send_to_connection(tx, &message);
                             }
                         }
                     }
@@ -319,7 +334,7 @@ impl WsHub {
                 // Direct message to specific user
                 if let Some(user_connections) = connections.get(&user_id) {
                     for handles in user_connections.values() {
-                        let _ = handles.broadcast_tx.send(message.clone());
+                        send_to_connection(handles, &message);
                     }
                 }
             }
@@ -327,7 +342,7 @@ impl WsHub {
             // Broadcast to all (rare, mainly for system messages)
             for user_connections in connections.values() {
                 for handles in user_connections.values() {
-                    let _ = handles.broadcast_tx.send(message.clone());
+                    send_to_connection(handles, &message);
                 }
             }
         }
