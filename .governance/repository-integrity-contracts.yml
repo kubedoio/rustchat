@@ -190,7 +190,7 @@ contracts:
     title: migration-upgrade-proof
     activation:
       phase: P006
-      state: planned
+      state: active
     gates:
       merge: advisory
       promotion: advisory
@@ -199,6 +199,11 @@ contracts:
       a release candidate must prove schema upgrade from an empty database and
       the latest published stable schema state, followed by healthy application
       readiness.
+    enforcement:
+      check: Migration Matrix
+      workflow: CI (.github/workflows/ci.yml)
+      script: scripts/migration-matrix.sh
+      trigger: backend/migrations/** or scripts/migration-matrix.sh changes
     required_paths:
       - empty-to-head
       - latest-stable-schema-to-head
