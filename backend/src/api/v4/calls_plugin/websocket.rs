@@ -649,11 +649,32 @@ async fn resolve_call_for_ws_connection(
         let member_calls = find_member_calls_for_user(state, user_id).await?;
         if member_calls.len() == 1 {
             let call = member_calls.into_iter().next().expect("len checked above");
+            // Complete the registration instead of silently attaching an
+            // unregistered session: SDP/ICE handlers use the returned session
+            // id to join the media transport, and a channel member without a
+            // participant record would be invisible in participant lists and
+            // exempt from per-participant state (mute, screen share).
+            // Mirrors the join_call registration using the connection's own
+            // session id.
+            state
+                .call_state_manager
+                .add_participant(
+                    call.call_id,
+                    Participant {
+                        user_id,
+                        session_id: requested_session_id,
+                        joined_at: Utc::now().timestamp_millis(),
+                        muted: true,
+                        screen_sharing: false,
+                        hand_raised: false,
+                    },
+                )
+                .await;
             warn!(
                 user_id = %user_id,
                 requested_session_id = %requested_session_id,
                 call_id = %call.call_id,
-                "calls.ws session lookup recovered using channel membership fallback"
+                "calls.ws session lookup recovered via channel membership; participant registered"
             );
             Ok((call, requested_session_id))
         } else if member_calls.is_empty() {
