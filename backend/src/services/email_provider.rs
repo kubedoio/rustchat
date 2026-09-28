@@ -10,9 +10,16 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
 };
 use std::fmt;
+use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
 use crate::models::email::{MailProviderSettings, TlsMode};
+
+/// Connect/read/write timeout for SMTP operations. Without it a blackholed
+/// SMTP connection keeps `send()` in flight indefinitely, which extends the
+/// window in which the email worker's stale-sending lease reclaim can hand
+/// the same outgoing email to another send attempt (at worst: re-sent).
+const SMTP_IO_TIMEOUT: Option<Duration> = Some(Duration::from_secs(30));
 
 /// Errors that can occur during email sending
 #[derive(Debug, Clone)]
@@ -171,6 +178,7 @@ impl SmtpProvider {
                             ))
                         })?
                         .port(port)
+                        .timeout(SMTP_IO_TIMEOUT)
                         .tls(Tls::Required(tls_params))
                         .build()
                 }
@@ -181,6 +189,7 @@ impl SmtpProvider {
                     );
                     AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(host)
                         .port(port)
+                        .timeout(SMTP_IO_TIMEOUT)
                         .build()
                 }
                 TlsMode::Starttls => {
@@ -196,6 +205,7 @@ impl SmtpProvider {
                             ))
                         })?
                         .port(port)
+                        .timeout(SMTP_IO_TIMEOUT)
                         .tls(Tls::Required(tls_params))
                         .build()
                 }
@@ -231,6 +241,7 @@ impl SmtpProvider {
                         })?
                         .credentials(creds)
                         .port(port)
+                        .timeout(SMTP_IO_TIMEOUT)
                         .tls(Tls::Required(tls_params))
                         .build()
                 }
@@ -241,6 +252,7 @@ impl SmtpProvider {
                     );
                     AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(host)
                         .port(port)
+                        .timeout(SMTP_IO_TIMEOUT)
                         .credentials(creds)
                         .build()
                 }
@@ -258,6 +270,7 @@ impl SmtpProvider {
                         })?
                         .credentials(creds)
                         .port(port)
+                        .timeout(SMTP_IO_TIMEOUT)
                         .tls(Tls::Required(tls_params))
                         .build()
                 }

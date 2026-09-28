@@ -130,13 +130,16 @@ fn validate_chunk_config(
             )));
         }
     }
-    // The combination must keep a positive step; the chunker clamps overlap
-    // below size, but reject it explicitly so clients get a clear error.
+    // The combination must keep a productive step: step = size - overlap,
+    // and overlap above size/2 yields degenerate chunking (e.g. size=64 with
+    // overlap=63 advances one character per chunk — thousands of chunks and
+    // embeddings per document). The chunker clamps overlap below size, but
+    // reject it explicitly so clients get a clear error.
     let effective_size = chunk_size.unwrap_or(512);
     let effective_overlap = chunk_overlap.unwrap_or(50);
-    if effective_overlap >= effective_size {
+    if effective_overlap * 2 > effective_size {
         return Err(AppError::Validation(
-            "chunk_overlap must be smaller than chunk_size".to_string(),
+            "chunk_overlap must be at most half of chunk_size".to_string(),
         ));
     }
     Ok((chunk_size, chunk_overlap))
@@ -908,5 +911,16 @@ mod tests {
     #[test]
     fn router_builds_with_axum_v08_route_syntax() {
         let _ = super::router();
+    }
+
+    #[test]
+    fn chunk_config_rejects_degenerate_overlap() {
+        // step = size - overlap must stay productive: overlap above half
+        // the size degenerates to one chunk per few characters.
+        assert!(super::validate_chunk_config(Some(64), Some(33)).is_err());
+        assert!(super::validate_chunk_config(None, Some(600)).is_err()); // > default size/2
+        assert!(super::validate_chunk_config(Some(64), Some(32)).is_ok()); // exactly half
+        assert!(super::validate_chunk_config(Some(512), Some(64)).is_ok());
+        assert!(super::validate_chunk_config(None, None).is_ok()); // defaults 512/50
     }
 }
