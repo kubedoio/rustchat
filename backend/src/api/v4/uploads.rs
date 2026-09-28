@@ -91,11 +91,26 @@ async fn create_upload(
 
     // Cap concurrent live sessions per user: each buffers up to the session
     // file-size cap in the database, so the aggregate commitment must be
-    // bounded by session count, not just per-session size.
-    let live_sessions = UploadRepository::new(&state.db)
-        .count_active_sessions_by_user(auth.user_id)
+    // bounded by session count, not just per-session size. The cap is
+    // enforced atomically (per-user advisory lock) so parallel session
+    // creations cannot race past it.
+    let session_id = Uuid::new_v4();
+    let now = Utc::now();
+    let expires_at = now + chrono::Duration::hours(24);
+
+    let created = UploadRepository::new(&state.db)
+        .create_session_capped(
+            session_id,
+            auth.user_id,
+            channel_id,
+            &input.filename,
+            input.file_size,
+            now,
+            expires_at,
+            MAX_LIVE_UPLOAD_SESSIONS_PER_USER,
+        )
         .await?;
-    if live_sessions >= MAX_LIVE_UPLOAD_SESSIONS_PER_USER {
+    if !created {
         return Err(AppError::TooManyRequests(
             format!(
                 "upload session limit reached ({MAX_LIVE_UPLOAD_SESSIONS_PER_USER} live \
@@ -104,23 +119,6 @@ async fn create_upload(
             None,
         ));
     }
-
-    // Create upload session
-    let session_id = Uuid::new_v4();
-    let now = Utc::now();
-    let expires_at = now + chrono::Duration::hours(24);
-
-    UploadRepository::new(&state.db)
-        .create_session(
-            session_id,
-            auth.user_id,
-            channel_id,
-            &input.filename,
-            input.file_size,
-            now,
-            expires_at,
-        )
-        .await?;
 
     Ok((
         StatusCode::CREATED,
@@ -243,131 +241,152 @@ async fn upload_data(
         hasher.update(&file_data);
         let hash = hex::encode(hasher.finalize());
 
-        // Upload to S3
-        state
-            .s3_client
-            .upload(&key, file_data.clone(), &mime_type)
-            .await?;
-
-        // Image processing for thumbnails (blocking operation offloaded)
-        let (width, height, thumbnail_data, preview_data) = if mime_type.starts_with("image/") {
-            let data_clone = file_data.clone();
-
-            tokio::task::spawn_blocking(move || {
-                if let Ok(img) = image::load_from_memory(&data_clone) {
-                    let (w, h) = img.dimensions();
-                    let w_out = Some(w as i32);
-                    let h_out = Some(h as i32);
-
-                    // Generate thumbnail (400x400 max) as JPEG for Mattermost mobile compatibility
-                    let thumb_data = if w > 400 || h > 400 {
-                        let thumb = img.thumbnail(400, 400);
-                        let mut buf = Vec::new();
-                        if thumb
-                            .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
-                            .is_ok()
-                        {
-                            Some(buf)
-                        } else {
-                            None
-                        }
-                    } else {
-                        let mut buf = Vec::new();
-                        if img
-                            .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
-                            .is_ok()
-                        {
-                            Some(buf)
-                        } else {
-                            None
-                        }
-                    };
-
-                    // Generate preview (1024x1024 max) as JPEG for Mattermost mobile compatibility
-                    let preview_data = if w > 1024 || h > 1024 {
-                        let preview = img.thumbnail(1024, 1024);
-                        let mut buf = Vec::new();
-                        if preview
-                            .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
-                            .is_ok()
-                        {
-                            Some(buf)
-                        } else {
-                            None
-                        }
-                    } else {
-                        let mut buf = Vec::new();
-                        if img
-                            .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
-                            .is_ok()
-                        {
-                            Some(buf)
-                        } else {
-                            None
-                        }
-                    };
-
-                    (w_out, h_out, thumb_data, preview_data)
-                } else {
-                    (None, None, None, None)
-                }
-            })
-            .await
-            .unwrap_or((None, None, None, None))
-        } else {
-            (None, None, None, None)
-        };
-
-        // Upload thumbnail to S3 if generated
-        let thumbnail_key: Option<String> = if let Some(thumb_data) = thumbnail_data {
-            let thumb_key = format!("thumbnails/{}/{}.jpg", auth.user_id, file_id);
-            if state
+        // Upload to S3, persist the file record, and drop the session. Any
+        // failure on this path must not leave the session alive: a live
+        // session consumes one of the user's capped slots until it expires
+        // (up to 24h), so failed finalizes would gradually lock the user
+        // out of new uploads.
+        let finalize = async {
+            state
                 .s3_client
-                .upload(&thumb_key, thumb_data, "image/jpeg")
+                .upload(&key, file_data.clone(), &mime_type)
+                .await?;
+
+            // Image processing for thumbnails (blocking operation offloaded)
+            let (width, height, thumbnail_data, preview_data) = if mime_type.starts_with("image/") {
+                let data_clone = file_data.clone();
+
+                tokio::task::spawn_blocking(move || {
+                    if let Ok(img) = image::load_from_memory(&data_clone) {
+                        let (w, h) = img.dimensions();
+                        let w_out = Some(w as i32);
+                        let h_out = Some(h as i32);
+
+                        // Generate thumbnail (400x400 max) as JPEG for Mattermost mobile compatibility
+                        let thumb_data = if w > 400 || h > 400 {
+                            let thumb = img.thumbnail(400, 400);
+                            let mut buf = Vec::new();
+                            if thumb
+                                .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
+                                .is_ok()
+                            {
+                                Some(buf)
+                            } else {
+                                None
+                            }
+                        } else {
+                            let mut buf = Vec::new();
+                            if img
+                                .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
+                                .is_ok()
+                            {
+                                Some(buf)
+                            } else {
+                                None
+                            }
+                        };
+
+                        // Generate preview (1024x1024 max) as JPEG for Mattermost mobile compatibility
+                        let preview_data = if w > 1024 || h > 1024 {
+                            let preview = img.thumbnail(1024, 1024);
+                            let mut buf = Vec::new();
+                            if preview
+                                .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
+                                .is_ok()
+                            {
+                                Some(buf)
+                            } else {
+                                None
+                            }
+                        } else {
+                            let mut buf = Vec::new();
+                            if img
+                                .write_to(&mut Cursor::new(&mut buf), ImageFormat::Jpeg)
+                                .is_ok()
+                            {
+                                Some(buf)
+                            } else {
+                                None
+                            }
+                        };
+
+                        (w_out, h_out, thumb_data, preview_data)
+                    } else {
+                        (None, None, None, None)
+                    }
+                })
                 .await
-                .is_ok()
-            {
-                Some(thumb_key)
+                .unwrap_or((None, None, None, None))
+            } else {
+                (None, None, None, None)
+            };
+
+            // Upload thumbnail to S3 if generated
+            let thumbnail_key: Option<String> = if let Some(thumb_data) = thumbnail_data {
+                let thumb_key = format!("thumbnails/{}/{}.jpg", auth.user_id, file_id);
+                if state
+                    .s3_client
+                    .upload(&thumb_key, thumb_data, "image/jpeg")
+                    .await
+                    .is_ok()
+                {
+                    Some(thumb_key)
+                } else {
+                    None
+                }
             } else {
                 None
+            };
+
+            if let Some(preview_data) = preview_data {
+                let preview_key = format!("previews/{}/{}.jpg", auth.user_id, file_id);
+                let _ = state
+                    .s3_client
+                    .upload(&preview_key, preview_data, "image/jpeg")
+                    .await;
             }
-        } else {
-            None
+
+            let has_thumbnail = thumbnail_key.is_some();
+
+            // Insert into files table with correct schema
+            UploadRepository::new(&state.db)
+                .create_file(
+                    file_id,
+                    auth.user_id,
+                    session.channel_id,
+                    &filename,
+                    &key,
+                    &mime_type,
+                    session.file_size,
+                    &hash,
+                    width,
+                    height,
+                    has_thumbnail,
+                    &thumbnail_key,
+                    now,
+                )
+                .await?;
+
+            // Delete upload session
+            UploadRepository::new(&state.db)
+                .delete_session(upload_id)
+                .await?;
+
+            Ok::<_, AppError>((width, height, has_thumbnail))
         };
 
-        if let Some(preview_data) = preview_data {
-            let preview_key = format!("previews/{}/{}.jpg", auth.user_id, file_id);
-            let _ = state
-                .s3_client
-                .upload(&preview_key, preview_data, "image/jpeg")
-                .await;
-        }
-
-        let has_thumbnail = thumbnail_key.is_some();
-
-        // Insert into files table with correct schema
-        UploadRepository::new(&state.db)
-            .create_file(
-                file_id,
-                auth.user_id,
-                session.channel_id,
-                &filename,
-                &key,
-                &mime_type,
-                session.file_size,
-                &hash,
-                width,
-                height,
-                has_thumbnail,
-                &thumbnail_key,
-                now,
-            )
-            .await?;
-
-        // Delete upload session
-        UploadRepository::new(&state.db)
-            .delete_session(upload_id)
-            .await?;
+        let (width, height, has_thumbnail) = match finalize.await {
+            Ok(values) => values,
+            Err(err) => {
+                // Best-effort cleanup so the failed session does not keep
+                // consuming a live-session cap slot; the buffered bytes are
+                // already accounted for either way.
+                let _ = UploadRepository::new(&state.db)
+                    .delete_session(upload_id)
+                    .await;
+                return Err(err);
+            }
+        };
 
         // Return FileInfo
         let file_info = mm::FileInfo {
