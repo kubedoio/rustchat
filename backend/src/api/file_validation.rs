@@ -213,6 +213,21 @@ pub fn validate_file_upload_head(
 }
 
 #[allow(dead_code)]
+/// Raw-text screening of SVG content (defense-in-depth; SVG uploads are
+/// rejected at the extension layer today, so this validator is not on a
+/// live path).
+///
+/// Known limitations, accepted for a screening layer:
+///
+/// - **Entity encoding**: an XML/HTML parser decodes entities
+///   (`&#106;avascript:`, `on&#108;oad=`), so entity-encoded payloads can
+///   pass raw-text screening. If this validator is ever wired to a live
+///   path, replace or augment it with a real XML parse plus
+///   allowlist-based sanitization — do not rely on substring/regex
+///   screening alone against an XML-parsing consumer.
+/// - **Content false positives**: patterns are matched over the whole
+///   document, so handler-like text inside `<text>` nodes or inert CDATA
+///   is also rejected. Conservative by intent.
 fn validate_svg(data: &[u8]) -> Result<(), AppError> {
     use regex::Regex;
     use std::sync::LazyLock;
@@ -233,10 +248,20 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
     static SMIL_HREF_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r#"(?i)attributename\s*=\s*["'](href|xlink:href)["']"#).unwrap()
     });
-    /// CSS that fetches remote resources from a `style` attribute.
+    /// CSS that fetches remote resources from a `style` attribute. Local
+    /// fragment references (`url(#gradient)`, `url(#pattern)`) are explicitly
+    /// allowed — they are the standard way to reference in-document
+    /// gradients/patterns and cannot fetch anything.
     static STYLE_FETCH_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r#"(?i)style\s*=\s*["'][^"']*\b(url|expression)\s*\("#).unwrap()
+        // `url(` must be followed by an optional quote and then something
+        // other than `#` (fragment), a quote, whitespace, or `)` (empty).
+        Regex::new(r#"(?i)style\s*=\s*["'][^"']*\b(url|expression)\s*\(\s*["']?[^#"'\s)]"#).unwrap()
     });
+    /// Any `href`/`xlink:href` attribute, with arbitrary whitespace around
+    /// `=` (`href = "…"` must not slip past the screen the way a plain
+    /// `contains("href=")` check allowed).
+    static HREF_ATTR_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#"(?i)(?:^|[\s<"'(])(xlink:)?href\s*="#).unwrap());
 
     let text = std::str::from_utf8(data)
         .map_err(|_| AppError::BadRequest("SVG must be valid UTF-8".to_string()))?;
@@ -274,8 +299,9 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
         ));
     }
 
-    // Reject external references
-    if lower.contains("xlink:href") || lower.contains("href=") {
+    // Reject external references (href/xlink:href attributes, whitespace
+    // around `=` included)
+    if HREF_ATTR_RE.is_match(text) {
         return Err(AppError::BadRequest(
             "SVG contains forbidden external references".to_string(),
         ));
@@ -447,6 +473,45 @@ mod tests {
         // XXE / billion-laughs vector.
         let svg = br#"<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
             <svg xmlns="http://www.w3.org/2000/svg"><text>&xxe;</text></svg>"#;
+        assert!(validate_svg(svg).is_err());
+    }
+
+    #[test]
+    fn malicious_svg_with_whitespace_around_href_is_rejected() {
+        // Regression: the old substring check `contains("href=")` allowed
+        // `href = ` with a space before the equals sign.
+        let cases: [&[u8]; 3] = [
+            br#"<svg xmlns="http://www.w3.org/2000/svg"><a href = "https://evil.example/x.svg">x</a></svg>"#,
+            br#"<svg xmlns="http://www.w3.org/2000/svg"><a href
+                = "https://evil.example/x.svg">x</a></svg>"#,
+            br#"<svg xmlns="http://www.w3.org/2000/svg"><use xlink:href = 'https://evil.example/p.svg'/></svg>"#,
+        ];
+        for svg in cases {
+            assert!(
+                validate_svg(svg).is_err(),
+                "expected rejection of: {}",
+                String::from_utf8_lossy(svg)
+            );
+        }
+    }
+
+    #[test]
+    fn benign_svg_with_local_fragment_style_reference_is_accepted() {
+        // Regression: `style="fill: url(#gradient)"` is the standard way to
+        // reference in-document gradients and must not be rejected; only
+        // remote fetches (url to a scheme/host) are forbidden.
+        let svg = br##"<svg xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="grad"><stop stop-color="#00ff00"/></linearGradient></defs>
+            <rect style="fill: url(#grad)" width="10" height="10"/>
+        </svg>"##;
+        assert!(validate_svg(svg).is_ok());
+    }
+
+    #[test]
+    fn malicious_svg_with_remote_style_url_is_rejected() {
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg">
+            <rect style="fill: url(https://evil.example/x)" width="10" height="10"/>
+        </svg>"#;
         assert!(validate_svg(svg).is_err());
     }
 }
