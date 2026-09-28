@@ -851,15 +851,21 @@ async fn deactivate_removed_keycloak_groups(
         // Self-healing by construction: the group's soft-delete happens
         // last, so a failure above leaves the group alive and the next
         // cycle re-runs this whole deactivation (and its cleanups).
-        let mut conn = state.db.acquire().await?;
-        for (syncable_type, syncable_id) in syncables {
-            let kind = if syncable_type == "team" {
-                SyncableKind::Team
-            } else {
-                SyncableKind::Channel
-            };
-            cleanup_unlinked_syncable(&mut conn, group_id, kind, syncable_id).await?;
-            emit_group_syncable_event(state, group_id, kind, syncable_id, false).await;
+        // The connection is scoped to the loop: the statements below run
+        // on the pool again, and holding a pooled connection across
+        // same-pool acquires would starve a single-connection pool
+        // (the acquire would wait on a connection this task holds).
+        {
+            let mut conn = state.db.acquire().await?;
+            for (syncable_type, syncable_id) in syncables {
+                let kind = if syncable_type == "team" {
+                    SyncableKind::Team
+                } else {
+                    SyncableKind::Channel
+                };
+                cleanup_unlinked_syncable(&mut conn, group_id, kind, syncable_id).await?;
+                emit_group_syncable_event(state, group_id, kind, syncable_id, false).await;
+            }
         }
 
         let member_rows: Vec<(Uuid, chrono::DateTime<chrono::Utc>)> =
