@@ -22,6 +22,9 @@ must be configured manually in the GitHub UI (or via the API).
 > PASS: main blocks force pushes for ordinary contributors
 > PASS: main blocks branch deletion
 > PASS: main requires conversation resolution
+> PASS: main requires at least 1 approving review
+> PASS: main requires CODEOWNERS review
+> PASS: main dismisses stale approvals on new commits
 > PASS: release-tag ruleset targets tags (id 14126218)
 > PASS: release-tag ruleset includes refs/tags/v*
 > ```
