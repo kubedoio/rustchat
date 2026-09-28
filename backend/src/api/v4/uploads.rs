@@ -25,6 +25,13 @@ use crate::mattermost_compat::{
 };
 use crate::repositories::{ChannelRepository, UploadRepository};
 
+/// Maximum declared size for a single upload session (100 MB).
+///
+/// Upload sessions buffer their bytes in the database (`file_data` bytea)
+/// until finalization, so this cap bounds the storage any single channel
+/// member can commit by starting (and never finishing) an upload.
+pub const MAX_UPLOAD_SESSION_FILE_SIZE: i64 = 100 * 1024 * 1024;
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/uploads", post(create_upload))
@@ -56,6 +63,17 @@ async fn create_upload(
         return Err(AppError::BadRequest(
             "file_size must be a positive integer".to_string(),
         ));
+    }
+
+    // Reject declared sizes above the session cap: upload sessions buffer
+    // their bytes in the database, so an unbounded declared size is an
+    // unbounded storage commitment from a single channel member.
+    if input.file_size > MAX_UPLOAD_SESSION_FILE_SIZE {
+        return Err(AppError::BadRequest(format!(
+            "file_size {} exceeds the maximum upload size of {} MB",
+            input.file_size,
+            MAX_UPLOAD_SESSION_FILE_SIZE / (1024 * 1024)
+        )));
     }
 
     // Verify user has access to channel
@@ -150,6 +168,15 @@ async fn upload_data(
         return Err(AppError::BadRequest(format!(
             "upload exceeds declared file_size: {} > {}",
             new_offset, session.file_size
+        )));
+    }
+
+    // Defense in depth for sessions created before the cap (or with a
+    // corrupted declared size): never append past the hard session cap.
+    if new_offset > MAX_UPLOAD_SESSION_FILE_SIZE {
+        return Err(AppError::BadRequest(format!(
+            "upload exceeds the maximum upload size of {} MB",
+            MAX_UPLOAD_SESSION_FILE_SIZE / (1024 * 1024)
         )));
     }
 

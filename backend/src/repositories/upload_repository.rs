@@ -109,6 +109,27 @@ impl<'a> UploadRepository<'a> {
         Ok(())
     }
 
+    /// Delete up to `limit` upload sessions whose `expires_at` has passed.
+    ///
+    /// Upload sessions buffer their bytes in the database (`file_data`
+    /// bytea); without this, an abandoned session (client never finalized)
+    /// leaks its row and bytes forever. Returns the number of rows removed
+    /// so the cleanup job can keep draining in bounded batches.
+    pub async fn delete_expired_sessions(&self, limit: i64) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM upload_sessions WHERE id IN (
+                SELECT id FROM upload_sessions
+                WHERE expires_at < NOW()
+                ORDER BY expires_at
+                LIMIT $1
+            )",
+        )
+        .bind(limit)
+        .execute(self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Create a file record.
     #[allow(clippy::too_many_arguments)]
     pub async fn create_file(

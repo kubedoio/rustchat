@@ -166,6 +166,12 @@ pub fn spawn_application_workers(
     );
     supervisor.track("retention", retention_handle);
 
+    // Upload-session expiry cleanup worker: purges abandoned upload
+    // sessions (and their buffered bytes) once past their 24h expiry.
+    let upload_cleanup_handle =
+        crate::jobs::spawn_upload_session_cleanup(state.db.clone(), state.shutdown.clone());
+    supervisor.track("upload-session-cleanup", upload_cleanup_handle);
+
     // Email worker.
     let email_handle = crate::jobs::spawn_email_worker(
         state.db.clone(),
