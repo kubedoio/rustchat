@@ -34,7 +34,18 @@ pub struct AgentRuntime {
     tool_registry: Option<Arc<ToolRegistry>>,
     rate_limiter: Arc<AgentRateLimiter>,
     semaphores: DashMap<Uuid, Arc<Semaphore>>,
+    /// Per-(agent, triggering user) trigger windows: a single user must not
+    /// be able to burn an agent's entire rate budget (and LLM spend) by
+    /// spamming mentions while other users are starved.
+    trigger_windows: DashMap<(Uuid, Uuid), (std::time::Instant, u32)>,
 }
+
+/// Maximum agent triggers a single user may cause per agent per minute.
+const MAX_TRIGGERS_PER_USER_PER_MINUTE: u32 = 6;
+/// Window for the per-user trigger limit.
+const TRIGGER_WINDOW: std::time::Duration = std::time::Duration::from_secs(60);
+/// Prune the trigger-window index once it grows past this many entries.
+const TRIGGER_INDEX_PRUNE_THRESHOLD: usize = 10_000;
 
 impl AgentRuntime {
     pub fn new(
@@ -55,6 +66,7 @@ impl AgentRuntime {
             tool_registry,
             rate_limiter,
             semaphores: DashMap::new(),
+            trigger_windows: DashMap::new(),
         }
     }
 
@@ -103,10 +115,50 @@ impl AgentRuntime {
             return Ok(());
         }
 
+        // Loop guard: an agent-authored post must not auto-trigger other
+        // agents — two respond_to_all agents in one channel would otherwise
+        // ping-pong forever, flooding the channel and burning tokens.
+        // Explicit mentions still work (mentioning an agent is an explicit
+        // instruction, even when the author is another agent).
+        if triggers
+            .values()
+            .any(|t| matches!(t, AgentTriggerType::RespondToAll))
+        {
+            let author = UserRepository::new(&self.db)
+                .get_by_id(post.user_id)
+                .await
+                .map_err(AppError::Database)?;
+            if author
+                .map(|u| u.entity_type == EntityType::Agent)
+                .unwrap_or(false)
+            {
+                tracing::debug!(
+                    author_id = %post.user_id,
+                    "Suppressing respond_to_all triggers for agent-authored post (loop guard)"
+                );
+                triggers.retain(|_, t| matches!(t, AgentTriggerType::Mention));
+                if triggers.is_empty() {
+                    return Ok(());
+                }
+            }
+        }
+
         for (agent_user_id, trigger_type) in triggers {
             // Prevent agent from triggering itself (infinite loop)
             if post.user_id == agent_user_id {
                 tracing::debug!(agent_id = %agent_user_id, "Skipping self-triggered agent response");
+                continue;
+            }
+
+            // Per-triggering-user limit: one user spamming @agent must not
+            // consume the agent's whole budget while other users are starved.
+            if !self.allow_trigger(agent_user_id, post.user_id) {
+                tracing::warn!(
+                    agent_id = %agent_user_id,
+                    user_id = %post.user_id,
+                    limit = MAX_TRIGGERS_PER_USER_PER_MINUTE,
+                    "Agent trigger throttled per user"
+                );
                 continue;
             }
 
@@ -204,6 +256,30 @@ impl AgentRuntime {
         }
 
         Ok(())
+    }
+
+    /// Check and consume one trigger from the per-(agent, user) window.
+    fn allow_trigger(&self, agent_user_id: Uuid, user_id: Uuid) -> bool {
+        // Opportunistic prune so the index cannot grow without bound.
+        if self.trigger_windows.len() > TRIGGER_INDEX_PRUNE_THRESHOLD {
+            self.trigger_windows
+                .retain(|_, (window_start, _)| window_start.elapsed() < TRIGGER_WINDOW);
+        }
+
+        let mut entry = self
+            .trigger_windows
+            .entry((agent_user_id, user_id))
+            .or_insert((std::time::Instant::now(), 0));
+        let (window_start, count) = *entry;
+        if window_start.elapsed() >= TRIGGER_WINDOW {
+            *entry = (std::time::Instant::now(), 1);
+            true
+        } else if count < MAX_TRIGGERS_PER_USER_PER_MINUTE {
+            entry.1 += 1;
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -607,4 +683,69 @@ fn parse_mentions(message: &str) -> Vec<String> {
     }
 
     mentions
+}
+
+#[cfg(test)]
+mod trigger_limit_tests {
+    use super::*;
+
+    fn runtime() -> AgentRuntime {
+        AgentRuntime::new(
+            sqlx::PgPool::connect_lazy("postgres://localhost/none").unwrap(),
+            WsHub::new(),
+            Arc::new(ProviderRegistry::new()),
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[tokio::test]
+    async fn per_user_trigger_limit_allows_then_throttles() {
+        let rt = runtime();
+        let agent = Uuid::new_v4();
+        let user = Uuid::new_v4();
+
+        for i in 0..MAX_TRIGGERS_PER_USER_PER_MINUTE {
+            assert!(
+                rt.allow_trigger(agent, user),
+                "trigger {} must be allowed",
+                i + 1
+            );
+        }
+        assert!(
+            !rt.allow_trigger(agent, user),
+            "trigger beyond the per-user limit must be throttled"
+        );
+    }
+
+    #[tokio::test]
+    async fn per_user_trigger_limit_is_independent_per_agent() {
+        let rt = runtime();
+        let user = Uuid::new_v4();
+        let agent_a = Uuid::new_v4();
+        let agent_b = Uuid::new_v4();
+
+        for _ in 0..MAX_TRIGGERS_PER_USER_PER_MINUTE {
+            assert!(rt.allow_trigger(agent_a, user));
+        }
+        assert!(!rt.allow_trigger(agent_a, user));
+        // The same user has a fresh budget against a different agent.
+        assert!(rt.allow_trigger(agent_b, user));
+    }
+
+    #[tokio::test]
+    async fn per_user_trigger_limit_is_independent_per_user() {
+        let rt = runtime();
+        let agent = Uuid::new_v4();
+        let user_a = Uuid::new_v4();
+        let user_b = Uuid::new_v4();
+
+        for _ in 0..MAX_TRIGGERS_PER_USER_PER_MINUTE {
+            assert!(rt.allow_trigger(agent, user_a));
+        }
+        assert!(!rt.allow_trigger(agent, user_a));
+        // Another user is not starved by the first user's spam.
+        assert!(rt.allow_trigger(agent, user_b));
+    }
 }
