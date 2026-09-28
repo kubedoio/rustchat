@@ -375,7 +375,19 @@ pub(crate) async fn reconcile_group_syncables(state: &AppState, group_id: Uuid) 
         } else {
             SyncableKind::Channel
         };
-        reconcile_group_syncable(state, group_id, kind, syncable_id).await?;
+        // One failing syncable must not abort the group's remaining
+        // reconciliation (or, via the Keycloak worker, the whole cycle):
+        // the others still need to converge. Failures are logged and
+        // retried on the next pass.
+        if let Err(err) = reconcile_group_syncable(state, group_id, kind, syncable_id).await {
+            tracing::warn!(
+                group_id = %group_id,
+                syncable_id = %syncable_id,
+                syncable_type = %syncable_type,
+                error = %err,
+                "Group syncable reconciliation failed"
+            );
+        }
     }
     Ok(())
 }
@@ -409,6 +421,47 @@ pub(crate) async fn reconcile_group_syncable(
     let Some(syncable) = syncable else {
         return Ok(());
     };
+
+    // A syncable whose team/channel was hard-deleted (nothing enforces an
+    // FK on syncable_id) must not abort reconciliation: erroring here
+    // would block every other syncable of the group and, via the Keycloak
+    // worker, every later group in the cycle. Treat it as unlinked —
+    // revoke the memberships it still grants, drop its tracking rows, and
+    // remove the dead link. A group whose IdP attributes still reference
+    // the deleted target re-creates the link on the next sync, and this
+    // path cleans it up again.
+    let target_exists: bool = match kind {
+        SyncableKind::Team => {
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM teams WHERE id = $1)")
+                .bind(syncable_id)
+                .fetch_one(&state.db)
+                .await?
+        }
+        SyncableKind::Channel => {
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM channels WHERE id = $1)")
+                .bind(syncable_id)
+                .fetch_one(&state.db)
+                .await?
+        }
+    };
+    if !target_exists {
+        tracing::warn!(
+            group_id = %group_id,
+            syncable_id = %syncable_id,
+            syncable_type = kind.as_db_str(),
+            "Group syncable target no longer exists; revoking its grants and removing the link"
+        );
+        cleanup_unlinked_syncable(state, group_id, kind, syncable_id).await?;
+        sqlx::query(
+            "DELETE FROM group_syncables WHERE group_id = $1 AND syncable_type = $2 AND syncable_id = $3",
+        )
+        .bind(group_id)
+        .bind(kind.as_db_str())
+        .bind(syncable_id)
+        .execute(&state.db)
+        .await?;
+        return Ok(());
+    }
 
     let group_user_ids: Vec<Uuid> =
         sqlx::query_scalar("SELECT user_id FROM group_members WHERE group_id = $1")
@@ -494,6 +547,118 @@ pub(crate) async fn reconcile_group_syncable(
             cleanup_tracking_membership(state, group_id, kind, syncable_id, &tracked).await?;
         }
     }
+
+    Ok(())
+}
+
+/// Purge every group-syncable link pointing at a team (or at any of its
+/// channels — those cascade with the team) together with its tracking
+/// rows, inside the caller's hard-delete transaction. Nothing enforces an
+/// FK on `group_syncables.syncable_id`, so skipping this leaves dangling
+/// links that abort reconciliation for their groups. All memberships
+/// those syncables granted target the team or its channels and cascade
+/// with the delete.
+pub(crate) async fn purge_team_syncables(
+    tx: &mut sqlx::PgConnection,
+    team_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        DELETE FROM group_syncables gs
+        WHERE (gs.syncable_type = 'team' AND gs.syncable_id = $1)
+           OR (gs.syncable_type = 'channel' AND gs.syncable_id IN (
+                   SELECT c.id FROM channels c WHERE c.team_id = $1))
+        "#,
+    )
+    .bind(team_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        r#"
+        DELETE FROM group_syncable_memberships gsm
+        WHERE (gsm.syncable_type = 'team' AND gsm.syncable_id = $1)
+           OR (gsm.syncable_type = 'channel' AND gsm.syncable_id IN (
+                   SELECT c.id FROM channels c WHERE c.team_id = $1))
+        "#,
+    )
+    .bind(team_id)
+    .execute(&mut *tx)
+    .await?;
+
+    Ok(())
+}
+
+/// Purge the group-syncable links pointing at a channel and revoke what
+/// they granted, inside the caller's hard-delete transaction.
+/// `channel_members` cascade with the channel, but a channel syncable
+/// also grants its TEAM memberships — those are revoked here (or
+/// re-converged when another active grant keeps them) or the group's
+/// members silently keep team access. The links themselves are removed
+/// because nothing enforces an FK on `group_syncables.syncable_id` and
+/// dangling links abort reconciliation for their groups.
+pub(crate) async fn purge_channel_syncables(
+    tx: &mut sqlx::PgConnection,
+    channel_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    // Drop the links first: group_syncable_active_grants then excludes
+    // this channel's grants for every statement below.
+    sqlx::query("DELETE FROM group_syncables WHERE syncable_type = 'channel' AND syncable_id = $1")
+        .bind(channel_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // Revoke team memberships granted by this channel's syncables that no
+    // other active grant keeps alive...
+    sqlx::query(
+        r#"
+        DELETE FROM team_members tm
+        WHERE (tm.team_id, tm.user_id) IN (
+                  SELECT gsm.target_id, gsm.user_id
+                  FROM group_syncable_memberships gsm
+                  WHERE gsm.syncable_type = 'channel'
+                    AND gsm.syncable_id = $1
+                    AND gsm.target_type = 'team')
+          AND NOT EXISTS (
+                  SELECT 1
+                  FROM group_syncable_active_grants g
+                  WHERE g.target_type = 'team'
+                    AND g.target_id = tm.team_id
+                    AND g.user_id = tm.user_id)
+        "#,
+    )
+    .bind(channel_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // ...and re-converge the roles of members that other active grants
+    // still keep.
+    sqlx::query(
+        r#"
+        UPDATE team_members tm SET role = (
+            SELECT CASE WHEN bool_or(g.role = 'admin') THEN 'admin' ELSE 'member' END
+            FROM group_syncable_active_grants g
+            WHERE g.target_type = 'team'
+              AND g.target_id = tm.team_id
+              AND g.user_id = tm.user_id)
+        WHERE (tm.team_id, tm.user_id) IN (
+                  SELECT gsm.target_id, gsm.user_id
+                  FROM group_syncable_memberships gsm
+                  WHERE gsm.syncable_type = 'channel'
+                    AND gsm.syncable_id = $1
+                    AND gsm.target_type = 'team')
+        "#,
+    )
+    .bind(channel_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        "DELETE FROM group_syncable_memberships WHERE syncable_type = 'channel' AND syncable_id = $1",
+    )
+    .bind(channel_id)
+    .execute(&mut *tx)
+    .await?;
 
     Ok(())
 }

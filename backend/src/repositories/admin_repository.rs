@@ -16,6 +16,8 @@ use crate::models::{
     CreateRetentionPolicy, CreateSsoConfig, Permission, RetentionPolicy, ServerConfig, SsoConfig,
     TeamMember, TeamMemberResponse, UpdateSsoConfig,
 };
+use crate::services::group_membership_sync::purge_channel_syncables;
+use crate::services::group_membership_sync::purge_team_syncables;
 
 /// Repository for admin-related database operations
 pub struct AdminRepository<'a> {
@@ -1317,11 +1319,15 @@ impl<'a> AdminRepository<'a> {
 
     /// Delete a team by ID
     pub async fn delete_team(&self, id: Uuid) -> ApiResult<()> {
+        // Single transaction: purge the group-syncable links pointing at
+        // the team before deleting it, so they cannot dangle.
+        let mut tx = self.pool.begin().await?;
+        purge_team_syncables(&mut tx, id).await?;
         sqlx::query("DELETE FROM teams WHERE id = $1")
             .bind(id)
-            .execute(self.pool)
+            .execute(&mut *tx)
             .await?;
-
+        tx.commit().await?;
         Ok(())
     }
 
@@ -1494,11 +1500,16 @@ impl<'a> AdminRepository<'a> {
 
     /// Delete a channel by ID
     pub async fn delete_channel(&self, id: Uuid) -> ApiResult<()> {
+        // Single transaction: purge the group-syncable links pointing at
+        // the channel and revoke the team memberships they granted (only
+        // channel_members cascade; team grants need explicit revocation).
+        let mut tx = self.pool.begin().await?;
+        purge_channel_syncables(&mut tx, id).await?;
         sqlx::query("DELETE FROM channels WHERE id = $1")
             .bind(id)
-            .execute(self.pool)
+            .execute(&mut *tx)
             .await?;
-
+        tx.commit().await?;
         Ok(())
     }
 
