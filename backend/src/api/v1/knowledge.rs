@@ -287,6 +287,36 @@ pub async fn upload_document(
         )));
     }
 
+    // Verify the claimed MIME type against the actual content so a
+    // mislabeled file cannot reach the extraction pipeline (magic bytes for
+    // binary formats, UTF-8 decodability for text). The client-supplied
+    // content type is never trusted on its own.
+    match mime_type.as_str() {
+        "application/pdf" => {
+            if !data.starts_with(b"%PDF") {
+                return Err(AppError::BadRequest(
+                    "File content is not a valid PDF".to_string(),
+                ));
+            }
+        }
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
+            // DOCX is a ZIP container (local file header signature).
+            let is_zip =
+                data.starts_with(b"PK") && data.len() >= 4 && data[2] == 0x03 && data[3] == 0x04;
+            if !is_zip {
+                return Err(AppError::BadRequest(
+                    "File content is not a valid DOCX document".to_string(),
+                ));
+            }
+        }
+        t if t.starts_with("text/") && std::str::from_utf8(&data).is_err() => {
+            return Err(AppError::BadRequest(
+                "Text file content is not valid UTF-8".to_string(),
+            ));
+        }
+        _ => {}
+    }
+
     // Compute hash
     let hash = Sha256::digest(&data);
     let hash_hex = hex::encode(hash);
