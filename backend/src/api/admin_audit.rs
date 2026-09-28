@@ -351,3 +351,35 @@ pub fn router() -> Router<AppState> {
         )
         .route("/admin/audit/membership/export", get(export_audit_logs))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn audit_log_query_parses_wire_format_sent_by_the_admin_ui() {
+        // The exact query string the frontend's shared param builder
+        // produces (empty filters omitted, RFC3339 dates, colons
+        // percent-encoded by the serializer). Regression lock for the
+        // export 400: the raw filter object sent
+        // `policy_id=&from_date=2026-09-21`, which fails
+        // Option<Uuid>/Option<DateTime<Utc>> deserialization.
+        let query: AuditLogQuery = serde_urlencoded::from_str(
+            "status=failed&action=add&from_date=2026-09-21T00%3A00%3A00.000Z&to_date=2026-09-28T00%3A00%3A00.000Z",
+        )
+        .expect("wire format must deserialize");
+        assert_eq!(query.status.as_deref(), Some("failed"));
+        assert_eq!(query.action.as_deref(), Some("add"));
+        assert!(query.from_date.is_some());
+        assert!(query.to_date.is_some());
+        assert!(query.policy_id.is_none());
+
+        // The broken form the export previously sent must keep failing —
+        // this documents the contract the frontend must not regress to
+        // (empty string is not a valid Option<Uuid>, and a bare
+        // yyyy-MM-dd date is not a valid DateTime<Utc>).
+        assert!(
+            serde_urlencoded::from_str::<AuditLogQuery>("policy_id=&from_date=2026-09-21").is_err()
+        );
+    }
+}

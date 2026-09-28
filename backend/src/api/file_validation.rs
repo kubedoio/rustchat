@@ -232,6 +232,18 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
     use regex::Regex;
     use std::sync::LazyLock;
 
+    /// Active-content SVG elements (`script`, `foreignObject`, `style`),
+    /// including namespaced forms. XML element identity is
+    /// (namespace, localName), so `<x:script>` with the prefix bound to
+    /// the SVG namespace is the same SVGScriptElement the literal
+    /// `<script>` form is — a literal-tag check is bypassable by any
+    /// prefix. The element name must be followed by whitespace, `/`, `>`,
+    /// or end-of-input (so a truncated `<script` at EOF is still
+    /// rejected, matching the old substring check) while longer element
+    /// names (`<stylesheet>`) are not matched.
+    static ACTIVE_ELEMENT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?i)</?(?:[\w.-]+:)?(script|foreignobject|style)(?:\s|/|>|\z)"#).unwrap()
+    });
     /// Any `on*= ` event-handler attribute (onclick, onbegin, onanimationstart,
     /// whitespace variants like `onload =`). An allowlist of specific handler
     /// names is trivially bypassed by lesser-known or future event names.
@@ -278,24 +290,23 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
 
     let lower = text.to_ascii_lowercase();
 
-    // Reject script tags
-    if lower.contains("<script") || lower.contains("</script>") {
-        return Err(AppError::BadRequest(
-            "SVG contains forbidden script elements".to_string(),
-        ));
+    // Reject active-content elements (script, foreignObject, style),
+    // including namespaced forms (`<x:script>` with the prefix bound to
+    // the SVG namespace is still an SVGScriptElement — see the regex doc
+    // comment).
+    if let Some(captures) = ACTIVE_ELEMENT_RE.captures(&lower) {
+        let message = match &captures[1] {
+            "script" => "SVG contains forbidden script elements",
+            "foreignobject" => "SVG contains forbidden foreignObject elements",
+            _ => "SVG contains forbidden style elements",
+        };
+        return Err(AppError::BadRequest(message.to_string()));
     }
 
     // Reject event handlers (any on* attribute, not a fixed allowlist)
     if EVENT_HANDLER_RE.is_match(text) {
         return Err(AppError::BadRequest(
             "SVG contains forbidden event handler attributes".to_string(),
-        ));
-    }
-
-    // Reject foreignObject (can embed HTML)
-    if lower.contains("<foreignobject") || lower.contains("</foreignobject>") {
-        return Err(AppError::BadRequest(
-            "SVG contains forbidden foreignObject elements".to_string(),
         ));
     }
 
@@ -315,14 +326,8 @@ fn validate_svg(data: &[u8]) -> Result<(), AppError> {
         ));
     }
 
-    // Reject <style> elements (CSS-based exfiltration / CSP interaction)
-    if lower.contains("<style") || lower.contains("</style>") {
-        return Err(AppError::BadRequest(
-            "SVG contains forbidden style elements".to_string(),
-        ));
-    }
-
-    // Reject style attributes that fetch remote resources
+    // (Style ELEMENTS are rejected by the active-element regex above;
+    // this check covers style ATTRIBUTES that fetch remote resources.)
     if STYLE_FETCH_RE.is_match(text) {
         return Err(AppError::BadRequest(
             "SVG contains a style attribute with a forbidden fetch".to_string(),
@@ -375,6 +380,45 @@ mod tests {
         let svg = b"<svg><foreignObject><script>alert(1)</script></foreignObject></svg>";
         let result = validate_svg(svg);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn malicious_svg_with_namespaced_active_elements_is_rejected() {
+        // XML element identity is (namespace, localName): a prefixed
+        // element whose prefix is bound to the SVG namespace IS the
+        // active element. The old literal-tag checks (<script,
+        // <foreignobject, <style) were bypassed by any prefix.
+        let cases: [&[u8]; 8] = [
+            b"<svg xmlns:x='http://www.w3.org/2000/svg'><x:script>alert(1)</x:script></svg>",
+            b"<svg xmlns:evil='http://www.w3.org/2000/svg'><evil:script>alert(1)</evil:script></svg>",
+            b"<svg xmlns:x='http://www.w3.org/2000/svg'><x:foreignObject><body>hi</body></x:foreignObject></svg>",
+            b"<svg xmlns:x='http://www.w3.org/2000/svg'><x:style>*{}</x:style></svg>",
+            br#"<svg xmlns:x="http://www.w3.org/2000/svg"><x:script/x:script></svg>"#,
+            b"<svg xmlns:x='http://www.w3.org/2000/svg'></x:script></svg>",
+            // Truncated at EOF (no closing >): still rejected — the old
+            // substring check caught these and the regex terminator
+            // includes end-of-input.
+            b"<svg><script",
+            b"<svg><foreignobject",
+        ];
+        for svg in cases {
+            assert!(
+                validate_svg(svg).is_err(),
+                "expected rejection of: {}",
+                String::from_utf8_lossy(svg)
+            );
+        }
+    }
+
+    #[test]
+    fn benign_svg_with_prefix_lookalikes_is_accepted_by_validator() {
+        // Longer element names must not trip the active-element regex
+        // (the name must end at whitespace, `/`, or `>`).
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg">
+            <scriptures xmlns="http://example.com/ns"><text>x</text></scriptures>
+            <stylesheets width="10"/>
+        </svg>"#;
+        assert!(validate_svg(svg).is_ok());
     }
 
     #[test]
