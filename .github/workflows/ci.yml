@@ -476,8 +476,13 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Full history incl. tags: the upgrade path reconstructs the latest
-          # published stable schema via git archive of its tag.
+          # published stable schema via git archive of its tag. fetch-tags
+          # matters for fork PRs, whose checkouts do not inherit upstream
+          # tags created after the fork (origin is the base repo for
+          # pull_request events). The script additionally falls back to a
+          # pinned commit if the tag is still missing.
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Run migration matrix (RI-C07)
         env:

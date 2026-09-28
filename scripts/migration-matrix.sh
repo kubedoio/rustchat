@@ -31,7 +31,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-${REPO_ROOT}/backend/migrations}"
+# Repo-relative pathspec for git commands: git resolves pathspecs relative to
+# the repo root, so an absolute MIGRATIONS_DIR must not be passed verbatim
+# (it would match nothing and silently disable the append-only guard).
+MIGRATIONS_RELPATH="$(realpath --relative-to="${REPO_ROOT}" "${MIGRATIONS_DIR}")"
 BASE_TAG="${MIGRATION_MATRIX_TAG:-v0.4.1}"
+# Commit of ${BASE_TAG} (v0.4.1). Used when the tag ref is absent — e.g.
+# fork PR checkouts that do not inherit upstream tags created after the
+# fork. The commit is an ancestor of main, so shallow-free checkouts of
+# the PR merge ref still contain it.
+BASE_TAG_FALLBACK_SHA="8fa18602f4e4f1b3205489326c477b2e1e11d2a9"
 
 PGHOST="${PGHOST:-localhost}"
 PGPORT="${PGPORT:-5432}"
@@ -50,20 +59,31 @@ fail() { echo "migration-matrix: FAIL: $*" >&2; exit 1; }
 note() { echo "migration-matrix: $*"; }
 
 [[ -d "${MIGRATIONS_DIR}" ]] || fail "migrations dir not found: ${MIGRATIONS_DIR}"
-git -C "${REPO_ROOT}" rev-parse --verify --quiet "${BASE_TAG}^{commit}" >/dev/null \
-  || fail "base tag not found: ${BASE_TAG} (set MIGRATION_MATRIX_TAG)"
+if git -C "${REPO_ROOT}" rev-parse --verify --quiet "${BASE_TAG}^{commit}" >/dev/null; then
+  BASE_REF="${BASE_TAG}"
+else
+  # The tag ref may be absent on fork PR checkouts (tags are not part of
+  # normal fetch refspecs). Fall back to the pinned commit of the same
+  # release; identical tree, so the matrix result is unchanged.
+  if git -C "${REPO_ROOT}" cat-file -e "${BASE_TAG_FALLBACK_SHA}^{commit}" 2>/dev/null; then
+    BASE_REF="${BASE_TAG_FALLBACK_SHA}"
+    note "base tag ${BASE_TAG} not found; using pinned commit ${BASE_REF} (same tree)"
+  else
+    fail "base tag not found: ${BASE_TAG} (set MIGRATION_MATRIX_TAG)"
+  fi
+fi
 
-note "base tag for upgrade path: ${BASE_TAG}"
+note "base ref for upgrade path: ${BASE_REF}"
 
 # ---------------------------------------------------------------------------
 # Guard: migrations must be append-only since the base tag (RI-C07 prohibits
 # rewriting previously applied migrations; sqlx checksums would reject it).
 # ---------------------------------------------------------------------------
-CHANGE_STAT="$(git -C "${REPO_ROOT}" diff --name-status "${BASE_TAG}" HEAD -- "${MIGRATIONS_DIR#/}" | awk '{print $1}' | sort -u | tr -d '\n')"
+CHANGE_STAT="$(git -C "${REPO_ROOT}" diff --name-status "${BASE_REF}" HEAD -- "${MIGRATIONS_RELPATH}" | awk '{print $1}' | sort -u | tr -d '\n')"
 if [[ -n "${CHANGE_STAT}" && "${CHANGE_STAT}" != "A" ]]; then
-  fail "migrations were modified or deleted since ${BASE_TAG} (only additions are allowed): $(git -C "${REPO_ROOT}" diff --name-status "${BASE_TAG}" HEAD -- "${MIGRATIONS_DIR#/}" | grep -v '^A' | head -5)"
+  fail "migrations were modified or deleted since ${BASE_REF} (only additions are allowed): $(git -C "${REPO_ROOT}" diff --name-status "${BASE_REF}" HEAD -- "${MIGRATIONS_RELPATH}" | grep -v '^A' | head -5)"
 fi
-note "PASS append-only history: no migration modified/deleted since ${BASE_TAG}"
+note "PASS append-only history: no migration modified/deleted since ${BASE_REF}"
 
 # ---------------------------------------------------------------------------
 # Path 1: empty -> HEAD (fresh install).
@@ -80,7 +100,7 @@ note "PASS empty-to-head: all $(ls "${MIGRATIONS_DIR}"/*.sql | wc -l) migrations
 # ---------------------------------------------------------------------------
 TAG_DIR="${WORK_DIR}/tag_migrations"
 mkdir -p "${TAG_DIR}"
-git -C "${REPO_ROOT}" archive "${BASE_TAG}" "$(realpath --relative-to="${REPO_ROOT}" "${MIGRATIONS_DIR}")" \
+git -C "${REPO_ROOT}" archive "${BASE_REF}" "${MIGRATIONS_RELPATH}" \
   | tar -x --strip-components=2 -C "${TAG_DIR}"
 
 ${PSQL[@]} postgres -c "CREATE DATABASE \"${UPGRADE_DB}\";" >/dev/null
@@ -141,4 +161,4 @@ for db in "${EMPTY_DB}" "${UPGRADE_DB}"; do
 done
 note "PASS migrated-readiness: repository-critical columns present on both paths"
 
-note "ALL CHECKS PASSED (empty-to-head, ${BASE_TAG}-to-head, converged readiness)"
+note "ALL CHECKS PASSED (empty-to-head, ${BASE_REF}-to-head, converged readiness)"
