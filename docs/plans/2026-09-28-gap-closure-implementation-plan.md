@@ -116,19 +116,27 @@ Changes:
 
 **Objective:** close the weak SVG filter flagged as GAP-23.
 
-Current state (verified): `backend/src/api/file_validation.rs:232-235` rejects only
-`<script`. An uploaded SVG can still carry `onload=`-style event handler attributes,
-`javascript:`/`data:` URLs in `href`/`xlink:href`, `<foreignObject>` HTML embeds, and
-external references.
+Current state (verified against the baseline): `backend/src/api/file_validation.rs`
+already rejects `<script`, six hardcoded event-handler names (`onload`/`onerror`/
+`onclick`/`onmouseover`/`onfocus`/`onblur`), `<foreignObject>`, and `href=`/
+`xlink:href` (all `href` forms are rejected wholesale). Remaining bypass vectors:
+the handler allowlist misses lesser-known or future `on*` names and whitespace
+variants (`onload =`); active-content URI schemes (`javascript:`, `data:text/html`,
+`data:image/svg+xml`) outside `href` values, e.g. in SMIL `values=`; `<style>`
+elements; `style` attributes with `url()`/`expression()` fetches; SMIL animations
+rewriting `href` at runtime; and `<!ENTITY` declarations (XXE / billion-laughs).
+Note that SVG uploads are rejected at the extension layer today, so this validator
+is defense-in-depth, not a live path.
 
 Changes (same file, plus tests):
 
-1. Reject SVG markup containing: `on\w+=` event-handler attributes,
-   `javascript:` and `data:` URI schemes in any attribute value, `<foreignObject`,
-   `<use href="#…"`/external `xlink:href` references to remote resources, and
-   `<!DOCTYPE`/`<!ENTITY` (XXE/billion-laughs vector).
-2. Keep the existing `<script` rejection.
-3. Add unit tests for each bypass vector (pattern the existing test at line 294).
+1. Replace the six-name handler allowlist with a general `on[a-z]+\s*=` regex.
+2. Reject active-content URI schemes anywhere in the document.
+3. Reject `<style` elements and style attributes containing remote `url()` fetches.
+4. Reject SMIL animations targeting `href`/`xlink:href`.
+5. Reject `<!ENTITY` declarations (plain `<!DOCTYPE svg>` stays allowed).
+6. Add unit tests for each bypass vector and for benign patterns that must keep
+   passing.
 
 Note: the durable fix is serving user SVGs with `Content-Disposition: attachment` +
 `Content-Type: image/svg+xml` isolation and/or a sanitizer; screening stays the

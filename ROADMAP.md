@@ -38,7 +38,7 @@ Priorities:
       current minimal set and keep readiness/migration state accurate.
 - [ ] **Message validation and pagination** — `client_msg_id` idempotency,
       cursor pagination on hot channel-history paths.
-- [x] **Rate limiting coverage** — File upload and search endpoints (wired: `upload_ip_rate_limit` and `websocket_ip_rate_limit` in `backend/src/api/v4/mod.rs`, `search_ip_rate_limit` in `backend/src/api/search.rs`; covered by `backend/tests/test_rate_limiting.rs`).
+- [x] **Rate limiting coverage** — File upload and search endpoints (wired: `upload_ip_rate_limit` and `websocket_ip_rate_limit` in `backend/src/api/v4/mod.rs`, `search_ip_rate_limit` in `backend/src/api/search.rs`; the middleware delegates to the service covered by `backend/tests/test_rate_limiting.rs`, which is Redis-gated and runs in the integration suite — endpoint-level middleware tests are not yet present).
 - [ ] **Defects** — Resolve the open compliance-export and audit-dashboard
       bugs honestly (working behavior or explicitly unsupported).
 
