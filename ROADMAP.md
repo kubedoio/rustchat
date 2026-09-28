@@ -39,8 +39,15 @@ Priorities:
 - [ ] **Message validation and pagination** — `client_msg_id` idempotency,
       cursor pagination on hot channel-history paths.
 - [x] **Rate limiting coverage** — File upload and search endpoints (wired: `upload_ip_rate_limit` and `websocket_ip_rate_limit` in `backend/src/api/v4/mod.rs`, `search_ip_rate_limit` in `backend/src/api/search.rs`; the Redis-backed service tests in `backend/tests/test_rate_limiting.rs` cover the limiting service — endpoint-level middleware tests are not yet present).
-- [ ] **Defects** — Resolve the open compliance-export and audit-dashboard
+- [x] **Defects** — Resolve the open compliance-export and audit-dashboard
       bugs honestly (working behavior or explicitly unsupported).
+      — **Resolved (2026-09-28):** compliance export is explicitly
+      unsupported in the admin UI (phantom endpoint removed; the feature is
+      Phase 2); the audit-dashboard JSON export was fixed (it previously
+      downloaded `{}` because a Blob was passed to `JSON.stringify`); and the
+      dashboard is relabeled honestly as "Membership Policy Audit" since all
+      of its data (summary cards, failure stats, log table) comes from the
+      membership-policy audit table. The system audit log keeps its own view.
 
 ## Next — Operational Hardening and Incremental Architecture Cleanup
 

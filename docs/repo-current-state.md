@@ -84,7 +84,7 @@ For details see `docs/compatibility-scope.md`.
 |---|---|---|
 | ~~Required/authoritative CI and live repository protections need convergence and evidence~~ — resolved (RI-C01/C02). Note: the merge gate was found missing on 2026-09-28 re-verification and re-applied the same day; `scripts/verify-protection.sh` passes | governance/release | P0 |
 | ~~Promoted artifact publication must be tied to complete release/security gates~~ — resolved (RI-C03 promotion gate) | release | P0 |
-| Compliance export and audit dashboard defects | admin | P0/release |
+| Compliance export is not implemented and is now explicitly labeled as such in the admin UI (no phantom export button); audit-dashboard JSON export fixed; audit dashboard relabeled honestly as "Membership Policy Audit" (its summary/failure widgets and log table all read `auto_membership_policy_audit` — membership-policy sync runs; the system audit log has its own view). A system-wide audit summary would be a new feature | admin | compliance export feature is Phase 2 |
 | Realtime replay durability and graceful WebSocket shutdown | realtime | Hardening |
 | Direct SQL persistence in API handlers: baselined and guarded (RI-C04); bounded migration ongoing | backend architecture | Incremental hardening |
 | Large backend modules: baselined and guarded (RI-C05); targeted decomposition ongoing | maintainability | Incremental hardening |

@@ -95,9 +95,11 @@ async function fetchAuditLogs() {
 // Export logs
 async function exportLogs() {
   try {
+    // Do NOT use responseType: 'blob' here: the endpoint returns JSON, and
+    // serializing a Blob with JSON.stringify yields "{}" (the old bug —
+    // every exported file was empty). Parse the JSON, then build the file.
     const response = await api.get('/admin/audit/membership/export', {
       params: filters.value,
-      responseType: 'blob',
     })
 
     const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
@@ -131,7 +133,7 @@ onMounted(() => {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-text-1">Audit Dashboard</h1>
+        <h1 class="text-2xl font-bold text-text-1">Membership Policy Audit</h1>
         <p class="text-text-3 mt-1">Monitor membership policy execution and failures</p>
       </div>
       <div class="flex space-x-2">
@@ -158,7 +160,7 @@ onMounted(() => {
       <div class="p-6 bg-bg-surface-1 rounded-lg shadow-sm border border-border-1">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-text-3">Total Operations (24h)</p>
+            <p class="text-sm font-medium text-text-3">Policy Sync Operations (24h)</p>
             <p class="text-2xl font-bold text-text-1 mt-1">{{ summary.total_operations_24h }}</p>
           </div>
           <div class="p-3 bg-brand/10 rounded-lg">
@@ -170,7 +172,7 @@ onMounted(() => {
       <div class="p-6 bg-bg-surface-1 rounded-lg shadow-sm border border-border-1">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-text-3">Successful (24h)</p>
+            <p class="text-sm font-medium text-text-3">Policy Syncs OK (24h)</p>
             <p class="text-2xl font-bold text-success mt-1">
               {{ summary.successful_operations_24h }}
             </p>
@@ -184,7 +186,7 @@ onMounted(() => {
       <div class="p-6 bg-bg-surface-1 rounded-lg shadow-sm border border-border-1">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-text-3">Failed (24h)</p>
+            <p class="text-sm font-medium text-text-3">Policy Sync Failures (24h)</p>
             <p class="text-2xl font-bold text-danger mt-1">{{ summary.failed_operations_24h }}</p>
           </div>
           <div class="p-3 bg-danger/10 rounded-lg">
@@ -200,7 +202,7 @@ onMounted(() => {
       <div class="p-6 bg-bg-surface-1 rounded-lg shadow-sm border border-border-1">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-text-3">Failure Rate (24h)</p>
+            <p class="text-sm font-medium text-text-3">Policy Sync Failure Rate (24h)</p>
             <p class="text-2xl font-bold mt-1" :class="failureRateClass">
               {{ summary.failure_rate_24h.toFixed(1) }}%
             </p>
@@ -316,7 +318,7 @@ onMounted(() => {
       <div class="px-6 py-4 border-b border-border-1 flex items-center justify-between">
         <h2 class="text-lg font-semibold text-text-1 flex items-center">
           <FileText class="w-5 h-5 mr-2" />
-          Audit Logs
+          Policy Audit Logs
         </h2>
         <button
           class="flex items-center text-sm text-text-2 hover:text-text-1"
