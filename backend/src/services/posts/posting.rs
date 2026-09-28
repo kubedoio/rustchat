@@ -212,7 +212,7 @@ async fn send_push_notifications(
     state: &AppState,
     channel_id: Uuid,
     user_id: Uuid,
-    _post_id: Uuid,
+    post_id: Uuid,
     response: &PostResponse,
     mentions: &[String],
     username_for_push: String,
@@ -282,6 +282,7 @@ async fn send_push_notifications(
                     sender_name_clone,
                     message_preview_clone,
                     is_dm,
+                    post_id,
                 )
                 .await
                 {
