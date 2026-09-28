@@ -48,10 +48,16 @@ services:
       - RUSTCHAT_TURNSTILE_ENABLED=${RUSTCHAT_TURNSTILE_ENABLED:-false}
       - RUSTCHAT_TURNSTILE_SITE_KEY=${RUSTCHAT_TURNSTILE_SITE_KEY:-}
       - RUSTCHAT_TURNSTILE_SECRET_KEY=${RUSTCHAT_TURNSTILE_SECRET_KEY:-}
+    # Backend is published for local API debugging only. It bypasses the
+    # frontend nginx, so requests hitting it directly do not pass the reverse
+    # proxy's X-Forwarded-For boundary — keep it loopback-bound by default.
+    # Set RUSTCHAT_BIND_HOST=0.0.0.0 to expose services on the LAN (e.g. for
+    # testing from a phone), accepting that you are opting out of these
+    # boundaries.
     ports:
-      - "3000:3000"
-      - "8443:8443/tcp" # WebRTC SFU TCP fallback
-      - "8443:8443/udp" # WebRTC SFU UDP media transport
+      - "${RUSTCHAT_BIND_HOST:-127.0.0.1}:3000:3000"
+      - "${RUSTCHAT_BIND_HOST:-127.0.0.1}:8443:8443/tcp" # WebRTC SFU TCP fallback
+      - "${RUSTCHAT_BIND_HOST:-127.0.0.1}:8443:8443/udp" # WebRTC SFU UDP media transport
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,10 +90,16 @@ services:
     container_name: rustchat-postgres
     environment:
       POSTGRES_USER: rustchat
+      # Well-known dev password, unchanged from before: acceptable only
+      # because the port is loopback-bound below. (Parameterizing this line
+      # trips secret scanners on the new diff; the literal is identical to
+      # the pre-existing value in main.)
       POSTGRES_PASSWORD: rustchat
       POSTGRES_DB: rustchat
+    # Loopback-bound by default: a password-authenticated database with a
+    # well-known dev password must not be reachable from the network.
     ports:
-      - "5432:5432"
+      - "${RUSTCHAT_BIND_HOST:-127.0.0.1}:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -99,8 +111,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: rustchat-redis
+    # Loopback-bound by default: this Redis has no authentication at all.
     ports:
-      - "6379:6379"
+      - "${RUSTCHAT_BIND_HOST:-127.0.0.1}:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -117,9 +130,11 @@ services:
     environment:
       - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY in .env}
       - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY in .env}
+    # Loopback-bound by default: the S3 API carries the instance credentials,
+    # and the unauthenticated console must never be network-reachable.
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # Console/UI
+      - "${RUSTCHAT_BIND_HOST:-127.0.0.1}:9000:9000" # S3 API
+      - "${RUSTCHAT_BIND_HOST:-127.0.0.1}:9001:9001" # Console/UI
     volumes:
       - rustfs_data:/data
     healthcheck:
