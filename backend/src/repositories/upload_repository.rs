@@ -23,9 +23,17 @@ impl<'a> UploadRepository<'a> {
         Self { pool }
     }
 
-    /// Create a new upload session.
+    /// Create a new upload session, atomically enforcing the caller's
+    /// live-session cap for the user.
+    ///
+    /// Returns `Ok(false)` when the user already holds `max_live_sessions`
+    /// live (unexpired) sessions. The count-then-insert pair runs under a
+    /// per-user transaction advisory lock so concurrent session creations
+    /// for the same user cannot both observe capacity and both insert
+    /// (racing past the cap). The `(42, *)` lock-key namespace is local to
+    /// this call site; no other advisory-lock user shares it.
     #[allow(clippy::too_many_arguments)]
-    pub async fn create_session(
+    pub async fn create_session_capped(
         &self,
         id: Uuid,
         user_id: Uuid,
@@ -34,7 +42,32 @@ impl<'a> UploadRepository<'a> {
         file_size: i64,
         created_at: DateTime<Utc>,
         expires_at: DateTime<Utc>,
-    ) -> Result<(), sqlx::Error> {
+        max_live_sessions: i64,
+    ) -> Result<bool, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query("SELECT pg_advisory_xact_lock(42, hashtext($1))")
+            .bind(user_id.to_string())
+            .execute(&mut *tx)
+            .await?;
+
+        let live: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*)
+            FROM upload_sessions
+            WHERE user_id = $1
+              AND expires_at > NOW()
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if live >= max_live_sessions {
+            // Dropping the transaction releases the advisory lock.
+            return Ok(false);
+        }
+
         sqlx::query(
             r#"
             INSERT INTO upload_sessions (id, user_id, channel_id, filename, file_size, file_offset, created_at, expires_at)
@@ -48,25 +81,11 @@ impl<'a> UploadRepository<'a> {
         .bind(file_size)
         .bind(created_at)
         .bind(expires_at)
-        .execute(self.pool)
+        .execute(&mut *tx)
         .await?;
 
-        Ok(())
-    }
-
-    /// Count the user's live (unexpired, unfinalized) upload sessions.
-    pub async fn count_active_sessions_by_user(&self, user_id: Uuid) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-            FROM upload_sessions
-            WHERE user_id = $1
-              AND expires_at > NOW()
-            "#,
-        )
-        .bind(user_id)
-        .fetch_one(self.pool)
-        .await
+        tx.commit().await?;
+        Ok(true)
     }
 
     /// Get an active upload session by ID.

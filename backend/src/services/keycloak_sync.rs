@@ -19,6 +19,11 @@ use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 
 const GROUP_SOURCE_KEYCLOAK: &str = "plugin_keycloak";
 
+/// Per-request timeout for every Keycloak admin API call. The sync worker
+/// is a single background task: without a bound, one blackholed IdP request
+/// would stall all group/membership convergence indefinitely.
+const KEYCLOAK_HTTP_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct KeycloakSyncReport {
     pub groups_processed: usize,
@@ -300,6 +305,7 @@ async fn fetch_admin_token(state: &AppState) -> ApiResult<String> {
             ("client_id", cfg.client_id.as_str()),
             ("client_secret", cfg.client_secret.as_str()),
         ])
+        .timeout(KEYCLOAK_HTTP_TIMEOUT)
         .send()
         .await
         .map_err(|e| AppError::ExternalService(format!("Keycloak token request failed: {}", e)))?;
@@ -325,32 +331,50 @@ async fn fetch_groups(state: &AppState, token: &str) -> ApiResult<Vec<KeycloakGr
     let base = cfg.admin_base_url.trim_end_matches('/');
     let groups_url = format!("{}/admin/realms/{}/groups", base, cfg.realm);
 
-    let response = state
-        .http_client
-        .get(groups_url)
-        .query(&[
-            ("briefRepresentation", "false"),
-            ("max", "10000"),
-            ("first", "0"),
-        ])
-        .bearer_auth(token)
-        .send()
-        .await
-        .map_err(|e| AppError::ExternalService(format!("Keycloak groups request failed: {}", e)))?;
+    // Paginate like fetch_group_members: a single max=N request silently
+    // truncates realms with more than N groups, and the truncated set is
+    // then treated as "removed" — mass-deactivating every group beyond
+    // the first page. An empty page ends the scan.
+    let mut first = 0usize;
+    let mut all = Vec::new();
+    loop {
+        let response = state
+            .http_client
+            .get(&groups_url)
+            .query(&[
+                ("briefRepresentation", "false".to_string()),
+                ("max", "500".to_string()),
+                ("first", first.to_string()),
+            ])
+            .timeout(KEYCLOAK_HTTP_TIMEOUT)
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|e| {
+                AppError::ExternalService(format!("Keycloak groups request failed: {}", e))
+            })?;
 
-    if response.status() != StatusCode::OK {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(AppError::ExternalService(format!(
-            "Keycloak groups request failed: {} {}",
-            status, body
-        )));
+        if response.status() != StatusCode::OK {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AppError::ExternalService(format!(
+                "Keycloak groups request failed: {} {}",
+                status, body
+            )));
+        }
+
+        let page = response.json::<Vec<KeycloakGroup>>().await.map_err(|e| {
+            AppError::ExternalService(format!("Invalid Keycloak groups response: {}", e))
+        })?;
+
+        if page.is_empty() {
+            break;
+        }
+        first += page.len();
+        all.extend(page);
     }
 
-    response
-        .json::<Vec<KeycloakGroup>>()
-        .await
-        .map_err(|e| AppError::ExternalService(format!("Invalid Keycloak groups response: {}", e)))
+    Ok(all)
 }
 
 async fn fetch_group_members(
@@ -372,6 +396,7 @@ async fn fetch_group_members(
             .http_client
             .get(&url)
             .query(&[("first", first), ("max", 500)])
+            .timeout(KEYCLOAK_HTTP_TIMEOUT)
             .bearer_auth(token)
             .send()
             .await
