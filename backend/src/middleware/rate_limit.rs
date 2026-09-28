@@ -30,32 +30,81 @@ use axum::{
 };
 use deadpool_redis::redis::AsyncCommands;
 
-/// Extract the client IP from common proxy headers or connection info.
-fn extract_client_ip(request: &Request) -> Option<String> {
-    if let Some(forwarded) = request.headers().get("X-Forwarded-For") {
-        if let Ok(s) = forwarded.to_str() {
-            if let Some(ip) = s.split(',').next() {
-                let ip = ip.trim();
-                if !ip.is_empty() {
-                    return Some(ip.to_string());
+/// Extract the client IP from trusted proxy headers or connection info.
+///
+/// Forwarding headers (`X-Forwarded-For`, `X-Real-IP`) are only honored when
+/// the immediate peer address is present in `trusted_proxies`. Otherwise those
+/// headers are ignored (the client could spoof them to bypass per-IP rate
+/// limits) and the immediate peer address is used.
+fn extract_client_ip(request: &Request, trusted_proxies: &[String]) -> Option<String> {
+    let peer = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|info| info.0.ip());
+
+    if let Some(peer_ip) = peer {
+        if peer_is_trusted_proxy(peer_ip, trusted_proxies) {
+            if let Some(forwarded) = request.headers().get("X-Forwarded-For") {
+                if let Ok(s) = forwarded.to_str() {
+                    if let Some(ip) = s.split(',').next() {
+                        let ip = ip.trim();
+                        if !ip.is_empty() {
+                            return Some(ip.to_string());
+                        }
+                    }
+                }
+            }
+
+            if let Some(real_ip) = request.headers().get("X-Real-IP") {
+                if let Ok(s) = real_ip.to_str() {
+                    let ip = s.trim();
+                    if !ip.is_empty() {
+                        return Some(ip.to_string());
+                    }
                 }
             }
         }
     }
 
-    if let Some(real_ip) = request.headers().get("X-Real-IP") {
-        if let Ok(s) = real_ip.to_str() {
-            let ip = s.trim();
-            if !ip.is_empty() {
-                return Some(ip.to_string());
-            }
-        }
-    }
+    peer.map(|ip| ip.to_string())
+}
 
-    request
-        .extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|info| info.0.ip().to_string())
+/// Whether `peer` matches one of the configured trusted-proxy entries (an
+/// exact address or a CIDR block).
+fn peer_is_trusted_proxy(peer: std::net::IpAddr, trusted_proxies: &[String]) -> bool {
+    trusted_proxies.iter().any(|entry| ip_matches(peer, entry))
+}
+
+fn ip_matches(ip: std::net::IpAddr, entry: &str) -> bool {
+    let entry = entry.trim();
+    if let Some((base, prefix)) = entry.split_once('/') {
+        match (base.parse::<std::net::IpAddr>(), prefix.parse::<u8>()) {
+            (Ok(base), Ok(prefix)) => cidr_contains(base, ip, prefix),
+            _ => false,
+        }
+    } else {
+        entry
+            .parse::<std::net::IpAddr>()
+            .map(|e| e == ip)
+            .unwrap_or(false)
+    }
+}
+
+fn cidr_contains(base: std::net::IpAddr, ip: std::net::IpAddr, prefix: u8) -> bool {
+    use std::net::IpAddr;
+    match (base, ip) {
+        (IpAddr::V4(base), IpAddr::V4(ip)) => {
+            let shift = (32 - u32::from(prefix.min(32))).min(32);
+            let mask = if shift >= 32 { 0 } else { u32::MAX << shift };
+            (u32::from(base) & mask) == (u32::from(ip) & mask)
+        }
+        (IpAddr::V6(base), IpAddr::V6(ip)) => {
+            let shift = (128 - u32::from(prefix.min(128))).min(128);
+            let mask = if shift >= 128 { 0 } else { u128::MAX << shift };
+            (u128::from(base) & mask) == (u128::from(ip) & mask)
+        }
+        _ => false,
+    }
 }
 
 /// Check an IP-based rate limit using a fixed window counter in Redis.
@@ -99,7 +148,7 @@ pub async fn register_ip_rate_limit(
     const WINDOW_SECS: u64 = 15 * 60;
     const MAX_REQUESTS: u64 = 5;
 
-    let ip = match extract_client_ip(&request) {
+    let ip = match extract_client_ip(&request, &state.config.security.trusted_proxies) {
         Some(ip) => ip,
         None => {
             tracing::warn!("Unable to determine client IP for registration rate limiting");
@@ -132,7 +181,7 @@ pub async fn auth_ip_rate_limit(
     const WINDOW_SECS: u64 = 15 * 60;
     const MAX_REQUESTS: u64 = 10;
 
-    let ip = match extract_client_ip(&request) {
+    let ip = match extract_client_ip(&request, &state.config.security.trusted_proxies) {
         Some(ip) => ip,
         None => {
             tracing::warn!("Unable to determine client IP for auth rate limiting");
@@ -165,7 +214,7 @@ pub async fn password_reset_ip_rate_limit(
     const WINDOW_SECS: u64 = 15 * 60;
     const MAX_REQUESTS: u64 = 3;
 
-    let ip = match extract_client_ip(&request) {
+    let ip = match extract_client_ip(&request, &state.config.security.trusted_proxies) {
         Some(ip) => ip,
         None => {
             tracing::warn!("Unable to determine client IP for password reset rate limiting");
@@ -206,7 +255,7 @@ pub async fn websocket_ip_rate_limit(
     const WINDOW_SECS: u64 = 60;
     const MAX_REQUESTS: u64 = 20;
 
-    let ip = match extract_client_ip(&request) {
+    let ip = match extract_client_ip(&request, &state.config.security.trusted_proxies) {
         Some(ip) => ip,
         None => {
             tracing::warn!("Unable to determine client IP for websocket rate limiting");
@@ -239,7 +288,7 @@ pub async fn upload_ip_rate_limit(
     const WINDOW_SECS: u64 = 15 * 60;
     const MAX_REQUESTS: u64 = 30;
 
-    let ip = match extract_client_ip(&request) {
+    let ip = match extract_client_ip(&request, &state.config.security.trusted_proxies) {
         Some(ip) => ip,
         None => {
             tracing::warn!("Unable to determine client IP for upload rate limiting");
@@ -272,7 +321,7 @@ pub async fn search_ip_rate_limit(
     const WINDOW_SECS: u64 = 60;
     const MAX_REQUESTS: u64 = 60;
 
-    let ip = match extract_client_ip(&request) {
+    let ip = match extract_client_ip(&request, &state.config.security.trusted_proxies) {
         Some(ip) => ip,
         None => {
             tracing::warn!("Unable to determine client IP for search rate limiting");
@@ -389,23 +438,60 @@ mod tests {
     }
 
     #[test]
-    fn extract_client_ip_prefers_first_forwarded_for_ip() {
-        let request = Request::builder()
+    fn extract_client_ip_prefers_first_forwarded_for_ip_from_trusted_proxy() {
+        let mut request = Request::builder()
             .header("X-Forwarded-For", "203.0.113.10, 10.0.0.2")
             .body(Body::empty())
             .expect("request");
+        request.extensions_mut().insert(ConnectInfo(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            443,
+        )));
+        let trusted = vec!["10.0.0.0/8".to_string()];
 
-        assert_eq!(extract_client_ip(&request).as_deref(), Some("203.0.113.10"));
+        assert_eq!(
+            extract_client_ip(&request, &trusted).as_deref(),
+            Some("203.0.113.10")
+        );
     }
 
     #[test]
-    fn extract_client_ip_uses_real_ip_when_forwarded_for_missing() {
-        let request = Request::builder()
+    fn extract_client_ip_ignores_forwarded_for_from_untrusted_peer() {
+        // No trusted proxies configured (default): the spoofable forwarding
+        // header must be ignored and the immediate peer address used instead,
+        // so a directly-reachable client cannot rotate its IP to bypass limits.
+        let mut request = Request::builder()
+            .header("X-Forwarded-For", "203.0.113.10, 10.0.0.2")
+            .body(Body::empty())
+            .expect("request");
+        request.extensions_mut().insert(ConnectInfo(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(203, 0, 113, 55)),
+            443,
+        )));
+        let trusted: Vec<String> = Vec::new();
+
+        assert_eq!(
+            extract_client_ip(&request, &trusted).as_deref(),
+            Some("203.0.113.55")
+        );
+    }
+
+    #[test]
+    fn extract_client_ip_uses_real_ip_from_trusted_proxy() {
+        let mut request = Request::builder()
             .header("X-Real-IP", "203.0.113.20")
             .body(Body::empty())
             .expect("request");
+        request.extensions_mut().insert(ConnectInfo(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            443,
+        )));
+        let trusted = vec!["10.0.0.1".to_string()];
 
-        assert_eq!(extract_client_ip(&request).as_deref(), Some("203.0.113.20"));
+        assert_eq!(
+            extract_client_ip(&request, &trusted).as_deref(),
+            Some("203.0.113.20")
+        );
     }
 
     #[test]
@@ -415,21 +501,29 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(203, 0, 113, 30)),
             443,
         )));
+        let trusted: Vec<String> = Vec::new();
 
-        assert_eq!(extract_client_ip(&request).as_deref(), Some("203.0.113.30"));
+        assert_eq!(
+            extract_client_ip(&request, &trusted).as_deref(),
+            Some("203.0.113.30")
+        );
     }
 
     #[test]
-    fn extract_client_ip_ignores_empty_forwarded_for() {
+    fn extract_client_ip_ignores_empty_forwarded_for_even_from_trusted_proxy() {
         let mut request = Request::builder()
             .header("X-Forwarded-For", "   ")
             .body(Body::empty())
             .expect("request");
         request.extensions_mut().insert(ConnectInfo(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(203, 0, 113, 40)),
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
             443,
         )));
+        let trusted = vec!["10.0.0.0/8".to_string()];
 
-        assert_eq!(extract_client_ip(&request).as_deref(), Some("203.0.113.40"));
+        assert_eq!(
+            extract_client_ip(&request, &trusted).as_deref(),
+            Some("10.0.0.1")
+        );
     }
 }

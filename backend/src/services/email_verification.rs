@@ -79,15 +79,42 @@ pub async fn create_verification_token(
 pub async fn verify_token(db: &sqlx::PgPool, token: &str, purpose: &str) -> Result<Uuid, AppError> {
     let token_hash = hash_token(token);
 
-    // Find and validate the token
+    // Atomically consume the token (single-use). The guarded UPDATE both
+    // validates and consumes in one statement, so two concurrent requests with
+    // the same token cannot both succeed: exactly one affects a row.
+    let consume = sqlx::query(
+        r#"
+        UPDATE email_verification_tokens
+        SET used_at = NOW()
+        WHERE token_hash = $1
+          AND purpose = $2
+          AND used_at IS NULL
+          AND expires_at > NOW()
+        "#,
+    )
+    .bind(&token_hash)
+    .bind(purpose)
+    .execute(db)
+    .await
+    .map_err(|e| {
+        error!("Failed to verify token: {}", e);
+        AppError::Internal("Failed to verify token".to_string())
+    })?;
+
+    if consume.rows_affected() != 1 {
+        warn!("Invalid, expired, or already-used verification token");
+        return Err(AppError::BadRequest(
+            "Invalid or expired verification token".to_string(),
+        ));
+    }
+
+    // Resolve the owning user now that the token has been consumed.
     let result: Option<(Uuid, String)> = sqlx::query_as(
         r#"
-        SELECT user_id, email 
-        FROM email_verification_tokens 
-        WHERE token_hash = $1 
+        SELECT user_id, email
+        FROM email_verification_tokens
+        WHERE token_hash = $1
           AND purpose = $2
-          AND used_at IS NULL 
-          AND expires_at > NOW()
         "#,
     )
     .bind(&token_hash)
@@ -102,28 +129,12 @@ pub async fn verify_token(db: &sqlx::PgPool, token: &str, purpose: &str) -> Resu
     let (user_id, email) = match result {
         Some(r) => r,
         None => {
-            warn!("Invalid or expired verification token");
+            warn!("Verification token row missing after consume");
             return Err(AppError::BadRequest(
                 "Invalid or expired verification token".to_string(),
             ));
         }
     };
-
-    // Mark token as used
-    sqlx::query(
-        r#"
-        UPDATE email_verification_tokens 
-        SET used_at = NOW() 
-        WHERE token_hash = $1
-        "#,
-    )
-    .bind(&token_hash)
-    .execute(db)
-    .await
-    .map_err(|e| {
-        error!("Failed to mark token as used: {}", e);
-        AppError::Internal("Failed to complete verification".to_string())
-    })?;
 
     // Mark user's email as verified
     sqlx::query(

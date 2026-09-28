@@ -684,6 +684,14 @@ pub struct SecurityConfig {
     /// Rate limit: WebSocket connection attempts per minute per IP
     #[serde(default = "default_rate_limit_ws_per_minute")]
     pub rate_limit_ws_per_minute: u32,
+
+    /// Trusted reverse-proxy addresses/CIDRs whose `X-Forwarded-For` /
+    /// `X-Real-IP` headers are honored for per-IP rate limiting. When empty
+    /// (the default), forwarding headers are ignored and the immediate peer
+    /// address is used, so a directly-reachable client cannot spoof its IP to
+    /// bypass throttling. Example: ["127.0.0.1", "10.0.0.0/8"].
+    #[serde(default)]
+    pub trusted_proxies: Vec<String>,
 }
 
 impl Default for SecurityConfig {
@@ -693,6 +701,7 @@ impl Default for SecurityConfig {
             rate_limit_enabled: default_rate_limit_enabled(),
             rate_limit_auth_per_minute: default_rate_limit_auth_per_minute(),
             rate_limit_ws_per_minute: default_rate_limit_ws_per_minute(),
+            trusted_proxies: Vec::new(),
         }
     }
 }
