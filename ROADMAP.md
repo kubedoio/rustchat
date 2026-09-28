@@ -39,8 +39,14 @@ Priorities:
 - [ ] **Message validation and pagination** — `client_msg_id` idempotency,
       cursor pagination on hot channel-history paths.
 - [ ] **Rate limiting coverage** — File upload and search endpoints.
-- [ ] **Defects** — Resolve the open compliance-export and audit-dashboard
+- [~] **Defects** — Resolve the open compliance-export and audit-dashboard
       bugs honestly (working behavior or explicitly unsupported).
+      — **Partially resolved (2026-09-28):** compliance export is explicitly
+      unsupported in the admin UI (phantom endpoint removed; the feature is
+      Phase 2); the audit-dashboard JSON export was fixed (it previously
+      downloaded `{}` because a Blob was passed to `JSON.stringify`).
+      Remaining: the audit dashboard presents membership-policy sync
+      statistics as system-wide audit values (#89).
 
 ## Next — Operational Hardening and Incremental Architecture Cleanup
 

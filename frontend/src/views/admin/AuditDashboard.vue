@@ -95,9 +95,11 @@ async function fetchAuditLogs() {
 // Export logs
 async function exportLogs() {
   try {
+    // Do NOT use responseType: 'blob' here: the endpoint returns JSON, and
+    // serializing a Blob with JSON.stringify yields "{}" (the old bug —
+    // every exported file was empty). Parse the JSON, then build the file.
     const response = await api.get('/admin/audit/membership/export', {
       params: filters.value,
-      responseType: 'blob',
     })
 
     const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })

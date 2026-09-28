@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { log } from '@/utils/log'
 import { ref, onMounted, watch } from 'vue'
 import { useAdminStore } from '../../features/admin/stores/adminStore'
 import { Scale, Trash2, Save, AlertCircle, CheckCircle, Download } from 'lucide-vue-next'
-import api from '../../api/client'
 import { getApiErrorMessage } from '@/core/errors/errorUtils'
 
 const adminStore = useAdminStore()
@@ -16,9 +14,6 @@ const form = ref({
 const saving = ref(false)
 const saveSuccess = ref(false)
 const saveError = ref('')
-
-const exporting = ref(false)
-const exportSuccess = ref(false)
 
 onMounted(async () => {
   await adminStore.fetchConfig()
@@ -49,19 +44,6 @@ const saveSettings = async () => {
     saveError.value = getApiErrorMessage(e) || 'Failed to save settings'
   } finally {
     saving.value = false
-  }
-}
-
-const triggerExport = async () => {
-  exporting.value = true
-  try {
-    await api.post('/admin/compliance/export')
-    exportSuccess.value = true
-    setTimeout(() => (exportSuccess.value = false), 5000)
-  } catch (e) {
-    log.error(e)
-  } finally {
-    exporting.value = false
   }
 }
 </script>
@@ -152,23 +134,15 @@ const triggerExport = async () => {
           <Download class="w-5 h-5 text-gray-400 mr-2" />
           <h2 class="text-lg font-semibold text-gray-900">Compliance Export</h2>
         </div>
+        <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full"
+          >Not implemented</span
+        >
       </div>
       <p class="text-sm text-gray-500 mb-4">
-        Export all system data (messages, files, logs) for compliance auditing purposes. The export
-        will be generated in the background and a download link will be emailed to you.
+        Exporting all system data (messages, files, logs) for compliance auditing is not implemented
+        in this build. Retention settings above are enforced; a full compliance export is tracked on
+        the roadmap.
       </p>
-
-      <div v-if="exportSuccess" class="mb-4 p-3 bg-green-50 text-green-700 rounded-lg text-sm">
-        Compliance export started successfully.
-      </div>
-
-      <button
-        :disabled="exporting"
-        class="px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-gray-700 font-medium transition-colors"
-        @click="triggerExport"
-      >
-        {{ exporting ? 'Starting Export...' : 'Start Compliance Export' }}
-      </button>
     </div>
   </div>
 </template>
