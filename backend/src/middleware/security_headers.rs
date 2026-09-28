@@ -6,7 +6,7 @@
 
 use axum::{
     body::Body,
-    http::{header, Request, Response},
+    http::{header, HeaderValue, Request, Response},
 };
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
@@ -111,6 +111,63 @@ impl SecurityHeadersConfig {
     }
 }
 
+/// Security header values pre-parsed once at layer construction.
+///
+/// All values currently come from compile-time presets, but parsing them
+/// once here — with a descriptive failure — means a malformed value fails
+/// loudly at startup instead of panicking on every request inside the
+/// service (the previous behavior parsed and unwrapped per response).
+#[derive(Debug, Clone)]
+struct ParsedSecurityHeaders {
+    csp: HeaderValue,
+    frame_options: HeaderValue,
+    content_type_options: HeaderValue,
+    referrer_policy: HeaderValue,
+    permissions_policy: HeaderValue,
+    xss_protection: HeaderValue,
+    /// Present only when HSTS is enabled.
+    hsts: Option<HeaderValue>,
+}
+
+impl ParsedSecurityHeaders {
+    fn from_config(config: &SecurityHeadersConfig) -> Self {
+        fn parse(field: &'static str, value: &str) -> HeaderValue {
+            value.parse().unwrap_or_else(|e| {
+                panic!(
+                    "invalid security header value for {field}: {value:?} ({e}); \
+                     fix the SecurityHeadersConfig preset"
+                )
+            })
+        }
+
+        let hsts = if config.hsts_enabled {
+            let hsts_value = format!(
+                "max-age={}{}{}",
+                config.hsts_max_age,
+                if config.hsts_include_subdomains {
+                    "; includeSubDomains"
+                } else {
+                    ""
+                },
+                if config.hsts_preload { "; preload" } else { "" }
+            );
+            Some(parse("hsts", &hsts_value))
+        } else {
+            None
+        };
+
+        Self {
+            csp: parse("csp", &config.csp),
+            frame_options: parse("frame_options", &config.frame_options),
+            content_type_options: parse("content_type_options", &config.content_type_options),
+            referrer_policy: parse("referrer_policy", &config.referrer_policy),
+            permissions_policy: parse("permissions_policy", &config.permissions_policy),
+            xss_protection: parse("xss_protection", &config.xss_protection),
+            hsts,
+        }
+    }
+}
+
 /// Security headers middleware layer
 #[derive(Debug, Clone)]
 pub struct SecurityHeadersLayer {
@@ -141,7 +198,7 @@ impl<S> Layer<S> for SecurityHeadersLayer {
     fn layer(&self, inner: S) -> Self::Service {
         SecurityHeadersService {
             inner,
-            config: self.config.clone(),
+            headers: ParsedSecurityHeaders::from_config(&self.config),
         }
     }
 }
@@ -150,7 +207,7 @@ impl<S> Layer<S> for SecurityHeadersLayer {
 #[derive(Debug, Clone)]
 pub struct SecurityHeadersService<S> {
     inner: S,
-    config: SecurityHeadersConfig,
+    headers: ParsedSecurityHeaders,
 }
 
 impl<S, B> Service<Request<B>> for SecurityHeadersService<S>
@@ -170,71 +227,45 @@ where
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        let config = self.config.clone();
+        let headers = self.headers.clone();
         let mut inner = self.inner.clone();
 
         Box::pin(async move {
             let mut response = inner.call(req).await?;
-            let headers = response.headers_mut();
+            let headers_map = response.headers_mut();
 
+            // All values were parsed and validated once at layer construction.
             // Content Security Policy
-            headers.insert(header::CONTENT_SECURITY_POLICY, config.csp.parse().unwrap());
+            headers_map.insert(header::CONTENT_SECURITY_POLICY, headers.csp);
 
             // X-Frame-Options
-            headers.insert(
-                header::X_FRAME_OPTIONS,
-                config.frame_options.parse().unwrap(),
-            );
+            headers_map.insert(header::X_FRAME_OPTIONS, headers.frame_options);
 
             // X-Content-Type-Options
-            headers.insert(
-                header::X_CONTENT_TYPE_OPTIONS,
-                config.content_type_options.parse().unwrap(),
-            );
+            headers_map.insert(header::X_CONTENT_TYPE_OPTIONS, headers.content_type_options);
 
             // Referrer-Policy
-            headers.insert(
+            headers_map.insert(
                 header::HeaderName::from_static("referrer-policy"),
-                config.referrer_policy.parse().unwrap(),
+                headers.referrer_policy,
             );
 
             // Permissions-Policy (formerly Feature-Policy)
-            headers.insert(
+            headers_map.insert(
                 header::HeaderName::from_static("permissions-policy"),
-                config.permissions_policy.parse().unwrap(),
+                headers.permissions_policy,
             );
 
             // X-XSS-Protection (legacy but still useful)
-            headers.insert(
-                header::X_XSS_PROTECTION,
-                config.xss_protection.parse().unwrap(),
-            );
+            headers_map.insert(header::X_XSS_PROTECTION, headers.xss_protection);
 
-            // Strict-Transport-Security (HSTS)
-            if config.hsts_enabled {
-                let hsts_value = format!(
-                    "max-age={}{}{}",
-                    config.hsts_max_age,
-                    if config.hsts_include_subdomains {
-                        "; includeSubDomains"
-                    } else {
-                        ""
-                    },
-                    if config.hsts_preload { "; preload" } else { "" }
-                );
-                headers.insert(
-                    header::STRICT_TRANSPORT_SECURITY,
-                    hsts_value.parse().unwrap(),
-                );
+            // Strict-Transport-Security (HSTS) — only when enabled
+            if let Some(hsts) = headers.hsts {
+                headers_map.insert(header::STRICT_TRANSPORT_SECURITY, hsts);
             }
 
-            // Additional security headers
-
-            // Prevent MIME sniffing
-            headers.insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
-
             // Remove server information (if present)
-            headers.remove(header::SERVER);
+            headers_map.remove(header::SERVER);
 
             Ok(response)
         })
@@ -293,5 +324,32 @@ mod tests {
         let config = SecurityHeadersConfig::api_only();
         assert!(config.csp.contains("default-src 'none'"));
         assert_eq!(config.frame_options, "DENY");
+    }
+
+    #[test]
+    fn test_all_presets_parse_into_valid_header_values() {
+        // Regression: the service used to .parse().unwrap() per request;
+        // presets must therefore all be valid HeaderValues so that
+        // construction-time parsing cannot fail at startup.
+        for config in [
+            SecurityHeadersConfig::strict(),
+            SecurityHeadersConfig::development(),
+            SecurityHeadersConfig::api_only(),
+            cors_compatible_config(),
+        ] {
+            let parsed = ParsedSecurityHeaders::from_config(&config);
+            assert!(!parsed.csp.is_empty());
+            assert!(!parsed.frame_options.is_empty());
+            assert!(!parsed.content_type_options.is_empty());
+            assert_eq!(
+                parsed.hsts.is_some(),
+                config.hsts_enabled,
+                "HSTS header presence must match hsts_enabled"
+            );
+            if let Some(hsts) = parsed.hsts {
+                let hsts = hsts.to_str().expect("hsts is ASCII");
+                assert!(hsts.starts_with("max-age="));
+            }
+        }
     }
 }
