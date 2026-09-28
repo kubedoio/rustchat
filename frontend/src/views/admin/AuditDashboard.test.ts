@@ -168,12 +168,16 @@ describe('AuditDashboard export', () => {
     }
 
     // List and export must send identical filters (shared param builder).
-    const listParams = (apiGet.mock.calls.find(c => c[0] === '/admin/audit/membership')![1] as {
-      params?: Record<string, unknown>
-    }).params
-    const exportParams = (apiGet.mock.calls.find(
-      c => c[0] === '/admin/audit/membership/export'
-    )![1] as { params?: Record<string, unknown> }).params
+    const listParams = (
+      apiGet.mock.calls.find(c => c[0] === '/admin/audit/membership')![1] as {
+        params?: Record<string, unknown>
+      }
+    ).params
+    const exportParams = (
+      apiGet.mock.calls.find(c => c[0] === '/admin/audit/membership/export')![1] as {
+        params?: Record<string, unknown>
+      }
+    ).params
     expect(exportParams).toEqual(listParams)
 
     wrapper.unmount()
