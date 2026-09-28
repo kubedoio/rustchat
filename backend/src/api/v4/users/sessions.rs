@@ -82,8 +82,10 @@ pub async fn attach_device(
 ) -> ApiResult<impl IntoResponse> {
     use tracing::{info, warn};
 
-    let body_str = String::from_utf8_lossy(&body);
-    info!(user_id = %auth.user_id, body = %body_str, "attach_device received");
+    // NOTE: the request body and device_id embed long-lived FCM/APNS push
+    // tokens. Never log them (or prefixes of them) — logs are routinely
+    // shipped to systems with weaker access control than production secrets.
+    info!(user_id = %auth.user_id, body_len = body.len(), "attach_device received");
 
     // Try to parse body, but accept empty/malformed requests gracefully
     let input: AttachDeviceRequest = match super::parse_body::<AttachDeviceRequest>(
@@ -92,11 +94,11 @@ pub async fn attach_device(
         "Invalid device body",
     ) {
         Ok(v) => {
-            info!(user_id = %auth.user_id, device_id = ?v.device_id, "attach_device parsed successfully");
+            info!(user_id = %auth.user_id, has_device_id = v.device_id.is_some(), "attach_device parsed successfully");
             v
         }
         Err(e) => {
-            warn!(user_id = %auth.user_id, error = %e, body = %body_str, "attach_device parse error");
+            warn!(user_id = %auth.user_id, error = %e, "attach_device parse error");
             // Return OK for malformed requests - mobile sends various formats
             return Ok(Json(serde_json::json!({"status": "OK"})));
         }
@@ -110,9 +112,8 @@ pub async fn attach_device(
 
         info!(
             user_id = %auth.user_id,
-            device_id = %device_id_stored,
+            device_id_len = device_id_stored.len(),
             has_token = resolved_token.is_some(),
-            token_preview = %resolved_token.as_deref().map(|token| &token[..20.min(token.len())]).unwrap_or(""),
             platform = %platform,
             device_notification_disabled = ?input.device_notification_disabled,
             mobile_version = ?input.mobile_version,
@@ -137,7 +138,6 @@ pub async fn attach_device(
             Ok(result) => {
                 info!(
                     user_id = %auth.user_id,
-                    device_id = %device_id_stored,
                     rows_affected = result.rows_affected(),
                     "attach_device stored device registration"
                 );
@@ -145,7 +145,6 @@ pub async fn attach_device(
             Err(e) => {
                 warn!(
                     user_id = %auth.user_id,
-                    device_id = %device_id_stored,
                     platform = %platform,
                     has_token = resolved_token.is_some(),
                     error = %e,

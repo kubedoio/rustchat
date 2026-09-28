@@ -205,7 +205,13 @@ impl TemplateRenderer {
                     let length =
                         h.param(1).and_then(|v| v.value().as_i64()).unwrap_or(100) as usize;
                     if text.len() > length {
-                        out.write(&format!("{}...", &text[..length]))?;
+                        // Never slice through a multi-byte UTF-8 character
+                        // (e.g. emoji/CJK in chat excerpts) — that panics.
+                        let mut end = length;
+                        while !text.is_char_boundary(end) {
+                            end -= 1;
+                        }
+                        out.write(&format!("{}...", &text[..end]))?;
                     } else {
                         out.write(text)?;
                     }
@@ -646,5 +652,49 @@ impl StandardVariables {
                 description: Some("Link to unsubscribe from announcements".to_string()),
             },
         ]
+    }
+}
+
+#[cfg(test)]
+mod truncate_tests {
+    use super::*;
+
+    fn render_truncate(value: &str, length: i64) -> String {
+        let renderer = TemplateRenderer::new();
+        let context = RenderContext::new()
+            .with_variables(serde_json::json!({ "value": value }))
+            .expect("variables should serialize");
+        let template = format!("{{{{truncate value {}}}}}", length);
+        renderer
+            .render_template(&template, &context)
+            .expect("template should render")
+    }
+
+    #[test]
+    fn truncate_ascii_is_unchanged() {
+        assert_eq!(render_truncate("hello world", 5), "hello...");
+        assert_eq!(render_truncate("short", 100), "short");
+    }
+
+    #[test]
+    fn truncate_multibyte_boundary_does_not_panic() {
+        // 4-byte emoji followed by CJK: byte 5 and 6 land inside multi-byte
+        // characters. This must truncate at a character boundary, not panic.
+        let text = "👍中文消息内容";
+        let rendered = render_truncate(text, 5);
+        assert!(rendered.ends_with("..."));
+        assert!(!rendered.starts_with('\u{FFFD}'));
+        // "👍" is 4 bytes; byte boundary 5 lands inside "中", so we expect
+        // only the emoji to survive before the ellipsis.
+        assert_eq!(rendered, "👍...");
+    }
+
+    #[test]
+    fn truncate_cjk_only_input() {
+        let rendered = render_truncate("中文消息", 3);
+        // "中" is exactly 3 bytes, so it survives intact.
+        assert_eq!(rendered, "中...");
+        // Byte 4 lands inside the second CJK char: only the first survives.
+        assert_eq!(render_truncate("中文消息", 4), "中...");
     }
 }

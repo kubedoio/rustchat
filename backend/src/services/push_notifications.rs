@@ -558,6 +558,7 @@ pub async fn send_call_ringing_notification(
 }
 
 /// Send message notification to a user
+#[allow(clippy::too_many_arguments)]
 pub async fn send_message_notification(
     state: &AppState,
     user_id: Uuid,
@@ -566,6 +567,7 @@ pub async fn send_message_notification(
     sender_name: String,
     message: String,
     is_dm: bool,
+    post_id: Uuid,
 ) -> Result<usize, PushNotificationError> {
     let (title, body) = if is_dm {
         (sender_name.clone(), message)
@@ -573,8 +575,10 @@ pub async fn send_message_notification(
         (format!("{} in {}", sender_name, channel_name), message)
     };
 
-    // Generate a post_id for navigation (mobile requires this field)
-    let post_id = uuid::Uuid::new_v4().to_string();
+    // Real post ID so tapping the notification deep-links to the actual
+    // message. Never synthesize a random one — it navigates to a
+    // non-existent post.
+    let post_id = post_id.to_string();
 
     // Get server URL for the mobile app to identify which server
     let server_url = get_site_url(state).await;
