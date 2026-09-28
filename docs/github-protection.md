@@ -5,31 +5,38 @@ must be configured manually in the GitHub UI (or via the API).
 
 ## Verified Settings
 
-> **⚠ 2026-09-28 re-verification FAILED — issue #258 remains open.**
+> **2026-09-28: re-verification initially FAILED, then RESOLVED same day.**
 > Running `scripts/verify-protection.sh` on 2026-09-28 showed that live
-> `main` does **not** currently enforce the merge gate:
+> `main` did **not** enforce the merge gate (`required_status_checks` was
+> empty; `required_pull_request_reviews` was null), contradicting the
+> 2026-09-27 verification record — issue #258.
 >
-> - `required_status_checks` is **empty** — `CI Complete`, `Security Complete`,
->   and `dco-check` are *not* required contexts.
-> - `required_pull_request_reviews` is **null** — no approving-review or
->   CODEOWNERS requirement is enforced.
+> The merge gate was re-applied on 2026-09-28 (required contexts
+> `CI Complete`, `Security Complete`, `dco-check`, strict; 1 approving
+> review, CODEOWNERS review, dismiss stale approvals) and
+> `scripts/verify-protection.sh` now passes all checks:
 >
-> What *is* live and verified on 2026-09-28: `enforce_admins` on; force pushes
-> and deletion blocked; conversation resolution required; the release-tag
-> ruleset (below). The configuration below is therefore the **intended**
-> state, not the current state, until a maintainer applies the required
-> checks and review policy on `main` (tracked in #258).
+> ```text
+> PASS: main requires the merge-gate status contexts
+> PASS: main enforces admins
+> PASS: main blocks force pushes for ordinary contributors
+> PASS: main blocks branch deletion
+> PASS: main requires conversation resolution
+> PASS: release-tag ruleset targets tags (id 14126218)
+> PASS: release-tag ruleset includes refs/tags/v*
+> ```
+>
+> Re-verify at any time by running the script (requires `GITHUB_TOKEN`).
 
-The following reflects the **verified, live** configuration as last fully
-verified — **2026-09-27**; see the re-verification warning above for the
-current delta (RI-C02). Reproduce with:
+The following reflects the **verified, live** configuration (RI-C02).
+Reproduce with:
 
 ```bash
 gh api repos/kubedoio/rustchat/branches/main/protection
 gh api repos/kubedoio/rustchat/rulesets
 ```
 
-### `main` branch protection (verified 2026-09-27; merge gate found missing 2026-09-28)
+### `main` branch protection (verified 2026-09-28)
 
 - **Require a pull request before merging** — 1 approving review, CODEOWNERS review for affected paths, dismiss stale approvals on new commits.
 - **Require status checks** — required contexts `CI Complete`, `Security Complete`, `dco-check`; require branches to be up to date (`strict`).

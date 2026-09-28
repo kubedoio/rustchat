@@ -82,7 +82,7 @@ For details see `docs/compatibility-scope.md`.
 
 | Gap | Area | Priority |
 |---|---|---|
-| ~~Required/authoritative CI and live repository protections need convergence and evidence~~ — **regressed: 2026-09-28 re-verification found the merge gate (required status checks + required reviews) is NOT live on `main`; #258 reopened-pending** (RI-C02 doc corrected) | governance/release | P0 |
+| ~~Required/authoritative CI and live repository protections need convergence and evidence~~ — resolved (RI-C01/C02). Note: the merge gate was found missing on 2026-09-28 re-verification and re-applied the same day; `scripts/verify-protection.sh` passes | governance/release | P0 |
 | ~~Promoted artifact publication must be tied to complete release/security gates~~ — resolved (RI-C03 promotion gate) | release | P0 |
 | Compliance export and audit dashboard defects | admin | P0/release |
 | Realtime replay durability and graceful WebSocket shutdown | realtime | Hardening |
