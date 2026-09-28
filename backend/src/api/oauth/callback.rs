@@ -305,35 +305,44 @@ async fn find_or_create_user(
     }
 
     // 2) Fallback to email match for first trusted link.
-    if let Some(user) = repo.get_user_by_email(email).await? {
-        let current_link = repo.get_user_auth_link_by_id(user.id).await?;
+    //
+    // The email assertion is only trusted for linking when the provider
+    // explicitly verified it (OIDC `email_verified`). Otherwise an attacker
+    // who controls an unverified email attribute at the IdP could take over
+    // the RustChat account that already owns that email. When the provider
+    // did not assert verification, fall through to account creation instead.
+    let email_trusted_for_linking = user_info.email_verified == Some(true);
+    if email_trusted_for_linking {
+        if let Some(user) = repo.get_user_by_email(email).await? {
+            let current_link = repo.get_user_auth_link_by_id(user.id).await?;
 
-        if let Some(existing_external_id) = current_link.as_ref().and_then(|l| l.1.as_deref()) {
-            let same_provider =
-                current_link.as_ref().and_then(|l| l.0.as_deref()) == Some(provider_key);
-            let same_external = external_id == Some(existing_external_id);
-            if !same_provider || !same_external {
-                return Err(AppError::Conflict(
-                    "Account is already linked to a different SSO identity".to_string(),
-                ));
+            if let Some(existing_external_id) = current_link.as_ref().and_then(|l| l.1.as_deref()) {
+                let same_provider =
+                    current_link.as_ref().and_then(|l| l.0.as_deref()) == Some(provider_key);
+                let same_external = external_id == Some(existing_external_id);
+                if !same_provider || !same_external {
+                    return Err(AppError::Conflict(
+                        "Account is already linked to a different SSO identity".to_string(),
+                    ));
+                }
             }
+
+            let should_link =
+                external_id.is_some() && current_link.as_ref().and_then(|l| l.1.as_ref()).is_none();
+            let should_sync_role = config.provider_type == "oidc" && !desired_role.is_empty();
+            let updated_user = repo
+                .update_user_login_and_link(
+                    user.id,
+                    should_link,
+                    provider_key,
+                    external_id,
+                    should_sync_role,
+                    &desired_role,
+                )
+                .await?;
+
+            return Ok(updated_user);
         }
-
-        let should_link =
-            external_id.is_some() && current_link.as_ref().and_then(|l| l.1.as_ref()).is_none();
-        let should_sync_role = config.provider_type == "oidc" && !desired_role.is_empty();
-        let updated_user = repo
-            .update_user_login_and_link(
-                user.id,
-                should_link,
-                provider_key,
-                external_id,
-                should_sync_role,
-                &desired_role,
-            )
-            .await?;
-
-        return Ok(updated_user);
     }
 
     // 3) Create user if auto-provisioning is enabled.

@@ -247,6 +247,10 @@ pub(crate) async fn exchange_github_token(
 
     let user_info = UserInfo {
         email: email.clone(),
+        // GitHub primary emails are verified by GitHub before being exposed
+        // here; GitHub's API does not return an explicit per-email flag on
+        // this endpoint.
+        email_verified: Some(true),
         name: github_user.name,
         preferred_username: Some(github_user.login),
         groups: vec![],
@@ -335,6 +339,7 @@ pub(crate) async fn exchange_oidc_token(
         // Use claims from ID token
         UserInfo {
             email: c.email.clone().unwrap_or_default(),
+            email_verified: c.email_verified,
             name: c.name.clone(),
             preferred_username: c.preferred_username.clone(),
             groups: extract_groups(c, config.groups_claim.as_deref()),
@@ -358,12 +363,14 @@ pub(crate) async fn exchange_oidc_token(
             .map_err(|e| AppError::Internal(format!("Failed to parse UserInfo: {}", e)))?;
 
         let email = userinfo.email.clone().unwrap_or_default();
+        let email_verified = userinfo.email_verified;
         let name = userinfo.name.clone();
         let preferred_username = userinfo.preferred_username.clone();
         let groups = extract_groups_from_userinfo(&userinfo, config.groups_claim.as_deref());
 
         UserInfo {
             email,
+            email_verified,
             name,
             preferred_username,
             groups,
@@ -377,13 +384,13 @@ pub(crate) async fn exchange_oidc_token(
 
     let email = user_info.email.clone();
 
-    // Check email_verified claim if present
-    if let Some(ref c) = claims {
-        if c.email_verified == Some(false) {
-            return Err(AppError::Forbidden(
-                "Email not verified with OAuth provider".to_string(),
-            ));
-        }
+    // Reject explicitly-unverified emails on both paths (ID token claims and
+    // userinfo endpoint). Previously only the ID-token path checked this,
+    // leaving the userinfo fallback as a trust-boundary gap.
+    if user_info.email_verified == Some(false) {
+        return Err(AppError::Forbidden(
+            "Email not verified with OAuth provider".to_string(),
+        ));
     }
 
     // Check domain restrictions for Google
