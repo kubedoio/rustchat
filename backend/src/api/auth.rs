@@ -405,22 +405,6 @@ async fn login_inner(
 
     enforce_password_login_allowed(&state, &user.email).await?;
 
-    // Keep per-account throttle in addition to centralized per-IP middleware.
-    if state.config.security.rate_limit_enabled {
-        let config =
-            RateLimitConfig::auth_per_minute(state.config.security.rate_limit_auth_per_minute);
-        let user_key = format!("user:{}", user.id);
-        let user_result = rate_limit::check_rate_limit(&state.redis, &config, &user_key).await?;
-
-        if !user_result.allowed {
-            tracing::warn!(user_id = %user.id, "Rate limit exceeded for user login");
-            return Err(AppError::TooManyRequests(
-                "Too many login attempts. Please try again later.".to_string(),
-                Some(config.window_secs),
-            ));
-        }
-    }
-
     // Verify password (OAuth users or users pending password setup cannot login with password)
     let password_hash = user.password_hash.as_deref().ok_or_else(|| {
         if user.email_verified {
@@ -435,6 +419,25 @@ async fn login_inner(
     })?;
 
     if !verify_password(&input.password, password_hash)? {
+        // Per-account throttle counts only FAILED attempts. A correct-password
+        // login can therefore never be blocked, so a known account cannot be
+        // DoS'd out of its own (successful) logins by flooding with bad
+        // passwords; the throttle still bounds brute-forcing against a victim.
+        if state.config.security.rate_limit_enabled {
+            let config =
+                RateLimitConfig::auth_per_minute(state.config.security.rate_limit_auth_per_minute);
+            let user_key = format!("user:{}", user.id);
+            let user_result =
+                rate_limit::check_rate_limit(&state.redis, &config, &user_key).await?;
+            if !user_result.allowed {
+                tracing::warn!(user_id = %user.id, "Too many failed login attempts for user");
+                return Err(AppError::TooManyRequests(
+                    "Too many login attempts. Please try again later.".to_string(),
+                    Some(config.window_secs),
+                ));
+            }
+        }
+
         return Err(AppError::Unauthorized(
             "Invalid email or password".to_string(),
         ));

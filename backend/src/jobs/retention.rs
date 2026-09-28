@@ -17,6 +17,11 @@ use crate::config::RetentionJobConfig;
 use crate::error::AppError;
 use crate::storage::{ListObjectsResult, ListedObject, ObjectStorage};
 
+/// Batch size for retention file cleanup. Records are fetched and deleted in
+/// bounded batches so a very large backlog does not load every expired row into
+/// memory at once.
+const RETENTION_FILE_BATCH: u64 = 500;
+
 /// Minimum grace period for orphan-scan age filtering. Config values below this
 /// floor are clamped so that an in-flight upload cannot be deleted before its
 /// `files` row is committed.
@@ -62,10 +67,11 @@ pub trait RetentionStore: Send + Sync {
     /// Delete messages older than `cutoff`. Returns number of rows deleted.
     async fn delete_old_messages(&self, cutoff: DateTime<Utc>) -> Result<u64, sqlx::Error>;
 
-    /// Fetch file rows older than `cutoff`.
+    /// Fetch up to `limit` file rows older than `cutoff`, oldest first.
     async fn fetch_expired_file_records(
         &self,
         cutoff: DateTime<Utc>,
+        limit: u64,
     ) -> Result<Vec<ExpiredFileRecord>, sqlx::Error>;
 
     /// Delete file rows whose keys are in `keys`. Returns number of rows deleted.
@@ -89,11 +95,14 @@ impl RetentionStore for PgRetentionStore<'_> {
     async fn fetch_expired_file_records(
         &self,
         cutoff: DateTime<Utc>,
+        limit: u64,
     ) -> Result<Vec<ExpiredFileRecord>, sqlx::Error> {
         let records = sqlx::query_as::<_, (Uuid, Uuid, String, Option<String>)>(
-            "SELECT id, uploader_id, key, thumbnail_key FROM files WHERE created_at < $1",
+            "SELECT id, uploader_id, key, thumbnail_key FROM files \
+             WHERE created_at < $1 ORDER BY created_at LIMIT $2",
         )
         .bind(cutoff)
+        .bind(limit as i64)
         .fetch_all(self.0)
         .await?;
 
@@ -238,57 +247,72 @@ pub async fn run_retention_cleanup_with_store<S: ObjectStorage, R: RetentionStor
     // Clean up old files
     if config.file_retention_days > 0 {
         let cutoff = Utc::now() - Duration::days(config.file_retention_days);
+        let mut total_deleted: u64 = 0;
+        let mut file_keys: Vec<String> = Vec::new();
 
-        let records = store.fetch_expired_file_records(cutoff).await?;
-        let mut deleted_keys = Vec::with_capacity(records.len());
+        // Process expired files in bounded batches (oldest first). Rows are
+        // removed as they are processed, so re-fetching from the cutoff is a
+        // stable keyset and never loads the whole backlog into memory.
+        loop {
+            let records = store
+                .fetch_expired_file_records(cutoff, RETENTION_FILE_BATCH)
+                .await?;
+            if records.is_empty() {
+                break;
+            }
 
-        for record in &records {
-            let mut all_deleted = true;
+            let mut deleted_keys: Vec<&str> = Vec::with_capacity(records.len());
 
-            // Delete derivative objects first. If the primary delete fails we
-            // keep the files row for retry; derivatives are best-effort and must
-            // not prevent removing a row whose primary object is already gone.
-            if let Some(thumbnail_key) = &record.thumbnail_key {
-                if let Err(e) = storage.delete_object(thumbnail_key).await {
+            for record in &records {
+                let mut all_deleted = true;
+
+                // Delete derivative objects first. If the primary delete fails we
+                // keep the files row for retry; derivatives are best-effort and must
+                // not prevent removing a row whose primary object is already gone.
+                if let Some(thumbnail_key) = &record.thumbnail_key {
+                    if let Err(e) = storage.delete_object(thumbnail_key).await {
+                        stats.file_delete_errors += 1;
+                        warn!(
+                            error = %e,
+                            key = %thumbnail_key,
+                            "Retention: failed to delete thumbnail S3 object"
+                        );
+                    }
+                }
+
+                let preview_key = format!("previews/{}/{}.jpg", record.uploader_id, record.id);
+                if let Err(e) = storage.delete_object(&preview_key).await {
                     stats.file_delete_errors += 1;
                     warn!(
                         error = %e,
-                        key = %thumbnail_key,
-                        "Retention: failed to delete thumbnail S3 object"
+                        key = %preview_key,
+                        "Retention: failed to delete preview S3 object"
                     );
                 }
+
+                if let Err(e) = storage.delete_object(&record.key).await {
+                    all_deleted = false;
+                    stats.file_delete_errors += 1;
+                    warn!(
+                        error = %e,
+                        key = %record.key,
+                        "Retention: failed to delete primary S3 object; leaving files row for retry"
+                    );
+                }
+
+                if all_deleted {
+                    deleted_keys.push(record.key.as_str());
+                }
+                file_keys.push(record.key.clone());
             }
 
-            let preview_key = format!("previews/{}/{}.jpg", record.uploader_id, record.id);
-            if let Err(e) = storage.delete_object(&preview_key).await {
-                stats.file_delete_errors += 1;
-                warn!(
-                    error = %e,
-                    key = %preview_key,
-                    "Retention: failed to delete preview S3 object"
-                );
-            }
-
-            if let Err(e) = storage.delete_object(&record.key).await {
-                all_deleted = false;
-                stats.file_delete_errors += 1;
-                warn!(
-                    error = %e,
-                    key = %record.key,
-                    "Retention: failed to delete primary S3 object; leaving files row for retry"
-                );
-            }
-
-            if all_deleted {
-                deleted_keys.push(record.key.as_str());
+            if !deleted_keys.is_empty() {
+                total_deleted += store.delete_files_by_keys(&deleted_keys).await?;
             }
         }
 
-        if !deleted_keys.is_empty() {
-            stats.files_deleted = store.delete_files_by_keys(&deleted_keys).await?;
-        }
-
-        stats.file_keys = records.into_iter().map(|r| r.key).collect();
+        stats.files_deleted = total_deleted;
+        stats.file_keys = file_keys;
         info!(
             "Retention: Deleted {} files older than {} days ({} S3 errors)",
             stats.files_deleted, config.file_retention_days, stats.file_delete_errors
@@ -601,8 +625,14 @@ mod tests {
         async fn fetch_expired_file_records(
             &self,
             _cutoff: DateTime<Utc>,
+            limit: u64,
         ) -> Result<Vec<ExpiredFileRecord>, sqlx::Error> {
-            Ok(self.file_records.lock().await.clone())
+            // Mirror the DB: each call returns the next batch and removes the
+            // rows, so the driver's pagination loop terminates after the
+            // backlog is drained.
+            let mut records = self.file_records.lock().await;
+            let take = (limit as usize).min(records.len());
+            Ok(records.drain(..take).collect())
         }
 
         async fn delete_files_by_keys(&self, keys: &[&str]) -> Result<u64, sqlx::Error> {
