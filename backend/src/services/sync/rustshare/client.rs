@@ -1,6 +1,14 @@
 //! RustShare API client
 
 use serde::Deserialize;
+use std::time::Duration;
+
+/// Hard cap on a single downloaded file's size.
+///
+/// Downloads are buffered fully in memory before streaming to S3; without a
+/// cap, a remote listing a huge file (or a compromised server) OOMs the
+/// backend. The orchestrator skips larger files with a logged warning.
+pub const MAX_DOWNLOAD_BYTES: i64 = 100 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct RustShareClient {
@@ -28,8 +36,17 @@ pub struct RustShareFileList {
 
 impl RustShareClient {
     pub fn new(base_url: String, auth_token: String) -> Self {
+        // Bounded client: without timeouts a stalled RustShare connection
+        // hangs the sync task indefinitely. The overall timeout is generous
+        // because legitimate large downloads take a while; the size cap in
+        // `download_file` bounds memory, this bounds time.
+        let http = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(300))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
         Self {
-            http: reqwest::Client::new(),
+            http,
             base_url: base_url.trim_end_matches('/').to_string(),
             auth_token,
         }
@@ -79,6 +96,10 @@ impl RustShareClient {
     }
 
     /// Download a file's content.
+    ///
+    /// Fails with [`RustShareError::FileTooLarge`] when the response declares
+    /// (or streams) more than [`MAX_DOWNLOAD_BYTES`]; the body is never
+    /// buffered beyond that cap.
     pub async fn download_file(&self, file_id: &str) -> Result<Vec<u8>, RustShareError> {
         let url = format!("{}/api/v1/files/{}/download", self.base_url, file_id);
         let response = self
@@ -97,7 +118,29 @@ impl RustShareClient {
             });
         }
 
-        Ok(response.bytes().await?.to_vec())
+        // Pre-check declared size, then bound the actual read: a lying or
+        // chunked response must not be able to OOM the process either.
+        if let Some(len) = response.content_length() {
+            if len as i64 > MAX_DOWNLOAD_BYTES {
+                return Err(RustShareError::FileTooLarge {
+                    declared: len as i64,
+                    limit: MAX_DOWNLOAD_BYTES,
+                });
+            }
+        }
+
+        let mut data: Vec<u8> = Vec::new();
+        let mut stream = response;
+        while let Some(chunk) = stream.chunk().await? {
+            if (data.len() + chunk.len()) as i64 > MAX_DOWNLOAD_BYTES {
+                return Err(RustShareError::FileTooLarge {
+                    declared: -1, // unknown; exceeded while streaming
+                    limit: MAX_DOWNLOAD_BYTES,
+                });
+            }
+            data.extend_from_slice(&chunk);
+        }
+        Ok(data)
     }
 }
 
@@ -109,4 +152,6 @@ pub enum RustShareError {
     ApiError { status: u16, body: String },
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+    #[error("file too large: declared {declared} bytes, limit {limit}")]
+    FileTooLarge { declared: i64, limit: i64 },
 }

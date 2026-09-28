@@ -111,6 +111,17 @@ impl EmailWorker {
     async fn process_batch(&self) -> Result<WorkerStats, sqlx::Error> {
         let mut stats = WorkerStats::default();
 
+        // Crash recovery first: if a previous worker run died between
+        // marking a row `sending` and completing delivery, that row would
+        // otherwise be stuck (and the email silently lost) forever.
+        let reclaimed = self.reclaim_stale_sending().await?;
+        if reclaimed > 0 {
+            warn!(
+                reclaimed,
+                "Reclaimed emails stuck in 'sending' after a worker crash"
+            );
+        }
+
         // Get pending emails
         let pending = self.get_pending_emails().await?;
 
@@ -176,6 +187,34 @@ impl EmailWorker {
         .await?;
 
         Ok(emails)
+    }
+
+    /// Reset rows stuck in `sending` past the lease window back to `queued`.
+    ///
+    /// Crash recovery, mirroring `integration_outbox::reclaim_stale_in_flight`:
+    /// if the worker dies after marking an email `sending` but before the
+    /// delivery attempt finishes, the row would never be picked up again
+    /// (`get_pending_emails` only selects `queued`). Retrying after the lease
+    /// is safe: a delivery that actually completed before the crash is, at
+    /// worst, re-sent — the same posture as the existing retry logic for
+    /// transient send failures.
+    async fn reclaim_stale_sending(&self) -> Result<u64, sqlx::Error> {
+        /// Lease window: comfortably above one batch (rate-limited) send
+        /// plus provider timeouts, but short enough to recover quickly.
+        const SENDING_LEASE_SECS: f64 = 600.0;
+
+        let result = sqlx::query(
+            r#"
+            UPDATE email_outbox
+            SET status = 'queued', updated_at = NOW()
+            WHERE status = 'sending'
+              AND updated_at < NOW() - make_interval(secs => $1)
+            "#,
+        )
+        .bind(SENDING_LEASE_SECS)
+        .execute(&self.db)
+        .await?;
+        Ok(result.rows_affected())
     }
 
     /// Process a single email
