@@ -263,7 +263,7 @@ async fn ensure_membership(
 /// computation therefore excludes this syncable's grant explicitly instead
 /// of relying on the tracking row already being gone.
 async fn cleanup_tracking_membership(
-    state: &AppState,
+    conn: &mut sqlx::PgConnection,
     group_id: Uuid,
     kind: SyncableKind,
     syncable_id: Uuid,
@@ -290,7 +290,7 @@ async fn cleanup_tracking_membership(
     .bind(group_id)
     .bind(kind.as_db_str())
     .bind(syncable_id)
-    .fetch_one(&state.db)
+    .fetch_one(&mut *conn)
     .await?;
 
     if remaining_grants > 0 {
@@ -303,7 +303,7 @@ async fn cleanup_tracking_membership(
                 .bind(&remaining_role)
                 .bind(tracked.target_id)
                 .bind(tracked.user_id)
-                .execute(&state.db)
+                .execute(&mut *conn)
                 .await?;
         } else {
             sqlx::query(
@@ -312,20 +312,20 @@ async fn cleanup_tracking_membership(
             .bind(&remaining_role)
             .bind(tracked.target_id)
             .bind(tracked.user_id)
-            .execute(&state.db)
+            .execute(&mut *conn)
             .await?;
         }
     } else if tracked.target_type == "team" {
         sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
             .bind(tracked.target_id)
             .bind(tracked.user_id)
-            .execute(&state.db)
+            .execute(&mut *conn)
             .await?;
     } else {
         sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
             .bind(tracked.target_id)
             .bind(tracked.user_id)
-            .execute(&state.db)
+            .execute(&mut *conn)
             .await?;
     }
 
@@ -348,7 +348,7 @@ async fn cleanup_tracking_membership(
     .bind(&tracked.target_type)
     .bind(tracked.target_id)
     .bind(tracked.user_id)
-    .execute(&state.db)
+    .execute(&mut *conn)
     .await?;
 
     Ok(())
@@ -451,15 +451,11 @@ pub(crate) async fn reconcile_group_syncable(
             syncable_type = kind.as_db_str(),
             "Group syncable target no longer exists; revoking its grants and removing the link"
         );
-        cleanup_unlinked_syncable(state, group_id, kind, syncable_id).await?;
-        sqlx::query(
-            "DELETE FROM group_syncables WHERE group_id = $1 AND syncable_type = $2 AND syncable_id = $3",
-        )
-        .bind(group_id)
-        .bind(kind.as_db_str())
-        .bind(syncable_id)
-        .execute(&state.db)
-        .await?;
+        // Atomically remove the dead link and revoke its grants. On
+        // failure the link survives and the next pass retries (an IdP
+        // attribute that still references the deleted target re-creates
+        // the link on the next sync, and this path cleans it again).
+        unlink_group_syncable(state, group_id, kind, syncable_id).await?;
         return Ok(());
     }
 
@@ -537,6 +533,7 @@ pub(crate) async fn reconcile_group_syncable(
         .await?;
     }
 
+    let mut conn = state.db.acquire().await?;
     for tracked in existing_tracked {
         let desired_key = DesiredMembership {
             target_type: tracked.target_type.clone(),
@@ -544,7 +541,7 @@ pub(crate) async fn reconcile_group_syncable(
             user_id: tracked.user_id,
         };
         if !desired.contains(&desired_key) {
-            cleanup_tracking_membership(state, group_id, kind, syncable_id, &tracked).await?;
+            cleanup_tracking_membership(&mut conn, group_id, kind, syncable_id, &tracked).await?;
         }
     }
 
@@ -556,18 +553,44 @@ pub(crate) async fn reconcile_group_syncable(
 /// rows, inside the caller's hard-delete transaction. Nothing enforces an
 /// FK on `group_syncables.syncable_id`, so skipping this leaves dangling
 /// links that abort reconciliation for their groups. All memberships
-/// those syncables granted target the team or its channels and cascade
-/// with the delete.
+/// those syncables granted target the team or its channels and are
+/// removed below (the caller's `DELETE FROM teams` would cascade them
+/// anyway; deleting them explicitly first keeps the canonical lock
+/// order).
 pub(crate) async fn purge_team_syncables(
     tx: &mut sqlx::PgConnection,
     team_id: Uuid,
 ) -> Result<(), sqlx::Error> {
+    // Lock order: link rows, then membership rows, then tracking rows —
+    // the canonical order shared with ensure_membership,
+    // cleanup_tracking_membership, soft_delete_group, and
+    // unlink_group_syncable. Deleting the tracking rows before the
+    // membership rows (e.g. leaving both to the caller's cascading team
+    // delete) inverts the order and can deadlock against a concurrent
+    // reconcile cleanup.
     sqlx::query(
         r#"
         DELETE FROM group_syncables gs
         WHERE (gs.syncable_type = 'team' AND gs.syncable_id = $1)
            OR (gs.syncable_type = 'channel' AND gs.syncable_id IN (
                    SELECT c.id FROM channels c WHERE c.team_id = $1))
+        "#,
+    )
+    .bind(team_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // Exactly the rows the team delete would cascade — deleted first to
+    // take their locks in canonical order.
+    sqlx::query("DELETE FROM team_members WHERE team_id = $1")
+        .bind(team_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query(
+        r#"
+        DELETE FROM channel_members cm
+        WHERE cm.channel_id IN (SELECT c.id FROM channels c WHERE c.team_id = $1)
         "#,
     )
     .bind(team_id)
@@ -597,6 +620,13 @@ pub(crate) async fn purge_team_syncables(
 /// members silently keep team access. The links themselves are removed
 /// because nothing enforces an FK on `group_syncables.syncable_id` and
 /// dangling links abort reconciliation for their groups.
+///
+/// Lock order: link rows, then membership rows, then tracking rows — the
+/// canonical order shared with every other grant-cleanup path. The
+/// tracking delete must stay AFTER the team_members statements: moving it
+/// earlier would invert the order against `cleanup_tracking_membership`
+/// and `soft_delete_group` and reintroduce the deadlock the canonical
+/// order exists to prevent.
 pub(crate) async fn purge_channel_syncables(
     tx: &mut sqlx::PgConnection,
     channel_id: Uuid,
@@ -664,9 +694,11 @@ pub(crate) async fn purge_channel_syncables(
 }
 
 /// Remove every membership a syncable granted (used when the syncable is
-/// unlinked or its group disappears from the identity provider).
+/// unlinked or its group disappears from the identity provider). Runs on
+/// the caller's connection/transaction — see [`unlink_group_syncable`] for
+/// the atomic link-removal entry point.
 pub(crate) async fn cleanup_unlinked_syncable(
-    state: &AppState,
+    conn: &mut sqlx::PgConnection,
     group_id: Uuid,
     kind: SyncableKind,
     syncable_id: Uuid,
@@ -683,11 +715,57 @@ pub(crate) async fn cleanup_unlinked_syncable(
     .bind(group_id)
     .bind(kind.as_db_str())
     .bind(syncable_id)
-    .fetch_all(&state.db)
+    .fetch_all(&mut *conn)
     .await?;
 
     for tracked in tracked_rows {
-        cleanup_tracking_membership(state, group_id, kind, syncable_id, &tracked).await?;
+        cleanup_tracking_membership(conn, group_id, kind, syncable_id, &tracked).await?;
     }
     Ok(())
+}
+
+/// Atomically unlink a group syncable: remove its link row and revoke
+/// every membership it granted in a single transaction.
+///
+/// On failure the transaction rolls back — the link survives, so the next
+/// reconcile pass (or the next IdP attribute sync) retries the cleanup. A
+/// non-transactional unlink that failed mid-cleanup would instead leave
+/// the grants active with no retry path: reconcile only iterates live
+/// syncables, and nothing else revisits a (group, syncable) tuple whose
+/// link row is already gone.
+///
+/// Lock order: link row first, then membership rows, then tracking rows —
+/// the canonical order shared with `ensure_membership`,
+/// `cleanup_tracking_membership`, and `soft_delete_group`'s transaction.
+/// Inside the transaction the link row is already deleted, so the
+/// `group_syncable_active_grants` view excludes this syncable's grants
+/// for every revoke/converge decision below (in addition to the explicit
+/// per-syncable exclusion in `cleanup_tracking_membership`).
+///
+/// Returns `Ok(false)` when no live link row exists for the tuple.
+pub(crate) async fn unlink_group_syncable(
+    state: &AppState,
+    group_id: Uuid,
+    kind: SyncableKind,
+    syncable_id: Uuid,
+) -> ApiResult<bool> {
+    let mut tx = state.db.begin().await?;
+
+    let deleted = sqlx::query(
+        "DELETE FROM group_syncables WHERE group_id = $1 AND syncable_type = $2 AND syncable_id = $3",
+    )
+    .bind(group_id)
+    .bind(kind.as_db_str())
+    .bind(syncable_id)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if deleted == 0 {
+        // Dropping the transaction releases its locks; nothing was changed.
+        return Ok(false);
+    }
+
+    cleanup_unlinked_syncable(&mut tx, group_id, kind, syncable_id).await?;
+    tx.commit().await?;
+    Ok(true)
 }

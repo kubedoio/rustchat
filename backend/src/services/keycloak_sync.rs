@@ -63,7 +63,7 @@ struct KeycloakUser {
 
 use crate::services::group_membership_sync::{
     cleanup_unlinked_syncable, reconcile_group_syncable, reconcile_group_syncables,
-    GroupSyncableRow, SyncableKind,
+    unlink_group_syncable, GroupSyncableRow, SyncableKind,
 };
 
 pub fn spawn_periodic_keycloak_sync(state: Arc<AppState>) -> tokio::task::JoinHandle<()> {
@@ -181,7 +181,10 @@ async fn sync_keycloak_group(
     reconcile_group_syncables(state, group_id).await?;
     for (kind, syncable_id, removed_link) in changed_syncables {
         if removed_link {
-            cleanup_unlinked_syncable(state, group_id, kind, syncable_id).await?;
+            // Atomic unlink: link removal and grant revocation commit
+            // together; on failure the link survives and the next pass
+            // (attribute still absent, link still alive) retries.
+            unlink_group_syncable(state, group_id, kind, syncable_id).await?;
             emit_group_syncable_event(state, group_id, kind, syncable_id, false).await;
         } else {
             reconcile_group_syncable(state, group_id, kind, syncable_id).await?;
@@ -664,15 +667,11 @@ async fn sync_group_syncables_from_attributes(
     }
 
     for ((_syncable_type, _syncable_id), row) in current_map {
-        sqlx::query(
-            "DELETE FROM group_syncables WHERE group_id = $1 AND syncable_type = $2 AND syncable_id = $3",
-        )
-        .bind(group_id)
-        .bind(&row.syncable_type)
-        .bind(row.syncable_id)
-        .execute(&state.db)
-        .await?;
-
+        // The link row is NOT deleted here: the caller unlinks atomically
+        // (link removal + grant revocation in one transaction), so a
+        // failed revocation rolls back and the next sync pass — which
+        // still sees the attribute absent and the link alive — reports
+        // the removal again and retries.
         removed += 1;
         let kind = if row.syncable_type == "team" {
             SyncableKind::Team
@@ -849,13 +848,17 @@ async fn deactivate_removed_keycloak_groups(
         .bind(group_id)
         .fetch_all(&state.db)
         .await?;
+        // Self-healing by construction: the group's soft-delete happens
+        // last, so a failure above leaves the group alive and the next
+        // cycle re-runs this whole deactivation (and its cleanups).
+        let mut conn = state.db.acquire().await?;
         for (syncable_type, syncable_id) in syncables {
             let kind = if syncable_type == "team" {
                 SyncableKind::Team
             } else {
                 SyncableKind::Channel
             };
-            cleanup_unlinked_syncable(state, group_id, kind, syncable_id).await?;
+            cleanup_unlinked_syncable(&mut conn, group_id, kind, syncable_id).await?;
             emit_group_syncable_event(state, group_id, kind, syncable_id, false).await;
         }
 

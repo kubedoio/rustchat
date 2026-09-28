@@ -23,7 +23,7 @@ const GROUP_SOURCE_PLUGIN_PREFIX: &str = "plugin_";
 // worker via the service module: roles converge to the union of active
 // grants on every pass, and manual memberships are never adopted.
 use crate::services::group_membership_sync::{
-    cleanup_unlinked_syncable, reconcile_group_syncable, reconcile_group_syncables, SyncableKind,
+    reconcile_group_syncable, reconcile_group_syncables, unlink_group_syncable, SyncableKind,
 };
 
 #[derive(Debug, Deserialize)]
@@ -758,19 +758,15 @@ async fn unlink_group_syncable_by_kind(
     ensure_syncable_exists(&state, kind, syncable_id).await?;
     verify_link_unlink_permission(&state, &auth, &group, kind, syncable_id).await?;
 
-    let deleted = GroupRepository::new(&state.db)
-        .delete_group_syncable(group_id, kind.as_db_str(), syncable_id)
-        .await?;
-
-    if deleted == 0 {
+    // Atomic unlink: the link row and every membership it granted are
+    // removed in one transaction. A failure rolls back — the link
+    // survives and the next reconcile pass retries — instead of leaving
+    // the grants active with no retry path (reconcile only iterates live
+    // syncables, so a committed link deletion can never be revisited).
+    let unlinked = unlink_group_syncable(&state, group_id, kind, syncable_id).await?;
+    if !unlinked {
         return Err(AppError::NotFound("Group syncable not found".to_string()));
     }
-
-    // Revoke the memberships this syncable granted before responding: the
-    // syncable row is already deleted, so nothing would ever retry a
-    // failed spawned cleanup (reconcile only iterates live syncables) and
-    // members would silently keep the access the group no longer grants.
-    cleanup_unlinked_syncable(&state, group_id, kind, syncable_id).await?;
 
     emit_group_syncable_event(&state, kind, syncable_id, group_id, false).await;
 

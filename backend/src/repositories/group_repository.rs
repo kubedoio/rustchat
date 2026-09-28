@@ -682,28 +682,6 @@ impl<'a> GroupRepository<'a> {
         .await
     }
 
-    pub async fn delete_group_syncable(
-        &self,
-        group_id: Uuid,
-        syncable_type: &str,
-        syncable_id: Uuid,
-    ) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query(
-            r#"
-            DELETE FROM group_syncables
-            WHERE group_id = $1
-              AND syncable_type = $2
-              AND syncable_id = $3
-            "#,
-        )
-        .bind(group_id)
-        .bind(syncable_type)
-        .bind(syncable_id)
-        .execute(self.pool)
-        .await?;
-        Ok(result.rows_affected())
-    }
-
     // --- Group-team/channel linking ---
 
     pub async fn get_team_meta(&self, team_id: Uuid) -> Result<Option<TeamMetaRow>, sqlx::Error> {
