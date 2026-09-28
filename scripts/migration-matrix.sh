@@ -31,6 +31,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-${REPO_ROOT}/backend/migrations}"
+# A relative MIGRATIONS_DIR is resolved against the repo root: realpath
+# would otherwise resolve it against the caller's CWD, failing loudly from
+# any other directory (or, if a same-named directory existed there, silently
+# guarding the wrong one).
+if [[ "${MIGRATIONS_DIR}" != /* ]]; then
+  MIGRATIONS_DIR="${REPO_ROOT}/${MIGRATIONS_DIR}"
+fi
 # Repo-relative pathspec for git commands: git resolves pathspecs relative to
 # the repo root, so an absolute MIGRATIONS_DIR must not be passed verbatim
 # (it would match nothing and silently disable the append-only guard).

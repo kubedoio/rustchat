@@ -310,3 +310,48 @@ async fn non_member_upload_with_channel_id_query_param_is_rejected() {
             .unwrap();
     assert_eq!(0, count);
 }
+
+#[tokio::test]
+async fn live_upload_session_count_is_capped_per_user() {
+    let ctx = setup_user().await;
+    let (_team_id, channel_id) = setup_team_channel(&ctx).await;
+
+    let create = |filename: String| {
+        let body = json!({
+            "channel_id": channel_id.to_string(),
+            "filename": filename,
+            "file_size": 1024_i64,
+        });
+        ctx.app
+            .api_client
+            .post(format!("{}/api/v4/uploads", ctx.app.address))
+            .header("Authorization", format!("Bearer {}", ctx.token))
+            .json(&body)
+    };
+
+    // Fill the user's live-session budget.
+    for i in 0..rustchat::api::v4::uploads::MAX_LIVE_UPLOAD_SESSIONS_PER_USER {
+        let res = create(format!("file{i}.txt")).send().await.unwrap();
+        assert_eq!(
+            201,
+            res.status().as_u16(),
+            "session {i} within the cap must be accepted"
+        );
+    }
+
+    // The next session must be rejected without creating a row.
+    let res = create("one-too-many.txt".to_string()).send().await.unwrap();
+    assert_eq!(429, res.status().as_u16());
+
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM upload_sessions WHERE user_id = $1 AND expires_at > NOW()",
+    )
+    .bind(ctx.user_uuid)
+    .fetch_one(&ctx.app.db_pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        rustchat::api::v4::uploads::MAX_LIVE_UPLOAD_SESSIONS_PER_USER,
+        count
+    );
+}
