@@ -19,14 +19,14 @@ use uuid::Uuid;
 use crate::api::AppState;
 use crate::error::{ApiResult, AppError};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct DesiredMembership {
     target_type: String,
     target_id: Uuid,
     user_id: Uuid,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct TrackedMembershipRow {
     target_type: String,
     target_id: Uuid,
@@ -84,8 +84,10 @@ impl SyncableRef {
 }
 
 /// Record (or refresh) the grant this syncable confers on the member.
+/// Runs on the caller's connection/transaction so grants compose into
+/// the reconcile transaction that holds the syncable's link-row lock.
 async fn upsert_tracking_membership(
-    state: &AppState,
+    conn: &mut sqlx::PgConnection,
     syncable: SyncableRef,
     target_type: &str,
     target_id: Uuid,
@@ -108,7 +110,7 @@ async fn upsert_tracking_membership(
     .bind(target_id)
     .bind(user_id)
     .bind(role)
-    .execute(&state.db)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
@@ -122,7 +124,7 @@ async fn upsert_tracking_membership(
 /// With no grants left the CASE falls through to `member`, so a concurrent
 /// cleanup cannot write NULL or fail on the NOT NULL constraint.
 async fn converge_role_to_grants(
-    state: &AppState,
+    conn: &mut sqlx::PgConnection,
     target_type: &str,
     target_id: Uuid,
     user_id: Uuid,
@@ -142,7 +144,7 @@ async fn converge_role_to_grants(
         )
         .bind(target_id)
         .bind(user_id)
-        .execute(&state.db)
+        .execute(&mut *conn)
         .await?;
     } else {
         sqlx::query(
@@ -159,7 +161,7 @@ async fn converge_role_to_grants(
         )
         .bind(target_id)
         .bind(user_id)
-        .execute(&state.db)
+        .execute(&mut *conn)
         .await?;
     }
     Ok(())
@@ -179,7 +181,7 @@ async fn converge_role_to_grants(
 ///   membership), it is left untouched and untracked: group removal must
 ///   not revoke memberships the sync never granted.
 async fn ensure_membership(
-    state: &AppState,
+    conn: &mut sqlx::PgConnection,
     syncable: SyncableRef,
     target_type: &str,
     target_id: Uuid,
@@ -198,7 +200,7 @@ async fn ensure_membership(
         .bind(target_id)
         .bind(user_id)
         .bind(role)
-        .execute(&state.db)
+        .execute(&mut *conn)
         .await?
         .rows_affected()
             > 0
@@ -209,15 +211,15 @@ async fn ensure_membership(
         .bind(target_id)
         .bind(user_id)
         .bind(role)
-        .execute(&state.db)
+        .execute(&mut *conn)
         .await?
         .rows_affected()
             > 0
     };
 
     if created {
-        upsert_tracking_membership(state, syncable, target_type, target_id, user_id, role).await?;
-        converge_role_to_grants(state, target_type, target_id, user_id).await?;
+        upsert_tracking_membership(conn, syncable, target_type, target_id, user_id, role).await?;
+        converge_role_to_grants(conn, target_type, target_id, user_id).await?;
         return Ok(());
     }
 
@@ -238,15 +240,15 @@ async fn ensure_membership(
     .bind(target_type)
     .bind(target_id)
     .bind(user_id)
-    .fetch_one(&state.db)
+    .fetch_one(&mut *conn)
     .await?;
 
     if !sync_granted {
         return Ok(());
     }
 
-    upsert_tracking_membership(state, syncable, target_type, target_id, user_id, role).await?;
-    converge_role_to_grants(state, target_type, target_id, user_id).await?;
+    upsert_tracking_membership(conn, syncable, target_type, target_id, user_id, role).await?;
+    converge_role_to_grants(conn, target_type, target_id, user_id).await?;
     Ok(())
 }
 
@@ -395,12 +397,32 @@ pub(crate) async fn reconcile_group_syncables(state: &AppState, group_id: Uuid) 
 /// Reconcile one syncable: ensure every desired membership (converging
 /// roles to the union of active grants) and clean up tracked memberships
 /// that are no longer desired.
+///
+/// Concurrency contract: the whole reconcile runs in ONE transaction that
+/// first takes a `FOR SHARE` lock on the syncable's `group_syncables` row.
+/// An atomic unlink (`unlink_group_syncable`) deletes that row before
+/// revoking grants; without the share lock, a reconcile racing the unlink
+/// could read the link as live, re-grant memberships, and commit them
+/// AFTER the unlink's cleanup snapshot — stranding grants whose link row
+/// is gone and which nothing revisits. With the lock, the unlink's DELETE
+/// blocks until the reconcile commits, and the unlink's cleanup then sees
+/// (and removes) everything the reconcile granted. Conversely, a reconcile
+/// arriving after the unlink's DELETE finds no live row and skips.
+/// Shared (not exclusive) so concurrent reconciles of the same syncable
+/// still run in parallel.
+///
+/// Membership rows are locked in a deterministic order (sorted
+/// (target_type, target_id, user_id)) in both loops, so concurrent
+/// reconcile transactions cannot deadlock against each other over
+/// overlapping user sets.
 pub(crate) async fn reconcile_group_syncable(
     state: &AppState,
     group_id: Uuid,
     kind: SyncableKind,
     syncable_id: Uuid,
 ) -> ApiResult<()> {
+    let mut tx = state.db.begin().await?;
+
     let syncable: Option<GroupSyncableRow> = sqlx::query_as(
         r#"
         SELECT gs.group_id, gs.syncable_type, gs.syncable_id, gs.auto_add, gs.scheme_admin
@@ -410,12 +432,13 @@ pub(crate) async fn reconcile_group_syncable(
           AND gs.syncable_type = $2
           AND gs.syncable_id = $3
           AND gs.delete_at IS NULL
+        FOR SHARE OF gs
         "#,
     )
     .bind(group_id)
     .bind(kind.as_db_str())
     .bind(syncable_id)
-    .fetch_optional(&state.db)
+    .fetch_optional(&mut *tx)
     .await?;
 
     let Some(syncable) = syncable else {
@@ -434,13 +457,13 @@ pub(crate) async fn reconcile_group_syncable(
         SyncableKind::Team => {
             sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM teams WHERE id = $1)")
                 .bind(syncable_id)
-                .fetch_one(&state.db)
+                .fetch_one(&mut *tx)
                 .await?
         }
         SyncableKind::Channel => {
             sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM channels WHERE id = $1)")
                 .bind(syncable_id)
-                .fetch_one(&state.db)
+                .fetch_one(&mut *tx)
                 .await?
         }
     };
@@ -451,18 +474,19 @@ pub(crate) async fn reconcile_group_syncable(
             syncable_type = kind.as_db_str(),
             "Group syncable target no longer exists; revoking its grants and removing the link"
         );
-        // Atomically remove the dead link and revoke its grants. On
-        // failure the link survives and the next pass retries (an IdP
-        // attribute that still references the deleted target re-creates
-        // the link on the next sync, and this path cleans it again).
-        unlink_group_syncable(state, group_id, kind, syncable_id).await?;
+        // Atomically remove the dead link and revoke its grants on this
+        // transaction (we already hold the link row's share lock, so the
+        // pool-backed wrapper would self-deadlock). On failure everything
+        // rolls back — the link survives and the next pass retries.
+        unlink_group_syncable_in_tx(&mut tx, group_id, kind, syncable_id).await?;
+        tx.commit().await?;
         return Ok(());
     }
 
     let group_user_ids: Vec<Uuid> =
         sqlx::query_scalar("SELECT user_id FROM group_members WHERE group_id = $1")
             .bind(group_id)
-            .fetch_all(&state.db)
+            .fetch_all(&mut *tx)
             .await?;
 
     let mut desired = HashSet::new();
@@ -481,7 +505,7 @@ pub(crate) async fn reconcile_group_syncable(
                 let channel_team_id: Uuid =
                     sqlx::query_scalar("SELECT team_id FROM channels WHERE id = $1")
                         .bind(syncable_id)
-                        .fetch_optional(&state.db)
+                        .fetch_optional(&mut *tx)
                         .await?
                         .ok_or_else(|| AppError::ChannelNotFound)?;
 
@@ -501,7 +525,7 @@ pub(crate) async fn reconcile_group_syncable(
         }
     }
 
-    let existing_tracked: Vec<TrackedMembershipRow> = sqlx::query_as(
+    let mut existing_tracked: Vec<TrackedMembershipRow> = sqlx::query_as(
         r#"
         SELECT target_type, target_id, user_id
         FROM group_syncable_memberships
@@ -513,8 +537,14 @@ pub(crate) async fn reconcile_group_syncable(
     .bind(group_id)
     .bind(kind.as_db_str())
     .bind(syncable_id)
-    .fetch_all(&state.db)
+    .fetch_all(&mut *tx)
     .await?;
+
+    // Deterministic lock order across concurrent reconciles (see the doc
+    // comment above).
+    let mut desired: Vec<DesiredMembership> = desired.into_iter().collect();
+    desired.sort_unstable();
+    existing_tracked.sort_unstable();
 
     for desired_membership in &desired {
         // ensure_membership creates the membership with the granted role,
@@ -523,7 +553,7 @@ pub(crate) async fn reconcile_group_syncable(
         // already-tracked members — is what makes a `scheme_admin` flip
         // converge on the next sync.
         ensure_membership(
-            state,
+            &mut tx,
             SyncableRef::new(group_id, kind, syncable_id),
             &desired_membership.target_type,
             desired_membership.target_id,
@@ -533,18 +563,18 @@ pub(crate) async fn reconcile_group_syncable(
         .await?;
     }
 
-    let mut conn = state.db.acquire().await?;
-    for tracked in existing_tracked {
+    for tracked in &existing_tracked {
         let desired_key = DesiredMembership {
             target_type: tracked.target_type.clone(),
             target_id: tracked.target_id,
             user_id: tracked.user_id,
         };
         if !desired.contains(&desired_key) {
-            cleanup_tracking_membership(&mut conn, group_id, kind, syncable_id, &tracked).await?;
+            cleanup_tracking_membership(&mut tx, group_id, kind, syncable_id, tracked).await?;
         }
     }
 
+    tx.commit().await?;
     Ok(())
 }
 
@@ -750,7 +780,25 @@ pub(crate) async fn unlink_group_syncable(
     syncable_id: Uuid,
 ) -> ApiResult<bool> {
     let mut tx = state.db.begin().await?;
+    let unlinked = unlink_group_syncable_in_tx(&mut tx, group_id, kind, syncable_id).await?;
+    if !unlinked {
+        // Dropping the transaction releases its locks; nothing was changed.
+        return Ok(false);
+    }
+    tx.commit().await?;
+    Ok(true)
+}
 
+/// The unlink body on the caller's transaction (used by
+/// [`unlink_group_syncable`] and by reconciliation's dangling-target
+/// branch, which already holds the link row's lock — re-entering through
+/// the pool-backed wrapper there would self-deadlock on that lock).
+async fn unlink_group_syncable_in_tx(
+    tx: &mut sqlx::PgConnection,
+    group_id: Uuid,
+    kind: SyncableKind,
+    syncable_id: Uuid,
+) -> ApiResult<bool> {
     let deleted = sqlx::query(
         "DELETE FROM group_syncables WHERE group_id = $1 AND syncable_type = $2 AND syncable_id = $3",
     )
@@ -761,11 +809,9 @@ pub(crate) async fn unlink_group_syncable(
     .await?
     .rows_affected();
     if deleted == 0 {
-        // Dropping the transaction releases its locks; nothing was changed.
         return Ok(false);
     }
 
-    cleanup_unlinked_syncable(&mut tx, group_id, kind, syncable_id).await?;
-    tx.commit().await?;
+    cleanup_unlinked_syncable(tx, group_id, kind, syncable_id).await?;
     Ok(true)
 }
