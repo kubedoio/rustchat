@@ -23,7 +23,7 @@ const GROUP_SOURCE_PLUGIN_PREFIX: &str = "plugin_";
 // worker via the service module: roles converge to the union of active
 // grants on every pass, and manual memberships are never adopted.
 use crate::services::group_membership_sync::{
-    cleanup_unlinked_syncable, reconcile_group_syncable, SyncableKind,
+    cleanup_unlinked_syncable, reconcile_group_syncable, reconcile_group_syncables, SyncableKind,
 };
 
 #[derive(Debug, Deserialize)]
@@ -698,9 +698,11 @@ async fn restore_group(
     emit_received_group_event(&state, &group).await;
 
     // Soft-deleting a group revoked the memberships its grants conferred;
-    // restoring the group must re-grant them (for custom groups nothing
-    // else ever re-runs the reconcile).
-    spawn_reconcile_group_syncables(state, group_id);
+    // restoring the group must re-grant them. This runs synchronously and
+    // propagates failures: for custom groups nothing else ever re-runs the
+    // reconcile, so a fire-and-forget spawn that failed would silently
+    // leave the restored group's members locked out.
+    reconcile_group_syncables(&state, group_id).await?;
 
     Ok(Json(group_json(&group)))
 }
