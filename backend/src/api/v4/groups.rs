@@ -3,9 +3,7 @@ use crate::auth::policy::permissions;
 use crate::error::{ApiResult, AppError};
 use crate::mattermost_compat::id::{encode_mm_id, parse_mm_or_uuid};
 use crate::models::channel::ChannelType;
-use crate::repositories::group_repository::{
-    GroupListRow, GroupRow, GroupSyncableRow, TrackedMembershipRow,
-};
+use crate::repositories::group_repository::{GroupListRow, GroupRow, GroupSyncableRow};
 use crate::repositories::GroupRepository;
 use axum::{
     extract::{Path, State},
@@ -15,34 +13,18 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashSet;
 use uuid::Uuid;
 
 const GROUP_SOURCE_CUSTOM: &str = "custom";
 const GROUP_SOURCE_LDAP: &str = "ldap";
 const GROUP_SOURCE_PLUGIN_PREFIX: &str = "plugin_";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum SyncableKind {
-    Team,
-    Channel,
-}
-
-impl SyncableKind {
-    fn as_db_str(self) -> &'static str {
-        match self {
-            Self::Team => "team",
-            Self::Channel => "channel",
-        }
-    }
-
-    fn as_mm_type(self) -> &'static str {
-        match self {
-            Self::Team => "Team",
-            Self::Channel => "Channel",
-        }
-    }
-}
+// Group-sync reconcile/cleanup semantics are shared with the Keycloak
+// worker via the service module: roles converge to the union of active
+// grants on every pass, and manual memberships are never adopted.
+use crate::services::group_membership_sync::{
+    cleanup_unlinked_syncable, reconcile_group_syncable, SyncableKind,
+};
 
 #[derive(Debug, Deserialize)]
 struct CreateGroupRequest {
@@ -72,13 +54,6 @@ struct GroupSyncablePatch {
 #[derive(Debug, Deserialize)]
 struct GroupModifyMembersRequest {
     user_ids: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct DesiredMembership {
-    target_type: String,
-    target_id: Uuid,
-    user_id: Uuid,
 }
 
 pub fn router() -> Router<AppState> {
@@ -528,194 +503,6 @@ fn spawn_reconcile_group_syncables(state: AppState, group_id: Uuid) {
     });
 }
 
-async fn cleanup_tracking_membership(
-    state: &AppState,
-    group_id: Uuid,
-    kind: SyncableKind,
-    syncable_id: Uuid,
-    tracked: &TrackedMembershipRow,
-) -> ApiResult<()> {
-    GroupRepository::new(&state.db)
-        .delete_group_syncable_membership(
-            group_id,
-            kind.as_db_str(),
-            syncable_id,
-            &tracked.target_type,
-            tracked.target_id,
-            tracked.user_id,
-        )
-        .await?;
-
-    let kept_by_other_syncable = GroupRepository::new(&state.db)
-        .has_other_syncable_memberships(&tracked.target_type, tracked.target_id, tracked.user_id)
-        .await?;
-
-    if kept_by_other_syncable {
-        return Ok(());
-    }
-
-    if tracked.target_type == "team" {
-        GroupRepository::new(&state.db)
-            .remove_team_member(tracked.target_id, tracked.user_id)
-            .await?;
-    } else {
-        GroupRepository::new(&state.db)
-            .remove_channel_member(tracked.target_id, tracked.user_id)
-            .await?;
-    }
-
-    Ok(())
-}
-
-async fn ensure_membership(
-    state: &AppState,
-    target_type: &str,
-    target_id: Uuid,
-    user_id: Uuid,
-    scheme_admin: bool,
-) -> ApiResult<bool> {
-    let role = if scheme_admin { "admin" } else { "member" };
-
-    let rows_affected = if target_type == "team" {
-        GroupRepository::new(&state.db)
-            .ensure_team_member(target_id, user_id, role)
-            .await?
-    } else {
-        GroupRepository::new(&state.db)
-            .ensure_channel_member(target_id, user_id, role)
-            .await?
-    };
-
-    Ok(rows_affected > 0)
-}
-
-async fn reconcile_group_syncable(
-    state: &AppState,
-    group_id: Uuid,
-    kind: SyncableKind,
-    syncable_id: Uuid,
-) -> ApiResult<()> {
-    let syncable = GroupRepository::new(&state.db)
-        .get_group_syncable(group_id, kind.as_db_str(), syncable_id)
-        .await?;
-
-    let Some(syncable) = syncable else {
-        return Ok(());
-    };
-
-    let group_user_ids = GroupRepository::new(&state.db)
-        .list_group_user_ids(group_id)
-        .await?;
-
-    let mut desired = HashSet::new();
-
-    if syncable.auto_add {
-        match kind {
-            SyncableKind::Team => {
-                for user_id in &group_user_ids {
-                    desired.insert(DesiredMembership {
-                        target_type: "team".to_string(),
-                        target_id: syncable_id,
-                        user_id: *user_id,
-                    });
-                }
-            }
-            SyncableKind::Channel => {
-                let channel_team_id = GroupRepository::new(&state.db)
-                    .get_channel_team_id(syncable_id)
-                    .await?
-                    .ok_or_else(|| AppError::ChannelNotFound)?;
-
-                for user_id in &group_user_ids {
-                    desired.insert(DesiredMembership {
-                        target_type: "team".to_string(),
-                        target_id: channel_team_id,
-                        user_id: *user_id,
-                    });
-                    desired.insert(DesiredMembership {
-                        target_type: "channel".to_string(),
-                        target_id: syncable_id,
-                        user_id: *user_id,
-                    });
-                }
-            }
-        }
-    }
-
-    let existing_tracked = GroupRepository::new(&state.db)
-        .list_group_syncable_memberships(group_id, kind.as_db_str(), syncable_id)
-        .await?;
-
-    let mut tracked_set: HashSet<TrackedMembershipRow> = existing_tracked.iter().cloned().collect();
-
-    for desired_membership in &desired {
-        let key = TrackedMembershipRow {
-            target_type: desired_membership.target_type.clone(),
-            target_id: desired_membership.target_id,
-            user_id: desired_membership.user_id,
-        };
-
-        if tracked_set.contains(&key) {
-            continue;
-        }
-
-        let inserted = ensure_membership(
-            state,
-            &desired_membership.target_type,
-            desired_membership.target_id,
-            desired_membership.user_id,
-            syncable.scheme_admin,
-        )
-        .await?;
-
-        if inserted {
-            GroupRepository::new(&state.db)
-                .insert_group_syncable_membership(
-                    group_id,
-                    kind.as_db_str(),
-                    syncable_id,
-                    &desired_membership.target_type,
-                    desired_membership.target_id,
-                    desired_membership.user_id,
-                )
-                .await?;
-
-            tracked_set.insert(key);
-        }
-    }
-
-    for tracked in existing_tracked {
-        let desired_key = DesiredMembership {
-            target_type: tracked.target_type.clone(),
-            target_id: tracked.target_id,
-            user_id: tracked.user_id,
-        };
-
-        if !desired.contains(&desired_key) {
-            cleanup_tracking_membership(state, group_id, kind, syncable_id, &tracked).await?;
-        }
-    }
-
-    Ok(())
-}
-
-async fn cleanup_unlinked_syncable(
-    state: &AppState,
-    group_id: Uuid,
-    kind: SyncableKind,
-    syncable_id: Uuid,
-) -> ApiResult<()> {
-    let tracked_rows = GroupRepository::new(&state.db)
-        .list_group_syncable_memberships(group_id, kind.as_db_str(), syncable_id)
-        .await?;
-
-    for tracked in tracked_rows {
-        cleanup_tracking_membership(state, group_id, kind, syncable_id, &tracked).await?;
-    }
-
-    Ok(())
-}
-
 /// GET /api/v4/groups
 async fn get_groups(
     State(state): State<AppState>,
@@ -909,6 +696,11 @@ async fn restore_group(
         .ok_or_else(|| AppError::GroupNotFound)?;
 
     emit_received_group_event(&state, &group).await;
+
+    // Soft-deleting a group revoked the memberships its grants conferred;
+    // restoring the group must re-grant them (for custom groups nothing
+    // else ever re-runs the reconcile).
+    spawn_reconcile_group_syncables(state, group_id);
 
     Ok(Json(group_json(&group)))
 }

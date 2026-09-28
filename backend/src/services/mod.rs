@@ -11,6 +11,7 @@ pub mod email_service;
 pub mod email_verification;
 pub mod llm;
 
+pub mod group_membership_sync;
 pub mod keycloak_sync;
 pub mod knowledge;
 pub mod membership_policies;

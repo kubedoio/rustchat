@@ -323,7 +323,14 @@ impl<'a> GroupRepository<'a> {
         &self,
         group_id: Uuid,
     ) -> Result<Option<GroupListRow>, sqlx::Error> {
-        sqlx::query_as::<_, GroupListRow>(
+        // Single transaction: the soft delete and the grant cleanup it
+        // triggers must be all-or-nothing. A mid-sequence failure would
+        // otherwise leave a partially-revoked state that nothing
+        // self-heals for custom groups (the Keycloak worker only
+        // processes groups still present in the IdP).
+        let mut tx = self.pool.begin().await?;
+
+        let group = sqlx::query_as::<_, GroupListRow>(
             r#"
             UPDATE groups
             SET deleted_at = NOW(), updated_at = NOW()
@@ -353,8 +360,107 @@ impl<'a> GroupRepository<'a> {
             "#,
         )
         .bind(group_id)
-        .fetch_optional(self.pool)
-        .await
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if group.is_some() {
+            // The group's grants stop conferring access immediately: drop
+            // its tracking rows, revoke memberships that no active grant
+            // keeps alive, and re-converge the roles of members that other
+            // active grants still keep (a stale 'admin' tracking row must
+            // not survive the group's deletion). Runs in the same
+            // transaction as the soft delete, so the view already excludes
+            // this group for every statement below.
+            sqlx::query(
+                r#"
+                DELETE FROM team_members tm
+                WHERE (tm.team_id, tm.user_id) IN (
+                          SELECT target_id, user_id
+                          FROM group_syncable_memberships
+                          WHERE group_id = $1 AND target_type = 'team'
+                      )
+                  AND NOT EXISTS (
+                          SELECT 1
+                          FROM group_syncable_active_grants g
+                          WHERE g.target_type = 'team'
+                            AND g.target_id = tm.team_id
+                            AND g.user_id = tm.user_id
+                      )
+                "#,
+            )
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                r#"
+                DELETE FROM channel_members cm
+                WHERE (cm.channel_id, cm.user_id) IN (
+                          SELECT target_id, user_id
+                          FROM group_syncable_memberships
+                          WHERE group_id = $1 AND target_type = 'channel'
+                      )
+                  AND NOT EXISTS (
+                          SELECT 1
+                          FROM group_syncable_active_grants g
+                          WHERE g.target_type = 'channel'
+                            AND g.target_id = cm.channel_id
+                            AND g.user_id = cm.user_id
+                      )
+                "#,
+            )
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                r#"
+                UPDATE team_members tm SET role = (
+                    SELECT CASE WHEN bool_or(g.role = 'admin') THEN 'admin' ELSE 'member' END
+                    FROM group_syncable_active_grants g
+                    WHERE g.target_type = 'team'
+                      AND g.target_id = tm.team_id
+                      AND g.user_id = tm.user_id
+                )
+                WHERE (tm.team_id, tm.user_id) IN (
+                          SELECT target_id, user_id
+                          FROM group_syncable_memberships
+                          WHERE group_id = $1 AND target_type = 'team'
+                      )
+                "#,
+            )
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                r#"
+                UPDATE channel_members cm SET role = (
+                    SELECT CASE WHEN bool_or(g.role = 'admin') THEN 'admin' ELSE 'member' END
+                    FROM group_syncable_active_grants g
+                    WHERE g.target_type = 'channel'
+                      AND g.target_id = cm.channel_id
+                      AND g.user_id = cm.user_id
+                )
+                WHERE (cm.channel_id, cm.user_id) IN (
+                          SELECT target_id, user_id
+                          FROM group_syncable_memberships
+                          WHERE group_id = $1 AND target_type = 'channel'
+                      )
+                "#,
+            )
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query("DELETE FROM group_syncable_memberships WHERE group_id = $1")
+                .bind(group_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+
+        tx.commit().await?;
+        Ok(group)
     }
 
     pub async fn restore_group(&self, group_id: Uuid) -> Result<Option<GroupListRow>, sqlx::Error> {
@@ -448,13 +554,6 @@ impl<'a> GroupRepository<'a> {
         sqlx::query_scalar("SELECT COUNT(*) FROM group_members WHERE group_id = $1")
             .bind(group_id)
             .fetch_one(self.pool)
-            .await
-    }
-
-    pub async fn list_group_user_ids(&self, group_id: Uuid) -> Result<Vec<Uuid>, sqlx::Error> {
-        sqlx::query_scalar("SELECT user_id FROM group_members WHERE group_id = $1")
-            .bind(group_id)
-            .fetch_all(self.pool)
             .await
     }
 
@@ -716,61 +815,6 @@ impl<'a> GroupRepository<'a> {
 
     // --- Group membership tracking ---
 
-    pub async fn delete_group_syncable_membership(
-        &self,
-        group_id: Uuid,
-        syncable_type: &str,
-        syncable_id: Uuid,
-        target_type: &str,
-        target_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"
-            DELETE FROM group_syncable_memberships
-            WHERE group_id = $1
-              AND syncable_type = $2
-              AND syncable_id = $3
-              AND target_type = $4
-              AND target_id = $5
-              AND user_id = $6
-            "#,
-        )
-        .bind(group_id)
-        .bind(syncable_type)
-        .bind(syncable_id)
-        .bind(target_type)
-        .bind(target_id)
-        .bind(user_id)
-        .execute(self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn has_other_syncable_memberships(
-        &self,
-        target_type: &str,
-        target_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
-        sqlx::query_scalar(
-            r#"
-            SELECT EXISTS(
-                SELECT 1
-                FROM group_syncable_memberships
-                WHERE target_type = $1
-                  AND target_id = $2
-                  AND user_id = $3
-            )
-            "#,
-        )
-        .bind(target_type)
-        .bind(target_id)
-        .bind(user_id)
-        .fetch_one(self.pool)
-        .await
-    }
-
     pub async fn remove_team_member(
         &self,
         team_id: Uuid,
@@ -781,103 +825,6 @@ impl<'a> GroupRepository<'a> {
             .bind(user_id)
             .execute(self.pool)
             .await?;
-        Ok(())
-    }
-
-    pub async fn remove_channel_member(
-        &self,
-        channel_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(channel_id)
-            .bind(user_id)
-            .execute(self.pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn ensure_team_member(
-        &self,
-        team_id: Uuid,
-        user_id: Uuid,
-        role: &str,
-    ) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query(
-            "INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (team_id, user_id) DO NOTHING",
-        )
-        .bind(team_id)
-        .bind(user_id)
-        .bind(role)
-        .execute(self.pool)
-        .await?;
-        Ok(result.rows_affected())
-    }
-
-    pub async fn ensure_channel_member(
-        &self,
-        channel_id: Uuid,
-        user_id: Uuid,
-        role: &str,
-    ) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query(
-            "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (channel_id, user_id) DO NOTHING",
-        )
-        .bind(channel_id)
-        .bind(user_id)
-        .bind(role)
-        .execute(self.pool)
-        .await?;
-        Ok(result.rows_affected())
-    }
-
-    pub async fn list_group_syncable_memberships(
-        &self,
-        group_id: Uuid,
-        syncable_type: &str,
-        syncable_id: Uuid,
-    ) -> Result<Vec<TrackedMembershipRow>, sqlx::Error> {
-        sqlx::query_as::<_, TrackedMembershipRow>(
-            r#"
-            SELECT target_type, target_id, user_id
-            FROM group_syncable_memberships
-            WHERE group_id = $1
-              AND syncable_type = $2
-              AND syncable_id = $3
-            "#,
-        )
-        .bind(group_id)
-        .bind(syncable_type)
-        .bind(syncable_id)
-        .fetch_all(self.pool)
-        .await
-    }
-
-    pub async fn insert_group_syncable_membership(
-        &self,
-        group_id: Uuid,
-        syncable_type: &str,
-        syncable_id: Uuid,
-        target_type: &str,
-        target_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"
-            INSERT INTO group_syncable_memberships
-                (group_id, syncable_type, syncable_id, target_type, target_id, user_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT DO NOTHING
-            "#,
-        )
-        .bind(group_id)
-        .bind(syncable_type)
-        .bind(syncable_id)
-        .bind(target_type)
-        .bind(target_id)
-        .bind(user_id)
-        .execute(self.pool)
-        .await?;
         Ok(())
     }
 }
