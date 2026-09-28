@@ -56,8 +56,18 @@ const auditLogs = [
 ]
 
 function stubApi() {
-  apiGet.mockImplementation((url: string) => {
+  // Emulate HttpClient semantics faithfully: with responseType 'blob' the
+  // client resolves response.data to a Blob (HttpClient.ts: `await
+  // response.blob()`). This is what made the old export code produce "{}"
+  // (JSON.stringify of a Blob) — the mock must reproduce that behavior for
+  // the regression assertion to be meaningful.
+  apiGet.mockImplementation((url: string, config?: { responseType?: string }) => {
     if (url === '/admin/audit/membership/export') {
+      if (config?.responseType === 'blob') {
+        return Promise.resolve({
+          data: new Blob([JSON.stringify(auditLogs)], { type: 'application/json' }),
+        })
+      }
       return Promise.resolve({ data: auditLogs })
     }
     if (url === '/admin/audit/membership/summary') {
@@ -90,18 +100,21 @@ describe('AuditDashboard export', () => {
     stubApi()
     const wrapper = await mountView()
 
-    // The export request must not ask for a blob: the endpoint returns JSON,
-    // and JSON.stringify(new Blob()) — the old bug — produces "{}".
     const exportButton = wrapper.findAll('button').find(b => b.text().includes('Export'))
     expect(exportButton).toBeDefined()
     await exportButton!.trigger('click')
     await flushPromises()
 
+    // Guard 1 (call-site contract): the export request must not ask for a
+    // blob — the endpoint returns JSON.
     const exportCall = apiGet.mock.calls.find(c => c[0] === '/admin/audit/membership/export')
     expect(exportCall).toBeDefined()
     const config = exportCall![1] as Record<string, unknown> | undefined
     expect(config?.responseType).not.toBe('blob')
 
+    // Guard 2 (content, regression-meaningful because the mock emulates
+    // HttpClient's blob behavior): with the old code (responseType 'blob'
+    // + JSON.stringify) the downloaded file was "{}".
     expect(createdUrls).toHaveLength(1)
     const exported = await createdUrls[0].text()
     const parsed = JSON.parse(exported)
