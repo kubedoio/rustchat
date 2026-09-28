@@ -35,6 +35,7 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
       push-proxy: ${{ steps.filter.outputs.push-proxy }}
       scripts: ${{ steps.filter.outputs.scripts }}
+      migrations: ${{ steps.filter.outputs.migrations }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -61,6 +62,10 @@ jobs:
               - '.github/workflows/ci.yml'
             scripts:
               - 'scripts/**'
+            migrations:
+              - 'backend/migrations/**'
+              - 'scripts/migration-matrix.sh'
+              - '.github/workflows/ci.yml'
 
   backend-check:
     name: Backend Check
@@ -445,10 +450,45 @@ jobs:
       - name: Check module growth control (RI-C05)
         run: python3 tools/repository-integrity/check_module_size.py
 
+  migration-matrix:
+    name: Migration Matrix
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.migrations == 'true' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          # Trust auth for the throwaway CI database: no credentials exist
+          # to leak (the service is only reachable from the job runner).
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Full history incl. tags: the upgrade path reconstructs the latest
+          # published stable schema via git archive of its tag.
+          fetch-depth: 0
+
+      - name: Run migration matrix (RI-C07)
+        env:
+          PGPORT: "5433"
+          PGUSER: postgres
+        run: scripts/migration-matrix.sh
+
   ci-complete:
     name: CI Complete
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release, repo-integrity]
+    needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release, repo-integrity, migration-matrix]
     if: always()
     timeout-minutes: 5
     steps:
@@ -466,6 +506,7 @@ jobs:
           DOCKER_VALIDATE_RESULT: ${{ needs.docker-validate.result }}
           BUILD_RELEASE_RESULT: ${{ needs.build-release.result }}
           REPO_INTEGRITY_RESULT: ${{ needs.repo-integrity.result }}
+          MIGRATION_MATRIX_RESULT: ${{ needs.migration-matrix.result }}
         run: >-
           scripts/ci-aggregate.sh
           DETECT_CHANGES_RESULT
@@ -477,3 +518,4 @@ jobs:
           DOCKER_VALIDATE_RESULT
           BUILD_RELEASE_RESULT
           REPO_INTEGRITY_RESULT
+          MIGRATION_MATRIX_RESULT

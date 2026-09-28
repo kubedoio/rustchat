@@ -27,7 +27,7 @@ stable required status-check contexts:
 
 | Context | Workflow | Proven property |
 |---|---|---|
-| `CI Complete` | `ci.yml` (aggregate) | backend/frontend/push-proxy build, lint, unit, e2e, docker validate, release build |
+| `CI Complete` | `ci.yml` (aggregate) | backend/frontend/push-proxy build, lint, unit, e2e, docker validate, release build, migration matrix (RI-C07) |
 | `Security Complete` | `security.yml` (aggregate) | CodeQL, cargo-audit, cargo-deny, npm-audit (high), dependency-review |
 | `dco-check` | `dco.yml` | every commit signed off per DCO |
 
@@ -64,7 +64,11 @@ exact candidate commit. Enforced by `.github/workflows/release.yml`:
 | Buzz deterministic compatibility (RI-C08, P007) | external-protocol compatibility record |
 
 Release-only checks (migration matrix, Buzz compatibility, backup/restore) are
-activated by their phases and do not run on every small PR.
+activated by their phases. The migration matrix (RI-C07) is now a required CI
+job: `Migration Matrix` in `ci.yml` runs `scripts/migration-matrix.sh` on every
+change to `backend/migrations/**`, proving empty→HEAD and
+latest-published-stable→HEAD convergence with repository-critical column
+readiness checks.
 
 ## Verification
 
