@@ -111,16 +111,24 @@ struct ApnsJwtClaims {
     iat: i64,
 }
 
+/// A currently valid APNS JWT and when it expires.
+struct ApnsAuthToken {
+    jwt: String,
+    expires_at: chrono::DateTime<chrono::Utc>,
+}
+
 /// APNS HTTP/2 client for VoIP pushes
 pub struct ApnsClient {
     http_client: reqwest::Client,
     /// APNS configuration
     pub config: ApnsConfig,
-    /// JWT authentication token
-    auth_token: String,
-    /// Token expiration time (intentionally kept for future refresh logic)
-    #[allow(dead_code)]
-    token_expires_at: chrono::DateTime<chrono::Utc>,
+    /// JWT authentication token, refreshed on demand before it expires.
+    ///
+    /// Apple rejects provider JWTs whose `iat` is stale (~1h validity). The
+    /// token is minted once at startup and must be reissued during long
+    /// process uptimes, otherwise every APNS push fails after the first
+    /// hour. Guarded by an async mutex because the send paths take `&self`.
+    token: tokio::sync::Mutex<ApnsAuthToken>,
 }
 
 impl ApnsClient {
@@ -133,7 +141,7 @@ impl ApnsClient {
             .map_err(ApnsError::Network)?;
 
         // Generate initial JWT token
-        let (auth_token, token_expires_at) = generate_jwt_token(&config).await?;
+        let (jwt, expires_at) = generate_jwt_token(&config).await?;
 
         info!(
             bundle_id = %config.bundle_id,
@@ -144,26 +152,24 @@ impl ApnsClient {
         Ok(Self {
             http_client,
             config,
-            auth_token,
-            token_expires_at,
+            token: tokio::sync::Mutex::new(ApnsAuthToken { jwt, expires_at }),
         })
     }
 
-    /// Get a valid JWT token (refreshing if necessary)
-    #[allow(dead_code)]
-    fn get_auth_token(&mut self) -> Result<String, ApnsError> {
-        let now = chrono::Utc::now();
+    /// Return a valid JWT, reissuing it when it expires within 5 minutes.
+    async fn valid_auth_token(&self) -> Result<String, ApnsError> {
+        /// Reissue this long before expiry so an in-flight request never
+        /// carries an expired token.
+        const REFRESH_MARGIN: chrono::TimeDelta = chrono::TimeDelta::minutes(5);
 
-        // Refresh token if it expires within 5 minutes
-        if now + chrono::Duration::minutes(5) > self.token_expires_at {
-            // Note: In production, you'd want to handle this asynchronously
-            // For now, we'll just return an error indicating token refresh is needed
-            return Err(ApnsError::Jwt(
-                "Token expired, client needs refresh".to_string(),
-            ));
+        let mut token = self.token.lock().await;
+        if chrono::Utc::now() + REFRESH_MARGIN >= token.expires_at {
+            info!("Refreshing APNS JWT (current token expiring soon)");
+            let (jwt, expires_at) = generate_jwt_token(&self.config).await?;
+            token.jwt = jwt;
+            token.expires_at = expires_at;
         }
-
-        Ok(self.auth_token.clone())
+        Ok(token.jwt.clone())
     }
 
     /// Send a VoIP push notification
@@ -202,11 +208,12 @@ impl ApnsClient {
             }
         });
 
-        // Send the request with JWT authentication
+        // Send the request with JWT authentication (refreshed on demand)
+        let auth_token = self.valid_auth_token().await?;
         let response = self
             .http_client
             .post(&url)
-            .header("authorization", format!("bearer {}", self.auth_token))
+            .header("authorization", format!("bearer {}", auth_token))
             .header("apns-topic", &payload.topic)
             .header("apns-push-type", "voip")
             .header("apns-priority", "10") // Immediate delivery
@@ -273,10 +280,11 @@ impl ApnsClient {
             apns_payload["is_crt_enabled"] = serde_json::Value::Bool(is_crt_enabled);
         }
 
+        let auth_token = self.valid_auth_token().await?;
         let response = self
             .http_client
             .post(&url)
-            .header("authorization", format!("bearer {}", self.auth_token))
+            .header("authorization", format!("bearer {}", auth_token))
             .header("apns-topic", &payload.topic)
             .header("apns-push-type", "alert")
             .header("apns-priority", "10")
@@ -383,5 +391,80 @@ mod tests {
             build_alert_topic("com.rustchat.app.voip"),
             "com.rustchat.app"
         );
+    }
+}
+
+#[cfg(test)]
+mod auth_tests {
+    use super::*;
+
+    /// Generate a throwaway P-256 key at test runtime and write it as PKCS#8
+    /// PEM. The key is never hardcoded (secret scanners flag embedded
+    /// private keys, and committing key material is bad hygiene regardless).
+    fn write_test_key(path: &std::path::Path) {
+        use p256::ecdsa::SigningKey;
+        use p256::elliptic_curve::rand_core::OsRng;
+        use p256::pkcs8::{EncodePrivateKey, LineEnding};
+
+        let signing_key = SigningKey::random(&mut OsRng);
+        let pem = signing_key
+            .to_pkcs8_pem(LineEnding::LF)
+            .expect("encode test key as PKCS#8 PEM");
+        std::fs::write(path, pem.as_str()).expect("write test key");
+    }
+
+    async fn test_client() -> ApnsClient {
+        let key_path = std::env::temp_dir().join(format!(
+            "rustchat_push_proxy_test_apns_key_{}.pem",
+            std::process::id()
+        ));
+        write_test_key(&key_path);
+        ApnsClient::new(ApnsConfig {
+            key_path: key_path.clone(),
+            key_id: "TESTKEY1234".to_string(),
+            team_id: "TEAM123456".to_string(),
+            bundle_id: "com.example.rustchat.test".to_string(),
+            server: ApnsServer::Development,
+        })
+        .await
+        .expect("client should initialize with a valid key")
+    }
+
+    #[tokio::test]
+    async fn fresh_token_is_reused_within_validity() {
+        let client = test_client().await;
+        let first = client.valid_auth_token().await.expect("valid token");
+        let second = client.valid_auth_token().await.expect("valid token");
+        // No reissue while far from expiry.
+        assert_eq!(first, second);
+    }
+
+    #[tokio::test]
+    async fn expired_token_is_reissued() {
+        let client = test_client().await;
+        let original_expiry = client.token.lock().await.expires_at;
+
+        // Simulate the process outliving the token: age it past expiry.
+        {
+            let mut token = client.token.lock().await;
+            token.expires_at = chrono::Utc::now() - chrono::TimeDelta::minutes(1);
+        }
+
+        let refreshed = client.valid_auth_token().await.expect("refreshed token");
+        let token = client.token.lock().await;
+        assert!(
+            token.expires_at > chrono::Utc::now() + chrono::TimeDelta::minutes(50),
+            "reissued token must carry a fresh ~1h validity, got {:?}",
+            token.expires_at
+        );
+        assert!(
+            token.expires_at > original_expiry,
+            "expiry must have been recomputed by the refresh path"
+        );
+        // The refreshed JWT may be byte-identical to the original when both
+        // are minted within the same second (iat has second resolution and
+        // ES256 signing is deterministic); the refreshed expiry above is the
+        // proof the reissue branch executed.
+        assert!(!refreshed.is_empty());
     }
 }
