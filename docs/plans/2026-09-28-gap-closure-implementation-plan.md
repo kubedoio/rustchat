@@ -119,7 +119,7 @@ Changes:
 Current state (verified against the baseline): `backend/src/api/file_validation.rs`
 already rejects `<script`, six hardcoded event-handler names (`onload`/`onerror`/
 `onclick`/`onmouseover`/`onfocus`/`onblur`), `<foreignObject>`, and `href=`/
-`xlink:href` (all `href` forms are rejected wholesale). Remaining bypass vectors:
+`xlink:href` attribute forms. Remaining bypass vectors:
 the handler allowlist misses lesser-known or future `on*` names and whitespace
 variants (`onload =`); active-content URI schemes (`javascript:`, `data:text/html`,
 `data:image/svg+xml`) outside `href` values, e.g. in SMIL `values=`; `<style>`
