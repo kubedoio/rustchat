@@ -29,6 +29,7 @@ RustChat is not positioned as a Slack clone or a generic chat app.
 It is not presented as a fully mature enterprise communication suite yet. It is a public-preview infrastructure product for teams that are comfortable evaluating and operating self-hosted software.
 
 
+[![CI](https://github.com/kubedoio/rustchat/actions/workflows/ci.yml/badge.svg)](https://github.com/kubedoio/rustchat/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.95%2B-orange.svg)](https://www.rust-lang.org/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3.5%2B-green.svg)](https://vuejs.org/)
