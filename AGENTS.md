@@ -9,8 +9,9 @@ RustChat is a self-hosted team communication platform. The runtime is split into
 ```
 rustchat/
 ├── backend/          # Rust API server (Axum + SQLx + PostgreSQL)
-│   ├── src/          # a2a, api (v1 + v4), auth, config, db, error, jobs,
-│   │                 # mattermost_compat, middleware, models, realtime,
+│   ├── src/          # api (v1 + v4), auth, bootstrap, calls, config, db,
+│   │                 # error, integrations, jobs, mattermost_compat,
+│   │                 # middleware, models, realtime, repositories,
 │   │                 # services, storage, telemetry
 │   ├── migrations/   # SQLx database migrations
 │   └── tests/        # Integration tests
@@ -84,7 +85,7 @@ Boundaries are enforced by path scope. When in doubt, ask for human review rathe
 
 | Agent | Allowed paths | Prohibited / gated paths |
 |---|---|---|
-| `backend-agent` | `backend/src/**`, `backend/tests/**`, `backend/migrations/**`, `push-proxy/**` | `backend/src/auth/**` (explicit approval); `backend/src/api/v4/**` (compat-reviewer co-approval); `backend/src/mattermost_compat/**` (compat-reviewer co-approval); `backend/src/a2a/**` (senior review); `.governance/**`; `frontend/**` |
+| `backend-agent` | `backend/src/**`, `backend/tests/**`, `backend/migrations/**`, `push-proxy/**` | `backend/src/auth/**` (explicit approval); `backend/src/api/v4/**` (compat-reviewer co-approval); `backend/src/mattermost_compat/**` (compat-reviewer co-approval); `.governance/**`; `frontend/**` |
 | `frontend-agent` | `frontend/src/**`, `frontend/e2e/**` | `backend/**`; `.governance/**` |
 | `compat-agent` | Read-only: `backend/compat/**`, `backend/src/api/v4/**`, `backend/src/mattermost_compat/**`, `tools/mm-compat/**` | Writes only to `previous-analyses/**`, `docs/superpowers/specs/**`, `docs/superpowers/plans/**`; cannot approve PRs or write production code |
 

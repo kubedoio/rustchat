@@ -45,6 +45,20 @@ require "main blocks branch deletion" \
 require "main requires conversation resolution" \
   "[[ \"$(printf '%s' "${BRANCH_PROTECTION}" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("required_conversation_resolution",{}).get("enabled"))')\" == \"True\" ]]"
 
+# Review gate: 1 approving review, CODEOWNERS review, dismiss stale approvals.
+review_count="$(printf '%s' "${BRANCH_PROTECTION}" | python3 -c 'import sys,json;r=json.load(sys.stdin).get("required_pull_request_reviews");print(r.get("required_approving_review_count") if r else None)')"
+review_codeowners="$(printf '%s' "${BRANCH_PROTECTION}" | python3 -c 'import sys,json;r=json.load(sys.stdin).get("required_pull_request_reviews");print(r.get("require_code_owner_reviews") if r else None)')"
+review_dismiss_stale="$(printf '%s' "${BRANCH_PROTECTION}" | python3 -c 'import sys,json;r=json.load(sys.stdin).get("required_pull_request_reviews");print(r.get("dismiss_stale_reviews") if r else None)')"
+
+require "main requires at least 1 approving review" \
+  "[[ \"${review_count}\" != \"None\" && \"${review_count}\" -ge 1 ]]"
+
+require "main requires CODEOWNERS review" \
+  "[[ \"${review_codeowners}\" == \"True\" ]]"
+
+require "main dismisses stale approvals on new commits" \
+  "[[ \"${review_dismiss_stale}\" == \"True\" ]]"
+
 RULESETS="$(curl -fsSL -H "Authorization: token ${TOKEN}" -H "Accept: application/vnd.github+json" "${API}/repos/${REPO}/rulesets")"
 
 # Find an active "Protect release tags" ruleset targeting tags with refs/tags/v*.

@@ -27,8 +27,3 @@ export { registerThreadHandlers } from './handlers/threadSocketHandlers'
 // Components
 // export { default as MessageList } from './components/MessageList.vue'
 // export { default as MessageInput } from './components/MessageInput.vue'
-export { default as ThreadPanel } from '../../components/thread/ThreadPanel.vue'
-export { default as ThreadHeader } from '../../components/thread/ThreadHeader.vue'
-export { default as ThreadReplyList } from '../../components/thread/ThreadReplyList.vue'
-export { default as ThreadReplyItem } from '../../components/thread/ThreadReplyItem.vue'
-export { default as ThreadComposer } from '../../components/composer/ThreadComposer.vue'
