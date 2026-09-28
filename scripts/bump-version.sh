@@ -15,14 +15,15 @@ echo "Bumping version to $NEW_VERSION..."
 
 # Update Backend (Cargo.toml)
 if [ -f "backend/Cargo.toml" ]; then
-  sed -i '' "s/^version = \".*\"/version = \"$NEW_VERSION\"/" backend/Cargo.toml
+  # Portable in-place edit (works on both GNU and BSD sed).
+  sed -i.bak "s/^version = \".*\"/version = \"$NEW_VERSION\"/" backend/Cargo.toml && rm -f backend/Cargo.toml.bak
   echo "Updated backend/Cargo.toml"
 fi
 
 # Update Frontend (package.json)
 if [ -f "frontend/package.json" ]; then
   # Using a simpler sed approach for package.json to avoid complex JSON parsing dependencies
-  sed -i '' "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" frontend/package.json
+  sed -i.bak "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" frontend/package.json && rm -f frontend/package.json.bak
   echo "Updated frontend/package.json"
 fi
 
