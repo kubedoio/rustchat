@@ -905,9 +905,14 @@ async fn ensure_membership(
 ) -> ApiResult<bool> {
     let role = if scheme_admin { "admin" } else { "member" };
 
+    // The sync is the source of truth for members it grants (Mattermost
+    // group-sync semantics): the role is converged on every pass so that
+    // removing `scheme_admin` from a Keycloak group actually downgrades the
+    // users it granted admin to. `DO NOTHING` left them admin forever —
+    // privilege escalation that outlived its justification.
     let affected = if target_type == "team" {
         sqlx::query(
-            "INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (team_id, user_id) DO NOTHING",
+            "INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (team_id, user_id) DO UPDATE SET role = EXCLUDED.role",
         )
         .bind(target_id)
         .bind(user_id)
@@ -917,7 +922,7 @@ async fn ensure_membership(
         .rows_affected()
     } else {
         sqlx::query(
-            "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (channel_id, user_id) DO NOTHING",
+            "INSERT INTO channel_members (channel_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (channel_id, user_id) DO UPDATE SET role = EXCLUDED.role",
         )
         .bind(target_id)
         .bind(user_id)
@@ -1087,10 +1092,9 @@ async fn reconcile_group_syncable(
             user_id: desired_membership.user_id,
         };
 
-        if tracked_set.contains(&key) {
-            continue;
-        }
-
+        // Always run ensure_membership, even for already-tracked members:
+        // the group's scheme_admin flag may have flipped since the grant,
+        // and the upsert converges the stored role to the desired one.
         let inserted = ensure_membership(
             state,
             &desired_membership.target_type,
@@ -1099,6 +1103,10 @@ async fn reconcile_group_syncable(
             syncable.scheme_admin,
         )
         .await?;
+
+        if tracked_set.contains(&key) {
+            continue;
+        }
 
         if inserted {
             sqlx::query(
