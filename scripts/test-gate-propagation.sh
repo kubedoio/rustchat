@@ -144,6 +144,67 @@ promo_expect integration_failed  1 "promotion: post-merge integration failure ->
 promo_expect integration_pending 1 "promotion: post-merge integration pending -> moving alias blocked"
 promo_expect missing             1 "promotion: missing required promotion check -> moving alias blocked"
 
+# ---------- 3. Promotion gate multi-page pagination ----------
+# >100 check-runs on a release commit spans multiple API pages; the gate must
+# parse beyond page 1 (regression: concatenated page bodies broke json.load and
+# dropped checks after the first 100).
+
+MP_FIXTURE_DIR="$(mktemp -d)"
+trap 'rm -rf "${MP_FIXTURE_DIR}" "${FIXTURE_DIR}"' EXIT
+
+# Page 1 holds exactly 100 runs (2 required + 98 dummy); page 2 the other two
+# required runs. Generated via Python so the JSON is always well-formed.
+python3 - <<'PY' > "${MP_FIXTURE_DIR}/p1.json"
+import json
+runs = [
+    {"name": "CI Complete", "status": "completed", "conclusion": "success"},
+    {"name": "Security Complete", "status": "completed", "conclusion": "success"},
+] + [
+    {"name": f"dummy-{i}", "status": "completed", "conclusion": "success"}
+    for i in range(1, 99)
+]
+print(json.dumps({"total_count": 102, "check_runs": runs}))
+PY
+
+python3 - <<'PY' > "${MP_FIXTURE_DIR}/p2.json"
+import json
+runs = [
+    {"name": "dco-check", "status": "completed", "conclusion": "success"},
+    {"name": "Backend Integration Tests", "status": "completed", "conclusion": "success"},
+]
+print(json.dumps({"total_count": 102, "check_runs": runs}))
+PY
+
+cat > "${MP_FIXTURE_DIR}/http.sh" <<SH
+#!/usr/bin/env bash
+case "\$1" in
+  *"page=2"*) cat "${MP_FIXTURE_DIR}/p2.json" ;;
+  *)          cat "${MP_FIXTURE_DIR}/p1.json" ;;
+esac
+SH
+chmod +x "${MP_FIXTURE_DIR}/http.sh"
+
+env GITHUB_TOKEN=test PROMOTION_GATE_HTTP="${MP_FIXTURE_DIR}/http.sh" \
+  "${PROMO}" --repo org/repo --sha abc --token test "${REQ[@]}" \
+  >/dev/null 2>&1 && ok "promotion: required checks split across 2 pages -> promotion allowed" \
+  || bad "promotion: required checks split across 2 pages (exit $?)"
+
+# Negative: a failing check on page 2 must still be detected as a failure
+# (not misreported as "no check-run found").
+python3 - "${MP_FIXTURE_DIR}/p2.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+for r in d["check_runs"]:
+    if r["name"] == "Backend Integration Tests":
+        r["conclusion"] = "failure"
+json.dump(d, open(p, "w"))
+PY
+env GITHUB_TOKEN=test PROMOTION_GATE_HTTP="${MP_FIXTURE_DIR}/http.sh" \
+  "${PROMO}" --repo org/repo --sha abc --token test "${REQ[@]}" \
+  >/dev/null 2>&1 && bad "promotion: page-2 failure blocked promotion (exit 0)" \
+  || ok "promotion: page-2 failure blocks promotion"
+
 echo ""
 echo "gate-propagation tests: ${PASS} passed, ${FAIL} failed"
 [[ "${FAIL}" -eq 0 ]]

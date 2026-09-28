@@ -42,8 +42,14 @@ if [[ "${#REQUIRED[@]}" -eq 0 ]]; then
   exit 2
 fi
 
-# Fetch all check-run records for the commit (paginate).
-CHECK_RUNS_JSON=""
+# Fetch all check-run records for the commit (paginate). Each page body is a
+# separate JSON document, so pages are merged into a single JSON-lines file of
+# check_runs rather than concatenated (concatenation breaks json.load once
+# there are 2+ pages, i.e. >100 check-runs on a release commit).
+PAGE_DIR="$(mktemp -d)"
+trap 'rm -rf "${PAGE_DIR}"' EXIT
+RUNS_FILE="${PAGE_DIR}/runs.jsonl"
+: > "${RUNS_FILE}"
 PAGE=1
 while :; do
   url="${API_BASE}/repos/${REPO}/commits/${SHA}/check-runs?per_page=100&page=${PAGE}"
@@ -52,8 +58,13 @@ while :; do
   else
     body="$(curl -fsSL -H "Authorization: token ${TOKEN}" -H "Accept: application/vnd.github+json" "${url}")"
   fi
-  CHECK_RUNS_JSON="${CHECK_RUNS_JSON}${body}"
-  total="$(printf '%s' "${body}" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("total_count",0))' 2>/dev/null || echo 0)"
+  printf '%s' "${body}" | python3 -c '
+import sys, json
+runs = json.load(sys.stdin).get("check_runs", [])
+with open(sys.argv[1], "a") as f:
+    for run in runs:
+        f.write(json.dumps(run) + "\n")
+' "${RUNS_FILE}"
   page_count="$(printf '%s' "${body}" | python3 -c 'import sys,json;print(len(json.load(sys.stdin).get("check_runs",[])))' 2>/dev/null || echo 0)"
   [[ "${page_count}" -lt 100 ]] && break
   PAGE=$((PAGE + 1))
@@ -62,16 +73,21 @@ done
 FAILED=0
 for name in "${REQUIRED[@]}"; do
   # Literal match on the check-run name (GitHub Actions jobs use the job name,
-  # or job id when no name is set).
-  found="$(printf '%s' "${CHECK_RUNS_JSON}" | python3 -c "
+  # or job id when no name is set). Search the merged JSON-lines file so runs
+  # beyond the first page are not dropped.
+  found="$(python3 -c "
 import sys, json
 name = sys.argv[1]
-data = json.load(sys.stdin)
-for run in data.get('check_runs', []):
-    if str(run.get('name', '')).lower() == name.lower():
-        print(str(run.get('status', '')) + '|' + str(run.get('conclusion', '')))
-        break
-" "${name}")"
+with open(sys.argv[2]) as f:
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        run = json.loads(line)
+        if str(run.get('name', '')).lower() == name.lower():
+            print(str(run.get('status', '')) + '|' + str(run.get('conclusion', '')))
+            break
+" "${name}" "${RUNS_FILE}")"
   if [[ -n "${found}" ]]; then
     state="${found%%|*}"
     concl="${found##*|}"
