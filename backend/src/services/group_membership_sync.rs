@@ -253,6 +253,15 @@ async fn ensure_membership(
 /// Remove one syncable's tracking row and converge the membership it
 /// tracked: revoke it when no other active grant keeps it alive, otherwise
 /// re-converge the role to the remaining grants.
+///
+/// Lock order: the membership row is revoked or converged BEFORE the
+/// tracking row is deleted — the canonical order (membership tables, then
+/// tracking table) shared with `ensure_membership` and `soft_delete_group`'s
+/// transaction. Deleting the tracking row first would invert that order and
+/// can deadlock against a concurrent group soft-delete (each transaction
+/// holding the row lock the other is waiting on). The remaining-grant
+/// computation therefore excludes this syncable's grant explicitly instead
+/// of relying on the tracking row already being gone.
 async fn cleanup_tracking_membership(
     state: &AppState,
     group_id: Uuid,
@@ -260,6 +269,68 @@ async fn cleanup_tracking_membership(
     syncable_id: Uuid,
     tracked: &TrackedMembershipRow,
 ) -> ApiResult<()> {
+    // Remaining active grants excluding the one being removed, and the
+    // role their union confers (as if this syncable's tracking row were
+    // already deleted).
+    let (remaining_role, remaining_grants): (String, i64) = sqlx::query_as(
+        r#"
+        SELECT
+            CASE WHEN bool_or(g.role = 'admin') THEN 'admin' ELSE 'member' END,
+            COUNT(*)
+        FROM group_syncable_active_grants g
+        WHERE g.target_type = $1
+          AND g.target_id = $2
+          AND g.user_id = $3
+          AND (g.group_id, g.syncable_type, g.syncable_id) IS DISTINCT FROM ($4, $5, $6)
+        "#,
+    )
+    .bind(&tracked.target_type)
+    .bind(tracked.target_id)
+    .bind(tracked.user_id)
+    .bind(group_id)
+    .bind(kind.as_db_str())
+    .bind(syncable_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if remaining_grants > 0 {
+        // Other syncables still grant this membership: converge the role to
+        // the union of the remaining grants instead of leaving it at
+        // whatever the removed syncable last wrote (an admin grant removed
+        // second must not strand the member at 'member' — or vice versa).
+        if tracked.target_type == "team" {
+            sqlx::query("UPDATE team_members SET role = $1 WHERE team_id = $2 AND user_id = $3")
+                .bind(&remaining_role)
+                .bind(tracked.target_id)
+                .bind(tracked.user_id)
+                .execute(&state.db)
+                .await?;
+        } else {
+            sqlx::query(
+                "UPDATE channel_members SET role = $1 WHERE channel_id = $2 AND user_id = $3",
+            )
+            .bind(&remaining_role)
+            .bind(tracked.target_id)
+            .bind(tracked.user_id)
+            .execute(&state.db)
+            .await?;
+        }
+    } else if tracked.target_type == "team" {
+        sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
+            .bind(tracked.target_id)
+            .bind(tracked.user_id)
+            .execute(&state.db)
+            .await?;
+    } else {
+        sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+            .bind(tracked.target_id)
+            .bind(tracked.user_id)
+            .execute(&state.db)
+            .await?;
+    }
+
+    // Tracking row is deleted last (canonical lock order — see the doc
+    // comment above).
     sqlx::query(
         r#"
         DELETE FROM group_syncable_memberships
@@ -279,52 +350,6 @@ async fn cleanup_tracking_membership(
     .bind(tracked.user_id)
     .execute(&state.db)
     .await?;
-
-    let kept_by_other_syncable: bool = sqlx::query_scalar(
-        r#"
-        SELECT EXISTS(
-            SELECT 1
-            FROM group_syncable_active_grants
-            WHERE target_type = $1
-              AND target_id = $2
-              AND user_id = $3
-        )
-        "#,
-    )
-    .bind(&tracked.target_type)
-    .bind(tracked.target_id)
-    .bind(tracked.user_id)
-    .fetch_one(&state.db)
-    .await?;
-
-    if kept_by_other_syncable {
-        // Other syncables still grant this membership: converge the role to
-        // the union of the remaining grants instead of leaving it at
-        // whatever the removed syncable last wrote (an admin grant removed
-        // second must not strand the member at 'member' — or vice versa).
-        converge_role_to_grants(
-            state,
-            &tracked.target_type,
-            tracked.target_id,
-            tracked.user_id,
-        )
-        .await?;
-        return Ok(());
-    }
-
-    if tracked.target_type == "team" {
-        sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
-            .bind(tracked.target_id)
-            .bind(tracked.user_id)
-            .execute(&state.db)
-            .await?;
-    } else {
-        sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
-            .bind(tracked.target_id)
-            .bind(tracked.user_id)
-            .execute(&state.db)
-            .await?;
-    }
 
     Ok(())
 }

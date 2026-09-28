@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use aws_config::Region;
+use aws_sdk_s3::config::timeout::TimeoutConfig;
 use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::{
@@ -15,6 +16,20 @@ use tracing::error;
 
 use crate::error::AppError;
 use crate::storage::{ListObjectsResult, ListedObject, ObjectStorage};
+
+/// Bounded I/O for every S3 operation. Without it a black-holed storage
+/// endpoint hangs calls (and the upload finalizes that await them) forever;
+/// each hung finalize also holds one of the user's live upload-session
+/// slots until its 24h expiry.
+const S3_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const S3_OPERATION_TIMEOUT: Duration = Duration::from_secs(60);
+
+fn s3_timeout_config() -> TimeoutConfig {
+    TimeoutConfig::builder()
+        .connect_timeout(S3_CONNECT_TIMEOUT)
+        .operation_timeout(S3_OPERATION_TIMEOUT)
+        .build()
+}
 
 /// S3 storage client
 #[derive(Clone)]
@@ -47,7 +62,8 @@ impl S3Client {
         let mut config_builder = Config::builder()
             .region(Region::new(region_main))
             .behavior_version_latest()
-            .force_path_style(true);
+            .force_path_style(true)
+            .timeout_config(s3_timeout_config());
 
         if let Some(creds) = credentials {
             config_builder =
@@ -65,7 +81,8 @@ impl S3Client {
             let mut public_builder = Config::builder()
                 .region(Region::new(region.clone()))
                 .behavior_version_latest()
-                .force_path_style(true);
+                .force_path_style(true)
+                .timeout_config(s3_timeout_config());
 
             if let (Some(ak), Some(sk)) = (access_key.clone(), secret_key.clone()) {
                 let creds = Credentials::new(ak, sk, None, None, "rustchat");
