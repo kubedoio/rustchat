@@ -57,8 +57,19 @@ pub fn rrf_fuse(
         })
         .collect();
 
-    hybrid_results.sort_by(|a, b| b.fused_score.partial_cmp(&a.fused_score).unwrap());
+    sort_hybrid_results(&mut hybrid_results);
     hybrid_results
+}
+
+/// Sort results by fused score, descending.
+///
+/// Extracted so tests can exercise the exact production comparison.
+// total_cmp (not partial_cmp + unwrap): RRF scores are built from rank
+// arithmetic and are always finite in practice, but total_cmp keeps the
+// sort total and panic-free even if a non-finite score ever reaches here
+// (e.g. from a future scoring change), instead of panicking inside sort.
+fn sort_hybrid_results(results: &mut [HybridResult]) {
+    results.sort_by(|a, b| b.fused_score.total_cmp(&a.fused_score));
 }
 
 #[cfg(test)]
@@ -106,5 +117,23 @@ mod tests {
         assert_eq!(result.len(), 3);
         // chunk b should be first because it appears in both lists
         assert_eq!(result[0].chunk.chunk_text, "chunk b");
+    }
+
+    #[test]
+    fn test_rrf_fuse_sort_survives_nan_score() {
+        // Regression: sorting used partial_cmp().unwrap(), which panics on
+        // NaN. Exercises the exact production comparison via
+        // sort_hybrid_results (the helper rrf_fuse sorts with).
+        let semantic = vec![
+            make_chunk("chunk a", "doc 1"),
+            make_chunk("chunk b", "doc 2"),
+        ];
+        let mut result = rrf_fuse(semantic, vec![], RRF_K);
+        assert_eq!(result.len(), 2);
+        // Corrupt one score with NaN and re-run the production sort.
+        result[1].fused_score = f32::NAN;
+        sort_hybrid_results(&mut result);
+        // Must not panic; total_cmp keeps the order total for NaN.
+        assert_eq!(result.len(), 2);
     }
 }
