@@ -31,3 +31,6 @@ chrono = "0.4"
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+# Test-only: generates throwaway APNS signing keys at runtime so no key
+# material is ever committed (secret scanners flag embedded private keys).
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }

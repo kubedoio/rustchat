@@ -333,7 +333,13 @@ fn validate_hmac(
         ));
     }
 
-    // 2. Nonce deduplication (5-minute TTL)
+    // 2. Nonce deduplication (5-minute TTL).
+    //
+    // The map is pruned on every request, but a flood of validly-signed
+    // requests could still grow it without bound within the window. A hard
+    // capacity fails closed (rejects) rather than silently weakening replay
+    // protection by evicting live nonces.
+    const MAX_TRACKED_NONCES: usize = 50_000;
     seen_nonces.retain(|_, &mut inst| now_instant.duration_since(inst) < Duration::from_secs(300));
     if seen_nonces.contains_key(nonce) {
         warn!("Rejecting push request: nonce already seen");
@@ -342,6 +348,19 @@ fn validate_hmac(
             Json(PushResponse {
                 success: false,
                 message: "Unauthorized".to_string(),
+            }),
+        ));
+    }
+    if seen_nonces.len() >= MAX_TRACKED_NONCES {
+        warn!(
+            capacity = MAX_TRACKED_NONCES,
+            "Rejecting push request: nonce tracking capacity exceeded"
+        );
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(PushResponse {
+                success: false,
+                message: "Too many requests".to_string(),
             }),
         ));
     }
