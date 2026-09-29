@@ -145,7 +145,7 @@ describe('AuditDashboard export', () => {
       const params = cfg?.params ?? {}
 
       // No empty-string values (empty policy_id= fails Option<Uuid>).
-      for (const [key, value] of Object.entries(params)) {
+      for (const value of Object.values(params)) {
         expect(String(value)).not.toBe('')
         expect(value).toBeDefined()
         expect(value).not.toBeNull()
