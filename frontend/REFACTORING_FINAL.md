@@ -109,9 +109,12 @@ import { callService } from '@/features/calls'
 import { authService, useAuth } from '@/features/auth'
 import { themeService } from '@/features/theme'
 
-// WebSocket setup
-import { registerWebSocketHandlers } from '@/core/websocket'
-registerWebSocketHandlers()
+// WebSocket setup: the realtime layer is the useWebSocket composable, which
+// connects itself once the auth token is available. Custom event handlers
+// register through it:
+import { useWebSocket } from '@/composables/useWebSocket'
+const { onEvent } = useWebSocket()
+onEvent('posted', handlePosted)
 ```
 
 ---
