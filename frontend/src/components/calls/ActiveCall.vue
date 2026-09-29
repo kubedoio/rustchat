@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useCallsStore } from '../../stores/calls'
+import { useCallsStore } from '@/features/calls'
 import { useAuthStore } from '../../features/auth/stores/authStore'
 import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { computed, ref, watchEffect } from 'vue'
