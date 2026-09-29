@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { HttpClient } from '../HttpClient'
-import { normalizeIdsDeep, shouldNormalizeHttpPayload } from '@/utils/idCompat'
+import { shouldNormalizeHttpPayload } from '@/utils/idCompat'
 
 describe('Auth Integration', () => {
   let client: HttpClient

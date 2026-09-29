@@ -13,13 +13,18 @@ const excludedFiles = new Set([
 ]);
 
 function isExternalTarget(target) {
+  // Scheme checks must be case-insensitive and whitespace-tolerant: a
+  // markdown link like `[x](HTTP://example.com)` or one carrying a
+  // leading control character must classify the same as its lowercase
+  // form (CodeQL js/incomplete-url-scheme-check).
+  const normalized = target.trim().toLowerCase();
   return (
-    target.startsWith("http://") ||
-    target.startsWith("https://") ||
-    target.startsWith("mailto:") ||
-    target.startsWith("tel:") ||
-    target.startsWith("data:") ||
-    target.startsWith("javascript:")
+    normalized.startsWith("http://") ||
+    normalized.startsWith("https://") ||
+    normalized.startsWith("mailto:") ||
+    normalized.startsWith("tel:") ||
+    normalized.startsWith("data:") ||
+    normalized.startsWith("javascript:")
   );
 }
 
