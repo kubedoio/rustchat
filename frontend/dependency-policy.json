@@ -159,7 +159,7 @@
     "undici": {
       "reason": "Pin the transitive HTTP client to the audited safe release required by the current Node 24 toolchain.",
       "removeWhen": "The frontend dependency tree no longer requires a local undici override to satisfy the audit policy.",
-      "reviewedOn": "2026-06-19"
+      "reviewedOn": "2026-09-29"
     },
     "brace-expansion@^1": {
       "reason": "Force the transitive 1.x matcher (eslint's minimatch) to the patched 1.1.18 release.",
