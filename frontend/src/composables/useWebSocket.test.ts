@@ -676,7 +676,7 @@ describe('useWebSocket', () => {
     expect(FakeWebSocket.instances).toHaveLength(1)
   })
 
-  it('documents that a browser-delivered close event after disconnect() still triggers a ghost reconnect', async () => {
+  it('does not reconnect when the browser delivers a close event after an explicit disconnect()', async () => {
     const ws = await useFreshWebSocket()
     ws.connect()
     const sock = FakeWebSocket.instances[0]!
@@ -684,14 +684,104 @@ describe('useWebSocket', () => {
 
     ws.disconnect()
     // A real browser still delivers a close event after a client-side close().
-    // disconnect() does not detach the socket's onclose handler, so the full
-    // reconnect path runs again even though the user disconnected on purpose.
-    // This documents current (buggy) behavior; fix the source to flip this
-    // test. Tracked in #320.
+    // disconnect() detaches the socket's handlers before closing, so the close
+    // event must not run the reconnect path for an intentional disconnect
+    // (#320): no timer is armed, no state is mutated afterwards.
     sock.emitClose(1006, '')
 
+    expect(ws.connected.value).toBe(false)
+    expect(ws.reconnectAttempt.value).toBe(0)
+    expect(ws.disconnectedAt.value).toBeNull()
+    expect(ws.nextRetryIn.value).toBe(0)
+
+    // Generous window: well past every backoff delay (capped at 30s + jitter).
+    vi.advanceTimersByTime(120_000)
+    expect(FakeWebSocket.instances).toHaveLength(1)
+  })
+
+  it('tolerates a double disconnect without scheduling any reconnect', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    const sock = FakeWebSocket.instances[0]!
+    openSocket(sock)
+
+    ws.disconnect()
+    ws.disconnect()
+    // Late browser-delivered close events for the intentionally closed socket.
+    sock.emitClose(1006, '')
+    sock.emitClose(1006, '')
+
+    vi.advanceTimersByTime(120_000)
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(ws.reconnectAttempt.value).toBe(0)
+  })
+
+  it('handles rapid connect → disconnect → connect cycles without ghost reconnects', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    ws.disconnect()
+    ws.connect()
+    ws.disconnect()
+    ws.connect()
+    expect(FakeWebSocket.instances).toHaveLength(3)
+
+    // The browser delivers close events for the two sockets that disconnect()
+    // closed. Their handlers are detached, so neither may clobber the state of
+    // the live third socket nor schedule a reconnect.
+    FakeWebSocket.instances[0]!.emitClose(1006, '')
+    FakeWebSocket.instances[1]!.emitClose(1006, '')
+
+    vi.advanceTimersByTime(120_000)
+    expect(FakeWebSocket.instances).toHaveLength(3)
+
+    const third = FakeWebSocket.instances[2]!
+    openSocket(third)
+    expect(ws.connected.value).toBe(true)
+
+    // A genuine abnormal close of the live socket must still reconnect.
+    third.emitClose(1000, '')
     vi.advanceTimersByTime(reconnectDelay(1))
+    expect(FakeWebSocket.instances).toHaveLength(4)
+  })
+
+  it('closes and detaches a CONNECTING socket replaced by a second connect() so its late close cannot ghost-reconnect', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    const first = FakeWebSocket.instances[0]!
+    expect(first.readyState).toBe(FakeWebSocket.CONNECTING)
+
+    // A second connect() before the first socket opens replaces it. The
+    // orphaned CONNECTING socket must be closed with its handlers detached
+    // so it cannot interfere with the live replacement (#320).
+    ws.connect()
     expect(FakeWebSocket.instances).toHaveLength(2)
+    const second = FakeWebSocket.instances[1]!
+    expect(first.readyState).toBe(FakeWebSocket.CLOSED)
+    expect(first.onclose).toBeNull()
+    expect(first.onerror).toBeNull()
+    expect(first.onopen).toBeNull()
+    expect(first.onmessage).toBeNull()
+
+    // The browser later delivers the orphaned socket's failure as a close
+    // event; it must not clobber the live socket's state nor arm a
+    // reconnect timer.
+    first.emitClose(1006, '')
+    expect(ws.connected.value).toBe(false)
+    expect(ws.reconnectAttempt.value).toBe(0)
+    expect(ws.disconnectedAt.value).toBeNull()
+    expect(ws.nextRetryIn.value).toBe(0)
+
+    vi.advanceTimersByTime(120_000)
+    expect(FakeWebSocket.instances).toHaveLength(2)
+
+    // The live replacement socket behaves normally: it opens, and a
+    // genuine abnormal close still reconnects on schedule.
+    openSocket(second)
+    expect(ws.connected.value).toBe(true)
+    second.emitClose(1000, '')
+    expect(ws.reconnectAttempt.value).toBe(1)
+    vi.advanceTimersByTime(reconnectDelay(1))
+    expect(FakeWebSocket.instances).toHaveLength(3)
   })
 
   it('sends typing, stop-typing, and presence commands as actions', async () => {

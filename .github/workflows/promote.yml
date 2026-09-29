@@ -9,7 +9,13 @@ name: Promote Moving Aliases
 #
 # This workflow is triggered when the post-merge Integration Tests workflow
 # completes for `main`, so the moving aliases advance only after the full
-# promotion-gate set is verified for the exact commit.
+# promotion-gate set is verified for the exact commit. Because Integration
+# Tests may finish before other required checks on the same commit (e.g.
+# Security/CodeQL runs ~9 minutes longer), the gate is invoked with --wait:
+# it polls until every required check is completed, failing fast on real
+# failures and failing with a timeout if a check never settles. Waiting
+# strengthens RI-C03 compliance — aliases still advance only when the full
+# promotion-gate set is green for the exact commit.
 
 on:
   workflow_run:
@@ -30,7 +36,9 @@ jobs:
   gate:
     name: Promotion Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # --wait-timeout default is 1800s; leave headroom for polling/fetch
+    # overhead on top of the wait budget.
+    timeout-minutes: 40
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
       allowed: ${{ steps.gate.outputs.allowed }}
@@ -61,7 +69,8 @@ jobs:
               --required "CI Complete" \
               --required "Security Complete" \
               --required "dco-check" \
-              --required "Backend Integration Tests"; then
+              --required "Backend Integration Tests" \
+              --wait; then
             echo "allowed=true" >> "$GITHUB_OUTPUT"
           else
             echo "allowed=false" >> "$GITHUB_OUTPUT"
