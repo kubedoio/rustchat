@@ -72,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Compliance export is not implemented** — the admin UI labels it "Not implemented"; only a no-op compatibility stub exists on the backend.
 - **No durable realtime replay** — reconnect replay is in-memory and bounded (about 5 minutes / last 128 messages per connection); events missed beyond that window, or across a server restart, are not recovered and require a reload. A durable outbox/replay is planned.
 - **Message sending is not idempotent across reconnects** — `client_msg_id` is sent by the frontend but not yet enforced server-side.
-- **CSP still allows `script-src 'unsafe-inline'`** for the frontend bundle; hardening is planned.
+- **The SPA is not yet served with an enforcing CSP** — the backend API presets no longer allow inline scripts and the built frontend ships no inline or cross-origin scripts, but nginx serves the SPA document with the target policy in `Content-Security-Policy-Report-Only` only. Promoting it to enforcing requires a manual pass to confirm the known runtime allowances (Cloudflare Turnstile script, embedded call frames).
 - **The UI is English-only** — no i18n layer exists yet.
 
 ## [0.5.0] - 2026-06-10
