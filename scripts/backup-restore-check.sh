@@ -58,6 +58,16 @@ note() { echo "backup-restore-check: $*"; }
 
 [[ -d "${MIGRATIONS_DIR}" ]] || fail "migrations dir not found: ${MIGRATIONS_DIR}"
 
+# Guard: migration filenames must match the sqlx <version>_<description>.sql
+# convention (digits + [A-Za-z0-9_]). Names outside it would be word-split by
+# the apply loops or inject into the bookkeeping INSERT below, so they fail
+# loudly here; this also fails loudly when the directory contains no
+# migrations at all (a non-matching glob is passed through literally).
+for f in "${MIGRATIONS_DIR}"/*.sql; do
+  [[ "$(basename "$f")" =~ ^[0-9]+_[A-Za-z0-9_]+\.sql$ ]] \
+    || fail "migration filename does not match the sqlx <version>_<description>.sql convention: $(basename "$f")"
+done
+
 # Tables seeded below; row counts and content checksums are compared
 # verbatim between the source and the restored database.
 SEED_TABLES=(
@@ -75,13 +85,17 @@ SEED_TABLES=(
 # trip, compared as TEXT so source and restored databases can be diffed.
 #
 # Structural facts are taken from the catalog SEMANTICALLY (names, types,
-# key-column sets) rather than deparsed expression text: pg_get_constraintdef
-# / pg_dump output can legitimately differ in text between a database and
-# its own restore (semantically equivalent expression trees re-deparse
-# differently). What operators need proven is that the same objects with the
-# same shape exist after restore — which these facts capture.
+# key-column sets, FK actions, function signatures) rather than deparsed
+# expression text: pg_get_constraintdef / pg_dump output can legitimately
+# differ in text between a database and its own restore (semantically
+# equivalent expression trees re-deparse differently). CHECK-constraint and
+# column-default EXPRESSION TEXT is therefore not compared — that class of
+# difference is inherited from the dump itself, not introduced by restore.
+# What operators need proven is that the same objects with the same shape
+# exist after restore — which these facts capture.
 collect_facts() {
   local db="$1"
+  local t v
   {
     echo "== tables"
     ${PSQL[@]} "$db" -tAc "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1"
@@ -104,7 +118,8 @@ collect_facts() {
                        JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=x.attnum),'')||':'||
              COALESCE(c.confrelid::regclass::text,'')||':'||
              COALESCE((SELECT string_agg(a.attname,',' ORDER BY x.ord) FROM unnest(c.confkey) WITH ORDINALITY x(attnum,ord)
-                       JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=x.attnum),'')
+                       JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=x.attnum),'')||':'||
+             c.confdeltype::text||':'||c.confupdtype::text||':'||c.confmatchtype::text
       FROM pg_constraint c
       WHERE c.connamespace='public'::regnamespace ORDER BY 1"
     echo "== sequences"
@@ -118,16 +133,23 @@ collect_facts() {
     echo "== extensions"
     ${PSQL[@]} "$db" -tAc "SELECT extname||':'||extversion FROM pg_extension ORDER BY 1"
     echo "== functions"
-    ${PSQL[@]} "$db" -tAc "SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' GROUP BY proname ORDER BY 1"
+    ${PSQL[@]} "$db" -tAc "SELECT DISTINCT proname||':'||oidvectortypes(p.proargtypes) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' ORDER BY 1"
     echo "== migrations"
     ${PSQL[@]} "$db" -tAc "SELECT version||':'||encode(checksum,'hex') FROM _sqlx_migrations ORDER BY version"
     echo "== row counts"
     for t in "${SEED_TABLES[@]}"; do
-      echo "${t}=$(${PSQL[@]} "$db" -tAc "SELECT count(*) FROM ${t}")"
+      # Captured with explicit failure propagation: a command substitution
+      # inside echo would mask a failed query (e.g. after a future column
+      # rename) on BOTH databases and silently compare two empty values.
+      v="$(${PSQL[@]} "$db" -tAc "SELECT count(*) FROM ${t}")" \
+        || fail "row-count fact query failed for ${t} (${db})"
+      echo "${t}=${v}"
     done
     echo "== content checksums"
     for t in "${SEED_TABLES[@]}"; do
-      echo "${t}=$(${PSQL[@]} "$db" -tAc "SELECT coalesce(md5(string_agg(md5(t::text),'' ORDER BY md5(t::text))),'empty') FROM ${t} t")"
+      v="$(${PSQL[@]} "$db" -tAc "SELECT coalesce(md5(string_agg(md5(t::text),'' ORDER BY md5(t::text))),'empty') FROM ${t} t")" \
+        || fail "content-checksum fact query failed for ${t} (${db})"
+      echo "${t}=${v}"
     done
     echo "== fk integrity (dangling child rows)"
     ${PSQL[@]} "$db" -tAc "
@@ -147,7 +169,10 @@ collect_facts() {
 # ---------------------------------------------------------------------------
 # Step 1: fresh database at HEAD, seeded with deterministic data.
 # ---------------------------------------------------------------------------
-${PSQL[@]} postgres -c "CREATE DATABASE \"${SRC_DB}\";" >/dev/null
+# TEMPLATE template0 matches the documented operator procedure
+# (createdb -T template0 in docs/operations/runbook.md): a pristine base,
+# immune to local template1 customization.
+${PSQL[@]} postgres -c "CREATE DATABASE \"${SRC_DB}\" TEMPLATE template0;" >/dev/null
 MIGRATION_COUNT=0
 for f in $(ls "${MIGRATIONS_DIR}"/*.sql | sort); do
   ${PSQL[@]} "${SRC_DB}" -f "$f" >/dev/null \
@@ -156,11 +181,12 @@ for f in $(ls "${MIGRATIONS_DIR}"/*.sql | sort); do
 done
 note "applied ${MIGRATION_COUNT} migrations to the source database"
 
-# sqlx migration bookkeeping, replicated exactly as `sqlx migrate run`
-# leaves it (version = filename prefix, description = filename suffix,
-# checksum = sha384 of the file content). Applied via psql here, so the
-# table is created and populated explicitly — this is what a production
-# database contains and what a restore must preserve.
+# sqlx migration bookkeeping, recorded the way `sqlx migrate run` records it
+# (version = filename prefix, description = filename suffix, checksum =
+# sha384 of the file content). installed_on/execution_time take defaults —
+# only version + checksum are load-bearing for this check (a restore must
+# preserve migration state so the app knows where it stands). Applied via
+# psql here, so the table is created and populated explicitly.
 ${PSQL[@]} "${SRC_DB}" >/dev/null <<'SQL'
 CREATE TABLE _sqlx_migrations (
     version BIGINT NOT NULL PRIMARY KEY,
@@ -218,7 +244,7 @@ pg_dump -Fc -d "${SRC_DB}" -f "${DUMP_FILE}" \
   || fail "pg_dump failed"
 note "dumped source database ($(du -h "${DUMP_FILE}" | cut -f1), custom format)"
 
-${PSQL[@]} postgres -c "CREATE DATABASE \"${DST_DB}\";" >/dev/null
+${PSQL[@]} postgres -c "CREATE DATABASE \"${DST_DB}\" TEMPLATE template0;" >/dev/null
 pg_restore --no-owner --no-privileges -d "${DST_DB}" "${DUMP_FILE}" \
   || fail "pg_restore into a fresh database failed"
 note "restored dump into a fresh database"

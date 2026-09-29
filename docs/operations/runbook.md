@@ -410,7 +410,7 @@ If the container is running as `root`, check `docker/frontend.Dockerfile` for th
 ```bash
 # Database backup (custom format — the format the restore procedure and the
 # CI backup/restore check below are validated against)
-pg_dump -Fc $RUSTCHAT_DATABASE_URL -f rustchat_backup_$(date +%Y%m%d).dump
+pg_dump -Fc "$RUSTCHAT_DATABASE_URL" -f rustchat_backup_$(date +%Y%m%d).dump
 
 # Redis backup (if using persistence)
 redis-cli BGSAVE

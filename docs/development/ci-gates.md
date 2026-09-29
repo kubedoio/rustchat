@@ -72,7 +72,8 @@ readiness checks.
 
 Backup/restore recovery evidence (P006) is likewise continuously proven: the
 `Backup Restore` job in `ci.yml` runs `scripts/backup-restore-check.sh` on
-every change to `backend/migrations/**` or the script itself. It applies all
+every change to `backend/migrations/**`, the script, or the CI workflow. It
+applies all
 migrations, seeds representative data, takes a custom-format `pg_dump`,
 restores it into a fresh database, and asserts that schema objects, sqlx
 migration bookkeeping, row counts, content checksums, and referential
