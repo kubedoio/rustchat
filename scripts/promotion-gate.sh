@@ -65,6 +65,14 @@ if [[ "${#REQUIRED[@]}" -eq 0 ]]; then
   exit 2
 fi
 
+# Defensive floor: a zero/negative interval would busy-spin the wait loop
+# (the sleep is clamped to the remaining budget, so `waited` would never
+# advance and the timeout would never fire).
+if (( WAIT_INTERVAL < 1 )); then
+  echo "promotion-gate.sh: --wait-interval ${WAIT_INTERVAL} clamped to 1s" >&2
+  WAIT_INTERVAL=1
+fi
+
 PAGE_DIR="$(mktemp -d)"
 trap 'rm -rf "${PAGE_DIR}"' EXIT
 RUNS_FILE="${PAGE_DIR}/runs.jsonl"

@@ -301,6 +301,24 @@ else
   bad "wait: never-appearing timeout message missing check name"
 fi
 
+# (d) --wait-interval 0 must be clamped to a 1s floor. The wait loop clamps
+# each sleep to the remaining budget, so a zero interval would leave `waited`
+# stuck at 0 and the loop would poll unbounded without ever timing out
+# (review reproduction: 92 fetches in 6s). The extra args below override
+# wait_run's default --wait-interval/--wait-timeout (later flags win).
+clamp_rc=0
+wait_run "${W_FIXTURE_DIR}/c-d" \
+  "${FIXTURE_DIR}/integration_pending.json" "${FIXTURE_DIR}/integration_pending.json" \
+  --wait-interval 0 --wait-timeout 2 || clamp_rc=$?
+fetches="$(cat "${W_FIXTURE_DIR}/c-d" 2>/dev/null || echo 0)"
+if [[ "${clamp_rc}" -eq 1 ]] \
+   && grep -q "timed out waiting for Backend Integration Tests" "${W_FIXTURE_DIR}/out.log" \
+   && [[ "${fetches}" -le 3 ]]; then
+  ok "wait: --wait-interval 0 clamped to 1s floor (timed out cleanly, ${fetches} fetches)"
+else
+  bad "wait: --wait-interval 0 not clamped (exit ${clamp_rc}, ${fetches} fetches)"
+fi
+
 echo ""
 echo "gate-propagation tests: ${PASS} passed, ${FAIL} failed"
 [[ "${FAIL}" -eq 0 ]]
