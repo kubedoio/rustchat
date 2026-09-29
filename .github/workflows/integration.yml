@@ -6,6 +6,17 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      # PR-gated integration evidence (M5): backend changes must prove the
+      # integration suite before merge. The check stays advisory for merge
+      # (required only for promotion/release); promoting it to a merge-
+      # required context is a deliberate gate-set change (RI-C06) once a
+      # track record exists.
+      - 'backend/**'
+      - 'docker-compose.integration.yml'
+      - '.github/workflows/integration.yml'
 
 permissions:
   contents: read
