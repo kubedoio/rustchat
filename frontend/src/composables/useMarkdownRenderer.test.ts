@@ -6,7 +6,16 @@ describe('useMarkdownRenderer XSS corpus', () => {
 
   beforeAll(async () => {
     // Markdown libs are loaded asynchronously; give slow CI runners plenty of time.
-    await vi.waitFor(() => isReady.value === true, { timeout: 30000 })
+    // The callback must THROW until ready: vi.waitFor resolves immediately with
+    // whatever a non-throwing sync callback returns, so returning a boolean here
+    // would silently skip the wait (observed as flaky fallback-path output when
+    // parallel workers delay the dynamic imports).
+    await vi.waitFor(
+      () => {
+        expect(isReady.value).toBe(true)
+      },
+      { timeout: 30000 }
+    )
   })
 
   it('removes script tags', () => {
