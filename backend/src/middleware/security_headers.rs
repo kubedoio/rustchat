@@ -47,10 +47,10 @@ impl SecurityHeadersConfig {
     pub fn strict() -> Self {
         Self {
             // Strict CSP - adjust based on your frontend needs
-            // script-src has no 'unsafe-inline': the frontend must not ship
-            // inline <script> blocks (the theme boot script is an external
-            // same-origin file; see frontend/public/theme-boot.js and
-            // scripts/check-p0-gates.sh).
+            // script-src does not allow inline scripts: the frontend must
+            // not ship inline <script> blocks (the theme boot script is an
+            // external same-origin file; see frontend/public/theme-boot.js
+            // and scripts/check-p0-gates.sh).
             csp: "default-src 'self'; \
                    script-src 'self'; \
                    style-src 'self' 'unsafe-inline'; \

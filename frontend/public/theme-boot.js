@@ -20,7 +20,8 @@
   ])
   const darkThemes = new Set(['dark', 'futuristic', 'high-contrast', 'dynamic'])
 
-  // Theme color definitions (must match THEME_OPTIONS in theme.ts)
+  // Theme color definitions (must match THEME_OPTIONS in
+  // src/features/theme/stores/themeStore.ts)
   const themeColors = {
     light: {
       sidebarBg: '#1e325c',
