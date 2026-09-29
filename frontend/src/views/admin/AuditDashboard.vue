@@ -73,17 +73,28 @@ async function fetchDashboard() {
   }
 }
 
+// Build the query params shared by the log list and the export. Both hit
+// the same backend contract (AuditLogQuery: Option<Uuid> / Option<String> /
+// Option<DateTime<Utc>>), where an empty-string param is a UUID parse
+// error and a bare `yyyy-MM-dd` date is a DateTime parse error — either
+// turns the whole request into a 400. Empty filters must be omitted
+// entirely and dates sent as full RFC3339 timestamps.
+function buildAuditLogParams(): Record<string, string> {
+  const params: Record<string, string> = {}
+  if (filters.value.status) params.status = filters.value.status
+  if (filters.value.action) params.action = filters.value.action
+  if (filters.value.from_date) params.from_date = new Date(filters.value.from_date).toISOString()
+  if (filters.value.to_date) params.to_date = new Date(filters.value.to_date).toISOString()
+  return params
+}
+
 // Fetch audit logs with filters
 async function fetchAuditLogs() {
   loading.value = true
   try {
-    const params: any = {}
-    if (filters.value.status) params.status = filters.value.status
-    if (filters.value.action) params.action = filters.value.action
-    if (filters.value.from_date) params.from_date = new Date(filters.value.from_date).toISOString()
-    if (filters.value.to_date) params.to_date = new Date(filters.value.to_date).toISOString()
-
-    const response = await api.get('/admin/audit/membership', { params })
+    const response = await api.get('/admin/audit/membership', {
+      params: buildAuditLogParams(),
+    })
     auditLogs.value = response.data
   } catch (error: unknown) {
     toast.error('Failed to load audit logs', getErrorMessage(error))
@@ -98,8 +109,11 @@ async function exportLogs() {
     // Do NOT use responseType: 'blob' here: the endpoint returns JSON, and
     // serializing a Blob with JSON.stringify yields "{}" (the old bug —
     // every exported file was empty). Parse the JSON, then build the file.
+    // The filters go through the same param builder as the list request:
+    // the raw filter object (empty policy_id, bare yyyy-MM-dd dates) is
+    // rejected with a 400 by the backend's AuditLogQuery deserializer.
     const response = await api.get('/admin/audit/membership/export', {
-      params: filters.value,
+      params: buildAuditLogParams(),
     })
 
     const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })

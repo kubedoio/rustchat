@@ -44,7 +44,12 @@ Priorities:
       — **Resolved (2026-09-28):** compliance export is explicitly
       unsupported in the admin UI (phantom endpoint removed; the feature is
       Phase 2); the audit-dashboard JSON export was fixed (it previously
-      downloaded `{}` because a Blob was passed to `JSON.stringify`); and the
+      downloaded `{}` because a Blob was passed to `JSON.stringify`, and
+      its request failed with a 400 because the raw filter object —
+      empty-string params and bare `yyyy-MM-dd` dates — violated the
+      backend's `AuditLogQuery` deserialization contract; both defects
+      are fixed via a param builder shared with the list request, with a
+      wire-format regression test); and the
       dashboard is relabeled honestly as "Membership Policy Audit" since all
       of its data (summary cards, failure stats, log table) comes from the
       membership-policy audit table. The system audit log keeps its own view.

@@ -2,6 +2,7 @@
 
 import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { serializeQueryParams } from '../../api/http/querySerializer'
 
 const apiGet = vi.fn()
 
@@ -119,6 +120,65 @@ describe('AuditDashboard export', () => {
     const exported = await createdUrls[0].text()
     const parsed = JSON.parse(exported)
     expect(parsed).toEqual(auditLogs)
+
+    wrapper.unmount()
+  })
+
+  it('sends export and list requests that satisfy the backend AuditLogQuery contract', async () => {
+    stubApi()
+    const wrapper = await mountView()
+
+    const exportButton = wrapper.findAll('button').find(b => b.text().includes('Export'))
+    await exportButton!.trigger('click')
+    await flushPromises()
+
+    // The backend deserializes the query into AuditLogQuery
+    // (Option<Uuid>, Option<String>, Option<DateTime<Utc>>). The raw filter
+    // object violates that contract twice: an empty-string param
+    // (policy_id=) is a UUID parse error, and a bare yyyy-MM-dd date is a
+    // DateTime parse error — either makes the whole request a 400. Assert
+    // the params actually sent never do.
+    for (const url of ['/admin/audit/membership/export', '/admin/audit/membership']) {
+      const call = apiGet.mock.calls.find(c => c[0] === url)
+      expect(call).toBeDefined()
+      const cfg = call![1] as { params?: Record<string, unknown> } | undefined
+      const params = cfg?.params ?? {}
+
+      // No empty-string values (empty policy_id= fails Option<Uuid>).
+      for (const value of Object.values(params)) {
+        expect(String(value)).not.toBe('')
+        expect(value).toBeDefined()
+        expect(value).not.toBeNull()
+      }
+
+      // Dates must be full RFC3339 timestamps (yyyy-MM-dd alone fails
+      // Option<DateTime<Utc>>).
+      for (const key of ['from_date', 'to_date']) {
+        if (params[key] !== undefined) {
+          expect(String(params[key])).toMatch(
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
+          )
+        }
+      }
+
+      // The wire form (through the real serializer) contains no empty
+      // values either.
+      const qs = serializeQueryParams(params)
+      expect(qs).not.toMatch(/=(?:&|$)/)
+    }
+
+    // List and export must send identical filters (shared param builder).
+    const listParams = (
+      apiGet.mock.calls.find(c => c[0] === '/admin/audit/membership')![1] as {
+        params?: Record<string, unknown>
+      }
+    ).params
+    const exportParams = (
+      apiGet.mock.calls.find(c => c[0] === '/admin/audit/membership/export')![1] as {
+        params?: Record<string, unknown>
+      }
+    ).params
+    expect(exportParams).toEqual(listParams)
 
     wrapper.unmount()
   })
