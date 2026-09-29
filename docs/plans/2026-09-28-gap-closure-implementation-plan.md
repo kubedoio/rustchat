@@ -1,7 +1,7 @@
 # Gap Closure Implementation Plan — Fast Wins First
 
 **Date:** 2026-09-28  
-**Status:** Proposed  
+**Status:** Tier 1 executed and merged (2026-09-28/29 — see §3.1); Tier 2/3 pending.  
 **Scope:** close the gaps identified by the 2026-09-28 maturity/production-readiness analysis, starting with the fast, low-risk items, then medium and large items in dependency order  
 **Baseline:** `fix/review-round8` @ `dabacc3` (source v0.5.1)
 
@@ -25,13 +25,28 @@ misreported were dropped, not planned (see §6).
   need bounded slices and regression tests.
 - **Tier 3 (large):** weeks or design-first; require their own spec (and where
   architectural, an ADR).
-- **Critical path:** the pending v0.5.1 release (issue #259) is blocked by #88 and
-  #89 — so the #88/#89 triage (PR-5) is the highest-priority Tier-1 item even though
-  the eventual fix size is unknown.
+- **Critical path:** the pending v0.5.1 release (issue #259) was blocked by #88 and
+  #89 — both resolved 2026-09-28/29 (see §3.1), so the release (M8) is now the
+  critical-path item.
 
 ## 3. Tier 1 — fast, simple, verified
 
-Each item is one independently mergeable PR. Conventional Commits + DCO sign-off
+### 3.1 Execution record (2026-09-29)
+
+All Tier-1 items are merged. Mapping and deviations from the plan above:
+
+| Plan item | Merged as | Deviations / notes |
+|---|---|---|
+| PR-1 (docs truthfulness) | #306 | Also fixed two factual errors found in review: the plan's own PR-4 baseline claim and the ROADMAP rate-limiting evidence wording. |
+| PR-2 (frontend dead code) | #307 | Scope expanded beyond the duplicate `thread/ThreadPanel.vue`: the whole dead `components/thread/` cluster (4 files) and `composer/ThreadComposer.vue` were verified zero-consumer and deleted (−665 lines, deletion-only; exceeds the 300-line code cap — flagged on the PR, accepted by review). |
+| PR-3 (unwrap hygiene) | #308 | `security_headers.rs` panics descriptively at construction instead of returning `ConfigError` (chosen for fail-fast startup); production sort extracted to `sort_hybrid_results()` so the NaN regression test drives real production code. |
+| PR-4 (SVG hardening) | #309, #312 | Beyond the plan: closed a whitespace `href =` bypass, a local-fragment `url(#grad)` false positive, and (in #312) a namespaced-element bypass (`<x:script>`). Known limitation (entity encoding) documented in the validator doc comment. |
+| PR-5 (triage #88/#89) | #310, #312 | Docker was unavailable, so triage was static code tracing instead of live reproduction. Outcome: #88 honestly de-scoped (phantom endpoint removed, UI labeled "Not implemented"); #89 fixed in two bounded slices — blob export bug (#310) and query serialization 400s (#312) — plus honest relabeling of the dashboard as "Membership Policy Audit". Issues #88/#89 closed with evidence 2026-09-29. |
+| Maintenance (#258) | live fix + #311 | Re-verification found the merge gate missing on `main` (empty `required_status_checks`); re-applied the same day, `verify-protection.sh` extended to also assert the review gate (10/10 PASS). #311 records the regression and resolution. |
+
+Follow-up: #313 (open) triages all 30 open CodeQL alerts — three code fixes plus evidence-based dismissals.
+
+Each item below is one independently mergeable PR. Conventional Commits + DCO sign-off
 required. All are **standard risk**; none touch a protected path.
 
 ### PR-1 — Documentation truthfulness sweep
@@ -187,14 +202,14 @@ attach the output, and close #258 so the open-issue list reflects reality.
 
 | # | Item | Depends on | Notes |
 |---|---|---|---|
-| M1 | Fix or land the de-scope of #88/#89 | PR-5 | Bounded slices; regression tests mandatory. |
+| ~~M1~~ | ~~Fix or land the de-scope of #88/#89~~ **DONE** — absorbed by #310 + #312 (see §3.1); issues #88/#89 closed 2026-09-29 | ~~PR-5~~ | — |
 | M2 | Membership-revocation on channel removal (GAP-11) | — | **Elevated risk (permissions).** Unsubscribe WS connections in the realtime hub when a member is removed from a channel; add lifecycle regression tests (`tests/api_v4_websocket_lifecycle.rs` pattern). Maintainer sponsorship per `risk-tiers.yml`. |
 | M3 | P006: backup→restore→sanity evidence in CI | — | Extend `scripts/migration-matrix.sh` pattern: pg_dump the integration DB → restore into a fresh container → run readiness + smoke assertions. New workflow job; then check the ROADMAP backup item. |
 | M4 | CSP hardening: remove `script-src 'unsafe-inline'` | — | Audit `frontend/index.html` + built bundle for inline scripts; move to hash/nonce or strict `'self'`; keep `style-src` decision separate (Vue inline styles). Verify with full Playwright E2E + manual admin pass. Backend: `middleware/security_headers.rs`. |
 | M5 | Gate PRs on backend integration tests | — | Currently only `push: main`/nightly (`integration.yml`). Add a paths-filtered (`backend/**`) PR trigger or a required subset; watch CI cost. |
 | M6 | Frontend coverage for the biggest surfaces | — | Bounded slices: `MessageItem.vue`, `ChannelSidebar.vue`, `useWebSocket.ts` unit tests; add a `test:coverage` script with thresholds afterwards, not before. |
 | M7 | Governance `.governance/` a2a cleanup + frontend refactor finish | — | (a) Remove stale `a2a` patterns from `.governance/protected-paths.yml` + `agent-contracts.yml` — **protected path, architectural tier, needs justification**. (b) Finish or explicitly abandon the frontend store refactor: migrate `stores/calls.ts` (1,027 lines) into `features/calls/`, delete the unwired `core/websocket/WebSocketManager.ts`, record the outcome in the refactoring notes. |
-| M8 | Ship v0.5.1 | M1 (+ #259 checklist) | Execute `docs/release-process.md` end to end: `scripts/check-release-ready.sh`, signed tag, release workflow validation. |
+| M8 | Ship v0.5.1 | ~~M1~~ **unblocked** (#88/#89/#258 closed; #259 checklist remains) | Execute `docs/release-process.md` end to end: `scripts/check-release-ready.sh`, signed tag, release workflow validation. **Next critical-path item.** |
 
 ## 5. Tier 3 — large items (design first)
 
@@ -237,10 +252,12 @@ attach the output, and close #258 so the open-issue list reflects reality.
 ## 8. Suggested order
 
 ```
-PR-1 (docs) ─┬─ parallel ─┬─ PR-2 (frontend dead code)
-             │            ├─ PR-3 (backend unwraps)
-             │            └─ PR-4 (SVG hardening)
-PR-5 (triage #88/#89) ──> M1 ──> M8 (release v0.5.1)
-close #258 (no PR)
-then M2, M3, M4, M5, M6, M7 as capacity allows; Tier 3 by spec.
+PR-1 (docs) ─┬─ parallel ─┬─ PR-2 (frontend dead code)     } all merged
+             │            ├─ PR-3 (backend unwraps)         } 2026-09-28/29
+             │            └─ PR-4 (SVG hardening)           } (#306–#312)
+PR-5 (triage #88/#89) ──> M1 ──> M8 (release v0.5.1)        } #310/#312; M1 done
+close #258 (no PR)                                            } done (live fix + #311)
+
+Remaining order: M8 (release v0.5.1, unblocked) → M2, M3, M4, M5, M6, M7 as
+capacity allows; Tier 3 by spec.
 ```
