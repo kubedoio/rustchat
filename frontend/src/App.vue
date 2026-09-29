@@ -15,7 +15,7 @@ import { useAuthStore } from './features/auth/stores/authStore'
 import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
 import ActiveCall from './components/calls/ActiveCall.vue'
 import IncomingCallModal from './components/calls/IncomingCallModal.vue'
-import { useConfigStore } from './stores/config'
+import { useConfigStore } from './features/config'
 
 const toastManagerRef = ref(null)
 const { register } = useToast()
