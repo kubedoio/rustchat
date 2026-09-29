@@ -41,7 +41,7 @@ a moving artifact may represent a merged `main` commit as **promoted/healthy**.
 | `CI Complete` | build/test integrity |
 | `Security Complete` | dependency/security integrity |
 | `dco-check` | provenance of the commit |
-| `Backend Integration Tests` | post-merge integration health (nightly, on `main`) |
+| `Backend Integration Tests` | post-merge integration health (nightly, on `main`); also runs on PRs touching `backend/**` (advisory for merge, M5) |
 
 Enforcement: `.github/workflows/promote.yml` runs `scripts/promotion-gate.sh`
 against the exact commit and refuses to advance any moving alias unless every
