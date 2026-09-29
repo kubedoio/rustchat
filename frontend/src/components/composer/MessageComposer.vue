@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { useToast } from '../../composables/useToast'
-import { useCallsStore } from '../../stores/calls'
+import { useCallsStore } from '@/features/calls'
 import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { usePreferencesStore } from '../../features/preferences/stores/preferencesStore'
 import { useWebSocket } from '../../composables/useWebSocket'

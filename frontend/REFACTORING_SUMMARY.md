@@ -84,9 +84,8 @@ frontend/src/
 └── stores/                # Legacy (deprecated)
     ├── auth.ts            # 95 lines - Deprecated
     ├── messages.ts        # 601 lines - Deprecated
-    ├── calls.ts           # 960 lines - Deprecated
     ├── channels.ts        # 195 lines - Deprecated
-    └── ...
+    └── ...                # (calls.ts migrated to features/calls/stores/callsStore.ts)
 ```
 
 ---
@@ -112,7 +111,7 @@ await authService.updateStatus({ presence: 'away' })
 ### Messages, Calls, Channels
 ```typescript
 import { messageService, useMessageStore } from '@/features/messages'
-import { callService, useCallStore } from '@/features/calls'
+import { useCallsStore } from '@/features/calls'
 import { channelService, useChannelStore } from '@/features/channels'
 ```
 
