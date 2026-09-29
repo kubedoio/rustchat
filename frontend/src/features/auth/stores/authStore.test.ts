@@ -70,7 +70,7 @@ vi.mock('../../ui/stores/uiStore', () => ({
   }),
 }))
 
-vi.mock('@/stores/calls', () => ({
+vi.mock('@/features/calls', () => ({
   useCallsStore: () => ({
     resetSessionState: resetCalls,
   }),
