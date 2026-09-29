@@ -33,7 +33,7 @@ const uiStore = reactive({
   toggleLhs: vi.fn(),
 })
 
-vi.mock('@/stores/calls', () => ({
+vi.mock('@/features/calls', () => ({
   useCallsStore: () => callsStore,
 }))
 
