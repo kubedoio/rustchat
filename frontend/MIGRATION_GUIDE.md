@@ -100,15 +100,18 @@ const messages = computed(() => messageStore.getMessages(channelId))
 
 ### If you need custom WebSocket handling
 ```typescript
-import { wsManager } from '@/core/websocket/WebSocketManager'
+import { useWebSocket } from '@/composables/useWebSocket'
 
-// Register handler
-const unsubscribe = wsManager.on('custom_event', (event) => {
-  console.log('Received:', event)
-})
+const { onEvent, offEvent } = useWebSocket()
+
+// Register handler (callback receives the event's data payload)
+const handleCustomEvent = (data) => {
+  console.log('Received:', data)
+}
+onEvent('custom_event', handleCustomEvent)
 
 // Cleanup
-onUnmounted(() => unsubscribe())
+onUnmounted(() => offEvent('custom_event', handleCustomEvent))
 ```
 
 ---
@@ -247,8 +250,7 @@ await messageService.loadOlderMessages(channelId)
 | `useMessagesStore` from `@/stores/messages` | `useMessageStore` from `@/features/messages` |
 | `useCallsStore` from `@/stores/calls` | `useCallStore` from `@/features/calls` |
 | `useChannelStore` from `@/stores/channels` | `useChannelStore` from `@/features/channels` |
-| `useWebSocket` from `@/composables/useWebSocket` | `useWebSocket` from `@/composables/useWebSocketAdapter` (temp) |
-| | `wsManager` from `@/core/websocket/WebSocketManager` (preferred) |
+| `useWebSocket` from `@/composables/useWebSocket` | unchanged — this is the live realtime layer (`core/websocket/WebSocketManager.ts` was never wired and has been deleted) |
 
 ---
 

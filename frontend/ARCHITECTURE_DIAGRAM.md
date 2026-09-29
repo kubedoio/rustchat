@@ -74,9 +74,9 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      WEBSOCKET LAYER (Real-time)                         │
 │  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │                   WebSocketManager (189 lines)                      │ │
+│  │                   useWebSocket.ts composable (realtime layer)      │ │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │ │
-│  │  │  connect()  │  │  send()     │  │   on()      │  │ state      │ │ │
+│  │  │  connect()  │  │ sendMessage()│  │  onEvent()  │  │ connected  │ │ │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘ │ │
 │  │                                                                    │ │
 │  │  Event Routing:                                                    │ │
@@ -159,7 +159,7 @@
 | Service | messageService.ts | 250 | 225 | ✅ Good |
 | Store | messageStore.ts | 300 | 270 | ✅ Good |
 | Handler | messageSocketHandlers.ts | 200 | 156 | ✅ Good |
-| WebSocket | WebSocketManager.ts | 200 | 189 | ✅ Good |
+| WebSocket | useWebSocket.ts (composable) | 200 | 999 | ⚠️ Over target |
 
 ## Key Principles
 
