@@ -96,11 +96,12 @@ function handleCreated(event: WebSocketEvent) {
 
 ### 7. Register Handler
 ```typescript
-// In app initialization
-import { wsManager } from '@/core/websocket/WebSocketManager'
+// In a component setup or app initialization
+import { useWebSocket } from '@/composables/useWebSocket'
 import { handleWebSocketEvent } from '@/features/myfeature'
 
-wsManager.on('myfeature_created', handleWebSocketEvent)
+const { onEvent, offEvent } = useWebSocket()
+onEvent('myfeature_created', handleWebSocketEvent)
 ```
 
 ---

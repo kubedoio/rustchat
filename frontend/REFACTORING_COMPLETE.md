@@ -55,10 +55,6 @@ frontend/src/
 │   │   └── retry.ts
 │   ├── types/                     # Type utilities
 │   │   └── Result.ts
-│   ├── websocket/                 # WebSocket infrastructure
-│   │   ├── WebSocketManager.ts
-│   │   ├── registerHandlers.ts
-│   │   └── index.ts
 │   └── index.ts                   # Public API
 │
 ├── features/                      # 5,020 lines
@@ -108,8 +104,7 @@ frontend/src/
 │       └── index.ts
 │
 ├── composables/
-│   ├── useWebSocket.ts            # Legacy (deprecated)
-│   └── useWebSocketAdapter.ts     # Migration adapter
+│   └── useWebSocket.ts            # Live realtime layer
 │
 ├── stores/                        # Legacy (deprecated)
 │   ├── auth.ts
@@ -190,9 +185,11 @@ const { user, login, logout } = useAuth()
 
 ### WebSocket Setup
 ```typescript
-// In main.ts
-import { registerWebSocketHandlers } from '@/core/websocket'
-registerWebSocketHandlers()
+// The realtime layer is the useWebSocket composable, which connects itself
+// once the auth token is available. Custom event handlers register through it:
+import { useWebSocket } from '@/composables/useWebSocket'
+const { onEvent } = useWebSocket()
+onEvent('posted', handlePosted)
 ```
 
 ---
