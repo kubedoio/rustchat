@@ -9,7 +9,7 @@ import type { BreadcrumbSegment } from '../../components/navigation/BreadcrumbBa
 
 import { useMessageStore } from '@/features/messages/stores/messageStore'
 import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
-import { useCallsStore } from '../../stores/calls'
+import { useCallsStore } from '@/features/calls'
 import { useWebSocket } from '../../composables/useWebSocket'
 import AppShell from '../../components/layout/AppShell.vue'
 import ChannelHeader from '../../components/channel/ChannelHeader.vue'

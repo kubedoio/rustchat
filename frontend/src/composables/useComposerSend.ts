@@ -1,7 +1,7 @@
 import { type Ref, type ComputedRef } from 'vue'
 import { useToast } from './useToast'
 import { useChannelStore } from '@/features/channels/stores/channelStore'
-import { useCallsStore } from '../stores/calls'
+import { useCallsStore } from '@/features/calls'
 import { getErrorMessage } from '@/core/errors/errorUtils'
 
 export interface SendPayload {

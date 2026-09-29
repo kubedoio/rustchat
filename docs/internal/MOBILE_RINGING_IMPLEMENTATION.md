@@ -111,7 +111,7 @@ When a user clicks the "Ring" button in the call UI:
 
 ## WebUI (Frontend) Implementation Reference
 
-The WebUI already correctly handles ringing in `frontend/src/stores/calls.ts`:
+The WebUI already correctly handles ringing in `frontend/src/features/calls/stores/callsStore.ts`:
 
 ```typescript
 onEvent('custom_com.mattermost.calls_ringing', (data) => {

@@ -84,6 +84,10 @@
       "category": "build-tool-critical",
       "reason": "Official Vite integration for Vue SFC compilation."
     },
+    "@vitest/coverage-v8": {
+      "category": "build-tool-critical",
+      "reason": "Coverage provider for the test:coverage script (M6); resolves in package-lock to exactly 4.1.11, matching vitest's locked 4.1.11 — the two packages declare exact peer ranges of each other, so lockfile resolution keeps them in sync; the manifest follows the repo's caret convention (^4.1.11). The package was already in package-lock as vitest's optional peer, and its transitive dependencies are test-tooling only (istanbul/v8-coverage libs) — no runtime dependencies."
+    },
     "@vue/test-utils": {
       "category": "build-tool-critical",
       "reason": "Vue component testing utilities used by existing frontend tests."
@@ -159,7 +163,7 @@
     "undici": {
       "reason": "Pin the transitive HTTP client to the audited safe release required by the current Node 24 toolchain.",
       "removeWhen": "The frontend dependency tree no longer requires a local undici override to satisfy the audit policy.",
-      "reviewedOn": "2026-06-19"
+      "reviewedOn": "2026-09-29"
     },
     "brace-expansion@^1": {
       "reason": "Force the transitive 1.x matcher (eslint's minimatch) to the patched 1.1.18 release.",

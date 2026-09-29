@@ -105,7 +105,7 @@ frontend/src/
 ```typescript
 // Any feature
 import { messageService, useMessageStore } from '@/features/messages'
-import { callService } from '@/features/calls'
+import { useCallsStore } from '@/features/calls'
 import { authService, useAuth } from '@/features/auth'
 import { themeService } from '@/features/theme'
 
