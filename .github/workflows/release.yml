@@ -12,7 +12,11 @@ jobs:
   gate:
     name: Release Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The gate runs with --wait (bounded 1800s default timeout) because a tag
+    # pushed shortly after merge can race required checks that are still
+    # running on the tagged commit (e.g. Security/CodeQL). Leave headroom for
+    # polling/fetch overhead on top of the wait budget.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -30,7 +34,8 @@ jobs:
             --required "CI Complete" \
             --required "Security Complete" \
             --required "dco-check" \
-            --required "Backend Integration Tests"
+            --required "Backend Integration Tests" \
+            --wait
 
   validate:
     name: Validate release
