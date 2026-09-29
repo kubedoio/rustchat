@@ -127,6 +127,31 @@ for action in \
   fi
 done
 
+# 10. Production CSP forbids inline/eval scripts, and index.html ships no
+#     inline or cross-origin <script> tags (M4 CSP hardening).
+if grep -qE "script-src[^;]*'unsafe-inline'" backend/src/middleware/security_headers.rs; then
+  fail "production CSP presets must not allow script-src 'unsafe-inline'"
+else
+  pass "production CSP presets have no script-src 'unsafe-inline'"
+fi
+
+# Any <script ...> opening tag without src= is an inline script block,
+# blocked by script-src 'self' (matches <script>, <script type="...">,
+# <script\n ...>, same-line forms).
+if grep -oE '<script[^>]*>' frontend/index.html | grep -qv 'src='; then
+  fail "frontend/index.html must not contain inline <script> blocks (CSP script-src 'self')"
+else
+  pass "frontend/index.html has no inline <script> blocks"
+fi
+
+# Script sources must be same-origin: reject http(s):// and protocol-
+# relative // (covers double- and single-quoted src attributes).
+if grep -oE '<script[^>]*>' frontend/index.html | grep -Eq "src=[\"']?(https?:)?//"; then
+  fail "frontend/index.html must not load cross-origin scripts (CSP script-src 'self')"
+else
+  pass "frontend/index.html loads no cross-origin scripts"
+fi
+
 if [[ "${ERRORS}" -eq 0 ]]; then
   echo ""
   echo "All P0 production-readiness gates passed."

@@ -47,8 +47,12 @@ impl SecurityHeadersConfig {
     pub fn strict() -> Self {
         Self {
             // Strict CSP - adjust based on your frontend needs
+            // script-src does not allow inline scripts: the frontend must
+            // not ship inline <script> blocks (the theme boot script is an
+            // external same-origin file; see frontend/public/theme-boot.js
+            // and scripts/check-p0-gates.sh).
             csp: "default-src 'self'; \
-                   script-src 'self' 'unsafe-inline'; \
+                   script-src 'self'; \
                    style-src 'self' 'unsafe-inline'; \
                    img-src 'self' data: blob: https:; \
                    font-src 'self' data:; \
@@ -277,7 +281,7 @@ where
 pub fn cors_compatible_config() -> SecurityHeadersConfig {
     SecurityHeadersConfig {
         csp: "default-src 'self'; \
-               script-src 'self' 'unsafe-inline'; \
+               script-src 'self'; \
                style-src 'self' 'unsafe-inline'; \
                img-src 'self' data: blob: https:; \
                font-src 'self' data:; \
@@ -317,6 +321,37 @@ mod tests {
         let config = SecurityHeadersConfig::development();
         assert!(!config.hsts_enabled);
         assert!(config.csp.contains("unsafe-inline"));
+    }
+
+    #[test]
+    fn test_production_presets_forbid_inline_scripts() {
+        // M4 (CSP hardening): production presets must not allow inline
+        // scripts. style-src keeps 'unsafe-inline' (Vue inline styles), so
+        // the script-src directive is parsed and checked explicitly rather
+        // than substring-matching the whole policy.
+        fn script_src_directives(csp: &str) -> Vec<&str> {
+            csp.split(';')
+                .map(str::trim)
+                .filter(|d| d.starts_with("script-src"))
+                .collect()
+        }
+        for config in [SecurityHeadersConfig::strict(), cors_compatible_config()] {
+            let directives = script_src_directives(&config.csp);
+            assert!(
+                !directives.is_empty(),
+                "preset must define a script-src directive"
+            );
+            for directive in directives {
+                assert!(
+                    !directive.contains("unsafe-inline"),
+                    "script-src must not allow unsafe-inline: {directive}"
+                );
+                assert!(
+                    !directive.contains("unsafe-eval"),
+                    "script-src must not allow unsafe-eval: {directive}"
+                );
+            }
+        }
     }
 
     #[test]
