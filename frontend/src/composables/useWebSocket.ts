@@ -447,6 +447,19 @@ export function useWebSocket() {
 
     if (ws.value?.readyState === WebSocket.OPEN) return
 
+    // A previous connect() may have left a socket still CONNECTING (or
+    // CLOSING). Detach its handlers BEFORE replacing it: the orphaned
+    // socket keeps live onclose/onerror otherwise, and its late close
+    // event would run the reconnect path and clobber the new socket's
+    // state (#320).
+    if (ws.value && ws.value.readyState !== WebSocket.OPEN) {
+      ws.value.onclose = null
+      ws.value.onerror = null
+      ws.value.onopen = null
+      ws.value.onmessage = null
+      ws.value.close()
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
     // Align with Mattermost mobile websocket endpoint semantics.
@@ -836,6 +849,13 @@ export function useWebSocket() {
     clearReconnectTimer()
     stopCountdown()
     if (ws.value) {
+      // Detach handlers BEFORE closing: a real browser still delivers a close
+      // event after a client-side close(), and the onclose handler must not
+      // run the reconnect path for an intentional disconnect (#320).
+      ws.value.onclose = null
+      ws.value.onerror = null
+      ws.value.onopen = null
+      ws.value.onmessage = null
       ws.value.close()
       ws.value = null
     }
