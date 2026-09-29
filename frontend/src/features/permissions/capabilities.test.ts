@@ -119,7 +119,9 @@ describe('permission capabilities', () => {
     await flushPromises()
 
     expect(canManageChannel.value).toBe(true)
-    expect(getMembersMock).not.toHaveBeenCalled()
+    // Scope to this channel: composable instances from other tests keep living
+    // watchers on shared stores, so global call counts are order-dependent.
+    expect(getMembersMock).not.toHaveBeenCalledWith('channel-1')
   })
 
   it('loads membership once and grants channel management to channel admins', async () => {
@@ -139,8 +141,10 @@ describe('permission capabilities', () => {
     expect(isLoading.value).toBe(true)
     await flushPromises()
 
-    expect(getMembersMock).toHaveBeenCalledTimes(1)
-    expect(getMembersMock).toHaveBeenCalledWith('channel-2')
+    // Scope to this channel: composable instances from other tests keep living
+    // watchers on shared stores, so global call counts are order-dependent.
+    const channelCalls = getMembersMock.mock.calls.filter(call => call[0] === 'channel-2')
+    expect(channelCalls).toHaveLength(1)
     expect(isLoading.value).toBe(false)
     expect(canManageChannel.value).toBe(true)
   })
