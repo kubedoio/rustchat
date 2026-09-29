@@ -12,15 +12,29 @@ const excludedFiles = new Set([
   "REORGANIZATION_SUMMARY.md",
 ]);
 
+const EXTERNAL_SCHEMES = new Set([
+  "http:",
+  "https:",
+  "mailto:",
+  "tel:",
+  "data:",
+  "javascript:",
+  "vbscript:",
+  "file:",
+]);
+
 function isExternalTarget(target) {
-  return (
-    target.startsWith("http://") ||
-    target.startsWith("https://") ||
-    target.startsWith("mailto:") ||
-    target.startsWith("tel:") ||
-    target.startsWith("data:") ||
-    target.startsWith("javascript:")
-  );
+  // Scheme classification must be robust against case, whitespace, and
+  // arbitrary scheme names (CodeQL js/incomplete-url-scheme-check). Parsing
+  // with the URL constructor is the canonical complete check: relative
+  // targets (repo-internal links) fail to parse and classify as internal,
+  // while any absolute target is classified by its lowercased protocol.
+  try {
+    const { protocol } = new URL(target);
+    return EXTERNAL_SCHEMES.has(protocol);
+  } catch {
+    return false;
+  }
 }
 
 function collectMarkdownFiles(dir) {
