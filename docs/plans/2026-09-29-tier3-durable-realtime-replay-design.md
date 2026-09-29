@@ -1,7 +1,7 @@
 # Tier 3 Design Note: Durable Realtime Replay / Outbox
 
 **Status:** draft, requesting maintainer sponsorship + design review
-(architectal tier: storage/data model + protocol compatibility).
+(architectural tier: storage/data model + protocol compatibility).
 **Date:** 2026-09-29 (rev 2 — revised after an independent design review that
 found and fixed two blockers: the `assigned_seq`/`durable_seq` invariant was
 self-contradictory with a silent-event-loss path (now §3.3 "Sequencing
@@ -9,7 +9,7 @@ invariant"), and Slice 2 overstated its deliverable (now re-scoped in §4);
 plus eight should-fixes incorporated).
 **References:** `docs/plans/2026-09-28-gap-closure-implementation-plan.md` §5.1,
 `docs/plans/2026-09-29-m2-membership-revocation-design.md` (multi-node gap),
-`.governance/risk-tiers.yml` (architectal tier: `adr_required: true`,
+`.governance/risk-tiers.yml` (architectural tier: `adr_required: true`,
 `design_review: true`, maintainer sponsorship).
 
 ---
@@ -459,7 +459,7 @@ Proposed contract (additive, keeps the existing shape):
   (`handleUnreadUpdate`/`applyPostUnread`, `unreadStore.ts:134-141`) are not
   involved in the snapshot path. Unknown `data` fields are additive; **this
   repo's frontend** currently has no `resync_required` consumer at all
-  (verified: repo-wide grep empty), so new fields cannot break it. External
+  (verified: no occurrence anywhere in frontend/src), so new fields cannot break it. External
   Mattermost clients are governed by a separate contract this repo cannot
   verify — treat "ignored harmlessly" as unproven for them, which is why the
   compat review above is mandatory rather than assumed.
@@ -705,7 +705,7 @@ entitlement replay.
 | Cluster fan-out (Redis, at-most-once) | `backend/src/realtime/cluster_broadcast.rs` |
 | Buzz transactional outbox (pattern source) | `backend/src/integrations/outbox.rs`, `buzz/dispatcher.rs:40-102`, migration `20260925000003_integration_outbox.sql` |
 | Retention-job pattern | `backend/src/jobs/retention.rs` |
-| Client resume params + seq tracking + reconnect action | `frontend/src/composables/useWebSocket.ts:60-61`, `:453-460`, `:557-560`, `:499` |
+| Client resume params + seq tracking + reconnect action | `frontend/src/composables/useWebSocket.ts:61-62`, `:453-460`, `:557-560`, `:499` |
 | Client has no `resync_required` handler | `useWebSocket.ts:571-833` (absent; repo-wide grep empty) |
 | Hello sent unconditionally first (pre-hello resync needs new mechanism) | `backend/src/api/v4/websocket/connection.rs:178` |
 | Hub forward task aborted on disconnect (no seqs assigned while detached) | `connection.rs:379-380` |
