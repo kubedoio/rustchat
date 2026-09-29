@@ -55,8 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Refactored and expanded Architecture, User, Security, and Runbook documents to detail the new AI Agents module, PGVector requirements, and optional runtime flags.
-- Retired the abandoned Buzz-pivot program: ADR-005 now records that RustChat continues as an independent product with Buzz as an optional external integration target.
-- Consolidated the documentation hierarchy: single canonical architecture overview, substantive realtime and integrations documentation, and merged development guides.
+- Retired the abandoned Buzz-pivot program: removed `docs/pivot/`, ADR-004, `scripts/pivot/`, and the pivot architecture-guard workflow; ADR-005 now records that RustChat continues as an independent product with Buzz as an optional external integration target.
+- Consolidated the documentation hierarchy: single canonical architecture overview, substantive realtime and integrations documentation, new `docs/integrations/` section (RustShare), and merged development guides (`docs/development.md` folded into `docs/development/`).
+- Corrected stale documented facts: Rust MSRV (1.95+), Node.js requirement (24+), push-proxy default port, and the distinction between source version (0.5.1) and the latest published release (v0.4.1).
 - Rewrote the roadmap around the continuing product, with verified evidence pointers for completed items.
 - Fixed repository identity drift: active project links and container registry references now point to `kubedoio/rustchat`.
 - Runtime/bootstrap architecture cleanup and dead-code removal (frontend thread-panel decomposition, legacy stores, generated artifacts).
@@ -64,12 +65,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependency refreshes across backend, frontend, push-proxy, Docker base images, and GitHub Actions (Dependabot groups).
 
 ### Removed
-- Duplicate/pointer documents: `docs/architecture.md`, `docs/architecture/architecture-overview.md`, `docs/architecture/websocket.md`, `docs/MATTERMOST_CLIENTS.md`, `docs/pivot/`, and `scripts/pivot/`.
+- Duplicate/pointer documents: `docs/architecture.md`, `docs/architecture/architecture-overview.md`, `docs/architecture/websocket.md`, `docs/MATTERMOST_CLIENTS.md`.
 - Dead frontend code: unused thread-panel decomposition, thread composer, and scaffold test.
 
 ### Known limitations
-- **Compliance export is not implemented** — the admin UI labels it "Not implemented"; there is no export endpoint.
-- **No durable realtime replay** — events missed while disconnected are not replayed on reconnect; a reload is required. A durable outbox/replay is planned.
+- **Compliance export is not implemented** — the admin UI labels it "Not implemented"; only a no-op compatibility stub exists on the backend.
+- **No durable realtime replay** — reconnect replay is in-memory and bounded (about 5 minutes / last 128 messages per connection); events missed beyond that window, or across a server restart, are not recovered and require a reload. A durable outbox/replay is planned.
 - **Message sending is not idempotent across reconnects** — `client_msg_id` is sent by the frontend but not yet enforced server-side.
 - **CSP still allows `script-src 'unsafe-inline'`** for the frontend bundle; hardening is planned.
 - **The UI is English-only** — no i18n layer exists yet.

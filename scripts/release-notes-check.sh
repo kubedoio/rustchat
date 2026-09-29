@@ -36,9 +36,11 @@ fi
 SECTION_CONTENT=$(awk "/^## \[${VERSION}\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md | grep -v '^[[:space:]]*$' || true)
 if [[ -n "${SECTION_CONTENT}" ]]; then
   echo "OK: [${VERSION}] section has content"
-else
+elif grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
   echo "ERROR: [${VERSION}] section is empty"
   ERRORS=$((ERRORS + 1))
+else
+  echo "SKIP: [${VERSION}] section not present, already reported above"
 fi
 
 # 3. [Unreleased] is empty
