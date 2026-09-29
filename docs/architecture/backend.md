@@ -14,7 +14,6 @@ The backend is built with:
 
 ```
 backend/src/
-├── a2a/              # Agent-to-agent communication layer
 ├── api/              # HTTP handlers (including v1/agents.rs)
 │   ├── v1/          # Native API
 │   └── v4/          # Mattermost-compatible API

@@ -38,7 +38,6 @@ listed user must approve. The repository review policy is defined by
 | `backend/src/auth/**` | `@senolcolak` | `backend-agent` ⚠️ explicit approval | elevated |
 | `backend/src/api/v4/**` | `@senolcolak` + `@zoorpha` | `backend-agent` ⚠️ compat review | elevated |
 | `backend/src/mattermost_compat/**` | `@senolcolak` + `@zoorpha` | `backend-agent` ⚠️ compat review | elevated |
-| `backend/src/a2a/**` | `@senolcolak` | `backend-agent` ⚠️ senior review | elevated |
 | `backend/src/realtime/**` | `@senolcolak` | `backend-agent` | elevated |
 | `backend/src/integrations/**` | `@senolcolak` | bounded backend work only; architectural review required | architectural |
 | `backend/migrations/**` | `@senolcolak` | `backend-agent` | elevated |

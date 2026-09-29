@@ -64,7 +64,7 @@ To create a new AI Agent, navigate to **Admin Console > AI Agents** and click **
 
 ---
 
-Agents are stored as normal RustChat users with `entity_type = 'agent'`. They appear in channel membership lists and post authorship using their configured profiles. If your deployment uses external agent calls or agent-to-agent (a2a) communication, you can retrieve the agent's generated API key from the agent detail view.
+Agents are stored as normal RustChat users with `entity_type = 'agent'`. They appear in channel membership lists and post authorship using their configured profiles. If your deployment uses external agent calls, you can retrieve the agent's generated API key from the agent detail view.
 
 ## Assign Agents to Channels
 
