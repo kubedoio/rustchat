@@ -408,8 +408,9 @@ If the container is running as `root`, check `docker/frontend.Dockerfile` for th
 ### Backup Procedures
 
 ```bash
-# Database backup
-pg_dump $RUSTCHAT_DATABASE_URL | gzip > rustchat_backup_$(date +%Y%m%d).sql.gz
+# Database backup (custom format — the format the restore procedure and the
+# CI backup/restore check below are validated against)
+pg_dump -Fc "$RUSTCHAT_DATABASE_URL" -f rustchat_backup_$(date +%Y%m%d).dump
 
 # Redis backup (if using persistence)
 redis-cli BGSAVE
@@ -418,6 +419,37 @@ redis-cli BGSAVE
 cp .env .env.backup_$(date +%Y%m%d)
 ```
 
+### Restore Procedure and Verification
+
+Restore the custom-format dump into a **fresh database**, never over the
+live one:
+
+```bash
+# 1. Create the target database
+createdb -T template0 rustchat_restored
+
+# 2. Restore the dump
+pg_restore --no-owner --no-privileges -d rustchat_restored rustchat_backup_YYYYMMDD.dump
+
+# 3. Point the deployment at the restored database (or rename it into place
+#    during a maintenance window), then restart the backend.
+```
+
+This exact path (custom-format `pg_dump -Fc` → `pg_restore` into a fresh
+database) is continuously verified in CI: the **Backup Restore** job runs
+`scripts/backup-restore-check.sh` on every change to the schema or the
+script. It applies all migrations, seeds representative data, dumps,
+restores into a fresh database, and asserts that schema objects (tables,
+columns, indexes, constraints, sequences, views, triggers, enums,
+extensions, functions), sqlx migration bookkeeping, row counts, content
+checksums, and referential integrity are all identical after the round
+trip. A green run is standing evidence that the backup format restores
+cleanly for the current schema.
+
+After any manual restore, run the same verification against the restored
+database by diffing a fresh dump of it against a dump taken before the
+incident, or re-run `scripts/backup-restore-check.sh` (it never touches
+`DATABASE_URL`; see its header for connection variables).
 ### AI Agent Maintenance
 
 ```bash

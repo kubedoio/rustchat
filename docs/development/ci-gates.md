@@ -27,7 +27,7 @@ stable required status-check contexts:
 
 | Context | Workflow | Proven property |
 |---|---|---|
-| `CI Complete` | `ci.yml` (aggregate) | backend/frontend/push-proxy build, lint, unit, e2e, docker validate, release build, migration matrix (RI-C07) |
+| `CI Complete` | `ci.yml` (aggregate) | backend/frontend/push-proxy build, lint, unit, e2e, docker validate, release build, migration matrix (RI-C07), backup/restore evidence (P006 recovery) |
 | `Security Complete` | `security.yml` (aggregate) | CodeQL, cargo-audit, cargo-deny, npm-audit (high), dependency-review |
 | `dco-check` | `dco.yml` | every commit signed off per DCO |
 
@@ -69,6 +69,16 @@ job: `Migration Matrix` in `ci.yml` runs `scripts/migration-matrix.sh` on every
 change to `backend/migrations/**`, proving empty→HEAD and
 latest-published-stable→HEAD convergence with repository-critical column
 readiness checks.
+
+Backup/restore recovery evidence (P006) is likewise continuously proven: the
+`Backup Restore` job in `ci.yml` runs `scripts/backup-restore-check.sh` on
+every change to `backend/migrations/**`, the script, or the CI workflow. It
+applies all
+migrations, seeds representative data, takes a custom-format `pg_dump`,
+restores it into a fresh database, and asserts that schema objects, sqlx
+migration bookkeeping, row counts, content checksums, and referential
+integrity are identical after the round trip — the same procedure documented
+for operators in `docs/operations/runbook.md`.
 
 ## Verification
 
