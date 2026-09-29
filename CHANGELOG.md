@@ -7,29 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- Retired the abandoned Buzz-pivot program: removed `docs/pivot/`, ADR-004, `scripts/pivot/`, and the pivot architecture-guard workflow; ADR-005 now records that RustChat continues as an independent product with Buzz as an optional external integration target.
-- Consolidated the documentation hierarchy: single canonical architecture overview, substantive realtime and integrations documentation, new `docs/integrations/` section (RustShare), and merged development guides (`docs/development.md` folded into `docs/development/`).
-- Rewrote the roadmap around the continuing product.
-- Fixed repository identity drift: active project links and container registry references now point to `kubedoio/rustchat`.
-- Corrected stale documented facts: Rust MSRV (1.95+), Node.js requirement (24+), push-proxy default port, and the distinction between source version (0.5.1) and the latest published release (v0.4.1).
-
-### Removed
-- Duplicate/pointer documents: `docs/architecture.md`, `docs/architecture/architecture-overview.md`, `docs/architecture/websocket.md`, `docs/MATTERMOST_CLIENTS.md`.
-
 ## [0.5.1] - 2026-06-19
 
-### Added
-- AI Agents & Ecosystem feature support: Channel-participant AI agents with LLM providers (GPT models), optional tools integration (Tavily search), pgvector search for RAG knowledge bases, RustShare sync sources, and user feedback tracking (thumbs up/down).
-- Comprehensive AI Agents administration documentation and runtime integration guidance.
-- Standard Bot accounts creation and management documentation.
-- Docker Compose quickstart troubleshooting tips and S3 private bucket security configuration guidance.
-
-### Changed
-- Refactored and expanded Architecture, User, Security, and Runbook documents to detail the new AI Agents module, PGVector requirements, and optional runtime flags.
-
-### Fixed
-- Include `client_msg_id` in v1 channel posts list queries so message history loads instead of returning HTTP 500.
+> Note: `0.5.1` has been the source-tree version since 2026-06-19. This section
+> was consolidated on 2026-09-29 from all changes merged since then, ahead of
+> the release.
 
 ### Security
 - Default environment is now `production`; permissive development CORS is gated by `RUSTCHAT_ALLOW_DEV_CORS` and rejected in production.
@@ -38,6 +20,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Outgoing webhook and slash-command URLs are validated at creation time and resolved/validated at request time, with redirects disabled, to prevent DNS-rebinding SSRF.
 - Retention cleanup now deletes S3 objects and includes an optional orphan scanner configured by `RUSTCHAT_RETENTION_ORPHAN_SCAN_*` environment variables.
 - Frontend container now runs as the non-root `rustchat` user.
+- Email notification bodies now HTML-escape user-controlled content (HTML injection).
+- Single-use tokens (invites/password resets) are race-safe; login throttling counts only failed attempts and no longer trusts spoofable proxy IP headers.
+- Admin operations are restricted by a role allowlist; retention cleanup runs are bounded.
+- OIDC account linking now requires a verified email address.
+- Per-user agent trigger limits and an agent-to-agent loop guard bound runaway AI-agent execution.
+- Development Docker Compose services bind to loopback by default instead of all interfaces.
+- SVG upload screening hardened: general event-handler pattern, active URI schemes (`javascript:`/`data:`), SMIL `href` rewrites, remote `style` `url()` fetches, `<!ENTITY>` declarations, and whitespace/namespaced-element bypasses are all rejected.
+- `quinn-proto` updated to 0.11.15 (RUSTSEC-2026-0185); all other outstanding Dependabot security findings cleared.
+
+### Fixed
+- Include `client_msg_id` in v1 channel posts list queries so message history loads instead of returning HTTP 500.
+- Channel names are validated and empty-state copy improved.
+- Realtime hub drops empty user index entries and logs dropped broadcasts instead of silently losing them.
+- Push notifications contain the real `post_id`, redact push tokens from logs, and truncate at character boundaries.
+- Push proxy refreshes APNS JWTs before expiry and caps nonce tracking.
+- Calls register participants recovered via the channel-membership fallback.
+- Keycloak/IdP group sync converges roles to the union of active grants (downgrades take effect), survives dangling syncables, and unlink is atomic and serialized against concurrent reconciles.
+- Upload sessions are capped per user and purged when expired (database bloat).
+- SMTP send time is bounded; the RAG chunker rejects degenerate overlap; `MIGRATIONS_DIR` resolves correctly.
+- Knowledge uploads verify content types; mention highlighting no longer corrupts links; RustShare downloads are bounded; email sending recovers from crashes.
+- Admin audit-dashboard JSON export downloads the actual entries (it previously saved `{}` because a Blob was serialized) and no longer fails with 400 on filtered exports; the dashboard is relabeled honestly as "Membership Policy Audit".
+- Production `unwrap()` calls removed from the hybrid-search sort and security-header construction (fail-fast at startup with the offending field named instead).
+- Repository-integrity and CI gate regressions repaired (promotion-gate pagination, migration-matrix append-only guard, CodeQL toolchain handling).
+
+### Added
+- AI Agents & Ecosystem feature support: Channel-participant AI agents with LLM providers (GPT models), optional tools integration (Tavily search), pgvector search for RAG knowledge bases, RustShare sync sources, and user feedback tracking (thumbs up/down).
+- Comprehensive AI Agents administration documentation and runtime integration guidance.
+- Standard Bot accounts creation and management documentation.
+- Docker Compose quickstart troubleshooting tips and S3 private bucket security configuration guidance.
+- Repository-integrity program with CI enforcement: migration-upgrade-proof matrix (RI-C07), module-growth control (RI-C05), direct-SQL baseline with tripwire guard (RI-C04), and live branch-protection verification via `scripts/verify-protection.sh` (RI-C02).
+- Buzz integration as an optional, isolated external bridge (`docs/integrations/`).
+- Release-readiness tooling: `scripts/check-release-ready.sh` and `scripts/release-notes-check.sh`.
+
+### Changed
+- Refactored and expanded Architecture, User, Security, and Runbook documents to detail the new AI Agents module, PGVector requirements, and optional runtime flags.
+- Retired the abandoned Buzz-pivot program: ADR-005 now records that RustChat continues as an independent product with Buzz as an optional external integration target.
+- Consolidated the documentation hierarchy: single canonical architecture overview, substantive realtime and integrations documentation, and merged development guides.
+- Rewrote the roadmap around the continuing product, with verified evidence pointers for completed items.
+- Fixed repository identity drift: active project links and container registry references now point to `kubedoio/rustchat`.
+- Runtime/bootstrap architecture cleanup and dead-code removal (frontend thread-panel decomposition, legacy stores, generated artifacts).
+- CI moved to `ubuntu-latest` runners and merge/promotion/release gate integrity restored.
+- Dependency refreshes across backend, frontend, push-proxy, Docker base images, and GitHub Actions (Dependabot groups).
+
+### Removed
+- Duplicate/pointer documents: `docs/architecture.md`, `docs/architecture/architecture-overview.md`, `docs/architecture/websocket.md`, `docs/MATTERMOST_CLIENTS.md`, `docs/pivot/`, and `scripts/pivot/`.
+- Dead frontend code: unused thread-panel decomposition, thread composer, and scaffold test.
+
+### Known limitations
+- **Compliance export is not implemented** — the admin UI labels it "Not implemented"; there is no export endpoint.
+- **No durable realtime replay** — events missed while disconnected are not replayed on reconnect; a reload is required. A durable outbox/replay is planned.
+- **Message sending is not idempotent across reconnects** — `client_msg_id` is sent by the frontend but not yet enforced server-side.
+- **CSP still allows `script-src 'unsafe-inline'`** for the frontend bundle; hardening is planned.
+- **The UI is English-only** — no i18n layer exists yet.
 
 ## [0.5.0] - 2026-06-10
 
