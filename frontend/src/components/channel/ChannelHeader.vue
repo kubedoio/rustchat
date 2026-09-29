@@ -15,7 +15,7 @@ import {
   PanelLeft,
 } from 'lucide-vue-next'
 import { ref, computed } from 'vue'
-import { useCallsStore } from '../../stores/calls'
+import { useCallsStore } from '@/features/calls'
 import { useChannelStore } from '@/features/channels/stores/channelStore'
 import { useAuthStore } from '../../features/auth/stores/authStore'
 import { useUIStore } from '../../features/ui/stores/uiStore'

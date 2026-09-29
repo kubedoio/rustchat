@@ -29,10 +29,9 @@ const callsStore = useCallsStore()
 await callsStore.startCall(channelId)
 
 // NEW
-import { callService } from '@/features/calls'
-import { useCallStore } from '@/features/calls'
-const callStore = useCallStore()
-await callService.startCall(channelId)
+import { useCallsStore } from '@/features/calls'
+const callsStore = useCallsStore()
+await callsStore.startCall(channelId)
 ```
 
 ### Channels
@@ -248,7 +247,7 @@ await messageService.loadOlderMessages(channelId)
 | Old Import | New Import |
 |------------|------------|
 | `useMessagesStore` from `@/stores/messages` | `useMessageStore` from `@/features/messages` |
-| `useCallsStore` from `@/stores/calls` | `useCallStore` from `@/features/calls` |
+| `useCallsStore` from `@/stores/calls` | `useCallsStore` from `@/features/calls` (path only; store id and export name unchanged) |
 | `useChannelStore` from `@/stores/channels` | `useChannelStore` from `@/features/channels` |
 | `useWebSocket` from `@/composables/useWebSocket` | unchanged — this is the live realtime layer (`core/websocket/WebSocketManager.ts` was never wired and has been deleted) |
 
