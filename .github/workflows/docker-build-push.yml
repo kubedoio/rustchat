@@ -38,10 +38,19 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Least privilege by default for the whole workflow; the image-publishing
+# job below grants itself the additional packages:write it functionally
+# requires (pushing to GHCR).
+permissions:
+  contents: read
+
 jobs:
   build-and-push:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      packages: write
 
     strategy:
       fail-fast: false
