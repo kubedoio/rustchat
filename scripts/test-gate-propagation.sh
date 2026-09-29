@@ -205,6 +205,120 @@ env GITHUB_TOKEN=test PROMOTION_GATE_HTTP="${MP_FIXTURE_DIR}/http.sh" \
   >/dev/null 2>&1 && bad "promotion: page-2 failure blocked promotion (exit 0)" \
   || ok "promotion: page-2 failure blocks promotion"
 
+# ---------- 4. Promotion gate bounded wait mode (--wait) ----------
+# The promote workflow triggers via workflow_run as soon as Integration Tests
+# completes, but other required checks (e.g. Security/CodeQL) may still be
+# running on the same commit. With --wait the gate must distinguish "not
+# finished yet" from "failed": pending checks are re-fetched until they settle
+# or the timeout budget is exhausted; real failures fail immediately.
+
+W_FIXTURE_DIR="$(mktemp -d)"
+trap 'rm -rf "${W_FIXTURE_DIR}" "${MP_FIXTURE_DIR}" "${FIXTURE_DIR}"' EXIT
+
+# Fixture shim returning a different payload per invocation (counter file),
+# simulating check-runs appearing/completing between polls. Fixture selection
+# is controlled per case via W_FIRST / W_REST environment variables.
+cat > "${W_FIXTURE_DIR}/http-counter.sh" <<'SH'
+#!/usr/bin/env bash
+count_file="${W_COUNTER_FILE}"
+n="$(cat "${count_file}" 2>/dev/null || echo 0)"
+n=$((n + 1))
+echo "${n}" > "${count_file}"
+case "${n}" in
+  1) cat "${W_FIRST}" ;;
+  *) cat "${W_REST}" ;;
+esac
+SH
+chmod +x "${W_FIXTURE_DIR}/http-counter.sh"
+
+wait_run() {
+  # wait_run <counter-file> <first-fixture> <rest-fixture> <extra gate args...>
+  local counter="$1"; shift
+  local first="$1"; shift
+  local rest="$1"; shift
+  rm -f "${counter}"
+  env GITHUB_TOKEN=test PROMOTION_GATE_HTTP="${W_FIXTURE_DIR}/http-counter.sh" \
+    W_COUNTER_FILE="${counter}" W_FIRST="${first}" W_REST="${rest}" \
+    "${PROMO}" --repo org/repo --sha abc --token test "${REQ[@]}" \
+    --wait --wait-interval 1 --wait-timeout 3 "$@" \
+    >"${W_FIXTURE_DIR}/out.log" 2>&1
+}
+
+# (a) First fetch is missing a check-run, second fetch is complete+success:
+# the gate must wait and then PASS.
+if wait_run "${W_FIXTURE_DIR}/c-a" \
+     "${FIXTURE_DIR}/missing.json" "${FIXTURE_DIR}/all_green.json"; then
+  ok "wait: missing-then-green check-run -> promotion allowed"
+else
+  bad "wait: missing-then-green check-run (exit $?)"
+fi
+fetches="$(cat "${W_FIXTURE_DIR}/c-a")"
+if [[ "${fetches}" -ge 2 ]]; then
+  ok "wait: missing-then-green re-fetched check-runs (${fetches} fetches)"
+else
+  bad "wait: missing-then-green did not re-fetch (${fetches} fetches)"
+fi
+
+# (b) A completed-with-failure check must FAIL immediately, without further
+# fetches (no waiting on real failures).
+if wait_run "${W_FIXTURE_DIR}/c-b" \
+     "${FIXTURE_DIR}/integration_failed.json" "${FIXTURE_DIR}/all_green.json"; then
+  bad "wait: completed failure blocked promotion (exit 0)"
+else
+  ok "wait: completed failure -> moving alias blocked immediately"
+fi
+fetches="$(cat "${W_FIXTURE_DIR}/c-b")"
+if [[ "${fetches}" -eq 1 ]]; then
+  ok "wait: completed failure fetched exactly once (no waiting)"
+else
+  bad "wait: completed failure kept fetching (${fetches} fetches)"
+fi
+
+# (c) A never-completing check plus a tiny --wait-timeout must FAIL with a
+# clear timeout message. Both flavors of "not finished yet": a check-run stuck
+# in_progress and a check-run that never appears.
+if wait_run "${W_FIXTURE_DIR}/c-c1" \
+     "${FIXTURE_DIR}/integration_pending.json" "${FIXTURE_DIR}/integration_pending.json"; then
+  bad "wait: never-completing in_progress check blocked promotion (exit 0)"
+else
+  ok "wait: never-completing in_progress check -> moving alias blocked"
+fi
+if grep -q "timed out waiting for Backend Integration Tests" "${W_FIXTURE_DIR}/out.log"; then
+  ok "wait: in_progress timeout reports timed-out check name"
+else
+  bad "wait: in_progress timeout message missing check name"
+fi
+
+if wait_run "${W_FIXTURE_DIR}/c-c2" \
+     "${FIXTURE_DIR}/missing.json" "${FIXTURE_DIR}/missing.json"; then
+  bad "wait: never-appearing check blocked promotion (exit 0)"
+else
+  ok "wait: never-appearing check -> moving alias blocked"
+fi
+if grep -q "timed out waiting for Backend Integration Tests" "${W_FIXTURE_DIR}/out.log"; then
+  ok "wait: never-appearing timeout reports timed-out check name"
+else
+  bad "wait: never-appearing timeout message missing check name"
+fi
+
+# (d) --wait-interval 0 must be clamped to a 1s floor. The wait loop clamps
+# each sleep to the remaining budget, so a zero interval would leave `waited`
+# stuck at 0 and the loop would poll unbounded without ever timing out
+# (review reproduction: 92 fetches in 6s). The extra args below override
+# wait_run's default --wait-interval/--wait-timeout (later flags win).
+clamp_rc=0
+wait_run "${W_FIXTURE_DIR}/c-d" \
+  "${FIXTURE_DIR}/integration_pending.json" "${FIXTURE_DIR}/integration_pending.json" \
+  --wait-interval 0 --wait-timeout 2 || clamp_rc=$?
+fetches="$(cat "${W_FIXTURE_DIR}/c-d" 2>/dev/null || echo 0)"
+if [[ "${clamp_rc}" -eq 1 ]] \
+   && grep -q "timed out waiting for Backend Integration Tests" "${W_FIXTURE_DIR}/out.log" \
+   && [[ "${fetches}" -le 3 ]]; then
+  ok "wait: --wait-interval 0 clamped to 1s floor (timed out cleanly, ${fetches} fetches)"
+else
+  bad "wait: --wait-interval 0 not clamped (exit ${clamp_rc}, ${fetches} fetches)"
+fi
+
 echo ""
 echo "gate-propagation tests: ${PASS} passed, ${FAIL} failed"
 [[ "${FAIL}" -eq 0 ]]
