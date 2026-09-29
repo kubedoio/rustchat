@@ -31,10 +31,6 @@ paths:
     min_tier: elevated
     reason: "Compatibility analysis tooling"
 
-  - pattern: "backend/src/a2a/**"
-    min_tier: elevated
-    reason: "Agent-to-agent communication layer"
-
   - pattern: ".github/CODEOWNERS"
     min_tier: elevated
     reason: "Ownership changes affect review routing"
