@@ -79,8 +79,7 @@ frontend/src/
 │   └── notifications/     📁 Skeleton
 │
 ├── composables/
-│   ├── useWebSocket.ts         # Legacy (668 lines)
-│   └── useWebSocketAdapter.ts  # New adapter
+│   └── useWebSocket.ts         # Live realtime layer (999 lines)
 │
 └── stores/                # Legacy (deprecated)
     ├── auth.ts            # 95 lines - Deprecated
