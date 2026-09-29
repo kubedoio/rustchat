@@ -104,7 +104,9 @@ export const useConfigStore = defineStore('configStore', () => {
           ...siteConfig.value,
           ...config,
         }
-      } else if (data.category === 'authentication') {
+      } else if (data.category === 'authentication' && authConfig.value) {
+        // Only merge auth updates once an auth config has been loaded; otherwise a
+        // partial payload would replace the null placeholder with incomplete data.
         authConfig.value = { ...authConfig.value, ...config } as AuthConfig
       }
     })

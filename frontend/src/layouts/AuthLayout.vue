@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useConfigStore } from '../stores/config'
+import { useConfigStore } from '../features/config'
 const configStore = useConfigStore()
 
 const siteName = computed(() => configStore.siteConfig.site_name || 'RustChat')
