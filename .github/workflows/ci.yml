@@ -36,6 +36,7 @@ jobs:
       push-proxy: ${{ steps.filter.outputs.push-proxy }}
       scripts: ${{ steps.filter.outputs.scripts }}
       migrations: ${{ steps.filter.outputs.migrations }}
+      backup: ${{ steps.filter.outputs.backup }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -65,6 +66,10 @@ jobs:
             migrations:
               - 'backend/migrations/**'
               - 'scripts/migration-matrix.sh'
+              - '.github/workflows/ci.yml'
+            backup:
+              - 'backend/migrations/**'
+              - 'scripts/backup-restore-check.sh'
               - '.github/workflows/ci.yml'
 
   backend-check:
@@ -490,10 +495,41 @@ jobs:
           PGUSER: postgres
         run: scripts/migration-matrix.sh
 
+  backup-restore:
+    name: Backup Restore
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.backup == 'true' }}
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          # Trust auth for the throwaway CI database: no credentials exist
+          # to leak (the service is only reachable from the job runner).
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Run backup/restore check (P006 recovery evidence)
+        env:
+          PGPORT: "5433"
+          PGUSER: postgres
+        run: scripts/backup-restore-check.sh
+
   ci-complete:
     name: CI Complete
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release, repo-integrity, migration-matrix]
+    needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release, repo-integrity, migration-matrix, backup-restore]
     if: always()
     timeout-minutes: 5
     steps:
@@ -512,6 +548,7 @@ jobs:
           BUILD_RELEASE_RESULT: ${{ needs.build-release.result }}
           REPO_INTEGRITY_RESULT: ${{ needs.repo-integrity.result }}
           MIGRATION_MATRIX_RESULT: ${{ needs.migration-matrix.result }}
+          BACKUP_RESTORE_RESULT: ${{ needs.backup-restore.result }}
         run: >-
           scripts/ci-aggregate.sh
           DETECT_CHANGES_RESULT
@@ -524,3 +561,4 @@ jobs:
           BUILD_RELEASE_RESULT
           REPO_INTEGRITY_RESULT
           MIGRATION_MATRIX_RESULT
+          BACKUP_RESTORE_RESULT

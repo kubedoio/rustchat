@@ -66,7 +66,14 @@ Priorities:
       coverage.
 - [ ] **Migration upgrade matrix** — Prove empty→latest and latest published
       stable→latest upgrades with application readiness evidence.
-- [ ] **Backup & restore** — Documented and tested data protection procedures.
+- [x] **Backup & restore** — Documented and tested data protection procedures.
+      (Documented: docs/operations/runbook.md "Backup Procedures" and
+      "Restore Procedure and Verification". Tested: the CI **Backup Restore**
+      job runs `scripts/backup-restore-check.sh` on schema/script changes,
+      proving a custom-format `pg_dump` restores into a fresh database with
+      identical schema objects, sqlx migration bookkeeping, row counts,
+      content checksums, and referential integrity. Production backup
+      scheduling remains operator-side.)
 - [ ] **Observability** — Structured metrics, health checks, and alerting
       guides.
 - [ ] **Search improvements** — Better indexing, filtering, and performance.
