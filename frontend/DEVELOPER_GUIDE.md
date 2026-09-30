@@ -110,7 +110,11 @@ import type { MyFeatureEvent } from '@/features/myfeature'
 
 const { onEvent, offEvent } = useWebSocket()
 // The listener receives `unknown`; narrow it to the feature event type
-onEvent('myfeature_created', (data) => handleWebSocketEvent(data as MyFeatureEvent))
+const listener = (data: unknown) => handleWebSocketEvent(data as MyFeatureEvent)
+onEvent('myfeature_created', listener)
+
+// On teardown (e.g. in onUnmounted) — pass the same reference:
+offEvent('myfeature_created', listener)
 ```
 
 ---
