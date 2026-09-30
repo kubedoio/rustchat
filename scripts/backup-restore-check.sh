@@ -51,7 +51,7 @@ SRC_DB="rc_backup_src_${STAMP}"
 DST_DB="rc_backup_restore_${STAMP}"
 WORK_DIR="$(mktemp -d)"
 DUMP_FILE="${WORK_DIR}/rustchat_backup.dump"
-trap 'rm -rf "${WORK_DIR}"; ${PSQL[@]} postgres -c "DROP DATABASE IF EXISTS \"${SRC_DB}\";" >/dev/null 2>&1 || true; ${PSQL[@]} postgres -c "DROP DATABASE IF EXISTS \"${DST_DB}\";" >/dev/null 2>&1 || true' EXIT
+trap 'rm -rf "${WORK_DIR}"; "${PSQL[@]}" postgres -c "DROP DATABASE IF EXISTS \"${SRC_DB}\";" >/dev/null 2>&1 || true; "${PSQL[@]}" postgres -c "DROP DATABASE IF EXISTS \"${DST_DB}\";" >/dev/null 2>&1 || true' EXIT
 
 fail() { echo "backup-restore-check: FAIL: $*" >&2; exit 1; }
 note() { echo "backup-restore-check: $*"; }
@@ -98,11 +98,11 @@ collect_facts() {
   local t v
   {
     echo "== tables"
-    ${PSQL[@]} "$db" -tAc "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1"
+    "${PSQL[@]}" "$db" -tAc "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1"
     echo "== columns"
-    ${PSQL[@]} "$db" -tAc "SELECT table_name||':'||column_name||':'||udt_name||':'||is_nullable FROM information_schema.columns WHERE table_schema='public' ORDER BY 1"
+    "${PSQL[@]}" "$db" -tAc "SELECT table_name||':'||column_name||':'||udt_name||':'||is_nullable FROM information_schema.columns WHERE table_schema='public' ORDER BY 1"
     echo "== indexes"
-    ${PSQL[@]} "$db" -tAc "
+    "${PSQL[@]}" "$db" -tAc "
       SELECT t.relname||':'||ix.relname||':'||i.indisunique||':'||i.indisprimary||':'||
              (SELECT string_agg(a.attname,',' ORDER BY x.ord) FROM unnest(i.indkey) WITH ORDINALITY x(attnum,ord)
               JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=x.attnum)
@@ -112,7 +112,7 @@ collect_facts() {
       JOIN pg_namespace n ON n.oid=t.relnamespace
       WHERE n.nspname='public' ORDER BY 1"
     echo "== constraints"
-    ${PSQL[@]} "$db" -tAc "
+    "${PSQL[@]}" "$db" -tAc "
       SELECT c.conname||':'||c.contype::text||':'||c.conrelid::regclass::text||':'||
              COALESCE((SELECT string_agg(a.attname,',' ORDER BY x.ord) FROM unnest(c.conkey) WITH ORDINALITY x(attnum,ord)
                        JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=x.attnum),'')||':'||
@@ -123,36 +123,36 @@ collect_facts() {
       FROM pg_constraint c
       WHERE c.connamespace='public'::regnamespace ORDER BY 1"
     echo "== sequences"
-    ${PSQL[@]} "$db" -tAc "SELECT sequencename FROM pg_sequences WHERE schemaname='public' ORDER BY 1"
+    "${PSQL[@]}" "$db" -tAc "SELECT sequencename FROM pg_sequences WHERE schemaname='public' ORDER BY 1"
     echo "== views"
-    ${PSQL[@]} "$db" -tAc "SELECT viewname FROM pg_views WHERE schemaname='public' ORDER BY 1"
+    "${PSQL[@]}" "$db" -tAc "SELECT viewname FROM pg_views WHERE schemaname='public' ORDER BY 1"
     echo "== triggers"
-    ${PSQL[@]} "$db" -tAc "SELECT tgname||':'||c.relname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY 1"
+    "${PSQL[@]}" "$db" -tAc "SELECT tgname||':'||c.relname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY 1"
     echo "== enums"
-    ${PSQL[@]} "$db" -tAc "SELECT t.typname||':'||string_agg(e.enumlabel,',' ORDER BY e.enumsortorder) FROM pg_type t JOIN pg_enum e ON e.enumtypid=t.oid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' GROUP BY t.typname ORDER BY 1"
+    "${PSQL[@]}" "$db" -tAc "SELECT t.typname||':'||string_agg(e.enumlabel,',' ORDER BY e.enumsortorder) FROM pg_type t JOIN pg_enum e ON e.enumtypid=t.oid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' GROUP BY t.typname ORDER BY 1"
     echo "== extensions"
-    ${PSQL[@]} "$db" -tAc "SELECT extname||':'||extversion FROM pg_extension ORDER BY 1"
+    "${PSQL[@]}" "$db" -tAc "SELECT extname||':'||extversion FROM pg_extension ORDER BY 1"
     echo "== functions"
-    ${PSQL[@]} "$db" -tAc "SELECT DISTINCT proname||':'||oidvectortypes(p.proargtypes) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' ORDER BY 1"
+    "${PSQL[@]}" "$db" -tAc "SELECT DISTINCT proname||':'||oidvectortypes(p.proargtypes) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' ORDER BY 1"
     echo "== migrations"
-    ${PSQL[@]} "$db" -tAc "SELECT version||':'||encode(checksum,'hex') FROM _sqlx_migrations ORDER BY version"
+    "${PSQL[@]}" "$db" -tAc "SELECT version||':'||encode(checksum,'hex') FROM _sqlx_migrations ORDER BY version"
     echo "== row counts"
     for t in "${SEED_TABLES[@]}"; do
       # Captured with explicit failure propagation: a command substitution
       # inside echo would mask a failed query (e.g. after a future column
       # rename) on BOTH databases and silently compare two empty values.
-      v="$(${PSQL[@]} "$db" -tAc "SELECT count(*) FROM ${t}")" \
+      v="$("${PSQL[@]}" "$db" -tAc "SELECT count(*) FROM ${t}")" \
         || fail "row-count fact query failed for ${t} (${db})"
       echo "${t}=${v}"
     done
     echo "== content checksums"
     for t in "${SEED_TABLES[@]}"; do
-      v="$(${PSQL[@]} "$db" -tAc "SELECT coalesce(md5(string_agg(md5(t::text),'' ORDER BY md5(t::text))),'empty') FROM ${t} t")" \
+      v="$("${PSQL[@]}" "$db" -tAc "SELECT coalesce(md5(string_agg(md5(t::text),'' ORDER BY md5(t::text))),'empty') FROM ${t} t")" \
         || fail "content-checksum fact query failed for ${t} (${db})"
       echo "${t}=${v}"
     done
     echo "== fk integrity (dangling child rows)"
-    ${PSQL[@]} "$db" -tAc "
+    "${PSQL[@]}" "$db" -tAc "
       SELECT fk||'='||dangling FROM (VALUES
         ('team_members->teams',      (SELECT count(*) FROM team_members c LEFT JOIN teams p ON p.id=c.team_id WHERE p.id IS NULL)),
         ('team_members->users',      (SELECT count(*) FROM team_members c LEFT JOIN users p ON p.id=c.user_id WHERE p.id IS NULL)),
@@ -172,10 +172,10 @@ collect_facts() {
 # TEMPLATE template0 matches the documented operator procedure
 # (createdb -T template0 in docs/operations/runbook.md): a pristine base,
 # immune to local template1 customization.
-${PSQL[@]} postgres -c "CREATE DATABASE \"${SRC_DB}\" TEMPLATE template0;" >/dev/null
+"${PSQL[@]}" postgres -c "CREATE DATABASE \"${SRC_DB}\" TEMPLATE template0;" >/dev/null
 MIGRATION_COUNT=0
 for f in $(ls "${MIGRATIONS_DIR}"/*.sql | sort); do
-  ${PSQL[@]} "${SRC_DB}" -f "$f" >/dev/null \
+  "${PSQL[@]}" "${SRC_DB}" -f "$f" >/dev/null \
     || fail "seed database: migration failed: $(basename "$f")"
   MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
 done
@@ -187,7 +187,7 @@ note "applied ${MIGRATION_COUNT} migrations to the source database"
 # only version + checksum are load-bearing for this check (a restore must
 # preserve migration state so the app knows where it stands). Applied via
 # psql here, so the table is created and populated explicitly.
-${PSQL[@]} "${SRC_DB}" >/dev/null <<'SQL'
+"${PSQL[@]}" "${SRC_DB}" >/dev/null <<'SQL'
 CREATE TABLE _sqlx_migrations (
     version BIGINT NOT NULL PRIMARY KEY,
     description TEXT NOT NULL,
@@ -202,14 +202,14 @@ for f in $(ls "${MIGRATIONS_DIR}"/*.sql | sort); do
   version="${base%%_*}"
   description="$(echo "${base#*_}" | tr '_' ' ')"
   checksum="$(sha384sum "$f" | cut -d' ' -f1)"
-  ${PSQL[@]} "${SRC_DB}" -c "INSERT INTO _sqlx_migrations (version, description, success, checksum) VALUES (${version}, '${description}', TRUE, decode('${checksum}', 'hex'));" >/dev/null \
+  "${PSQL[@]}" "${SRC_DB}" -c "INSERT INTO _sqlx_migrations (version, description, success, checksum) VALUES (${version}, '${description}', TRUE, decode('${checksum}', 'hex'));" >/dev/null \
     || fail "failed to record sqlx migration bookkeeping for ${base}"
 done
 
 # Deterministic seed data across the core collaboration tables (fixed UUIDs
 # and timestamps so every run is reproducible). NOT NULL columns added by
 # later migrations all carry defaults, so explicit columns suffice.
-${PSQL[@]} "${SRC_DB}" >/dev/null <<'SQL'
+"${PSQL[@]}" "${SRC_DB}" >/dev/null <<'SQL'
 INSERT INTO organizations (id, name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'Backup Check Org');
 INSERT INTO users (id, username, email, password_hash, role) VALUES
@@ -244,7 +244,7 @@ pg_dump -Fc -d "${SRC_DB}" -f "${DUMP_FILE}" \
   || fail "pg_dump failed"
 note "dumped source database ($(du -h "${DUMP_FILE}" | cut -f1), custom format)"
 
-${PSQL[@]} postgres -c "CREATE DATABASE \"${DST_DB}\" TEMPLATE template0;" >/dev/null
+"${PSQL[@]}" postgres -c "CREATE DATABASE \"${DST_DB}\" TEMPLATE template0;" >/dev/null
 pg_restore --no-owner --no-privileges -d "${DST_DB}" "${DUMP_FILE}" \
   || fail "pg_restore into a fresh database failed"
 note "restored dump into a fresh database"
