@@ -280,6 +280,9 @@ jobs:
       - name: Run security regression guards
         run: scripts/check-p0-gates.sh
 
+      - name: Run gate propagation tests
+        run: scripts/test-gate-propagation.sh
+
   push-proxy-check:
     name: Push Proxy Check
     needs: detect-changes
@@ -346,15 +349,17 @@ jobs:
 
       - name: Create dummy .env for docker compose validation
         run: |
-          echo "RUSTCHAT_JWT_SECRET=$(openssl rand -hex 32)" > .env
-          echo "RUSTCHAT_JWT_ISSUER=dummy-issuer" >> .env
-          echo "RUSTCHAT_JWT_AUDIENCE=dummy-audience" >> .env
-          echo "RUSTCHAT_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
-          echo "RUSTCHAT_S3_ACCESS_KEY=dummy-s3-access-key" >> .env
-          echo "RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key" >> .env
-          echo "RUSTFS_ACCESS_KEY=dummy-rustfs-access-key" >> .env
-          echo "RUSTFS_SECRET_KEY=dummy-rustfs-secret-key" >> .env
-          echo "PUSH_PROXY_AUTH_KEY=$(openssl rand -hex 32)" >> .env
+          {
+            echo "RUSTCHAT_JWT_SECRET=$(openssl rand -hex 32)"
+            echo "RUSTCHAT_JWT_ISSUER=dummy-issuer"
+            echo "RUSTCHAT_JWT_AUDIENCE=dummy-audience"
+            echo "RUSTCHAT_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+            echo "RUSTCHAT_S3_ACCESS_KEY=dummy-s3-access-key"
+            echo "RUSTCHAT_S3_SECRET_KEY=dummy-s3-secret-key"
+            echo "RUSTFS_ACCESS_KEY=dummy-rustfs-access-key"
+            echo "RUSTFS_SECRET_KEY=dummy-rustfs-secret-key"
+            echo "PUSH_PROXY_AUTH_KEY=$(openssl rand -hex 32)"
+          } > .env
 
       - name: Validate docker-compose.yml
         run: docker compose config
