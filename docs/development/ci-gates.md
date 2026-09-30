@@ -87,6 +87,10 @@ for operators in `docs/operations/runbook.md`.
 scripts/test-gate-propagation.sh
 ```
 
+This harness runs in CI as part of the `Security Regression Guards` job on
+every run, so a regression in the aggregate or promotion-gate logic fails the
+`CI Complete` required check.
+
 ## Change procedure
 
 Any change to a gate set must update this document, the corresponding workflow,
