@@ -238,7 +238,10 @@ attach the output, and close #258 so the open-issue list reflects reality.
   reporting "Applying 3 tag(s) to 2 platform digest(s)"), and all three
   aliases — `main`, `nightly`, `nightly-7b6e960…` — were verified in the
   registry as multi-arch manifests resolving to the same digest on all
-  three services (backend, frontend, push-proxy).
+  three services (backend, frontend, push-proxy). A subsequent automatic
+  `workflow_run` promotion of the same commit (run 36729587535)
+  re-applied the aliases moments later, so the point-in-time digests
+  moved while the per-service alias equality held.
 - `fix(websocket)`: issue #320 (ghost reconnect after explicit `disconnect()`)
   fixed — close/onerror handlers detached before `ws.close()` so the late
   close event cannot re-arm the reconnect path; the orphaned-CONNECTING-socket
