@@ -294,8 +294,16 @@ jobs:
           # Tag arguments are built line by line from the metadata output.
           # Every tag must be applied in one imagetools create call so the
           # alias set advances atomically; an empty tag set is an error.
+          # read (without IFS=) trims surrounding whitespace and the \r
+          # strip makes CRLF input harmless — metadata-action emits \n
+          # only, so both are purely defensive.
           tag_args=()
-          while IFS= read -r tag; do
+          while read -r tag; do
+            tag="${tag%$'\r'}"
+            # trim any surrounding whitespace (read already handles the
+            # line start; this covers the tail after a \r strip)
+            tag="${tag#"${tag%%[![:space:]]*}"}"
+            tag="${tag%"${tag##*[![:space:]]}"}"
             if [ -n "$tag" ]; then
               tag_args+=(--tag "$tag")
             fi
@@ -304,5 +312,5 @@ jobs:
             echo "ERROR: metadata-action produced no tags for ${{ matrix.service }} — refusing to push an untagged manifest" >&2
             exit 1
           fi
-          echo "Applying ${#tag_args[@]} tag(s) to ${#refs[@]} platform digest(s)"
+          echo "Applying $((${#tag_args[@]} / 2)) tag(s) to ${#refs[@]} platform digest(s)"
           docker buildx imagetools create "${tag_args[@]}" "${refs[@]}"
