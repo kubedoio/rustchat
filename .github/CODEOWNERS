@@ -9,7 +9,6 @@
 
 # Backend (Rust API server + push proxy)
 /backend/src/                    @senolcolak
-/backend/src/a2a/                @senolcolak
 /backend/migrations/             @senolcolak
 /push-proxy/                     @senolcolak
 

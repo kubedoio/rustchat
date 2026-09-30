@@ -45,7 +45,7 @@ RustChat is a self-hosted team collaboration platform composed of 3 runtime serv
 │                                                                    │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │                     Service Layer                            │  │
-│  │  auth · channels · posts · files · realtime · jobs · a2a    │  │
+│  │  auth · channels · posts · files · realtime · jobs          │  │
 │  └──────────────────────┬───────────────────────────────────────┘  │
 └─────────────────────────┼──────────────────────────────────────────┘
                           │
@@ -73,7 +73,6 @@ RustChat is a self-hosted team collaboration platform composed of 3 runtime serv
 
 | Module | Responsibility |
 |---|---|
-| `a2a/` | Agent-to-agent communication layer |
 | `api/` | HTTP handlers: v1 native API + v4 Mattermost-compatible API |
 | `auth/` | Authentication: JWT generation/validation, password hashing (Argon2id) |
 | `config/` | Environment-based configuration (the `config` crate) |

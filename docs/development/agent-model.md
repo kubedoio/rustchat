@@ -31,7 +31,6 @@ Three agents are defined for rustchat:
 - `backend/src/auth/**` — requires explicit human approval
 - `backend/src/api/v4/**` — requires compat-reviewer co-approval (`@zoorpha`)
 - `backend/src/mattermost_compat/**` — requires compat-reviewer co-approval
-- `backend/src/a2a/**` — requires senior review
 - `.governance/**`, `frontend/**` — always prohibited
 
 **Limits:** ≤10 files, ≤300 lines per PR. Tests required. Human review required.
@@ -118,7 +117,6 @@ When in doubt whether a change touches the compat surface, treat it as if it doe
 | `backend/src/api/v4/` | ⚠️ co-approval | ❌ | ✅ read |
 | `backend/src/auth/` | ⚠️ explicit approval | ❌ | ❌ |
 | `backend/src/mattermost_compat/` | ⚠️ co-approval | ❌ | ✅ read |
-| `backend/src/a2a/` | ⚠️ senior review | ❌ | ❌ |
 | `backend/migrations/` | ✅ write | ❌ | ❌ |
 | `backend/tests/` | ✅ write | ❌ | ❌ |
 | `backend/compat/` | ❌ | ❌ | ✅ read |

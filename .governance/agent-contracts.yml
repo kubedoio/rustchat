@@ -19,7 +19,6 @@ agents:
       - backend/src/auth/**                # requires explicit approval
       - backend/src/api/v4/**              # requires compat-reviewer co-approval
       - backend/src/mattermost_compat/**   # requires compat-reviewer co-approval
-      - backend/src/a2a/**                 # requires senior review
       - .governance/**
       - frontend/**
     max_files_changed: 10
