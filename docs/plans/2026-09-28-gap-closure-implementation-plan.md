@@ -1,7 +1,7 @@
 # Gap Closure Implementation Plan — Fast Wins First
 
 **Date:** 2026-09-28  
-**Status:** Tier 1 executed and merged (2026-09-28/29 — see §3.1); Tier 2/3 pending.  
+**Status:** Tier 1 executed and merged (2026-09-28/29 — see §3.1); Tier 2 largely executed (M3–M7 delivered, M4 partially — see §4); M2/M8 maintainer-gated; Tier 3 pending.  
 **Scope:** close the gaps identified by the 2026-09-28 maturity/production-readiness analysis, starting with the fast, low-risk items, then medium and large items in dependency order  
 **Baseline:** `fix/review-round8` @ `dabacc3` (source v0.5.1)
 
@@ -68,7 +68,7 @@ Changes:
    (only license/Rust/Vue badges exist today).
 
 **Deliberately out of scope:** `a2a` also appears in `.governance/protected-paths.yml`
-and `.governance/agent-contracts.yml`. Those are protected paths (architectal tier);
+and `.governance/agent-contracts.yml`. Those are protected paths (architectural tier);
 cleaning them requires a separately justified governance PR (see Tier 2, M7). Do not
 bundle them here.
 
@@ -205,11 +205,43 @@ attach the output, and close #258 so the open-issue list reflects reality.
 | ~~M1~~ | ~~Fix or land the de-scope of #88/#89~~ **DONE** — absorbed by #310 + #312 (see §3.1); issues #88/#89 closed 2026-09-29 | ~~PR-5~~ | — |
 | M2 | Membership-revocation on channel removal (GAP-11) | — | **Elevated risk (permissions).** Premise partially stale on re-verification (2026-09-29): v1/v4 manual removal already unsubscribes and is regression-tested; remaining scope is the un-wired removal paths (agents, group sync, team cascade) and cluster-wide revocation. Design note: `docs/plans/2026-09-29-m2-membership-revocation-design.md` — awaiting maintainer sponsorship. |
 | M3 | P006: backup→restore→sanity evidence in CI | #316 | Delivered as `scripts/backup-restore-check.sh` + a `Backup Restore` CI job (aggregated into CI Complete): apply all migrations, replicate sqlx bookkeeping, seed 8 core tables, `pg_dump -Fc` → restore into a fresh database → assert semantic schema identity, migration bookkeeping, row counts/checksums, referential integrity. Runbook restore procedure + ROADMAP item closed. |
-| M4 | CSP hardening: remove `script-src 'unsafe-inline'` | — | Audit `frontend/index.html` + built bundle for inline scripts; move to hash/nonce or strict `'self'`; keep `style-src` decision separate (Vue inline styles). Verify with full Playwright E2E + manual admin pass. Backend: `middleware/security_headers.rs`. |
-| M5 | Gate PRs on backend integration tests | — | Currently only `push: main`/nightly (`integration.yml`). Add a paths-filtered (`backend/**`) PR trigger or a required subset; watch CI cost. |
-| M6 | Frontend coverage for the biggest surfaces | — | Bounded slices: `MessageItem.vue`, `ChannelSidebar.vue`, `useWebSocket.ts` unit tests; add a `test:coverage` script with thresholds afterwards, not before. |
-| M7 | Governance `.governance/` a2a cleanup + frontend refactor finish | — | (a) Remove stale `a2a` patterns from `.governance/protected-paths.yml` + `agent-contracts.yml` — **protected path, architectural tier, needs justification**. (b) Finish or explicitly abandon the frontend store refactor: migrate `stores/calls.ts` (1,027 lines) into `features/calls/`, delete the unwired `core/websocket/WebSocketManager.ts`, record the outcome in the refactoring notes. |
+| M4 | CSP hardening: remove `script-src 'unsafe-inline'` | — | **Partially delivered (2026-09-29, #318):** production CSP shipped in Report-Only mode (no `unsafe-inline` in `script-src`). Remaining (maintainer): manual admin pass against the Report-Only headers, then flip to enforcing in `frontend/nginx.conf`. |
+| M5 | Gate PRs on backend integration tests | — | **Delivered (2026-09-29, #319):** paths-filtered (`backend/**`) PR trigger runs the integration suite on backend-touching PRs. |
+| M6 | Frontend coverage for the biggest surfaces | — | **Delivered (2026-09-29):** suite-flake root causes fixed first (#321 — misused `vi.waitFor`, leaking `vi.doMock`, order-dependent assertions; flake was pre-existing on main); unit tests for `MessageItem.vue` (38, #322), `ChannelSidebar.vue` (24, #323), `useWebSocket.ts` (22, #324); `test:coverage` script + `@vitest/coverage-v8` with thresholds at honestly measured levels (#328: 38/28/28/39 vs measured 39.07/29.69/29.12/40.02; v8 provider reports test-reachable code only — see PR body). Not wired as a CI gate (separate future decision). Latent realtime bugs found by the new tests are tracked in #320, not silently fixed in test PRs. |
+| M7 | Governance `.governance/` a2a cleanup + frontend refactor finish | — | (a) **Delivered (2026-09-29, #335):** stale `a2a` references removed from `.governance/protected-paths.yml`, `.governance/agent-contracts.yml`, `.github/CODEOWNERS`, and their derived/current-state docs (`agent-model.md`, `ownership.md`, architecture docs, admin doc); justification recorded as ADR-007; remaining repo `a2a` hits are Cargo.lock checksum hex and historical point-in-time records. (b) **Delivered (2026-09-29):** dead-code census verified twice, unwired `core/websocket/WebSocketManager.ts` deleted + 5 frontend docs corrected (#325); `stores/calls.ts` migrated to `features/calls/stores/callsStore.ts` as a path-only move (store id `'calls'` + export `useCallsStore` unchanged, Pinia state identity preserved; new `features/calls` barrel; #327, 14-file deviation flagged); `stores/config.ts` then migrated to `features/config/` with the legacy auth-merge guard ported, fixing a live defect where features-store consumers missed `config_updated` updates (#334, closes the store refactor — `stores/` is now empty); outcomes recorded in `frontend/MIGRATION_GUIDE.md`. Current-state docs (refactoring notes, architecture diagram, developer guide, `AGENTS.md` tree, `docs/repo-current-state.md`) re-verified against the tree and corrected (#336). |
 | M8 | Ship v0.5.1 | ~~M1~~ **unblocked** (#88/#89/#258 closed; #259 checklist remains) | Execute `docs/release-process.md` end to end: `scripts/check-release-ready.sh`, signed tag, release workflow validation. **Next critical-path item.** |
+
+**Post-plan operational fixes (2026-09-29/30, from the comprehensive review cycle):**
+- `fix(deps)`: undici override bumped past newly published GHSA advisories —
+  dev-only exposure (production `npm audit --omit=dev` clean), but it failed
+  the `npm Audit` CI job on main and every open PR until fixed (#329).
+- `fix(ci)`: promotion-gate race fixed (`scripts/promotion-gate.sh` gained an
+  opt-in bounded `--wait` for pending required checks) — `Promote Moving
+  Aliases` had failed on every recent main commit because it triggered when
+  Integration Tests completed while Security (CodeQL) landed ~9 min later,
+  freezing the `main`/`nightly` aliases (RI-C03 contract preserved; #330).
+  Post-fix gates verified green, but the build stage then exposed a deeper
+  pre-existing failure: the arm64-under-QEMU image build exceeds the
+  120-minute job timeout (amd64 builds natively in ~26 min), so no promotion
+  run had ever completed. Fixed by distributing multi-arch builds across
+  native runners (#338).
+- `fix(websocket)`: issue #320 (ghost reconnect after explicit `disconnect()`)
+  fixed — close/onerror handlers detached before `ws.close()` so the late
+  close event cannot re-arm the reconnect path; the orphaned-CONNECTING-socket
+  route closed in the same change; regression-tested (#331).
+- `refactor(config)`: second live config store eliminated (#334) — the legacy
+  `stores/config.ts` and `features/config` store ran simultaneously with only
+  the legacy one wired for live updates; migrated with the legacy auth-merge
+  guard ported and a regression test.
+- `chore(governance)`: M7(a) executed (#335, ADR-007).
+- `docs`: current-state docs corrected against the actual tree (#336) —
+  the refactoring notes and architecture diagram still described deleted
+  files (legacy `stores/`, `WebSocketManager`, per-feature service/repo
+  layers) and nonexistent error-handling conventions; every corrected
+  path/count re-measured; historical point-in-time records untouched.
+- Follow-ups filed, deliberately not bundled: #332 (moving-alias push race,
+  pre-existing, exposed by the promotion fix), #333 (`updateConnectionStatus`
+  time-based branches are dead code — behavioral change, needs a decision).
 
 ## 5. Tier 3 — large items (design first)
 
@@ -218,6 +250,11 @@ attach the output, and close #258 so the open-issue list reflects reality.
    sequence continuity across restarts, bounded retention, replay-on-reconnect, and
    explicit `resync_required` beyond the window. Reuse patterns from the existing
    Buzz durable outbox (`backend/src/integrations/outbox.rs`) where applicable.
+   Design note: `docs/plans/2026-09-29-tier3-durable-realtime-replay-design.md`
+   (#326) — premise re-verified (three staleness corrections, incl. that window
+   overflow is silent today and `resync_required` has no frontend consumer),
+   adversarially design-reviewed (two blockers fixed pre-merge), awaiting maintainer
+   sponsorship; implementation not started.
 2. **`client_msg_id` idempotency + cursor pagination** on hot channel-history paths
    (frontend already sends `crypto.randomUUID()`; backend needs a uniqueness
    constraint + upsert and cursor-based history).
@@ -258,6 +295,7 @@ PR-1 (docs) ─┬─ parallel ─┬─ PR-2 (frontend dead code)     } all mer
 PR-5 (triage #88/#89) ──> M1 ──> M8 (release v0.5.1)        } #310/#312; M1 done
 close #258 (no PR)                                            } done (live fix + #311)
 
-Remaining order: M8 (release v0.5.1, unblocked) → M2, M3, M4, M5, M6, M7 as
-capacity allows; Tier 3 by spec.
+Remaining order (updated 2026-09-30): M8 (release v0.5.1, maintainer-gated) →
+M2 (awaiting sponsorship) → M4 enforcing flip (maintainer manual pass) →
+Tier 3 by spec. M3/M5/M6/M7 delivered (see §4).
 ```
