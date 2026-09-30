@@ -35,7 +35,7 @@ finally config in #334). `src/stores/` has been removed entirely.
 - [x] **Auth**: Login/logout, session, cookie, and status handling in a store-only module (`stores/authStore.ts` + test)
 
 ### Key Achievements
-1. **No Circular Dependencies**: The API client (`api/client.ts`) resolves `useAuthStore()` lazily inside its interceptors, so the client↔auth import does not create a module-load cycle
+1. **No Circular Dependencies**: The API client (`api/client.ts`) resolves `useAuthStore()` lazily inside its interceptors, so the client↔auth import never evaluates at module-load time (the static import cycle exists but is harmless — nothing is invoked during evaluation)
 2. **Cookie Management**: MMAUTHTOKEN handling lives in the auth store — `logout()` asks the backend to clear the HttpOnly MMAUTHTOKEN cookie
 3. **Session Persistence**: token kept in sessionStorage (`useSessionStorage('auth_token')`) with a JWT-expiry timer that schedules automatic logout
 4. **401 Handling**: Centralized in the API client response interceptor (`api/client.ts`), which calls `authStore.logout()`
