@@ -1,7 +1,7 @@
 # Gap Closure Implementation Plan — Fast Wins First
 
 **Date:** 2026-09-28  
-**Status:** Tier 1 executed and merged (2026-09-28/29 — see §3.1); Tier 2/3 pending.  
+**Status:** Tier 1 executed and merged (2026-09-28/29 — see §3.1); Tier 2 largely executed (M3–M7 delivered, M4 partially — see §4); M2/M8 maintainer-gated; Tier 3 pending.  
 **Scope:** close the gaps identified by the 2026-09-28 maturity/production-readiness analysis, starting with the fast, low-risk items, then medium and large items in dependency order  
 **Baseline:** `fix/review-round8` @ `dabacc3` (source v0.5.1)
 
@@ -291,6 +291,7 @@ PR-1 (docs) ─┬─ parallel ─┬─ PR-2 (frontend dead code)     } all mer
 PR-5 (triage #88/#89) ──> M1 ──> M8 (release v0.5.1)        } #310/#312; M1 done
 close #258 (no PR)                                            } done (live fix + #311)
 
-Remaining order: M8 (release v0.5.1, unblocked) → M2, M3, M4, M5, M6, M7 as
-capacity allows; Tier 3 by spec.
+Remaining order (updated 2026-09-30): M8 (release v0.5.1, maintainer-gated) →
+M2 (awaiting sponsorship) → M4 enforcing flip (maintainer manual pass) →
+Tier 3 by spec. M3/M5/M6/M7 delivered (see §4).
 ```
