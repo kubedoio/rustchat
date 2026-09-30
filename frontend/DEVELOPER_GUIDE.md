@@ -80,7 +80,14 @@ export const useMyFeatureStore = defineStore('myFeature', () => {
 ### 6. Create WebSocket Handler
 ```typescript
 // src/features/myfeature/handlers/myFeatureSocketHandlers.ts
-export function handleWebSocketEvent(event: WebSocketEvent) {
+// Feature-local event interface, mirroring e.g.
+// features/messages/handlers/messageSocketHandlers.ts
+export interface MyFeatureEvent {
+  event: 'myfeature_created' | 'myfeature_updated'
+  data: string // JSON stringified payload
+}
+
+export function handleWebSocketEvent(event: MyFeatureEvent) {
   switch (event.event) {
     case 'myfeature_created':
       handleCreated(event)
@@ -88,7 +95,7 @@ export function handleWebSocketEvent(event: WebSocketEvent) {
   }
 }
 
-function handleCreated(event: WebSocketEvent) {
+function handleCreated(event: MyFeatureEvent) {
   const data = JSON.parse(event.data)
   myFeatureService.handleIncoming(data)
 }
@@ -99,9 +106,15 @@ function handleCreated(event: WebSocketEvent) {
 // In a component setup or app initialization
 import { useWebSocket } from '@/composables/useWebSocket'
 import { handleWebSocketEvent } from '@/features/myfeature'
+import type { MyFeatureEvent } from '@/features/myfeature'
 
 const { onEvent, offEvent } = useWebSocket()
-onEvent('myfeature_created', handleWebSocketEvent)
+// The listener receives `unknown`; narrow it to the feature event type
+const listener = (data: unknown) => handleWebSocketEvent(data as MyFeatureEvent)
+onEvent('myfeature_created', listener)
+
+// On teardown (e.g. in onUnmounted) — pass the same reference:
+offEvent('myfeature_created', listener)
 ```
 
 ---

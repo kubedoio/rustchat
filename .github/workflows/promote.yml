@@ -47,13 +47,21 @@ jobs:
 
       - name: Resolve target commit
         id: resolve
+        # All interpolations flow through env: no raw ${{ }} inside run:.
+        # (The dispatch sha is owner-supplied; env passing keeps any
+        # future input value from being executed as script content.)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SHA: ${{ inputs.sha }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.sha }}" ]]; then
-            echo "sha=${{ inputs.sha }}" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_SHA" ]]; then
+            echo "sha=$INPUT_SHA" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            echo "sha=$WORKFLOW_RUN_SHA" >> "$GITHUB_OUTPUT"
           else
-            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run promotion gate
