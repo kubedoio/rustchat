@@ -68,6 +68,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
+      platform_count: ${{ steps.matrix.outputs.platform_count }}
     steps:
       - name: Compute service x platform matrix
         id: matrix
@@ -87,7 +88,7 @@ jobs:
           matrix=$(jq -cn \
             --arg platforms "$PLATFORMS" \
             --arg default_runner "$DEFAULT_RUNNER" '
-            ($platforms | split(",") | map(gsub("^ +| +$"; "")) | map(select(length > 0))) as $plats
+            ($platforms | split(",") | map(gsub("^ +| +$"; "")) | map(select(length > 0)) | unique) as $plats
             | [
                 {service: "backend", context: "./backend", dockerfile: "docker/backend.Dockerfile", image_suffix: "-backend"},
                 {service: "frontend", context: "./frontend", dockerfile: "docker/frontend.Dockerfile", image_suffix: "-frontend"},
@@ -105,6 +106,7 @@ jobs:
                   }
               ]')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "platform_count=$(echo "$matrix" | jq '[.[].platform] | unique | length')" >> "$GITHUB_OUTPUT"
           echo "Computed matrix:"
           echo "$matrix" | jq .
 
@@ -263,9 +265,21 @@ jobs:
           set -euo pipefail
           echo "Merging digests for $REPOSITORY:"
           ls -la
-          # Word splitting is intentional here: each tag and each digest
-          # becomes a separate argument to imagetools create.
+          # Refuse to create a partial manifest: the number of downloaded
+          # digests must match the platform count the prepare job computed.
+          # RI-C03: a moving alias must never identify a manifest that is
+          # missing platforms (e.g. a silently dropped artifact).
+          expected="${{ needs.prepare.outputs.platform_count }}"
+          actual=$(find . -maxdepth 1 -type f | wc -l)
+          if [ "$actual" -ne "$expected" ]; then
+            echo "ERROR: expected $expected digests for ${{ matrix.service }}, found $actual — refusing to create a partial manifest" >&2
+            exit 1
+          fi
+          # Word splitting is intentional: each tag and each digest
+          # reference becomes a separate argument to imagetools create.
+          # Digest files are bare hex, so the sha256: prefix is re-added
+          # here (buildx requires repo@sha256:<hex> references).
           # shellcheck disable=SC2046
           docker buildx imagetools create \
             $(printf ' --tag %s ' ${{ steps.meta.outputs.tags }}) \
-            $(printf "$REPOSITORY@%s@" *)
+            $(printf "$REPOSITORY@sha256:%s " *)
