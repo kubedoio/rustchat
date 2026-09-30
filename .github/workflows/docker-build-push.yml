@@ -1,5 +1,22 @@
 name: Docker Build and Push
 
+# Multi-arch image production.
+#
+# Platforms are built on NATIVE runners (linux/amd64 on the caller's runner,
+# linux/arm64 on GitHub's free arm64 hosted runners, available in public
+# repositories) and pushed by digest; a merge job then assembles the tagged
+# multi-platform manifest with `docker buildx imagetools create`.
+#
+# Why not one job with QEMU: a full Rust release build for linux/arm64 under
+# QEMU emulation takes multiple hours — far beyond the job timeout — which is
+# why every multi-arch promotion/release run before this change timed out
+# (the amd64 build completes in ~26 minutes on a native runner; the same
+# build emulated for arm64 exceeded 120 minutes). Native arm64 runners build
+# at native speed (~30 minutes), well within budget.
+#
+# QEMU is still set up for platforms that have no native hosted runner, so
+# exotic platforms remain buildable (slowly) via the caller's runner.
+
 on:
   workflow_call:
     inputs:
@@ -18,7 +35,7 @@ on:
         type: number
         default: 90
       runner:
-        description: 'GitHub runner label to run the job on'
+        description: 'Runner label for linux/amd64 (and any emulated platform)'
         type: string
         default: 'ubuntu-latest'
       platforms:
@@ -38,42 +55,81 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-# Least privilege by default for the whole workflow; the image-publishing
-# job below grants itself the additional packages:write it functionally
-# requires (pushing to GHCR).
+# Least privilege by default for the whole workflow; the jobs below grant
+# themselves the additional packages:write they functionally require
+# (pushing to GHCR).
 permissions:
   contents: read
 
 jobs:
-  build-and-push:
-    runs-on: ${{ inputs.runner }}
+  prepare:
+    name: Prepare build matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      platform_count: ${{ steps.matrix.outputs.platform_count }}
+    steps:
+      - name: Compute service x platform matrix
+        id: matrix
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+          DEFAULT_RUNNER: ${{ inputs.runner }}
+        run: |
+          set -euo pipefail
+          # Cross product of the three services with the requested platforms.
+          # Each platform maps to a native runner where one exists:
+          #   linux/arm64  -> ubuntu-24.04-arm (free arm64 hosted runner,
+          #                   public repositories only)
+          #   everything else -> the caller's runner (QEMU only if the
+          #                   platform has no native runner of its own)
+          # jq -c emits compact single-line JSON: GITHUB_OUTPUT values must
+          # not span lines without heredoc delimiters.
+          matrix=$(jq -cn \
+            --arg platforms "$PLATFORMS" \
+            --arg default_runner "$DEFAULT_RUNNER" '
+            ($platforms | split(",") | map(gsub("^ +| +$"; "")) | map(select(length > 0)) | unique) as $plats
+            | [
+                {service: "backend", context: "./backend", dockerfile: "docker/backend.Dockerfile", image_suffix: "-backend"},
+                {service: "frontend", context: "./frontend", dockerfile: "docker/frontend.Dockerfile", image_suffix: "-frontend"},
+                {service: "push-proxy", context: "./push-proxy", dockerfile: "push-proxy/Dockerfile", image_suffix: "-push-proxy"}
+              ] as $services
+            | [
+                $services[] as $s
+                | $plats[] as $p
+                | ($p | sub("^linux/"; "")) as $arch
+                | $s + {
+                    platform: $p,
+                    platform_id: ($p | gsub("/"; "_")),
+                    runner: (if $arch == "arm64" then "ubuntu-24.04-arm" else $default_runner end),
+                    qemu: (($arch != "arm64") and ($arch != "amd64"))
+                  }
+              ]')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "platform_count=$(echo "$matrix" | jq '[.[].platform] | unique | length')" >> "$GITHUB_OUTPUT"
+          echo "Computed matrix:"
+          echo "$matrix" | jq .
+
+  build:
+    name: Build ${{ matrix.service }} (${{ matrix.platform }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       contents: read
       packages: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: backend
-            context: ./backend
-            dockerfile: docker/backend.Dockerfile
-            image_suffix: -backend
-          - service: frontend
-            context: ./frontend
-            dockerfile: docker/frontend.Dockerfile
-            image_suffix: -frontend
-          - service: push-proxy
-            context: ./push-proxy
-            dockerfile: push-proxy/Dockerfile
-            image_suffix: -push-proxy
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      # Only needed for platforms without a native hosted runner (see prepare).
       - name: Set up QEMU
+        if: ${{ matrix.qemu }}
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
       - name: Set up Docker Buildx
@@ -94,14 +150,17 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}
           tags: ${{ inputs.tags }}
 
-      - name: Build and push Docker image
+      # Non-publishing builds (PR checks): build with the caller's tags,
+      # nothing is pushed.
+      - name: Build image
+        if: ${{ !inputs.push }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.service == 'backend' && inputs.backend_target || '' }}
-          push: ${{ inputs.push }}
-          platforms: ${{ inputs.platforms }}
+          push: false
+          platforms: ${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
@@ -110,3 +169,124 @@ jobs:
             VCS_REF=${{ github.sha }}
           cache-from: type=gha
           cache-to: ${{ inputs.cache_to }}
+
+      # Publishing builds: each platform is pushed by digest only; the merge
+      # job assembles the final tagged manifest from the digests.
+      - name: Build and push image by digest
+        if: ${{ inputs.push }}
+        id: push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.service == 'backend' && inputs.backend_target || '' }}
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            BUILD_DATE=${{ steps.meta.outputs.created }}
+            VCS_REF=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: ${{ inputs.cache_to }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        if: ${{ inputs.push }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/digests"
+          digest="${{ steps.push.outputs.digest }}"
+          touch "${RUNNER_TEMP}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: ${{ inputs.push }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digests-${{ matrix.service }}-${{ matrix.platform_id }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Merge ${{ matrix.service }} manifest
+    needs: [prepare, build]
+    if: ${{ inputs.push }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            image_suffix: -backend
+          - service: frontend
+            image_suffix: -frontend
+          - service: push-proxy
+            image_suffix: -push-proxy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Same inputs as the build jobs -> the same tag set; tags are applied
+      # to the merged manifest here.
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}
+          tags: ${{ inputs.tags }}
+
+      - name: Download digests
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.service }}-*
+          merge-multiple: true
+
+      - name: Create and push tagged manifest
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          REPOSITORY: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}
+        run: |
+          set -euo pipefail
+          echo "Merging digests for $REPOSITORY:"
+          ls -la
+          # Refuse to create a partial manifest: the number of downloaded
+          # digests must match the platform count the prepare job computed.
+          # RI-C03: a moving alias must never identify a manifest that is
+          # missing platforms (e.g. a silently dropped artifact).
+          expected="${{ needs.prepare.outputs.platform_count }}"
+          actual=$(find . -maxdepth 1 -type f | wc -l)
+          if [ "$expected" -lt 1 ] || [ "$actual" -ne "$expected" ]; then
+            echo "ERROR: expected $expected digests for ${{ matrix.service }}, found $actual — refusing to create a partial manifest" >&2
+            exit 1
+          fi
+          # Digest files are bare hex, so the sha256: prefix is re-added
+          # here (buildx requires repo@sha256:<hex> references). The
+          # argument list is built explicitly rather than through a printf
+          # format string so the references can never be corrupted by
+          # format characters in the repository name.
+          refs=()
+          for digest_file in *; do
+            refs+=("$REPOSITORY@sha256:$digest_file")
+          done
+          # Word splitting is intentional: each metadata tag becomes a
+          # separate --tag argument.
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            $(printf ' --tag %s ' ${{ steps.meta.outputs.tags }}) \
+            "${refs[@]}"
