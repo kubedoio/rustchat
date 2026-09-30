@@ -31,3 +31,11 @@ jobs:
         type=sha,format=long
     permissions:
       contents: read
+      # The callee's build job declares packages:write (it is shared with the
+      # publishing callers). GitHub enforces the call-site permissions as a
+      # hard ceiling for callee job permissions, so this must grant
+      # packages:write too or the call fails at startup with an error of the
+      # form "The nested job '<job-id>' is requesting 'packages: write', but
+      # is only allowed 'packages: none'". Nothing is pushed in this no-push
+      # path, so the write scope is never used here.
+      packages: write
