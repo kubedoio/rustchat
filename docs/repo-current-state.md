@@ -1,6 +1,6 @@
 # Repo Current State
 
-**Last updated:** 2026-09-27  
+**Last updated:** 2026-09-30  
 **Version:** v0.5.1 (source)
 
 > This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
@@ -102,6 +102,7 @@ The repository-integrity work is specified in
 
 | Phase | Description | Date |
 |---|---|---|
+| Gap-closure Tier 2 (M4–M7b) + operational fixes | CSP Report-Only header (#318), backend-integration PR gate (#319), frontend unit tests + test:coverage thresholds (#321–#324, #328), a2a governance cleanup + ADR-007 (#335), WebSocketManager deletion + calls/config store migrations (#325, #327, #334); undici override bump (#329), promotion-gate wait mode (#330), ghost-reconnect fix closing #320 (#331) | 2026-09 |
 | Repository integrity P001 | Authoritative green-main/security aggregates, promotion-gated artifacts, verified protection, dependency fixes | 2026-09 |
 | Repository integrity P002 | Live GitHub protection verified + documented (RI-C02) | 2026-09 |
 | Repository integrity P003 | API persistence-boundary baseline + guard (RI-C04); site pilot extraction | 2026-09 |

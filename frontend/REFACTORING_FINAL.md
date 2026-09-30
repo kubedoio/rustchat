@@ -42,33 +42,34 @@ All 13 stores have been refactored from a flat, mixed-concern architecture to a 
 
 ```
 frontend/src/
-├── core/                          # 837 lines, 13 files
-│   ├── entities/                  # User, Message, Channel, Call, Team
-│   ├── errors/                    # AppError hierarchy
-│   ├── repositories/              # Base interfaces
-│   ├── services/                  # Shared utilities
-│   ├── types/                     # Type utilities
-│   ├── websocket/                 # WebSocket infrastructure
-│   └── index.ts
+├── core/                          # Shared foundation
+│   ├── entities/                  # User, Message, Channel, Call, Team, Auth, Entity
+│   ├── errors/                    # AppError hierarchy, errorUtils
+│   └── services/                  # retry
 │
-├── features/                      # 6,337 lines, 55 files
-│   ├── auth/                      # 509 lines ✅
-│   ├── calls/                     # 1,476 lines ✅
-│   ├── channels/                  # 782 lines ✅
-│   ├── messages/                  # 880 lines ✅
-│   ├── teams/                     # 429 lines ✅
-│   ├── presence/                  # 304 lines ✅
-│   ├── unreads/                   # 307 lines ✅
-│   ├── preferences/               # 333 lines ✅
-│   ├── theme/                     # 430 lines ✅
-│   ├── ui/                        # 94 lines ✅
-│   ├── admin/                     # 378 lines ✅
-│   ├── playbooks/                 # 326 lines ✅
-│   └── config/                    # 89 lines ✅
+├── features/
+│   ├── auth/                      ✅ stores/authStore.ts
+│   ├── calls/                     ✅ index.ts + stores/callsStore.ts (store-only)
+│   ├── channels/                  ✅ handlers, repositories, services, stores
+│   ├── messages/                  ✅ handlers, repositories, services, stores
+│   ├── teams/                     ✅ stores/teamStore.ts
+│   ├── presence/                  ✅ services, stores, statusExpiry, presentation helpers
+│   ├── unreads/                   ✅ stores/unreadStore.ts
+│   ├── preferences/               ✅ stores/preferencesStore.ts
+│   ├── theme/                     ✅ stores/themeStore.ts
+│   ├── ui/                        ✅ stores/uiStore.ts
+│   ├── admin/                     ✅ stores (admin, agents, knowledge bases)
+│   ├── playbooks/                 ✅ stores/playbookStore.ts
+│   ├── config/                    ✅ index.ts + stores/configStore.ts
+│   └── ...                        # activity, knowledge, permissions
 │
-└── stores/                        # Legacy (deprecated)
-    └── *.ts                       # 3,100 lines
+└── composables/
+    └── useWebSocket.ts            # Realtime layer
 ```
+
+> `src/stores/` has been removed — all 13 legacy stores were migrated into
+> `features/` modules (calls in #327, config in #334) and the directory
+> no longer exists.
 
 ---
 
@@ -91,7 +92,7 @@ frontend/src/
 
 | Metric | Before | After | Improvement |
 |--------|--------|-------|-------------|
-| **Max file size** | 960 lines | 270 lines | **72% smaller** |
+| **Max file size** | 960 lines | 1,060 lines (messageStore.ts) | ⚠️ Largest store exceeds the 300-line target |
 | **Average file size** | 238 lines | 105 lines | **56% smaller** |
 | **Testability** | Poor | Excellent | ✅ |
 | **Maintainability** | Low | High | ✅ |
@@ -106,8 +107,8 @@ frontend/src/
 // Any feature
 import { messageService, useMessageStore } from '@/features/messages'
 import { useCallsStore } from '@/features/calls'
-import { authService, useAuth } from '@/features/auth'
-import { themeService } from '@/features/theme'
+import { useAuthStore } from '@/features/auth/stores/authStore'
+import { useThemeStore } from '@/features/theme/stores/themeStore'
 
 // WebSocket setup: the realtime layer is the useWebSocket composable, which
 // connects itself once the auth token is available. Custom event handlers
