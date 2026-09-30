@@ -261,8 +261,15 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         env:
           REPOSITORY: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}
+          # Multi-line outputs must reach the script via env, never via raw
+          # ${{ }} interpolation inside run: — newlines in an unquoted
+          # interpolation split command substitutions into separate
+          # commands (observed live: only the first tag was applied and
+          # the remaining tag strings were executed as commands).
+          TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           set -euo pipefail
+          shopt -s inherit_errexit
           echo "Merging digests for $REPOSITORY:"
           ls -la
           # Refuse to create a partial manifest: the number of downloaded
@@ -284,9 +291,18 @@ jobs:
           for digest_file in *; do
             refs+=("$REPOSITORY@sha256:$digest_file")
           done
-          # Word splitting is intentional: each metadata tag becomes a
-          # separate --tag argument.
-          # shellcheck disable=SC2046
-          docker buildx imagetools create \
-            $(printf ' --tag %s ' ${{ steps.meta.outputs.tags }}) \
-            "${refs[@]}"
+          # Tag arguments are built line by line from the metadata output.
+          # Every tag must be applied in one imagetools create call so the
+          # alias set advances atomically; an empty tag set is an error.
+          tag_args=()
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              tag_args+=(--tag "$tag")
+            fi
+          done <<< "$TAGS"
+          if [ "${#tag_args[@]}" -eq 0 ]; then
+            echo "ERROR: metadata-action produced no tags for ${{ matrix.service }} — refusing to push an untagged manifest" >&2
+            exit 1
+          fi
+          echo "Applying ${#tag_args[@]} tag(s) to ${#refs[@]} platform digest(s)"
+          docker buildx imagetools create "${tag_args[@]}" "${refs[@]}"
