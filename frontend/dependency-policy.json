@@ -86,7 +86,7 @@
     },
     "@vitest/coverage-v8": {
       "category": "build-tool-critical",
-      "reason": "Coverage provider for the test:coverage script (M6); resolves in package-lock to exactly 4.1.11, matching vitest's locked 4.1.11 — the two packages declare exact peer ranges of each other, so lockfile resolution keeps them in sync; the manifest follows the repo's caret convention (^4.1.11). The package was already in package-lock as vitest's optional peer, and its transitive dependencies are test-tooling only (istanbul/v8-coverage libs) — no runtime dependencies."
+      "reason": "Coverage provider for the test:coverage script (M6); resolves in package-lock to exactly 4.1.11, matching vitest's locked 4.1.11 \u2014 the two packages declare exact peer ranges of each other, so lockfile resolution keeps them in sync; the manifest follows the repo's caret convention (^4.1.11). The package was already in package-lock as vitest's optional peer, and its transitive dependencies are test-tooling only (istanbul/v8-coverage libs) \u2014 no runtime dependencies."
     },
     "@vue/test-utils": {
       "category": "build-tool-critical",
@@ -166,14 +166,14 @@
       "reviewedOn": "2026-09-29"
     },
     "brace-expansion@^1": {
-      "reason": "Force the transitive 1.x matcher (eslint's minimatch) to the patched 1.1.18 release.",
+      "reason": "Force the transitive 1.x matcher (eslint's minimatch) to the patched 1.1.21 release (GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p).",
       "removeWhen": "All upstream toolchain dependencies resolve to an equivalent or newer safe brace-expansion release without local forcing.",
-      "reviewedOn": "2026-08-12"
+      "reviewedOn": "2026-09-30"
     },
     "brace-expansion@^2": {
-      "reason": "Force the transitive 2.x matcher (js-beautify/glob's minimatch) to the patched 2.1.4 release.",
+      "reason": "Future-proofing: no 2.x copy is currently installed, but any future transitive 2.x resolution (dev toolchain only) lands on the patched 2.1.7 release (GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p).",
       "removeWhen": "All upstream toolchain dependencies resolve to an equivalent or newer safe brace-expansion release without local forcing.",
-      "reviewedOn": "2026-08-12"
+      "reviewedOn": "2026-09-30"
     }
   },
   "trustedPostInstallSteps": [
