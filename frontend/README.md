@@ -14,6 +14,7 @@ npm ci
 npm run dev
 npm run build
 npm run test:unit
+npm run test:coverage
 npm run check:dependency-policy
 ```
 
