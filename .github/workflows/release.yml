@@ -122,11 +122,86 @@ jobs:
       contents: read
       packages: write
 
+  image-evidence:
+    name: Record image digests and SBOMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate, gate, docker-release]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      # Resolves the immutable digest of every published service image and,
+      # for stable releases, fails the run on rolling-alias drift (X.Y or
+      # latest pointing anywhere but this release's manifest).
+      - name: Record image digests and verify alias consistency
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.VERSION }}"
+          args=(--prefix "${IMAGE_PREFIX}" --version "${version}" --output "image-digests-${version}.txt")
+          if [[ "${version}" != *"-"* ]]; then
+            args+=(--enforce-aliases)
+          fi
+          scripts/record-image-digests.sh "${args[@]}"
+
+      # SPDX SBOMs are generated from the published multi-arch images; syft
+      # scans the linux/amd64 variant of each index.
+      - name: Generate SBOM (backend)
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ env.IMAGE_PREFIX }}-backend:${{ steps.version.outputs.VERSION }}
+          format: spdx-json
+          output-file: sbom-backend-${{ steps.version.outputs.VERSION }}.spdx.json
+          upload-artifact: false
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SBOM (frontend)
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ env.IMAGE_PREFIX }}-frontend:${{ steps.version.outputs.VERSION }}
+          format: spdx-json
+          output-file: sbom-frontend-${{ steps.version.outputs.VERSION }}.spdx.json
+          upload-artifact: false
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SBOM (push-proxy)
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ env.IMAGE_PREFIX }}-push-proxy:${{ steps.version.outputs.VERSION }}
+          format: spdx-json
+          output-file: sbom-push-proxy-${{ steps.version.outputs.VERSION }}.spdx.json
+          upload-artifact: false
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload image evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-evidence
+          path: |
+            image-digests-*.txt
+            sbom-*.spdx.json
+          if-no-files-found: error
+
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [validate, gate, docker-release]
+    needs: [validate, gate, docker-release, image-evidence]
     permissions:
       contents: write
     steps:
@@ -137,7 +212,9 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Extract changelog section
         id: changelog
@@ -154,9 +231,16 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Download image evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: image-evidence
+          path: release-assets
+
       - name: Create Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
+          files: release-assets/*
           name: RustChat ${{ steps.version.outputs.VERSION }}
           body: |
             ${{ steps.changelog.outputs.SECTION }}
@@ -165,9 +249,13 @@ jobs:
 
             | Image | Tags |
             |-------|------|
-            | `ghcr.io/${{ github.repository }}-backend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
-            | `ghcr.io/${{ github.repository }}-frontend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
-            | `ghcr.io/${{ github.repository }}-push-proxy` | `${{ steps.version.outputs.VERSION }}`, `latest` |
+            | `${{ env.IMAGE_PREFIX }}-backend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
+            | `${{ env.IMAGE_PREFIX }}-frontend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
+            | `${{ env.IMAGE_PREFIX }}-push-proxy` | `${{ steps.version.outputs.VERSION }}`, `latest` |
+
+            Immutable digests for every published tag and SPDX SBOMs for each
+            image are attached to this release (`image-digests-*.txt`,
+            `sbom-*.spdx.json`).
 
             ## Upgrade Notes
 
@@ -180,9 +268,9 @@ jobs:
             ## Quick Start
 
             ```bash
-            docker pull ghcr.io/${{ github.repository }}-backend:${{ steps.version.outputs.VERSION }}
-            docker pull ghcr.io/${{ github.repository }}-frontend:${{ steps.version.outputs.VERSION }}
-            docker pull ghcr.io/${{ github.repository }}-push-proxy:${{ steps.version.outputs.VERSION }}
+            docker pull ${{ env.IMAGE_PREFIX }}-backend:${{ steps.version.outputs.VERSION }}
+            docker pull ${{ env.IMAGE_PREFIX }}-frontend:${{ steps.version.outputs.VERSION }}
+            docker pull ${{ env.IMAGE_PREFIX }}-push-proxy:${{ steps.version.outputs.VERSION }}
             ```
           draft: false
           prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
