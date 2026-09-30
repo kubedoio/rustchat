@@ -43,9 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admin audit-dashboard JSON export downloads the actual entries (it previously saved `{}` because a Blob was serialized) and no longer fails with 400 on filtered exports; the dashboard is relabeled honestly as "Membership Policy Audit".
 - Production `unwrap()` calls removed from the hybrid-search sort and security-header construction (fail-fast at startup with the offending field named instead).
 - Repository-integrity and CI gate regressions repaired (promotion-gate pagination, migration-matrix append-only guard, CodeQL toolchain handling).
+- Explicitly disconnecting a WebSocket no longer arms a ghost reconnect: close/error handlers are detached before `close()`, so a late close event cannot restart the connection after a user-initiated disconnect.
+- The single live configuration store now receives `config_updated` pushes (the legacy auth-merge guard was ported during the store consolidation; feature-store consumers previously missed live config updates).
+- The moving-alias promotion pipeline is repaired end to end: the promotion gate waits for pending required checks, multi-arch images build on native runners instead of timing out under QEMU, and the manifest merge applies the full tag set (`main`, `nightly`, `nightly-<sha>`) atomically.
 
 ### Added
 - AI Agents & Ecosystem feature support: Channel-participant AI agents with LLM providers (GPT models), optional tools integration (Tavily search), pgvector search for RAG knowledge bases, RustShare sync sources, and user feedback tracking (thumbs up/down).
+- Backup/restore evidence in CI: a dedicated job applies all migrations, seeds core tables, round-trips a `pg_dump`/`pg_restore`, and asserts schema, migration bookkeeping, row, and referential-integrity equivalence on every schema/script change.
 - Comprehensive AI Agents administration documentation and runtime integration guidance.
 - Standard Bot accounts creation and management documentation.
 - Docker Compose quickstart troubleshooting tips and S3 private bucket security configuration guidance.

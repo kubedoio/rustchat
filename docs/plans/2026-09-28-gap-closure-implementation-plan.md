@@ -205,7 +205,7 @@ attach the output, and close #258 so the open-issue list reflects reality.
 | ~~M1~~ | ~~Fix or land the de-scope of #88/#89~~ **DONE** — absorbed by #310 + #312 (see §3.1); issues #88/#89 closed 2026-09-29 | ~~PR-5~~ | — |
 | M2 | Membership-revocation on channel removal (GAP-11) | — | **Elevated risk (permissions).** Premise partially stale on re-verification (2026-09-29): v1/v4 manual removal already unsubscribes and is regression-tested; remaining scope is the un-wired removal paths (agents, group sync, team cascade) and cluster-wide revocation. Design note: `docs/plans/2026-09-29-m2-membership-revocation-design.md` — awaiting maintainer sponsorship. |
 | M3 | P006: backup→restore→sanity evidence in CI | #316 | Delivered as `scripts/backup-restore-check.sh` + a `Backup Restore` CI job (aggregated into CI Complete): apply all migrations, replicate sqlx bookkeeping, seed 8 core tables, `pg_dump -Fc` → restore into a fresh database → assert semantic schema identity, migration bookkeeping, row counts/checksums, referential integrity. Runbook restore procedure + ROADMAP item closed. |
-| M4 | CSP hardening: remove `script-src 'unsafe-inline'` | — | **Partially delivered (2026-09-29, #318):** production CSP shipped in Report-Only mode (no `unsafe-inline` in `script-src`). Remaining (maintainer): manual admin pass against the Report-Only headers, then flip to enforcing in `frontend/nginx.conf`. |
+| M4 | CSP hardening: remove `script-src 'unsafe-inline'` | — | **Partially delivered (2026-09-29, #318):** production SPA policy shipped in Report-Only mode with no `unsafe-inline` in `script-src` (the backend API presets are enforced directly). Remaining (maintainer): manual admin pass against the Report-Only headers, then flip to enforcing in `frontend/nginx.conf`. |
 | M5 | Gate PRs on backend integration tests | — | **Delivered (2026-09-29, #319):** paths-filtered (`backend/**`) PR trigger runs the integration suite on backend-touching PRs. |
 | M6 | Frontend coverage for the biggest surfaces | — | **Delivered (2026-09-29):** suite-flake root causes fixed first (#321 — misused `vi.waitFor`, leaking `vi.doMock`, order-dependent assertions; flake was pre-existing on main); unit tests for `MessageItem.vue` (38, #322), `ChannelSidebar.vue` (24, #323), `useWebSocket.ts` (22, #324); `test:coverage` script + `@vitest/coverage-v8` with thresholds at honestly measured levels (#328: 38/28/28/39 vs measured 39.07/29.69/29.12/40.02; v8 provider reports test-reachable code only — see PR body). Not wired as a CI gate (separate future decision). Latent realtime bugs found by the new tests are tracked in #320, not silently fixed in test PRs. |
 | M7 | Governance `.governance/` a2a cleanup + frontend refactor finish | — | (a) **Delivered (2026-09-29, #335):** stale `a2a` references removed from `.governance/protected-paths.yml`, `.governance/agent-contracts.yml`, `.github/CODEOWNERS`, and their derived/current-state docs (`agent-model.md`, `ownership.md`, architecture docs, admin doc); justification recorded as ADR-007; remaining repo `a2a` hits are Cargo.lock checksum hex and historical point-in-time records. (b) **Delivered (2026-09-29):** dead-code census verified twice, unwired `core/websocket/WebSocketManager.ts` deleted + 5 frontend docs corrected (#325); `stores/calls.ts` migrated to `features/calls/stores/callsStore.ts` as a path-only move (store id `'calls'` + export `useCallsStore` unchanged, Pinia state identity preserved; new `features/calls` barrel; #327, 14-file deviation flagged); `stores/config.ts` then migrated to `features/config/` with the legacy auth-merge guard ported, fixing a live defect where features-store consumers missed `config_updated` updates (#334, closes the store refactor — `stores/` is now empty); outcomes recorded in `frontend/MIGRATION_GUIDE.md`. Current-state docs (refactoring notes, architecture diagram, developer guide, `AGENTS.md` tree, `docs/repo-current-state.md`) re-verified against the tree and corrected (#336). |
@@ -224,7 +224,21 @@ attach the output, and close #258 so the open-issue list reflects reality.
   pre-existing failure: the arm64-under-QEMU image build exceeds the
   120-minute job timeout (amd64 builds natively in ~26 min), so no promotion
   run had ever completed. Fixed by distributing multi-arch builds across
-  native runners (#338).
+  native runners (#338). Live validation of the first completed run then
+  exposed a third layer: the manifest-merge step raw-interpolated the
+  multi-line metadata tag list into its shell script, so the newlines
+  split the command substitution and only the first tag (`main`) was
+  applied — the run reported green while `nightly`/`nightly-<sha>` were
+  never created (and, without `inherit_errexit`, the swallowed inner
+  failures never tripped `set -e`). Fixed by passing the tag list through
+  the step env and applying the full set in one `imagetools create` call,
+  with an empty-tag-set refusal (#340). The post-fix promotion
+  (run 36728252070, promoting 7b6e960) completed green end-to-end in
+  ~75 minutes (gate → native amd64+arm64 builds → manifest merges
+  reporting "Applying 3 tag(s) to 2 platform digest(s)"), and all three
+  aliases — `main`, `nightly`, `nightly-7b6e960…` — were verified in the
+  registry as multi-arch manifests resolving to the same digest on all
+  three services (backend, frontend, push-proxy).
 - `fix(websocket)`: issue #320 (ghost reconnect after explicit `disconnect()`)
   fixed — close/onerror handlers detached before `ws.close()` so the late
   close event cannot re-arm the reconnect path; the orphaned-CONNECTING-socket

@@ -1,7 +1,7 @@
 # ADR-007: Remove Stale a2a Governance References
 
 **Date:** 2026-09-29  
-**Status:** Proposed  
+**Status:** Accepted (2026-09-30, merged via #335; acceptance condition — maintainer sponsorship — met)  
 **Acceptance condition:** Maintainer sponsorship of this PR (the architectural-tier review required by `.governance/risk-tiers.yml`)  
 **Risk tier:** architectural (touches `.governance/**`; the change itself is a dead-reference removal with no behavioral effect)
 
