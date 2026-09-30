@@ -52,7 +52,7 @@ run_agg_expect 0 "aggregate: conditional jobs skipped is acceptable" \
   BACKEND_CHECK_RESULT=skipped FRONTEND_CHECK_RESULT=skipped \
   FRONTEND_E2E_RESULT=skipped PUSH_PROXY_CHECK_RESULT=skipped \
   DOCKER_VALIDATE_RESULT=skipped BUILD_RELEASE_RESULT=skipped \
-  REPO_INTEGRITY_RESULT=skipped MIGRATION_MATRIX_RESULT=skipped \
+  REPO_INTEGRITY_RESULT=success MIGRATION_MATRIX_RESULT=skipped \
   BACKUP_RESTORE_RESULT=skipped
 
 run_agg_expect 1 "aggregate: one required backend failure blocks CI Complete" \
