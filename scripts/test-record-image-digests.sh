@@ -346,10 +346,10 @@ run_expect 0 "args: whitespace in --services is tolerated" \
 index_json > "${FIXTURES}/acme__rustchat-backend__0.4.2.json"
 digest_for "converging" > "${FIXTURES}/acme__rustchat-backend__0.4.2.digest"
 printf '2' > "${FIXTURES}/acme__rustchat-backend__0.4.2.retry"
-RECORD_IMAGE_DIGESTS_ATTEMPTS=3
+export RECORD_IMAGE_DIGESTS_ATTEMPTS=3
 OUTRETRY="$(run_target \
   --prefix ghcr.io/acme/rustchat --services backend --version 0.4.2 2>/dev/null || true)"
-RECORD_IMAGE_DIGESTS_ATTEMPTS=2
+export RECORD_IMAGE_DIGESTS_ATTEMPTS=2
 if echo "${OUTRETRY}" | grep -q 'version tag 0.4.2: ghcr.io/acme/rustchat-backend@'; then
   ok "retry: transient 404s retried until the tag resolves"
 else
@@ -381,10 +381,10 @@ fi
 rm -f "${FIXTURES}/acme__rustchat-backend__0.4.3.status"
 
 # Invalid retry settings are usage errors.
-RECORD_IMAGE_DIGESTS_ATTEMPTS=x
+export RECORD_IMAGE_DIGESTS_ATTEMPTS=x
 ERRBAD="$(run_target --prefix ghcr.io/acme/rustchat --services backend \
   --version 0.5.1 2>&1 >/dev/null || true)"
-RECORD_IMAGE_DIGESTS_ATTEMPTS=2
+export RECORD_IMAGE_DIGESTS_ATTEMPTS=2
 if echo "${ERRBAD}" | grep -q 'retry settings must be non-negative integers'; then
   ok "retry: non-numeric attempts rejected"
 else
