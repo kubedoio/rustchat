@@ -35,8 +35,10 @@ Stable releases are created from Git tags matching `v*.*.*` (e.g., `v0.3.6`). Th
 **What happens when a stable tag is pushed:**
 1. The `Release` workflow triggers
 2. Validation checks run (VERSION file, Cargo.toml, package.json, CHANGELOG.md)
-3. GitHub Release is created with changelog content
-4. Multi-arch container images (`linux/amd64`, `linux/arm64`) are built and pushed to GHCR
+3. Multi-arch container images (`linux/amd64`, `linux/arm64`) are built and pushed to GHCR
+4. The `image-evidence` job resolves the immutable digest of every published tag, verifies the `X.Y` and `latest` aliases point at the same manifest, and generates SPDX SBOMs from the published images
+5. The digest record and SBOMs are attached to the GitHub Release as assets (`image-digests-<version>.txt`, `sbom-<service>-<version>.spdx.json`)
+6. GitHub Release is created with changelog content and the evidence assets
 
 ### Release Candidates
 
@@ -105,6 +107,7 @@ Then follow this checklist:
 - [ ] Push: `git push origin main && git push origin vX.Y.Z`
 - [ ] Wait for the `Release` workflow to complete
 - [ ] Verify the GitHub Release and container images are published
+- [ ] Verify the release assets include the image digest record and SBOMs
 - [ ] Announce in GitHub Discussions (optional)
 
 ## Example: Creating v0.4.0
@@ -151,6 +154,21 @@ docker pull ghcr.io/kubedoio/rustchat-frontend:v0.3.6
 # Verify multi-arch support
 docker manifest inspect ghcr.io/kubedoio/rustchat-backend:v0.3.6
 ```
+
+The Release workflow also attaches evidence assets to every GitHub Release:
+
+- `image-digests-<version>.txt` — the immutable digest (`image@sha256:...`) of each
+  service image, per-platform child digests of the multi-arch index, and the resolved
+  `X.Y`/`latest` alias digests. To pin a deployment, reference the recorded digest
+  directly (`ghcr.io/kubedoio/rustchat-backend@sha256:...`); it is immutable even if a
+  moving tag is later re-published.
+- `sbom-<service>-<version>.spdx.json` — an SPDX software bill of materials for each
+  image (generated from the published multi-arch index; the `linux/amd64` variant is
+  scanned).
+
+The digest record is produced by `scripts/record-image-digests.sh`, which also
+*enforces* alias consistency during the release: if `X.Y` or `latest` resolves to
+anything other than the version tag's manifest, the workflow fails.
 
 ## Rollback Procedure
 
