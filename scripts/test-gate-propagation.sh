@@ -31,14 +31,19 @@ run_agg_expect() {
     DETECT_CHANGES_RESULT SECURITY_REGRESSION_GUARDS_RESULT \
     BACKEND_CHECK_RESULT FRONTEND_CHECK_RESULT FRONTEND_E2E_RESULT \
     PUSH_PROXY_CHECK_RESULT DOCKER_VALIDATE_RESULT BUILD_RELEASE_RESULT \
+    REPO_INTEGRITY_RESULT MIGRATION_MATRIX_RESULT BACKUP_RESTORE_RESULT \
     >/dev/null 2>&1 || actual=$?
   if [[ "${actual}" -eq "${expected}" ]]; then ok "${desc}"; else bad "${desc} (exit ${actual})"; fi
 }
 
+# Mirrors the full ci-complete member set in .github/workflows/ci.yml so a
+# mis-wiring of any single member (not just BUILD_RELEASE_RESULT) is caught.
 ALL_RESULTS=(DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
   BACKEND_CHECK_RESULT=success FRONTEND_CHECK_RESULT=success \
   FRONTEND_E2E_RESULT=success PUSH_PROXY_CHECK_RESULT=success \
-  DOCKER_VALIDATE_RESULT=success BUILD_RELEASE_RESULT=success)
+  DOCKER_VALIDATE_RESULT=success BUILD_RELEASE_RESULT=success \
+  REPO_INTEGRITY_RESULT=success MIGRATION_MATRIX_RESULT=success \
+  BACKUP_RESTORE_RESULT=success)
 
 run_agg_expect 0 "aggregate: all members success" "${ALL_RESULTS[@]}"
 
@@ -46,19 +51,24 @@ run_agg_expect 0 "aggregate: conditional jobs skipped is acceptable" \
   DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
   BACKEND_CHECK_RESULT=skipped FRONTEND_CHECK_RESULT=skipped \
   FRONTEND_E2E_RESULT=skipped PUSH_PROXY_CHECK_RESULT=skipped \
-  DOCKER_VALIDATE_RESULT=skipped BUILD_RELEASE_RESULT=skipped
+  DOCKER_VALIDATE_RESULT=skipped BUILD_RELEASE_RESULT=skipped \
+  REPO_INTEGRITY_RESULT=skipped MIGRATION_MATRIX_RESULT=skipped \
+  BACKUP_RESTORE_RESULT=skipped
 
 run_agg_expect 1 "aggregate: one required backend failure blocks CI Complete" \
   DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
   BACKEND_CHECK_RESULT=failure FRONTEND_CHECK_RESULT=success \
   FRONTEND_E2E_RESULT=success PUSH_PROXY_CHECK_RESULT=success \
-  DOCKER_VALIDATE_RESULT=success BUILD_RELEASE_RESULT=success
+  DOCKER_VALIDATE_RESULT=success BUILD_RELEASE_RESULT=success \
+  REPO_INTEGRITY_RESULT=success MIGRATION_MATRIX_RESULT=success \
+  BACKUP_RESTORE_RESULT=success
 
 run_agg_expect 1 "aggregate: missing required member is a wiring failure" \
   DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
   BACKEND_CHECK_RESULT=success FRONTEND_CHECK_RESULT=success \
   FRONTEND_E2E_RESULT=success PUSH_PROXY_CHECK_RESULT=success \
-  DOCKER_VALIDATE_RESULT=success
+  DOCKER_VALIDATE_RESULT=success REPO_INTEGRITY_RESULT=success \
+  MIGRATION_MATRIX_RESULT=success BACKUP_RESTORE_RESULT=success
 
 # Security aggregate variant.
 sec_agg_expect() {
