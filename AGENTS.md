@@ -16,7 +16,7 @@ rustchat/
 │   ├── migrations/   # SQLx database migrations
 │   └── tests/        # Integration tests
 ├── frontend/         # Vue 3 + TypeScript SPA
-│   ├── src/          # core, features, api, components, composables, stores
+│   ├── src/          # core, features, api, components, composables
 │   └── e2e/          # Playwright tests
 ├── push-proxy/       # Rust service for FCM/APNS mobile push notifications
 ├── docs/             # Architecture, development, and operational docs

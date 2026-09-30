@@ -15,7 +15,7 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           STORE LAYER (State Only)                       │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │                     useMessageStore (270 lines)                   │   │
+│  │                     useMessageStore (1,060 lines)                 │   │
 │  │  • messagesByChannel: Map<ChannelId, Message[]>                   │   │
 │  │  • threadRepliesByRoot: Map<MessageId, Message[]>                 │   │
 │  │  • loading, error, hasMoreOlder                                   │   │
@@ -28,7 +28,7 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                          SERVICE LAYER (Business Logic)                  │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │                    messageService (225 lines)                     │   │
+│  │                    messageService (242 lines)                      │   │
 │  │                                                                   │   │
 │  │  loadMessages(channelId) ─────┐                                   │   │
 │  │  sendMessage(draft) ──────────┼──► Optimistic updates            │   │
@@ -47,7 +47,7 @@
 ┌────────┐  ┌─────────────────────────────────────────────────────────┐
 │  Store │  │                     REPOSITORY LAYER                     │
 │ Updates│  │  ┌─────────────────────────────────────────────────────┐ │
-│        │  │  │              messageRepository (206 lines)          │ │
+│        │  │  │              messageRepository (217 lines)          │ │
 │        │  │  │                                                      │ │
 │        │  │  │  • findByChannel() ──► GET /api/channels/:id/posts  │ │
 │        │  │  │  • create() ─────────► POST /api/posts              │ │
@@ -89,7 +89,7 @@
 │                            │                                            │
 │                            ▼                                            │
 │  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │              messageSocketHandlers.ts (156 lines)                   │ │
+│  │              messageSocketHandlers.ts (171 lines)                   │ │
 │  │                                                                     │ │
 │  │  handlePost() ──────► messageService.handleIncomingMessage()       │ │
 │  │  handlePostEdit() ──► messageService.handleMessageUpdate()         │ │
@@ -99,18 +99,16 @@
 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                          CORE LAYER (Shared)                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────────┐  │
-│  │   Entities  │  │    Types    │  │    Errors   │  │  Repositories  │  │
-│  │  ┌───────┐  │  │  ┌──────┐   │  │  ┌──────┐   │  │   Interface    │  │
-│  │  │ User  │  │  │  │Result│   │  │  │AppError│  │  │                │  │
-│  │  ├───────┤  │  │  ├──────┤   │  │  ├──────┤   │  │  Repository<T> │  │
-│  │  │Message│  │  │  │Async │   │  │  │Network │  │  │    findById    │  │
-│  │  ├───────┤  │  │  │Result│   │  │  │  Error │  │  │    findAll     │  │
-│  │  │Channel│  │  │  └──────┘   │  │  ├──────┤   │  │    create      │  │
-│  │  ├───────┤  │  │             │  │  │NotFound│  │  │    update      │  │
-│  │  │ Call  │  │  │             │  │  │ Error  │  │  │    delete      │  │
-│  │  └───────┘  │  │             │  │  └──────┘   │  │                │  │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └────────────────┘  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                       │
+│  │   Entities  │  │    Errors   │  │   Services  │                       │
+│  │             │  │             │  │             │                       │
+│  │    User     │  │  AppError   │  │  retry.ts   │                       │
+│  │    Message  │  │   Network   │  │             │                       │
+│  │    Channel  │  │    Error    │  │             │                       │
+│  │    Call     │  │  NotFound   │  │             │                       │
+│  │             │  │    Error    │  │             │                       │
+│  │             │  │             │  │             │                       │
+│  └─────────────┘  └─────────────┘  └─────────────┘                       │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -124,8 +122,8 @@
          ┌───────────────┼───────────────┐
          ▼               ▼               ▼
    ┌──────────┐   ┌──────────┐   ┌──────────┐
-   │Repository│   │Repository│   │Repository│
-   │ Messages │   │ Channels │   │   Calls  │
+   │Repository│   │Repository│   │  (none)  │
+   │ Messages │   │ Channels │   │  Calls*  │
    └────┬─────┘   └────┬─────┘   └────┬─────┘
         │              │              │
         └──────────────┼──────────────┘
@@ -149,17 +147,21 @@
             └──────────────┘
 ```
 
+\* Calls is store-only: `features/calls/` has no repository or service
+layer — the calls store (`features/calls/stores/callsStore.ts`) calls `api/calls.ts`
+directly.
+
 ## File Size Targets vs Actual
 
 | Layer | File | Target | Actual | Status |
 |-------|------|--------|--------|--------|
-| Entity | Message.ts | 50 | 80 | ✅ Good |
-| Entity | User.ts | 50 | 42 | ✅ Good |
-| Repository | messageRepository.ts | 200 | 206 | ✅ Good |
-| Service | messageService.ts | 250 | 225 | ✅ Good |
-| Store | messageStore.ts | 300 | 270 | ✅ Good |
-| Handler | messageSocketHandlers.ts | 200 | 156 | ✅ Good |
-| WebSocket | useWebSocket.ts (composable) | 200 | 999 | ⚠️ Over target |
+| Entity | Message.ts | 50 | 89 | ⚠️ Over target |
+| Entity | User.ts | 50 | 54 | ⚠️ Over target |
+| Repository | messageRepository.ts | 200 | 217 | ⚠️ Over target |
+| Service | messageService.ts | 250 | 242 | ✅ Good |
+| Store | messageStore.ts | 300 | 1,060 | ⚠️ Over target |
+| Handler | messageSocketHandlers.ts | 200 | 171 | ✅ Good |
+| WebSocket | useWebSocket.ts (composable) | 200 | 1,019 | ⚠️ Over target |
 
 ## Key Principles
 
@@ -167,4 +169,4 @@
 2. **Single Direction**: Data flows down, events flow up
 3. **Feature Isolation**: Each feature has its own folder
 4. **Pure Stores**: No business logic in stores
-5. **Explicit Errors**: Result types for error handling
+5. **Explicit Errors**: AppError hierarchy (`core/errors/AppError.ts`) with `errorUtils` helpers; repositories translate not-found to `null` and rethrow anything else

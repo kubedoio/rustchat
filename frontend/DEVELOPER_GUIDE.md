@@ -174,7 +174,7 @@ async function send() {
 - Use repositories for all API calls
 - Handle WebSocket events in feature handlers
 - Use branded types for IDs (`MessageId`, `ChannelId`)
-- Return Result types from repositories
+- Translate not-found to `null` with `isNotFoundError` and let other errors propagate from repositories (see `messageRepository.ts`)
 
 ### ❌ DON'T
 - Call API directly from stores
@@ -232,7 +232,7 @@ describe('useMessageStore', () => {
 
 ### Before (Old Pattern)
 ```typescript
-// stores/messages.ts (601 lines)
+// stores/messages.ts (601 lines — legacy store, since deleted; see MIGRATION_GUIDE.md)
 export const useMessageStore = defineStore('messages', {
   state: () => ({ messages: [] }),
   actions: {
@@ -249,14 +249,14 @@ export const useMessageStore = defineStore('messages', {
 
 ### After (New Pattern)
 ```typescript
-// stores/messageStore.ts (270 lines)
+// src/features/messages/stores/messageStore.ts
 export const useMessageStore = defineStore('messageStore', () => {
   const messagesByChannel = ref(new Map())
   const setMessages = (id, msgs) => messagesByChannel.value.set(id, msgs)
   return { messagesByChannel, setMessages }
 })
 
-// services/messageService.ts (225 lines)
+// src/features/messages/services/messageService.ts
 export class MessageService {
   async loadMessages(channelId) {
     const { messages } = await messageRepository.findByChannel(channelId)
