@@ -220,7 +220,11 @@ attach the output, and close #258 so the open-issue list reflects reality.
   Aliases` had failed on every recent main commit because it triggered when
   Integration Tests completed while Security (CodeQL) landed ~9 min later,
   freezing the `main`/`nightly` aliases (RI-C03 contract preserved; #330).
-  Post-fix promotion runs verified green; alias advance re-validated.
+  Post-fix gates verified green, but the build stage then exposed a deeper
+  pre-existing failure: the arm64-under-QEMU image build exceeds the
+  120-minute job timeout (amd64 builds natively in ~26 min), so no promotion
+  run had ever completed. Fixed by distributing multi-arch builds across
+  native runners (#338).
 - `fix(websocket)`: issue #320 (ghost reconnect after explicit `disconnect()`)
   fixed — close/onerror handlers detached before `ws.close()` so the late
   close event cannot re-arm the reconnect path; the orphaned-CONNECTING-socket
