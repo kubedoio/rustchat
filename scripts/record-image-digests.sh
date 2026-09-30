@@ -21,6 +21,11 @@
 # --enforce-aliases is meant for stable releases, where the build publishes
 # X.Y.Z, X.Y, and latest from one manifest. Prereleases must not pass it:
 # their aliases may legitimately point at the previous stable release.
+#
+# Environment:
+#   RECORD_IMAGE_DIGESTS_ATTEMPTS      manifest fetch attempts for transient
+#                                      statuses (default 5)
+#   RECORD_IMAGE_DIGESTS_RETRY_DELAY   seconds between attempts (default 5)
 set -euo pipefail
 
 PREFIX=""
@@ -99,6 +104,18 @@ REGISTRY="https://${PREFIX%%/*}"
 MINOR_VERSION="${VERSION%.*}"
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required" >&2 ; exit 1 ; }
 
+# Bounded retry for transient registry statuses on freshly-published tags.
+MANIFEST_ATTEMPTS="${RECORD_IMAGE_DIGESTS_ATTEMPTS:-5}"
+RETRY_DELAY="${RECORD_IMAGE_DIGESTS_RETRY_DELAY:-5}"
+for _n in "$MANIFEST_ATTEMPTS" "$RETRY_DELAY"; do
+  case "$_n" in
+    ''|*[!0-9]*)
+      echo "ERROR: retry settings must be non-negative integers (got: ${_n})" >&2 ; exit 2 ;;
+  esac
+done
+[ "$MANIFEST_ATTEMPTS" -ge 1 ] || {
+  echo "ERROR: RECORD_IMAGE_DIGESTS_ATTEMPTS must be at least 1" >&2 ; exit 2 ; }
+
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
@@ -118,21 +135,44 @@ registry_token() {
 # MANIFEST_DIGEST. Accepts both the OCI index and Docker manifest-list
 # media types. Fails (exits) with a clear message if the reference does
 # not resolve.
+#
+# Transient statuses that a freshly-published tag can produce while the
+# registry converges (404/408/425/429/5xx) are retried a bounded number
+# of times — the release evidence job reads tags moments after the same
+# run created them. Auth errors (401/403) and other statuses fail
+# immediately: retrying cannot help. Attempts and delay are tunable via
+# RECORD_IMAGE_DIGESTS_ATTEMPTS / RECORD_IMAGE_DIGESTS_RETRY_DELAY
+# (mainly for tests).
 fetch_manifest() {
-  local repo="$1" ref="$2" hdr body status
+  local repo="$1" ref="$2" hdr body status attempt
   hdr="${WORK}/manifest.hdr" body="${WORK}/manifest.json"
-  if ! status=$(curl -sS -D "$hdr" -o "$body" -w '%{http_code}' \
-      -H "Authorization: Bearer ${TOKEN}" \
-      -H "Accept: application/vnd.oci.image.index.v1+json" \
-      -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
-      "${REGISTRY}/v2/${repo}/manifests/${ref}" 2>/dev/null); then
-    echo "ERROR: registry request failed for ${repo}:${ref}" >&2
-    exit 1
-  fi
-  if [ "$status" != "200" ]; then
-    echo "ERROR: manifest ${repo}:${ref} not resolved (HTTP ${status})" >&2
-    exit 1
-  fi
+  attempt=0
+  while :; do
+    attempt=$((attempt + 1))
+    if ! status=$(curl -sS -D "$hdr" -o "$body" -w '%{http_code}' \
+        -H "Authorization: Bearer ${TOKEN}" \
+        -H "Accept: application/vnd.oci.image.index.v1+json" \
+        -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+        "${REGISTRY}/v2/${repo}/manifests/${ref}" 2>/dev/null); then
+      echo "ERROR: registry request failed for ${repo}:${ref}" >&2
+      exit 1
+    fi
+    case "$status" in
+      200) break ;;
+      404|408|425|429|5??)
+        if [ "$attempt" -lt "$MANIFEST_ATTEMPTS" ]; then
+          sleep "$RETRY_DELAY"
+          continue
+        fi
+        echo "ERROR: manifest ${repo}:${ref} not resolved (HTTP ${status}) after ${MANIFEST_ATTEMPTS} attempt(s)" >&2
+        exit 1
+        ;;
+      *)
+        echo "ERROR: manifest ${repo}:${ref} not resolved (HTTP ${status})" >&2
+        exit 1
+        ;;
+    esac
+  done
   MANIFEST_BODY="$(cat "$body")"
   MANIFEST_DIGEST="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="docker-content-digest:" {print $2}')"
   if [ -z "$MANIFEST_DIGEST" ]; then

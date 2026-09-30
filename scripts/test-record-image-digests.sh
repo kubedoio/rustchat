@@ -17,9 +17,16 @@ set -euo pipefail
 #   9. Failure-branch specificity: 404 vs digest-less 200 vs drift vs
 #      malformed/childless; recorded alias digests equal the version digest;
 #      token requests carry -f; the anonymous-auth run itself succeeds
+#  10. Transient-registry retry: converging tags resolve, exhausted retries
+#      fail closed, auth errors fail immediately, settings are validated
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="${SCRIPT_DIR}/record-image-digests.sh"
+
+# Keep retry behavior fast and deterministic in tests (the script defaults
+# to 5 attempts / 5s delay for the live registry consistency window).
+export RECORD_IMAGE_DIGESTS_ATTEMPTS=2
+export RECORD_IMAGE_DIGESTS_RETRY_DELAY=0
 
 PASS=0
 FAIL=0
@@ -83,6 +90,15 @@ case "${url}" in
     ref="${path##*/}"
     name="${repo//\//__}__${ref}"
     status="$(cat "${FIXTURES}/${name}.status" 2>/dev/null || echo 200)"
+    # A .retry fixture makes the endpoint return 404 that many times before
+    # serving normally (models registry convergence on fresh tags).
+    if [ -f "${FIXTURES}/${name}.retry" ]; then
+      left="$(cat "${FIXTURES}/${name}.retry")"
+      if [ "${left}" -gt 0 ]; then
+        echo "$((left - 1))" > "${FIXTURES}/${name}.retry"
+        status=404
+      fi
+    fi
     digest="$(cat "${FIXTURES}/${name}.digest" 2>/dev/null || true)"
     if [ -n "${hdr}" ]; then
       {
@@ -322,6 +338,58 @@ run_expect 2 "args: boolean flag with =value is a usage error" \
   --prefix ghcr.io/acme/rustchat --version 0.5.1 --enforce-aliases=1
 run_expect 0 "args: whitespace in --services is tolerated" \
   --prefix ghcr.io/acme/rustchat "--services=backend, frontend" --version 0.5.1
+
+# ---------- 9. transient-registry retry ----------
+# A freshly-published tag may 404 briefly while the registry converges; the
+# script must retry transient statuses (404/408/425/429/5xx) and succeed
+# once the tag appears, while still failing when it never does.
+index_json > "${FIXTURES}/acme__rustchat-backend__0.4.2.json"
+digest_for "converging" > "${FIXTURES}/acme__rustchat-backend__0.4.2.digest"
+printf '2' > "${FIXTURES}/acme__rustchat-backend__0.4.2.retry"
+RECORD_IMAGE_DIGESTS_ATTEMPTS=3
+OUTRETRY="$(run_target \
+  --prefix ghcr.io/acme/rustchat --services backend --version 0.4.2 2>/dev/null || true)"
+RECORD_IMAGE_DIGESTS_ATTEMPTS=2
+if echo "${OUTRETRY}" | grep -q 'version tag 0.4.2: ghcr.io/acme/rustchat-backend@'; then
+  ok "retry: transient 404s retried until the tag resolves"
+else
+  bad "retry: converging tag not resolved (got: ${OUTRETRY})"
+fi
+if [ "$(cat "${FIXTURES}/acme__rustchat-backend__0.4.2.retry")" = "0" ]; then
+  ok "retry: exactly the transient attempts were consumed"
+else
+  bad "retry: unexpected retry counter state"
+fi
+
+# Exhausted retries still fail closed with the attempts-annotated message.
+ERR404R="$(run_target "${PREFIX_ARGS[@]}" --version 9.9.9 2>&1 >/dev/null || true)"
+if echo "${ERR404R}" | grep -q 'not resolved (HTTP 404) after 2 attempt(s)'; then
+  ok "retry: exhausted retries report the attempts in the error"
+else
+  bad "retry: exhausted-retry message wrong (got: ${ERR404R})"
+fi
+
+# Non-transient statuses fail immediately, without retries.
+printf '401' > "${FIXTURES}/acme__rustchat-backend__0.4.3.status"
+ERR401="$(run_target --prefix ghcr.io/acme/rustchat --services backend \
+  --version 0.4.3 2>&1 >/dev/null || true)"
+if echo "${ERR401}" | grep -q 'not resolved (HTTP 401)$'; then
+  ok "retry: auth errors fail immediately without attempts annotation"
+else
+  bad "retry: 401 handling wrong (got: ${ERR401})"
+fi
+rm -f "${FIXTURES}/acme__rustchat-backend__0.4.3.status"
+
+# Invalid retry settings are usage errors.
+RECORD_IMAGE_DIGESTS_ATTEMPTS=x
+ERRBAD="$(run_target --prefix ghcr.io/acme/rustchat --services backend \
+  --version 0.5.1 2>&1 >/dev/null || true)"
+RECORD_IMAGE_DIGESTS_ATTEMPTS=2
+if echo "${ERRBAD}" | grep -q 'retry settings must be non-negative integers'; then
+  ok "retry: non-numeric attempts rejected"
+else
+  bad "retry: non-numeric attempts not rejected (got: ${ERRBAD})"
+fi
 
 echo
 echo "image-digest tests: ${PASS} passed, ${FAIL} failed"
