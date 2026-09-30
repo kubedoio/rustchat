@@ -148,7 +148,7 @@
 ```
 
 \* Calls is store-only: `features/calls/` has no repository or service
-layer — the calls store (`stores/callsStore.ts`) calls `api/calls.ts`
+layer — the calls store (`features/calls/stores/callsStore.ts`) calls `api/calls.ts`
 directly.
 
 ## File Size Targets vs Actual
@@ -169,4 +169,4 @@ directly.
 2. **Single Direction**: Data flows down, events flow up
 3. **Feature Isolation**: Each feature has its own folder
 4. **Pure Stores**: No business logic in stores
-5. **Explicit Errors**: Result types for error handling
+5. **Explicit Errors**: AppError hierarchy (`core/errors/AppError.ts`) with `errorUtils` helpers; repositories translate not-found to `null` and rethrow anything else

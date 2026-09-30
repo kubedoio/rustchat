@@ -174,7 +174,7 @@ async function send() {
 - Use repositories for all API calls
 - Handle WebSocket events in feature handlers
 - Use branded types for IDs (`MessageId`, `ChannelId`)
-- Return Result types from repositories
+- Translate not-found to `null` with `isNotFoundError` and let other errors propagate from repositories (see `messageRepository.ts`)
 
 ### ❌ DON'T
 - Call API directly from stores

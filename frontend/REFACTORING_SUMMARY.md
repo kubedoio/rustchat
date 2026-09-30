@@ -28,17 +28,17 @@ finally config in #334). `src/stores/` has been removed entirely.
 ## ✅ Completed Work
 
 ### Phase 1-5: Core + 4 Features
-- [x] **Core**: Entities, Errors, Types, WebSocket Manager
+- [x] **Core**: Entities, Errors (AppError + errorUtils), retry service
 - [x] **Messages**: Repository, Service, Store, Handlers
-- [x] **Calls**: WebRTC, Repository, Service, Store, Handlers
+- [x] **Calls**: WebRTC call handling in a store-only module (`index.ts` + `stores/callsStore.ts`)
 - [x] **Channels**: Repository, Service, Store, Handlers
-- [x] **Auth**: Login/logout, session, cookies, status, composables
+- [x] **Auth**: Login/logout, session, cookie, and status handling in a store-only module (`stores/authStore.ts` + test)
 
 ### Key Achievements
-1. **No Circular Dependencies**: Auth service uses global token function
-2. **Cookie Management**: MMAUTHTOKEN handling in repository
-3. **Session Persistence**: localStorage + cookie sync
-4. **401 Handling**: Centralized in auth service
+1. **No Circular Dependencies**: The API client (`api/client.ts`) resolves `useAuthStore()` lazily inside its interceptors, so the client↔auth import does not create a module-load cycle
+2. **Cookie Management**: MMAUTHTOKEN handling lives in the auth store — `logout()` asks the backend to clear the HttpOnly MMAUTHTOKEN cookie
+3. **Session Persistence**: token kept in sessionStorage (`useSessionStorage('auth_token')`) with a JWT-expiry timer that schedules automatic logout
+4. **401 Handling**: Centralized in the API client response interceptor (`api/client.ts`), which calls `authStore.logout()`
 
 ---
 

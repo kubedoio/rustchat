@@ -12,27 +12,43 @@ Successfully refactored the frontend from a flat, mixed-concern architecture to 
 
 | Layer | Files | Lines | Avg/File |
 |-------|-------|-------|----------|
-| **Core** | 11 | 837 | 76 |
-| **Features** | 40 | 5,020 | 126 |
-| **WebSocket** | 3 | 168 | 56 |
-| **Total New** | **54** | **6,025** | **112** |
-| **Legacy Stores** | 13 | 3,100 | 238 |
+| **Core** (`src/core/`) | 10 | 556 | 56 |
+| **Features** (`src/features/`, incl. tests) | 48 | 9,250 | 193 |
+| **Total** | **58** | **9,806** | **169** |
 
-### Features Completed
+Counts measured at HEAD via `git ls-tree -r HEAD frontend/src/<layer>` and
+`git show` (line counts include test files). The former `src/stores/`
+directory no longer exists, so no legacy row is shown — the migrations
+landed across several PRs and there is no single legacy snapshot left to
+measure.
 
-| Feature | Files | Lines | Old Lines | Change |
-|---------|-------|-------|-----------|--------|
-| **Messages** | 5 | 880 | 601 | +46% |
-| **Calls** | 5 | 1,476 | 960 | +54% |
-| **Channels** | 5 | 782 | 195 | +301% |
-| **Auth** | 5 | 509 | 95 | +436% |
-| **Teams** | 4 | 429 | 148 | +190% |
-| **Presence** | 4 | 304 | 145 | +110% |
-| **Unreads** | 4 | 307 | 130 | +136% |
-| **Preferences** | 4 | 333 | 105 | +217% |
-| **Total** | **36** | **5,020** | **2,379** | **+111%** |
+### Feature Modules (measured at HEAD, incl. tests)
 
-**Note**: Line increases represent proper separation of concerns, not code bloat. Each feature now has clear Repository/Service/Store/Handler layers.
+| Feature | Files | Lines |
+|---------|-------|-------|
+| **Messages** | 9 | 2,095 |
+| **Calls** | 2 | 1,033 |
+| **Channels** | 6 | 1,163 |
+| **Auth** | 2 | 472 |
+| **Teams** | 1 | 217 |
+| **Presence** | 6 | 477 |
+| **Unreads** | 1 | 242 |
+| **Preferences** | 1 | 153 |
+| **Theme** | 1 | 478 |
+| **UI** | 1 | 119 |
+| **Admin** | 5 | 1,021 |
+| **Playbooks** | 1 | 162 |
+| **Config** | 3 | 235 |
+| **Activity** | 4 | 365 |
+| **Knowledge** | 2 | 234 |
+| **Permissions** | 3 | 784 |
+| **Total** | **48** | **9,250** |
+
+**Note**: The old-vs-new line comparison from earlier drafts was dropped:
+the legacy stores were deleted across several PRs, so there is no
+measurable baseline to compare against. Only messages, channels, and
+activity have full Repository/Service layers; presence has a service
+layer; the rest are store-only by design.
 
 ---
 
@@ -95,7 +111,7 @@ frontend/src/
 4. ✅ **Pure Stores**: State management only, no business logic
 5. ✅ **Dependency Inversion**: No circular dependencies
 6. ✅ **Single Responsibility**: Each file has one job
-7. ✅ **Explicit Error Handling**: Result types, AppError hierarchy
+7. ✅ **Explicit Error Handling**: AppError hierarchy (`core/errors/AppError.ts`), `errorUtils` helpers, and `withRetry` normalizing unknown errors to `AppError`
 8. ✅ **Optimistic Updates**: UI responds immediately, syncs in background
 9. ✅ **WebSocket Decoupling**: Feature-specific handlers
 10. ✅ **Type Safety**: Branded types, strict typing
@@ -214,4 +230,4 @@ All major features have been refactored:
 - ✅ Teams (CRUD, members)
 - ✅ Unreads (counters, read state)
 
-**Total**: 54 files, 6,025 lines of well-organized, maintainable code.
+**Total**: 48 files, 9,250 lines in `src/features/` — 58 files / 9,806 lines including `src/core/` — of well-organized, maintainable code (incl. tests).
