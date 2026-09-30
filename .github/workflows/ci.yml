@@ -283,6 +283,9 @@ jobs:
       - name: Run gate propagation tests
         run: scripts/test-gate-propagation.sh
 
+      - name: Run image digest recording tests
+        run: scripts/test-record-image-digests.sh
+
   push-proxy-check:
     name: Push Proxy Check
     needs: detect-changes
