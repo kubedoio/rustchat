@@ -14,8 +14,9 @@ set -euo pipefail
 #   6. Registry credentials are forwarded to the token endpoint when set
 #   7. Malformed/childless manifests and token-endpoint failures are fatal
 #   8. Argument handling: missing values, boolean =value, service whitespace
-#   9. Failure-branch specificity: 404 vs digest-less 200; recorded alias
-#      digests equal the version digest; token requests carry -f
+#   9. Failure-branch specificity: 404 vs digest-less 200 vs drift vs
+#      malformed/childless; recorded alias digests equal the version digest;
+#      token requests carry -f; the anonymous-auth run itself succeeds
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="${SCRIPT_DIR}/record-image-digests.sh"
@@ -173,6 +174,8 @@ else
   bad "stable: attestation manifest leaked into record"
 fi
 # Recorded alias digests must equal the version-tag digest (not merely exist).
+# The extractions rely on backend being processed before frontend (services
+# list order), so head -1 selects the backend's lines.
 vd="$(echo "${OUT}" | awk '/version tag 0.5.1: ghcr.io\/acme\/rustchat-backend@/{print $NF}' | sed 's/.*@//' | head -1)"
 ld="$(echo "${OUT}" | awk '/alias latest:/{print $NF}' | head -1)"
 if [ -n "${vd}" ] && [ "${vd}" = "${ld}" ]; then
@@ -186,6 +189,12 @@ cp "${FIXTURES}/acme__rustchat-backend__latest.digest" "${WORK}/latest.orig"
 cp "${FIXTURES}/drifted.digest" "${FIXTURES}/acme__rustchat-backend__latest.digest"
 run_expect 1 "stable: alias drift fails under --enforce-aliases" \
   "${PREFIX_ARGS[@]}" --version 0.5.1 --enforce-aliases
+ERRDRIFT="$(run_target "${PREFIX_ARGS[@]}" --version 0.5.1 --enforce-aliases 2>&1 >/dev/null || true)"
+if echo "${ERRDRIFT}" | grep -q 'alias drift on ghcr.io/acme/rustchat-backend'; then
+  ok "stable: drift reported via the alias-drift error branch"
+else
+  bad "stable: wrong failure branch for drift (got: ${ERRDRIFT})"
+fi
 mv "${WORK}/latest.orig" "${FIXTURES}/acme__rustchat-backend__latest.digest"
 
 # ---------- 3. missing version tag ----------
@@ -244,12 +253,15 @@ else
 fi
 
 : > "${CURL_LOG}"
+# Assert the run itself succeeded before trusting the absence-based log
+# check below (a failed target would otherwise vacuously pass it).
+anon_rc=0
 run_target --prefix ghcr.io/acme/rustchat --services backend \
-  --version 0.5.1 >/dev/null 2>&1 || true
-if ! grep -q -- '-u ' "${CURL_LOG}"; then
+  --version 0.5.1 >/dev/null 2>&1 || anon_rc=$?
+if [ "${anon_rc}" -eq 0 ] && ! grep -q -- '-u ' "${CURL_LOG}"; then
   ok "auth: anonymous token request when no credentials set"
 else
-  bad "auth: credentials sent without env set"
+  bad "auth: anonymous run failed (exit ${anon_rc}) or credentials sent without env set"
 fi
 
 # ---------- 7. malformed / childless manifests and token failures ----------
@@ -259,12 +271,26 @@ printf '{not json' > "${FIXTURES}/acme__rustchat-backend__0.6.0.json"
 digest_for "malformed" > "${FIXTURES}/acme__rustchat-backend__0.6.0.digest"
 run_expect 1 "malformed: unparseable manifest body fails" \
   --prefix ghcr.io/acme/rustchat --services backend --version 0.6.0
+ERRMF="$(run_target --prefix ghcr.io/acme/rustchat --services backend \
+  --version 0.6.0 2>&1 >/dev/null || true)"
+if echo "${ERRMF}" | grep -q 'not a usable multi-arch index'; then
+  ok "malformed: reported via the unusable-index error branch"
+else
+  bad "malformed: wrong failure branch (got: ${ERRMF})"
+fi
 
 printf '{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json"}' \
   > "${FIXTURES}/acme__rustchat-backend__0.7.0.json"
 digest_for "childless" > "${FIXTURES}/acme__rustchat-backend__0.7.0.digest"
 run_expect 1 "childless: index without platform children fails" \
   --prefix ghcr.io/acme/rustchat --services backend --version 0.7.0
+ERRCL="$(run_target --prefix ghcr.io/acme/rustchat --services backend \
+  --version 0.7.0 2>&1 >/dev/null || true)"
+if echo "${ERRCL}" | grep -q 'not a usable multi-arch index'; then
+  ok "childless: reported via the unusable-index error branch"
+else
+  bad "childless: wrong failure branch (got: ${ERRCL})"
+fi
 
 # Token endpoint returning HTTP 200 with an errors body yields an empty
 # token (jq null handling) rather than a literal "null" bearer token.
