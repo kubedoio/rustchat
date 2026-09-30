@@ -271,15 +271,22 @@ jobs:
           # missing platforms (e.g. a silently dropped artifact).
           expected="${{ needs.prepare.outputs.platform_count }}"
           actual=$(find . -maxdepth 1 -type f | wc -l)
-          if [ "$actual" -ne "$expected" ]; then
+          if [ "$expected" -lt 1 ] || [ "$actual" -ne "$expected" ]; then
             echo "ERROR: expected $expected digests for ${{ matrix.service }}, found $actual — refusing to create a partial manifest" >&2
             exit 1
           fi
-          # Word splitting is intentional: each tag and each digest
-          # reference becomes a separate argument to imagetools create.
           # Digest files are bare hex, so the sha256: prefix is re-added
-          # here (buildx requires repo@sha256:<hex> references).
+          # here (buildx requires repo@sha256:<hex> references). The
+          # argument list is built explicitly rather than through a printf
+          # format string so the references can never be corrupted by
+          # format characters in the repository name.
+          refs=()
+          for digest_file in *; do
+            refs+=("$REPOSITORY@sha256:$digest_file")
+          done
+          # Word splitting is intentional: each metadata tag becomes a
+          # separate --tag argument.
           # shellcheck disable=SC2046
           docker buildx imagetools create \
             $(printf ' --tag %s ' ${{ steps.meta.outputs.tags }}) \
-            $(printf "$REPOSITORY@sha256:%s " *)
+            "${refs[@]}"
