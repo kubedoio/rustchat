@@ -14,6 +14,8 @@ set -euo pipefail
 #   6. Registry credentials are forwarded to the token endpoint when set
 #   7. Malformed/childless manifests and token-endpoint failures are fatal
 #   8. Argument handling: missing values, boolean =value, service whitespace
+#   9. Failure-branch specificity: 404 vs digest-less 200; recorded alias
+#      digests equal the version digest; token requests carry -f
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="${SCRIPT_DIR}/record-image-digests.sh"
@@ -43,7 +45,7 @@ cat > "${FAKE_BIN}/curl" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
 FIXTURES="${FAKE_FIXTURES}"
-hdr="" body="" wfmt="" url="" auth=""
+hdr="" body="" wfmt="" url="" auth="" flag_f=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -D) hdr="$2"; shift 2 ;;
@@ -51,7 +53,9 @@ while [ $# -gt 0 ]; do
     -w) wfmt="$2"; shift 2 ;;
     -u) auth="$2"; shift 2 ;;
     -H|--header) shift 2 ;;
-    -s|-S|-f|-sS|-sSf) shift ;;
+    -s|-S|-f|-sS|-sSf)
+      case "$1" in *f*) flag_f=1 ;; esac
+      shift ;;
     -*) echo "fake curl: unhandled flag $1" >&2; exit 64 ;;
     *) url="$1"; shift ;;
   esac
@@ -59,6 +63,10 @@ done
 if [ -n "${auth}" ]; then printf -- '-u %s\n' "${auth}" >> "${FAKE_CURL_LOG}"; fi
 case "${url}" in
   */token?scope=*)
+    # The real script must pass -f so token failures are fatal.
+    if [ "${flag_f}" -ne 1 ]; then
+      echo "fake curl: token request arrived without -f" >&2; exit 64
+    fi
     repo="${url##*scope=repository:}"; repo="${repo%%:*}"
     name="${repo//\//__}"
     if [ -f "${FIXTURES}/${name}__token.hardfail" ]; then exit 22; fi
@@ -148,7 +156,7 @@ PREFIX_ARGS=(--prefix "ghcr.io/acme/rustchat" "--services=backend,frontend")
 run_expect 0 "stable: aliases consistent, enforcement passes" \
   "${PREFIX_ARGS[@]}" --version 0.5.1 --enforce-aliases
 
-OUT="$(run_target "${PREFIX_ARGS[@]}" --version 0.5.1 --enforce-aliases 2>/dev/null)"
+OUT="$(run_target "${PREFIX_ARGS[@]}" --version 0.5.1 --enforce-aliases 2>/dev/null || true)"
 if echo "${OUT}" | grep -q '^# ghcr.io/acme/rustchat-backend$' \
   && echo "${OUT}" | grep -q 'version tag 0.5.1: ghcr.io/acme/rustchat-backend@' \
   && echo "${OUT}" | grep -q 'linux/amd64: sha256:aaaa1111' \
@@ -164,6 +172,14 @@ if ! echo "${OUT}" | grep -q 'unknown/unknown'; then
 else
   bad "stable: attestation manifest leaked into record"
 fi
+# Recorded alias digests must equal the version-tag digest (not merely exist).
+vd="$(echo "${OUT}" | awk '/version tag 0.5.1: ghcr.io\/acme\/rustchat-backend@/{print $NF}' | sed 's/.*@//' | head -1)"
+ld="$(echo "${OUT}" | awk '/alias latest:/{print $NF}' | head -1)"
+if [ -n "${vd}" ] && [ "${vd}" = "${ld}" ]; then
+  ok "stable: recorded alias digest equals version digest"
+else
+  bad "stable: alias digest mismatch in record (version=${vd} latest=${ld})"
+fi
 
 # ---------- 2. alias drift ----------
 cp "${FIXTURES}/acme__rustchat-backend__latest.digest" "${WORK}/latest.orig"
@@ -175,12 +191,29 @@ mv "${WORK}/latest.orig" "${FIXTURES}/acme__rustchat-backend__latest.digest"
 # ---------- 3. missing version tag ----------
 run_expect 1 "missing: version tag 404 fails" \
   "${PREFIX_ARGS[@]}" --version 9.9.9
+ERR404="$(run_target "${PREFIX_ARGS[@]}" --version 9.9.9 2>&1 >/dev/null || true)"
+if echo "${ERR404}" | grep -q 'not resolved (HTTP 404)'; then
+  ok "missing: 404 reported via the not-resolved error branch"
+else
+  bad "missing: wrong failure branch for 404 (got: ${ERR404})"
+fi
+
+# 200 response without a docker-content-digest header hits the
+# no-digest-header branch specifically.
+index_json > "${FIXTURES}/acme__rustchat-backend__0.8.0.json"
+ERRDH="$(run_target --prefix ghcr.io/acme/rustchat --services backend \
+  --version 0.8.0 2>&1 >/dev/null || true)"
+if echo "${ERRDH}" | grep -q 'no digest header'; then
+  ok "missing: digest-less 200 reported via the no-digest-header branch"
+else
+  bad "missing: wrong failure branch for digest-less 200 (got: ${ERRDH})"
+fi
 
 # ---------- 4. prerelease without enforcement ----------
 run_expect 0 "prerelease: aliases not enforced" \
   "${PREFIX_ARGS[@]}" --version 0.5.1-rc.1
 
-OUT_RC="$(run_target "${PREFIX_ARGS[@]}" --version 0.5.1-rc.1 2>/dev/null)"
+OUT_RC="$(run_target "${PREFIX_ARGS[@]}" --version 0.5.1-rc.1 2>/dev/null || true)"
 if echo "${OUT_RC}" | grep -q 'version tag 0.5.1-rc.1: ghcr.io/acme/rustchat-backend@' \
   && ! echo "${OUT_RC}" | grep -q 'alias latest:'; then
   ok "prerelease: records version digest, does not touch aliases"
@@ -203,7 +236,7 @@ fi
 PATH="${FAKE_BIN}:$PATH" FAKE_FIXTURES="${FIXTURES}" FAKE_CURL_LOG="${CURL_LOG}" \
   REGISTRY_USER=ci REGISTRY_TOKEN=sekrit \
   bash "${TARGET}" --prefix ghcr.io/acme/rustchat --services backend \
-  --version 0.5.1 >/dev/null 2>&1
+  --version 0.5.1 >/dev/null 2>&1 || true
 if grep -q -- '-u ci:sekrit' "${CURL_LOG}"; then
   ok "auth: credentials forwarded to token endpoint when set"
 else
@@ -212,7 +245,7 @@ fi
 
 : > "${CURL_LOG}"
 run_target --prefix ghcr.io/acme/rustchat --services backend \
-  --version 0.5.1 >/dev/null 2>&1
+  --version 0.5.1 >/dev/null 2>&1 || true
 if ! grep -q -- '-u ' "${CURL_LOG}"; then
   ok "auth: anonymous token request when no credentials set"
 else
