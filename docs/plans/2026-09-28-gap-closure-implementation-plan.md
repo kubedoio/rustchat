@@ -234,7 +234,7 @@ attach the output, and close #258 so the open-issue list reflects reality.
   the step env and applying the full set in one `imagetools create` call,
   with an empty-tag-set refusal (#340). The post-fix promotion
   (run 36728252070, promoting 7b6e960) completed green end-to-end in
-  ~75 minutes (gate → native amd64+arm64 builds → manifest merges
+  ~46 minutes (gate → native amd64+arm64 builds → manifest merges
   reporting "Applying 3 tag(s) to 2 platform digest(s)"), and all three
   aliases — `main`, `nightly`, `nightly-7b6e960…` — were verified in the
   registry as multi-arch manifests resolving to the same digest on all
