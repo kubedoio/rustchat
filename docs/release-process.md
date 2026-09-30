@@ -158,17 +158,20 @@ docker manifest inspect ghcr.io/kubedoio/rustchat-backend:v0.3.6
 The Release workflow also attaches evidence assets to every GitHub Release:
 
 - `image-digests-<version>.txt` — the immutable digest (`image@sha256:...`) of each
-  service image, per-platform child digests of the multi-arch index, and the resolved
-  `X.Y`/`latest` alias digests. To pin a deployment, reference the recorded digest
-  directly (`ghcr.io/kubedoio/rustchat-backend@sha256:...`); it is immutable even if a
-  moving tag is later re-published.
+  service image and the per-platform child digests of the multi-arch index. For
+  stable releases it also records the resolved `X.Y`/`latest` alias digests. To pin
+  a deployment, reference the recorded digest directly
+  (`ghcr.io/kubedoio/rustchat-backend@sha256:...`); it is immutable even if a moving
+  tag is later re-published.
 - `sbom-<service>-<version>.spdx.json` — an SPDX software bill of materials for each
   image (generated from the published multi-arch index; the `linux/amd64` variant is
   scanned).
 
 The digest record is produced by `scripts/record-image-digests.sh`, which also
-*enforces* alias consistency during the release: if `X.Y` or `latest` resolves to
-anything other than the version tag's manifest, the workflow fails.
+*enforces* alias consistency for stable releases: if `X.Y` or `latest` resolves to
+anything other than the version tag's manifest, the workflow fails. Prereleases
+record evidence without enforcement, since their aliases may legitimately point at
+the previous stable release.
 
 ## Rollback Procedure
 

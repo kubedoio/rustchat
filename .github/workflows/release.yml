@@ -212,7 +212,9 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Extract changelog section
         id: changelog
@@ -247,9 +249,9 @@ jobs:
 
             | Image | Tags |
             |-------|------|
-            | `ghcr.io/${{ github.repository }}-backend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
-            | `ghcr.io/${{ github.repository }}-frontend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
-            | `ghcr.io/${{ github.repository }}-push-proxy` | `${{ steps.version.outputs.VERSION }}`, `latest` |
+            | `${{ env.IMAGE_PREFIX }}-backend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
+            | `${{ env.IMAGE_PREFIX }}-frontend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
+            | `${{ env.IMAGE_PREFIX }}-push-proxy` | `${{ steps.version.outputs.VERSION }}`, `latest` |
 
             Immutable digests for every published tag and SPDX SBOMs for each
             image are attached to this release (`image-digests-*.txt`,
@@ -266,9 +268,9 @@ jobs:
             ## Quick Start
 
             ```bash
-            docker pull ghcr.io/${{ github.repository }}-backend:${{ steps.version.outputs.VERSION }}
-            docker pull ghcr.io/${{ github.repository }}-frontend:${{ steps.version.outputs.VERSION }}
-            docker pull ghcr.io/${{ github.repository }}-push-proxy:${{ steps.version.outputs.VERSION }}
+            docker pull ${{ env.IMAGE_PREFIX }}-backend:${{ steps.version.outputs.VERSION }}
+            docker pull ${{ env.IMAGE_PREFIX }}-frontend:${{ steps.version.outputs.VERSION }}
+            docker pull ${{ env.IMAGE_PREFIX }}-push-proxy:${{ steps.version.outputs.VERSION }}
             ```
           draft: false
           prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
