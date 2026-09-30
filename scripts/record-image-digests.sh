@@ -79,12 +79,21 @@ case "$PREFIX" in
   *) echo "ERROR: --prefix must be a full image prefix like ghcr.io/owner/repo" >&2 ; exit 2 ;;
 esac
 # Refs and service names flow into registry URLs; restrict them to a safe
-# charset so nothing needs URL encoding.
+# charset so nothing needs URL encoding. (Semver build metadata like
+# 1.2.3+build.5 is intentionally excluded — the repo never tags that way.)
 case "$VERSION" in
   *[!A-Za-z0-9._-]*)
     echo "ERROR: --version must contain only [A-Za-z0-9._-]: ${VERSION}" >&2 ; exit 2 ;;
 esac
 SERVICES="${SERVICES// /}"
+[ -n "$SERVICES" ] || { echo "ERROR: --services must name at least one service" >&2 ; usage ; }
+IFS=',' read -r -a SERVICE_LIST <<<"$SERVICES"
+for service in "${SERVICE_LIST[@]}"; do
+  case "$service" in
+    *[!a-z0-9-]*|'')
+      echo "ERROR: service names must be non-empty [a-z0-9-]: ${service}" >&2 ; exit 2 ;;
+  esac
+done
 
 REGISTRY="https://${PREFIX%%/*}"
 MINOR_VERSION="${VERSION%.*}"
@@ -133,12 +142,13 @@ fetch_manifest() {
 }
 
 # Child digests of the multi-arch index, skipping attestation manifests
-# (platform "unknown/unknown"). A jq failure here must be fatal: a
-# complete-looking record with silently missing platform digests defeats
-# the evidence contract, so callers assert the output is non-empty.
+# (platform "unknown/unknown") and any entry without a concrete platform.
+# A jq failure here must be fatal: a complete-looking record with silently
+# missing platform digests defeats the evidence contract, so callers assert
+# the output is non-empty.
 platform_lines() {
   jq -e -r '[.manifests[]?
-    | select((.platform.os? // "unknown") != "unknown")
+    | select(((.platform.os? // "") != "") and ((.platform.os? // "") != "unknown"))
     | "  \(.platform.os)/\(.platform.architecture): \(.digest)"] | .[]' <<<"$MANIFEST_BODY"
 }
 
@@ -150,9 +160,13 @@ out() {
   fi
 }
 
-[ -z "$OUTPUT" ] || : >"$OUTPUT"
+if [ -n "$OUTPUT" ]; then
+  if ! : >"$OUTPUT"; then
+    echo "ERROR: cannot write output file: ${OUTPUT}" >&2
+    exit 1
+  fi
+fi
 
-IFS=',' read -r -a SERVICE_LIST <<<"$SERVICES"
 for service in "${SERVICE_LIST[@]}"; do
   image="${PREFIX}-${service}"
   repo="${image#*/}"
@@ -166,15 +180,16 @@ for service in "${SERVICE_LIST[@]}"; do
   fi
 
   fetch_manifest "$repo" "$VERSION"
-  out "# ${image}"
-  out "  version tag ${VERSION}: ${image}@${MANIFEST_DIGEST}"
   # Release images are multi-arch by construction; a missing, malformed, or
   # childless platform list is exactly what this evidence job must catch
-  # (jq -e makes an empty result fatal).
+  # (jq -e makes an empty result fatal). Recorded only after the check so a
+  # fatal run leaves no partial evidence artifact behind.
   if ! children="$(platform_lines)"; then
     echo "ERROR: manifest for ${repo}:${VERSION} is not a usable multi-arch index (parse failure or no platform children)" >&2
     exit 1
   fi
+  out "# ${image}"
+  out "  version tag ${VERSION}: ${image}@${MANIFEST_DIGEST}"
   while IFS= read -r line; do
     out "$line"
   done <<<"$children"
