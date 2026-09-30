@@ -66,6 +66,11 @@ Priorities:
       coverage.
 - [ ] **Migration upgrade matrix** — Prove empty→latest and latest published
       stable→latest upgrades with application readiness evidence.
+      (Scope note: CI already proves schema convergence continuously —
+      empty→HEAD and latest-published-stable→HEAD via
+      `scripts/migration-matrix.sh`, see `docs/development/ci-gates.md`.
+      What remains open is the release-grade matrix with full application
+      readiness evidence, per `docs/repo-current-state.md`.)
 - [x] **Backup & restore** — Documented and tested data protection procedures.
       (Documented: docs/operations/runbook.md "Backup Procedures" and
       "Restore Procedure and Verification". Tested: the CI **Backup Restore**
