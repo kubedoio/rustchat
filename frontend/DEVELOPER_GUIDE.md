@@ -80,7 +80,9 @@ export const useMyFeatureStore = defineStore('myFeature', () => {
 ### 6. Create WebSocket Handler
 ```typescript
 // src/features/myfeature/handlers/myFeatureSocketHandlers.ts
-export function handleWebSocketEvent(event: WebSocketEvent) {
+import type { WsEnvelope } from '@/composables/useWebSocket'
+
+export function handleWebSocketEvent(event: WsEnvelope) {
   switch (event.event) {
     case 'myfeature_created':
       handleCreated(event)
@@ -88,7 +90,7 @@ export function handleWebSocketEvent(event: WebSocketEvent) {
   }
 }
 
-function handleCreated(event: WebSocketEvent) {
+function handleCreated(event: WsEnvelope) {
   const data = JSON.parse(event.data)
   myFeatureService.handleIncoming(data)
 }
