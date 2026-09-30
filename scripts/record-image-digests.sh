@@ -42,11 +42,12 @@ EOF
   exit 2
 }
 
-# Normalize --opt=value into --opt value so both forms work.
+# Normalize --opt=value into --opt value for the value-taking options.
 normalized=()
 for arg in "$@"; do
   case "$arg" in
-    --*=*) normalized+=("${arg%%=*}" "${arg#*=}") ;;
+    --prefix=*|--version=*|--services=*|--output=*)
+      normalized+=("${arg%%=*}" "${arg#*=}") ;;
     *) normalized+=("$arg") ;;
   esac
 done
@@ -54,10 +55,17 @@ set -- "${normalized[@]}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --prefix) PREFIX="${2:?}" ; shift 2 ;;
-    --version) VERSION="${2:?}" ; shift 2 ;;
-    --services) SERVICES="${2:?}" ; shift 2 ;;
-    --output) OUTPUT="${2:?}" ; shift 2 ;;
+    --prefix|--version|--services|--output)
+      if [ $# -lt 2 ]; then
+        echo "ERROR: $1 requires a value" >&2 ; usage
+      fi
+      case "$1" in
+        --prefix) PREFIX="$2" ;;
+        --version) VERSION="$2" ;;
+        --services) SERVICES="$2" ;;
+        --output) OUTPUT="$2" ;;
+      esac
+      shift 2 ;;
     --enforce-aliases) ENFORCE_ALIASES=1 ; shift ;;
     -h|--help) usage ;;
     *) echo "ERROR: unknown argument: $1" >&2 ; usage ;;
@@ -70,10 +78,20 @@ case "$PREFIX" in
   */*) : ;;
   *) echo "ERROR: --prefix must be a full image prefix like ghcr.io/owner/repo" >&2 ; exit 2 ;;
 esac
+# Refs and service names flow into registry URLs; restrict them to a safe
+# charset so nothing needs URL encoding.
+case "$VERSION" in
+  *[!A-Za-z0-9._-]*)
+    echo "ERROR: --version must contain only [A-Za-z0-9._-]: ${VERSION}" >&2 ; exit 2 ;;
+esac
+SERVICES="${SERVICES// /}"
 
 REGISTRY="https://${PREFIX%%/*}"
 MINOR_VERSION="${VERSION%.*}"
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required" >&2 ; exit 1 ; }
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "${WORK}"' EXIT
 
 # Exchange (optionally authenticated) for a pull-scoped registry token.
 # Anonymous access works for public packages.
@@ -84,7 +102,7 @@ registry_token() {
   fi
   curl -sSf "${auth_args[@]}" \
     "${REGISTRY}/token?scope=repository:${repo}:pull" \
-    | jq -r '.token // .access_token'
+    | jq -r '(.token // .access_token) // empty'
 }
 
 # Fetch a manifest by reference into the globals MANIFEST_BODY and
@@ -93,7 +111,7 @@ registry_token() {
 # not resolve.
 fetch_manifest() {
   local repo="$1" ref="$2" hdr body status
-  hdr="$(mktemp)" body="$(mktemp)"
+  hdr="${WORK}/manifest.hdr" body="${WORK}/manifest.json"
   if ! status=$(curl -sS -D "$hdr" -o "$body" -w '%{http_code}' \
       -H "Authorization: Bearer ${TOKEN}" \
       -H "Accept: application/vnd.oci.image.index.v1+json" \
@@ -108,7 +126,6 @@ fetch_manifest() {
   fi
   MANIFEST_BODY="$(cat "$body")"
   MANIFEST_DIGEST="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="docker-content-digest:" {print $2}')"
-  rm -f "$hdr" "$body"
   if [ -z "$MANIFEST_DIGEST" ]; then
     echo "ERROR: registry returned no digest header for ${repo}:${ref}" >&2
     exit 1
@@ -116,11 +133,13 @@ fetch_manifest() {
 }
 
 # Child digests of the multi-arch index, skipping attestation manifests
-# (platform "unknown/unknown").
+# (platform "unknown/unknown"). A jq failure here must be fatal: a
+# complete-looking record with silently missing platform digests defeats
+# the evidence contract, so callers assert the output is non-empty.
 platform_lines() {
-  jq -r '.manifests[]?
+  jq -e -r '[.manifests[]?
     | select((.platform.os? // "unknown") != "unknown")
-    | "  \(.platform.os)/\(.platform.architecture): \(.digest)"' <<<"$MANIFEST_BODY"
+    | "  \(.platform.os)/\(.platform.architecture): \(.digest)"] | .[]' <<<"$MANIFEST_BODY"
 }
 
 out() {
@@ -137,7 +156,10 @@ IFS=',' read -r -a SERVICE_LIST <<<"$SERVICES"
 for service in "${SERVICE_LIST[@]}"; do
   image="${PREFIX}-${service}"
   repo="${image#*/}"
-  TOKEN="$(registry_token "$repo")"
+  if ! TOKEN="$(registry_token "$repo")"; then
+    echo "ERROR: failed to obtain a registry token for ${repo}" >&2
+    exit 1
+  fi
   if [ -z "$TOKEN" ]; then
     echo "ERROR: no registry token obtained for ${repo}" >&2
     exit 1
@@ -146,10 +168,16 @@ for service in "${SERVICE_LIST[@]}"; do
   fetch_manifest "$repo" "$VERSION"
   out "# ${image}"
   out "  version tag ${VERSION}: ${image}@${MANIFEST_DIGEST}"
+  # Release images are multi-arch by construction; a missing, malformed, or
+  # childless platform list is exactly what this evidence job must catch
+  # (jq -e makes an empty result fatal).
+  if ! children="$(platform_lines)"; then
+    echo "ERROR: manifest for ${repo}:${VERSION} is not a usable multi-arch index (parse failure or no platform children)" >&2
+    exit 1
+  fi
   while IFS= read -r line; do
-    [ -n "$line" ] || continue
     out "$line"
-  done < <(platform_lines)
+  done <<<"$children"
 
   if [ "$ENFORCE_ALIASES" -eq 1 ]; then
     version_digest="$MANIFEST_DIGEST"
