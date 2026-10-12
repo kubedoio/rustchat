@@ -47,7 +47,7 @@ jobs:
         run: echo "DATABASE_URL=postgres://rustchat:rustchat@localhost:${{ job.services.postgres.ports[5432] }}/rustchat" >> "$GITHUB_ENV"
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3.38.2
+        uses: github/codeql-action/init@9f759ee644a3e7c15c1390abf49868036c00067b # v3.38.3
         with:
           languages: rust, javascript
           queries: security-extended,security-and-quality
@@ -83,7 +83,7 @@ jobs:
           key: ${{ runner.os }}-sqlx-cli-${{ hashFiles('backend/Cargo.lock') }}
 
       - name: Install SQLx CLI
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: sqlx-cli
 
@@ -104,7 +104,7 @@ jobs:
         run: cargo build --all-targets --all-features
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3.38.2
+        uses: github/codeql-action/analyze@9f759ee644a3e7c15c1390abf49868036c00067b # v3.38.3
 
   cargo-audit-backend:
     name: Cargo Audit (Backend)
@@ -126,7 +126,7 @@ jobs:
           key: ${{ runner.os }}-cargo-audit-v1
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: cargo-audit
 
@@ -153,7 +153,7 @@ jobs:
           key: ${{ runner.os }}-cargo-audit-v1
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: cargo-audit
 
@@ -180,7 +180,7 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-v1
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: cargo-deny
 
@@ -207,7 +207,7 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-v1
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: cargo-deny
 

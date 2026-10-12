@@ -159,7 +159,7 @@ jobs:
       # SPDX SBOMs are generated from the published multi-arch images; syft
       # scans the linux/amd64 variant of each index.
       - name: Generate SBOM (backend)
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ env.IMAGE_PREFIX }}-backend:${{ steps.version.outputs.VERSION }}
           format: spdx-json
@@ -169,7 +169,7 @@ jobs:
           registry-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate SBOM (frontend)
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ env.IMAGE_PREFIX }}-frontend:${{ steps.version.outputs.VERSION }}
           format: spdx-json
@@ -179,7 +179,7 @@ jobs:
           registry-password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate SBOM (push-proxy)
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ env.IMAGE_PREFIX }}-push-proxy:${{ steps.version.outputs.VERSION }}
           format: spdx-json
