@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.97-alpine@sha256:3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900 AS builder
+FROM rust:1.99-alpine@sha256:0cce0a5e0e8ba67b455257a3a02a1d99005f382748789d6464460028810f1627 AS builder
 
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev
 
