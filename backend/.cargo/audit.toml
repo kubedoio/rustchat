@@ -18,6 +18,22 @@ ignore = [
     # Tracking: https://rustsec.org/advisories/RUSTSEC-2023-0071
     # Action: Remove this ignore when rsa crate releases fixed version
     "RUSTSEC-2023-0071",
+
+    # RUSTSEC-2026-0387: crypto-bigint non-constant-time multiplication in
+    # modular exponentiation paths.
+    #
+    # Justification:
+    # - crypto-bigint 0.5.x is pinned by aws-sigv4 1.5 (`crypto-bigint ^0.5.4`),
+    #   pulled in transitively via aws-config / aws-sdk-s3 for S3 storage.
+    # - The advisory is patched in crypto-bigint >= 0.7.6 only, which is a
+    #   semver-major release aws-sigv4 does not accept yet.
+    # - RustChat does not perform RSA/ECC key operations with this crate; it is
+    #   used solely for AWS SigV4 request signing over already-derived keys.
+    #
+    # Tracking: https://rustsec.org/advisories/RUSTSEC-2026-0387
+    # Action: Remove this ignore once aws-sigv4 (or aws-sdk-*) ships a
+    #         crypto-bigint >= 0.7.6 dependency.
+    "RUSTSEC-2026-0387",
 ]
 
 # Threshold for reporting security vulnerabilities
