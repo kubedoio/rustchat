@@ -168,3 +168,56 @@ impl DocumentExtractor for DocxExtractor {
         &["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    /// Build a minimal DOCX (a ZIP containing `word/document.xml`) in memory.
+    fn build_docx(body_xml: &str) -> Vec<u8> {
+        let mut buffer = Cursor::new(Vec::new());
+        {
+            let mut archive = zip::ZipWriter::new(&mut buffer);
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            archive
+                .start_file("word/document.xml", options)
+                .expect("start document.xml entry");
+            archive
+                .write_all(body_xml.as_bytes())
+                .expect("write document.xml");
+            archive.finish().expect("finish docx archive");
+        }
+        buffer.into_inner()
+    }
+
+    #[test]
+    fn docx_extractor_reads_text_run_from_document_xml() {
+        let docx = build_docx(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body>
+                <w:p><w:r><w:t>RustChat</w:t></w:r></w:p>
+                <w:p><w:r><w:t xml:space="preserve"> knowledge </w:t></w:r></w:p>
+              </w:body>
+            </w:document>"#,
+        );
+
+        let extracted = DocxExtractor
+            .extract(&docx)
+            .expect("docx extraction should succeed");
+
+        assert!(extracted.contains("RustChat"), "got: {extracted:?}");
+        assert!(extracted.contains("knowledge"), "got: {extracted:?}");
+    }
+
+    #[test]
+    fn docx_extractor_rejects_non_zip_input() {
+        let error = DocxExtractor
+            .extract(b"definitely not a zip archive")
+            .expect_err("non-zip input must be rejected");
+
+        assert!(matches!(error, ExtractError::DocxExtractError(_)));
+    }
+}
