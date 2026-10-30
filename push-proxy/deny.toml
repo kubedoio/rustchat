@@ -13,6 +13,10 @@ yanked = "deny"
 ignore = [
     # RUSTSEC-2023-0071: Marvin Attack in rsa crate
     "RUSTSEC-2023-0071",
+    # RUSTSEC-2026-0387: crypto-bigint constant-time multiplication flaw.
+    # Pinned to 0.5.x by aws-sigv4 1.5; patched only in >= 0.7.6 (semver-major
+    # that aws-sigv4 does not accept). Used only for AWS SigV4 signing.
+    "RUSTSEC-2026-0387",
 ]
 
 [licenses]

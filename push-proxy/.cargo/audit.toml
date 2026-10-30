@@ -3,4 +3,10 @@
 # jsonwebtoken depends on rsa 0.9; no fixed upgrade is available upstream.
 # Severity: medium (5.9). Local use and JWT verification with trusted keys
 # is not exposed to network timing observation.
-ignore = ["RUSTSEC-2023-0071"]
+#
+# RUSTSEC-2026-0387: crypto-bigint constant-time multiplication flaw.
+# crypto-bigint 0.5.x is pinned by aws-sigv4 1.5 (^0.5.4) via aws-config.
+# Patched only in >= 0.7.6, a semver-major bump aws-sigv4 does not accept.
+# push-proxy uses the crate only for AWS SigV4 request signing, not for
+# RSA/ECC key operations on attacker-controlled input.
+ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2026-0387"]
