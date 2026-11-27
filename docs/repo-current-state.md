@@ -21,9 +21,9 @@
 > it is tracked in the release issue. Do not treat `0.5.1` (or `0.5.0`) as a
 > published release until a `v0.5.x` tag and GitHub release exist.
 
-As of this update (2026-11-27), a RustSec advisory/CI baseline fix is open as
-[PR #382](https://github.com/kubedoio/rustchat/pull/382) and is not merged into
-`main`.
+A RustSec advisory/CI baseline fix ([PR #382](https://github.com/kubedoio/rustchat/pull/382))
+merged into `main` on 2026-11-27, after the snapshot revision `b195719d`; it is
+not part of the snapshot described above.
 
 Version is synchronized across four files:
 - `VERSION`
