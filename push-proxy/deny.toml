@@ -17,6 +17,10 @@ ignore = [
     # Pinned to 0.5.x by aws-sigv4 1.5; patched only in >= 0.7.6 (semver-major
     # that aws-sigv4 does not accept). Used only for AWS SigV4 signing.
     "RUSTSEC-2026-0387",
+    # RUSTSEC-2026-0543: chrono is unmaintained (informational; no patched
+    # release will exist). Used for API timestamps; migrating to `time`/`jiff`
+    # is a cross-cutting refactor tracked separately.
+    "RUSTSEC-2026-0543",
 ]
 
 [licenses]

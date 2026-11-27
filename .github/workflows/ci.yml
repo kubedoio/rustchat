@@ -532,7 +532,17 @@ jobs:
         env:
           PGPORT: "5433"
           PGUSER: postgres
-        run: scripts/backup-restore-check.sh
+        # Run the check with the client tools from the same image as the
+        # server. The runner image ships a newer psql/pg_dump/pg_restore
+        # (currently PG 18), and an 18.x pg_dump emits session settings such
+        # as `SET transaction_timeout` that a PG 16 server rejects, turning
+        # this job red regardless of the change under test.
+        run: |
+          docker run --rm --network host \
+            -v "$PWD:/src" -w /src \
+            -e PGHOST=127.0.0.1 -e PGPORT -e PGUSER \
+            --entrypoint bash \
+            pgvector/pgvector:pg16 scripts/backup-restore-check.sh
 
   ci-complete:
     name: CI Complete
