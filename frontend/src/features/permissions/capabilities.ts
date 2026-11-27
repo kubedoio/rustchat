@@ -23,13 +23,21 @@ interface ChannelPermissionSnapshot {
   loading: boolean
 }
 
+// Authoritative, non-reactive lookup used by the loader. If the loader read the
+// reactive ref below, writing loading/failure snapshots would retrigger the
+// watcher that called it and cause an unbounded refetch loop.
+const channelPermissionState = new Map<string, ChannelPermissionSnapshot>()
+
+// Reactive mirror so computed values (`canManageCurrentChannel`, `isLoading`)
+// still update when snapshots change.
 const channelPermissionCache = ref<Record<string, ChannelPermissionSnapshot>>({})
 
 function setChannelPermissionSnapshot(channelId: string, snapshot: ChannelPermissionSnapshot) {
-  channelPermissionCache.value = {
-    ...channelPermissionCache.value,
-    [channelId]: snapshot,
-  }
+  channelPermissionState.set(channelId, snapshot)
+  // Rebuild from the Map rather than spreading the ref: this function runs
+  // synchronously inside the watcher, and reading the ref here would register
+  // it as a dependency of that watcher.
+  channelPermissionCache.value = Object.fromEntries(channelPermissionState)
 }
 
 export function canManageTeams(role?: string | null) {
@@ -77,6 +85,7 @@ export function canManageChannel(options: {
 }
 
 export function clearChannelPermissionCache() {
+  channelPermissionState.clear()
   channelPermissionCache.value = {}
 }
 
@@ -108,7 +117,9 @@ export function useCurrentTeamManagementPermission(teamIdSource: () => string | 
 }
 
 async function ensureChannelPermissionLoaded(channelId: string, userId: string) {
-  const existing = channelPermissionCache.value[channelId]
+  // Read the plain Map, not the reactive ref, so bookkeeping writes below cannot
+  // retrigger the watcher and start another fetch.
+  const existing = channelPermissionState.get(channelId)
   if (existing?.loaded || existing?.loading) {
     return
   }
