@@ -316,6 +316,9 @@ jobs:
       - name: Run image digest recording tests
         run: scripts/test-record-image-digests.sh
 
+      - name: Run migration matrix diagnostics tests
+        run: scripts/test-migration-matrix-diagnostics.sh
+
   push-proxy-check:
     name: Push Proxy Check
     needs: detect-changes
