@@ -22,7 +22,10 @@ set -euo pipefail
 #      SET transaction_timeout header -> exit 0, no diagnostic noise
 #   3. pg_dump failure -> exit 1 with pg_dump's error, not an opaque pipe exit
 #   4. large schema diff -> exit 1, output bounded to 80 lines, no broken pipe
-#   5. the matrix script has no diagnostic `... | head` / `... | grep` paths
+#   5. the harness keeps strict mode active: a mutated `diff | head` surfaces
+#      its raw 141/2 status instead of being masked as fail()'s exit 1
+#   6. the matrix script and shared lib have no diagnostic `... | head` /
+#      `... | grep` paths
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="${SCRIPT_DIR}/lib/schema-diff.sh"
@@ -48,7 +51,15 @@ mkdir -p "${FAKE_BIN}" "${FIXTURES}"
 cat > "${FAKE_BIN}/pg_dump" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
-db="${!#}"
+expected=(--schema-only --no-owner --no-privileges)
+if [[ "$#" -ne 4 \
+    || "$1" != "${expected[0]}" \
+    || "$2" != "${expected[1]}" \
+    || "$3" != "${expected[2]}" ]]; then
+  echo "fake pg_dump: unexpected arguments (expected: ${expected[*]} <db>): $*" >&2
+  exit 1
+fi
+db="$4"
 if [[ "${db}" == "dump_fails" ]]; then
   echo 'pg_dump: error: connection to database "dump_fails" failed: Connection refused' >&2
   exit 1
@@ -129,31 +140,41 @@ SQL
 } > "${FIXTURES}/big_b.sql"
 
 # ---------- driver ----------
-# Mirrors the strict mode and fail() contract of scripts/migration-matrix.sh.
-run_schema_flow() {
-  local left_db="$1"
-  local right_db="$2"
-  local label="$3"
+# The flow runs as a separate process, not as a shell function. Invoking a
+# function (or subshell) in a `||` list suppresses `set -e` for the whole call,
+# which is exactly the defect this harness must not have: a reintroduced
+# `diff | head` would exit 1 via fail() instead of exposing its raw 141/2.
+DRIVER="${WORK}/run-schema-flow.sh"
+cat > "${DRIVER}" <<'DRIVER'
+#!/usr/bin/env bash
+set -euo pipefail
 
-  (
-    set -euo pipefail
-    fail() { echo "migration-matrix: FAIL: $*" >&2; exit 1; }
-    # shellcheck source=lib/schema-diff.sh
-    source "${LIB}"
-    schema_dump "${left_db}" "${WORK}/left.sql"
-    schema_dump "${right_db}" "${WORK}/right.sql"
-    assert_schemas_identical "${WORK}/left.sql" "${WORK}/right.sql" \
-      "${WORK}/schema.diff" "${label}"
-  )
-}
+fail() { echo "migration-matrix: FAIL: $*" >&2; exit 1; }
+# shellcheck source=lib/schema-diff.sh
+source "${SCHEMA_DIFF_LIB}"
+schema_dump "$1" "${FLOW_WORK}/left.sql"
+schema_dump "$2" "${FLOW_WORK}/right.sql"
+assert_schemas_identical "${FLOW_WORK}/left.sql" "${FLOW_WORK}/right.sql" \
+  "${FLOW_WORK}/schema.diff" "$3"
+DRIVER
+chmod +x "${DRIVER}"
+export SCHEMA_DIFF_LIB="${LIB}"
+export FLOW_WORK="${WORK}"
 
 CASE_OUT="${WORK}/case.out"
 CASE_ERR="${WORK}/case.err"
 CASE_RC=0
 
-run_case() {
+# Run an arbitrary strict-mode script as a child and capture its raw status.
+run_script_case() {
+  local script="$1"
+  shift
   CASE_RC=0
-  run_schema_flow "$@" >"${CASE_OUT}" 2>"${CASE_ERR}" || CASE_RC=$?
+  bash "${script}" "$@" >"${CASE_OUT}" 2>"${CASE_ERR}" || CASE_RC=$?
+}
+
+run_case() {
+  run_script_case "${DRIVER}" "$@"
 }
 
 expect_rc() {
@@ -224,14 +245,74 @@ expect_err_contains "unified diff truncated to the first 80 lines" \
   "large schema difference reports truncation"
 expect_no_broken_pipe "large schema difference"
 
-# ---------- 5. static guards against reintroducing pipe diagnostics ----------
-# Strip comments so prose about the old pattern does not count as code.
-TARGET_CODE="$(sed 's/#.*$//' "${TARGET}")"
-if printf '%s\n' "${TARGET_CODE}" | grep -Eq '\|[[:space:]]*(head|grep)([[:space:]]|$)'; then
-  bad "migration-matrix.sh still pipes into head/grep"
+# ---------- 5. the harness keeps strict mode active (mutation control) ----------
+# Control: the old function-in-`||` shape swallows errexit, so the SIGPIPE from
+# `diff | head` is ignored and fail() runs, turning the raw 141/2 into exit 1.
+# This is the defect the harness itself previously had.
+run_old_style_mutation() {
+  (
+    set -euo pipefail
+    fail() { echo "migration-matrix: FAIL: schemas differ" >&2; exit 1; }
+    diff -u "$1" "$2" | head -40 >&2
+    fail "schemas differ"
+  )
+}
+
+OLD_STYLE_RC=0
+run_old_style_mutation "${FIXTURES}/big_a.sql" "${FIXTURES}/big_b.sql" \
+  >"${CASE_OUT}" 2>"${CASE_ERR}" || OLD_STYLE_RC=$?
+if [[ "${OLD_STYLE_RC}" -eq 1 ]] \
+    && grep -Fq "migration-matrix: FAIL: schemas differ" "${CASE_ERR}"; then
+  ok "control: function-in-|| harness masks SIGPIPE as fail()'s exit 1"
 else
-  ok "migration-matrix.sh has no producer | head/grep pipelines"
+  bad "control: expected masked exit 1 from function-in-|| harness, got ${OLD_STYLE_RC}"
 fi
+
+# The real harness runs each flow as a child process, so strict mode is active
+# inside it. The same mutated pipeline must surface the raw 141/2 failure and
+# must never reach fail(); otherwise a reintroduced `diff | head` would pass.
+MUTATION_DRIVER="${WORK}/mutated-diff-pipe.sh"
+cat > "${MUTATION_DRIVER}" <<'MUT'
+#!/usr/bin/env bash
+set -euo pipefail
+
+fail() { echo "migration-matrix: FAIL: schemas differ" >&2; exit 1; }
+diff -u "$1" "$2" | head -40 >&2
+fail "schemas differ"
+MUT
+chmod +x "${MUTATION_DRIVER}"
+
+run_script_case "${MUTATION_DRIVER}" "${FIXTURES}/big_a.sql" "${FIXTURES}/big_b.sql"
+if [[ "${CASE_RC}" -eq 141 || "${CASE_RC}" -eq 2 ]]; then
+  ok "mutated diff|head surfaces raw pipe failure (exit ${CASE_RC}), not fail()'s 1"
+else
+  bad "mutated diff|head returned ${CASE_RC}; expected 141 (SIGPIPE) or 2 (pipe error)"
+fi
+if grep -Fq "migration-matrix: FAIL: schemas differ" "${CASE_ERR}"; then
+  bad "mutated diff|head reached fail(); strict mode was masked in the child"
+else
+  ok "mutated diff|head never reaches fail()"
+fi
+
+# ---------- 6. static guards against reintroducing pipe diagnostics ----------
+# Strip comments so prose about the old pattern does not count as code.
+# Both files on the diagnostic path are scanned: a `| head` added to the shared
+# library is just as dangerous as one added to the matrix script.
+scan_no_pipe_diagnostics() {
+  local file="$1"
+  local code
+  code="$(sed 's/#.*$//' "${file}")"
+  if printf '%s\n' "${code}" \
+      | grep -Eq '\|[[:space:]]*(head|grep)([[:space:]]|$)'; then
+    bad "$(basename "${file}") still pipes into head/grep"
+  else
+    ok "$(basename "${file}") has no producer | head/grep pipelines"
+  fi
+}
+
+scan_no_pipe_diagnostics "${TARGET}"
+scan_no_pipe_diagnostics "${LIB}"
+
 if grep -Fq 'source "${SCRIPT_DIR}/lib/schema-diff.sh"' "${TARGET}"; then
   ok "migration-matrix.sh uses the tested schema-diff helper"
 else

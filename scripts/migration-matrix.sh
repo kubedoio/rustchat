@@ -42,6 +42,13 @@ fi
 # the repo root, so an absolute MIGRATIONS_DIR must not be passed verbatim
 # (it would match nothing and silently disable the append-only guard).
 MIGRATIONS_RELPATH="$(realpath --relative-to="${REPO_ROOT}" "${MIGRATIONS_DIR}")"
+# git archive prefixes archived paths with the repo-relative directory, so the
+# number of components to strip equals the depth of MIGRATIONS_RELPATH (2 for
+# the default backend/migrations). Deriving it keeps custom MIGRATIONS_DIR
+# values from silently extracting into nested directories (and applying every
+# migration to an empty upgrade database).
+IFS='/' read -r -a MIGRATIONS_PATH_PARTS <<< "${MIGRATIONS_RELPATH}"
+MIGRATIONS_STRIP_COMPONENTS="${#MIGRATIONS_PATH_PARTS[@]}"
 BASE_TAG="${MIGRATION_MATRIX_TAG:-v0.4.1}"
 # Commit of ${BASE_TAG} (v0.4.1). Used when the tag ref is absent — e.g.
 # fork PR checkouts that do not inherit upstream tags created after the
@@ -120,8 +127,14 @@ note "PASS empty-to-head: all $(ls "${MIGRATIONS_DIR}"/*.sql | wc -l) migrations
 TAG_DIR="${WORK_DIR}/tag_migrations"
 mkdir -p "${TAG_DIR}"
 git -C "${REPO_ROOT}" archive "${BASE_REF}" "${MIGRATIONS_RELPATH}" \
-  | tar -x --strip-components=2 -C "${TAG_DIR}" \
+  | tar -x --strip-components="${MIGRATIONS_STRIP_COMPONENTS}" -C "${TAG_DIR}" \
   || fail "failed to extract base-tag migrations from ${BASE_REF}"
+# A wrong --strip-components extracts into nested directories, leaving
+# ${TAG_DIR}/*.sql empty; the upgrade path would then apply every migration on
+# top of an empty database and silently prove nothing. Fail loudly instead.
+if ! compgen -G "${TAG_DIR}/*.sql" >/dev/null; then
+  fail "no base-tag migrations extracted from ${BASE_REF} (${MIGRATIONS_RELPATH}; strip-components=${MIGRATIONS_STRIP_COMPONENTS})"
+fi
 
 ${PSQL[@]} postgres -c "CREATE DATABASE \"${UPGRADE_DB}\";" >/dev/null
 for f in $(ls "${TAG_DIR}"/*.sql | sort); do
@@ -129,7 +142,7 @@ for f in $(ls "${TAG_DIR}"/*.sql | sort); do
     || fail "stable->HEAD: base-tag migration failed: $(basename "$f")"
 done
 BASE_COUNT=$(ls "${TAG_DIR}"/*.sql | wc -l)
-note "stable schema applied: ${BASE_COUNT} migrations from ${BASE_TAG}"
+note "stable schema applied: ${BASE_COUNT} migrations from ${BASE_REF}"
 
 # Apply only migrations added since the base tag (what sqlx migrate run does).
 NEW_COUNT=0
@@ -155,7 +168,7 @@ schema_dump "${EMPTY_DB}" "${WORK_DIR}/schema_empty.sql"
 schema_dump "${UPGRADE_DB}" "${WORK_DIR}/schema_upgrade.sql"
 assert_schemas_identical "${WORK_DIR}/schema_empty.sql" \
   "${WORK_DIR}/schema_upgrade.sql" "${WORK_DIR}/schema.diff" "migrated-readiness"
-note "PASS converged schema: empty->HEAD and ${BASE_TAG}->HEAD are identical"
+note "PASS converged schema: empty->HEAD and ${BASE_REF}->HEAD are identical"
 
 # Readiness spot checks: table:column pairs the repositories depend on. These
 # tables were created by divergent historical migrations; the compat

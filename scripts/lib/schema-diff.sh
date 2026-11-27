@@ -25,6 +25,15 @@
 #     upgrades. Other SET lines are left alone: they are identical for the two
 #     dumps produced by one pg_dump binary and can carry schema-relevant
 #     search_path/defaults.
+#
+# Caveat: normalization is line-oriented, so a multi-line string constant or
+# function body containing a line that looks exactly like `\restrict ...` or
+# `SET transaction_timeout = 0;` would have that line filtered from the dump.
+# This is acceptable for this comparison because empty->HEAD and
+# stable->HEAD apply the same migration set through the same filter, so the
+# filter cannot manufacture a difference between the two paths; a real schema
+# divergence still shows up in the surrounding lines. It is not a general
+# SQL-canonicalization tool.
 schema_dump() {
   local db="$1"
   local out="$2"

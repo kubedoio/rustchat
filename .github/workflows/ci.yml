@@ -66,6 +66,8 @@ jobs:
             migrations:
               - 'backend/migrations/**'
               - 'scripts/migration-matrix.sh'
+              - 'scripts/lib/schema-diff.sh'
+              - 'scripts/test-migration-matrix-diagnostics.sh'
               - '.github/workflows/ci.yml'
             backup:
               - 'backend/migrations/**'
