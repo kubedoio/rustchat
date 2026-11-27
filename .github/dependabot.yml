@@ -19,6 +19,11 @@ updates:
           - "minor"
           - "patch"
     ignore:
+      # vue-tsc 3.3.14 regresses template type inference and reports a bogus
+      # TS2339 ("Property 'value' does not exist on type Store<...>") for
+      # Pinia store access in large SFC templates (ProfileTab.vue). Stay on
+      # the last working release until the regression is fixed upstream.
+      - dependency-name: "vue-tsc"
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
