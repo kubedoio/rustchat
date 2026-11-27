@@ -454,14 +454,14 @@ impl MailProviderFactory {
             }
             crate::models::email::MailProviderType::Ses => {
                 // SES provider not yet implemented. Use SMTP provider with SES SMTP credentials
-                // as a workaround, or contribute: https://github.com/rustchat/rustchat/issues
+                // as a workaround, or contribute: https://github.com/kubedoio/rustchat/issues
                 Err(EmailProviderError::ConfigurationError(
                     "SES provider not yet implemented. Use SMTP provider with SES SMTP credentials as a workaround.".to_string(),
                 ))
             }
             crate::models::email::MailProviderType::Sendgrid => {
                 // SendGrid provider not yet implemented. Use SMTP provider with SendGrid SMTP credentials
-                // as a workaround, or contribute: https://github.com/rustchat/rustchat/issues
+                // as a workaround, or contribute: https://github.com/kubedoio/rustchat/issues
                 Err(EmailProviderError::ConfigurationError(
                     "SendGrid provider not yet implemented. Use SMTP provider with SendGrid SMTP credentials as a workaround.".to_string(),
                 ))
