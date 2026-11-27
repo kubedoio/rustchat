@@ -34,6 +34,21 @@ ignore = [
     # Action: Remove this ignore once aws-sigv4 (or aws-sdk-*) ships a
     #         crypto-bigint >= 0.7.6 dependency.
     "RUSTSEC-2026-0387",
+
+    # RUSTSEC-2026-0459: C SQLite CVE-2026-119375 via libsqlite3-sys.
+    #
+    # Justification:
+    # - libsqlite3-sys 0.30.x is required by sqlx-sqlite, an *optional*
+    #   dependency of sqlx 0.8. RustChat enables only the `postgres` driver
+    #   (`sqlx = { features = ["runtime-tokio", "postgres", ...] }`), so
+    #   sqlx-sqlite and libsqlite3-sys are never compiled or linked; they only
+    #   appear in Cargo.lock.
+    # - The advisory is patched in libsqlite3-sys >= 0.39.0, which is only
+    #   accepted by sqlx >= 0.9 (semver-major upgrade tracked separately).
+    #
+    # Tracking: https://rustsec.org/advisories/RUSTSEC-2026-0459
+    # Action: Remove this ignore when the project upgrades to sqlx 0.9+.
+    "RUSTSEC-2026-0459",
 ]
 
 # Threshold for reporting security vulnerabilities

@@ -26,6 +26,16 @@ ignore = [
     # aws-sigv4 does not accept. RustChat uses the crate only for AWS SigV4
     # request signing, not for RSA/ECC key operations on attacker input.
     "RUSTSEC-2026-0387",
+    # RUSTSEC-2026-0441: pin-utils is unmaintained (repo archived 2026-10-01).
+    # Transitive dependency of the futures ecosystem; no patched release will
+    # exist. Replacing it requires upstream (futures-* / other crates) to drop
+    # the dependency, so there is no action available in this repository.
+    "RUSTSEC-2026-0441",
+    # RUSTSEC-2026-0543: chrono is unmaintained (no release will fix it).
+    # chrono is used pervasively for API timestamps. Migrating to `time` or
+    # `jiff` is a cross-cutting refactor tracked separately; the advisory is
+    # informational and describes no vulnerability in chrono itself.
+    "RUSTSEC-2026-0543",
 ]
 
 [licenses]
