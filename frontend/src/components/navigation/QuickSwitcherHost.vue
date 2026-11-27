@@ -16,8 +16,7 @@ const router = useRouter()
 const quickSwitcher = useQuickSwitcher()
 
 function handleKeydown(e: KeyboardEvent) {
-  // Shift+Cmd/Ctrl+K is intentionally not the switcher shortcut. Keep the
-  // branch case-sensitive with respect to Shift so it cannot reopen here.
+  // Shift+Cmd/Ctrl+K is intentionally not the switcher shortcut.
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k') {
     e.preventDefault()
     quickSwitcher.toggle()

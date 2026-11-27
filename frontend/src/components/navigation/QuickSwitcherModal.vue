@@ -17,6 +17,7 @@
             v-model="query"
             type="text"
             placeholder="Jump to channel, team..."
+            aria-label="Search channels and teams"
             class="flex-1 bg-transparent outline-none text-base placeholder-gray-400"
             @keydown="handleKeydown"
           />
@@ -73,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { Search } from 'lucide-vue-next'
 import { matchSorter } from 'match-sorter'
 import QuickSwitcherItem from './QuickSwitcherItem.vue'
@@ -93,6 +94,7 @@ const emit = defineEmits<{
 const query = ref('')
 const selectedIndex = ref(0)
 const inputRef = ref<HTMLInputElement>()
+let previouslyFocused: HTMLElement | null = null
 
 const filteredItems = computed((): QSItem[] => {
   if (!query.value) return []
@@ -114,13 +116,36 @@ watch(
   () => props.isOpen,
   async open => {
     if (open) {
+      previouslyFocused = getFocusedElement()
       query.value = ''
       selectedIndex.value = 0
       await nextTick()
       inputRef.value?.focus()
+      return
     }
+
+    restoreFocus()
   }
 )
+
+// The modal can be torn down while still open (logout, route swap, host
+// unmount); hand focus back instead of leaking it to <body>.
+onBeforeUnmount(() => {
+  if (props.isOpen) restoreFocus()
+  previouslyFocused = null
+})
+
+function getFocusedElement(): HTMLElement | null {
+  const active = document.activeElement
+  if (!(active instanceof HTMLElement) || active === document.body) return null
+  return active
+}
+
+function restoreFocus() {
+  const target = previouslyFocused
+  previouslyFocused = null
+  if (target?.isConnected) target.focus()
+}
 
 function selectItem(item: QSItem) {
   emit('select', item)
@@ -128,6 +153,15 @@ function selectItem(item: QSItem) {
 }
 
 function handleKeydown(e: KeyboardEvent) {
+  // Result rows are non-focusable, so the search input is the only tab stop.
+  // Keep Tab/Shift+Tab inside the aria-modal dialog instead of letting focus
+  // escape to the page behind the overlay.
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    inputRef.value?.focus()
+    return
+  }
+
   const items = displayedItems.value
   if (!items.length) return
 

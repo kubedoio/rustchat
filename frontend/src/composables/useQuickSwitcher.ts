@@ -84,7 +84,14 @@ export function useQuickSwitcher() {
     isOpen.value = false
   }
   function toggle() {
-    isOpen.value = !isOpen.value
+    // Delegate to open/close so the Cmd+K path (which only calls toggle from
+    // QuickSwitcherHost) shares the lazy team fetch instead of flipping the
+    // flag directly.
+    if (isOpen.value) {
+      close()
+    } else {
+      open()
+    }
   }
 
   function addRecentItem(id: string) {
