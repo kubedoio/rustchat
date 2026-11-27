@@ -1,9 +1,12 @@
 # Repo Current State
 
-**Last updated:** 2026-09-30  
+**Last updated:** 2026-11-27<br>
+**Snapshot revision:** `b195719d` (2026-11-06)<br>
 **Version:** v0.5.1 (source)
 
-> This document describes the state of the repository as of its last update. For live issue tracking see GitHub Issues.
+> This is a point-in-time snapshot, not a live status page. Statements below
+> describe the repository at the snapshot revision unless they explicitly
+> describe later work. For live issue tracking see GitHub Issues.
 
 ---
 
@@ -18,12 +21,18 @@
 > it is tracked in the release issue. Do not treat `0.5.1` (or `0.5.0`) as a
 > published release until a `v0.5.x` tag and GitHub release exist.
 
-Version is synchronized across three files:
+At this snapshot a follow-up RustSec/npm advisory-baseline fix is open as
+[PR #382](https://github.com/kubedoio/rustchat/pull/382) and is not merged into
+`main`.
+
+Version is synchronized across four files:
+- `VERSION`
 - `backend/Cargo.toml` → `[package] version`
 - `frontend/package.json` → `"version"`
 - `push-proxy/Cargo.toml` → `[package] version`
 
-To check: `grep '^version' backend/Cargo.toml` or `jq .version frontend/package.json`
+To check: `cat VERSION`, `grep '^version' backend/Cargo.toml`, or
+`jq .version frontend/package.json`
 
 Versioning follows semver. Releases are cut by pushing a `v*` tag — the
 `release.yml` workflow generates the GitHub Release after its configured

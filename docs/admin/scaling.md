@@ -201,16 +201,18 @@ RUST_LOG=rustchat::realtime=debug,rustchat::middleware=debug
 
 ### Health Checks
 
-Health endpoint includes cluster status:
+The readiness endpoint includes dependency and connection status:
 
 ```bash
-curl http://localhost:3000/api/v1/health
+curl http://localhost:3000/api/v1/health/ready
 ```
 
 Response includes:
 - Database connectivity
 - Redis connectivity
-- Connection counts
+- S3 connectivity
+- Migration state
+- WebSocket connection counts
 
 ---
 

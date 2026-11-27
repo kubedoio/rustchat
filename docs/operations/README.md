@@ -38,10 +38,13 @@ This section contains operational runbooks and procedures for running RustChat i
 
 ### Health Checks
 ```bash
-# Backend health
-curl http://localhost:3000/health
+# Backend liveness (process is up)
+curl http://localhost:3000/api/v1/health/live
 
-# Full stack
+# Backend readiness (database, Redis, S3, migrations)
+curl http://localhost:3000/api/v1/health/ready
+
+# Full stack (through the frontend/Nginx proxy)
 curl http://localhost:8080/api/v4/system/ping
 ```
 

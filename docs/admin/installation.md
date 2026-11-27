@@ -43,7 +43,7 @@ For a quick local or small-scale setup:
 
 1. **Clone the Repo:**
    ```bash
-   git clone https://github.com/rustchat/rustchat.git
+   git clone https://github.com/kubedoio/rustchat.git
    cd rustchat
    ```
 2. **Configure Environment:**
