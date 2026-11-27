@@ -295,8 +295,7 @@ async function confirmDeleteAgent() {
             You are about to delete agent
             <span class="font-semibold text-text-1">{{
               deletingAgent?.display_name || deletingAgent?.username
-            }}</span
-            >.
+            }}</span>.
           </p>
           <p class="mt-1">This action cannot be undone.</p>
         </div>

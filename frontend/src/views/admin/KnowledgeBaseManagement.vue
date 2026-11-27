@@ -287,8 +287,7 @@ async function confirmDeleteKnowledgeBase() {
         <div class="text-xs text-text-2">
           <p>
             You are about to delete knowledge base
-            <span class="font-semibold text-text-1">{{ deletingKb?.name }}</span
-            >.
+            <span class="font-semibold text-text-1">{{ deletingKb?.name }}</span>.
           </p>
           <p class="mt-1">This action cannot be undone.</p>
         </div>

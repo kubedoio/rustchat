@@ -110,8 +110,8 @@ async function handleSubmit() {
       </div>
       <h3 class="text-xl font-semibold text-gray-900 mb-2">Check your email</h3>
       <p class="text-gray-600 mb-6">
-        If an account exists for <strong>{{ email }}</strong
-        >, you will receive a password reset link. Please check your inbox and spam folder.
+        If an account exists for <strong>{{ email }}</strong>, you will receive a password reset
+        link. Please check your inbox and spam folder.
       </p>
       <div class="space-y-4">
         <BaseButton variant="secondary" block @click="router.push('/login')">

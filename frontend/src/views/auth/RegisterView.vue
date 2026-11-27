@@ -127,9 +127,8 @@ async function handleRegister() {
       </div>
       <h3 class="text-xl font-semibold text-gray-900 mb-2">Check your email</h3>
       <p class="text-gray-600 mb-6">
-        We've sent a password setup link to <strong>{{ registeredEmail }}</strong
-        >. Please check your inbox and click the link to set your password and complete your
-        registration.
+        We've sent a password setup link to <strong>{{ registeredEmail }}</strong>. Please check
+        your inbox and click the link to set your password and complete your registration.
       </p>
       <div class="space-y-4">
         <p class="text-sm text-gray-500">
