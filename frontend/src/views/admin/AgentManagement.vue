@@ -266,7 +266,13 @@ async function confirmDeleteAgent() {
     />
 
     <!-- Delete Modal -->
-    <BaseModal v-if="deletingAgent" v-model="showDeleteModal" size="md" @close="closeDeleteModal">
+    <BaseModal
+      v-if="deletingAgent"
+      v-model="showDeleteModal"
+      size="md"
+      aria-label="Delete Agent"
+      @close="closeDeleteModal"
+    >
       <template #header>
         <div class="flex items-start justify-between p-5 border-b border-border-1">
           <div class="flex items-start gap-3">

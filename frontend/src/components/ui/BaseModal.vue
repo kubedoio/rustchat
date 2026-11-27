@@ -20,8 +20,9 @@ interface Props {
   /** Rendered as the default header and used as the dialog's accessible name. */
   title?: string
   /**
-   * Accessible name used when no `title` is rendered (no title prop, or a custom
-   * `header` slot is supplied). Falls back to "Dialog" when omitted.
+   * Explicit accessible-name override. When no default title header is rendered
+   * (custom `header` slot or no `title`), the name resolves as
+   * `ariaLabel ?? title ?? "Dialog"`.
    */
   ariaLabel?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
@@ -47,7 +48,7 @@ const titleId = `base-modal-title-${++modalInstanceCount}`
 const hasDefaultTitle = computed(() => Boolean(props.title) && !slots.header)
 const labelledBy = computed(() => (hasDefaultTitle.value ? titleId : undefined))
 const ariaLabel = computed(() =>
-  hasDefaultTitle.value ? undefined : (props.ariaLabel ?? 'Dialog')
+  hasDefaultTitle.value ? undefined : (props.ariaLabel ?? props.title ?? 'Dialog')
 )
 
 const sizeClasses: Record<string, string> = {

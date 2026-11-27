@@ -116,14 +116,25 @@ describe('BaseModal', () => {
       expect(getDialog().getAttribute('aria-label')).toBe('Dialog')
     })
 
-    it('falls back to ariaLabel when a custom header slot replaces the title', () => {
+    it('uses the title as accessible name when a custom header replaces the title', () => {
       mountModal(
-        { modelValue: true, title: 'Ignored', ariaLabel: 'Custom header dialog' },
-        { header: () => h('h2', 'Custom header') }
+        { modelValue: true, title: 'Delete User' },
+        { header: () => h('h2', 'Delete User') }
       )
 
       const dialog = getDialog()
-      expect(dialog.getAttribute('aria-label')).toBe('Custom header dialog')
+      expect(dialog.getAttribute('aria-label')).toBe('Delete User')
+      expect(dialog.hasAttribute('aria-labelledby')).toBe(false)
+    })
+
+    it('prefers ariaLabel over title with a custom header slot', () => {
+      mountModal(
+        { modelValue: true, title: 'Delete User', ariaLabel: 'Delete account' },
+        { header: () => h('h2', 'Delete User') }
+      )
+
+      const dialog = getDialog()
+      expect(dialog.getAttribute('aria-label')).toBe('Delete account')
       expect(dialog.hasAttribute('aria-labelledby')).toBe(false)
     })
 

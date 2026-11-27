@@ -260,7 +260,13 @@ async function confirmDeleteKnowledgeBase() {
     />
 
     <!-- Delete Modal -->
-    <BaseModal v-if="deletingKb" v-model="showDeleteModal" size="md" @close="closeDeleteModal">
+    <BaseModal
+      v-if="deletingKb"
+      v-model="showDeleteModal"
+      size="md"
+      aria-label="Delete Knowledge Base"
+      @close="closeDeleteModal"
+    >
       <template #header>
         <div class="flex items-start justify-between p-5 border-b border-border-1">
           <div class="flex items-start gap-3">
