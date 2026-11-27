@@ -22,9 +22,11 @@ name: Promote Moving Aliases
 # workflow-level concurrency group, and a superseded target exits cleanly
 # without touching any alias. `workflow_dispatch` follows the same rule so a
 # stale dispatch can never move aliases backwards; an operator who deliberately
-# wants to re-promote an older commit must set `allow_backfill: true`, which is
-# the only way to bypass the tip check. See the `concurrency` and
-# `Check target is still main head` comments below.
+# wants to re-publish an older commit must set `allow_backfill: true`, which is
+# the only way to bypass the tip check and publishes only the immutable
+# `nightly-<sha>` tag (never the shared `main` / `nightly` aliases). See the
+# `concurrency`, `Check target is still main head` and `build-and-push` tag
+# comments below.
 
 on:
   workflow_run:
@@ -86,12 +88,20 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_SHA" ]]; then
-            echo "sha=$INPUT_SHA" >> "$GITHUB_OUTPUT"
+            resolved="$INPUT_SHA"
           elif [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            echo "sha=$WORKFLOW_RUN_SHA" >> "$GITHUB_OUTPUT"
+            resolved="$WORKFLOW_RUN_SHA"
           else
-            echo "sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+            resolved="$COMMIT_SHA"
           fi
+          # A commit SHA is interpolated into the moving-alias tag list below;
+          # reject anything that is not a full 40-character hex SHA so an
+          # owner-supplied dispatch input cannot inject tag-list lines.
+          if [[ ! "$resolved" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: resolved target '$resolved' is not a full 40-character commit SHA" >&2
+            exit 1
+          fi
+          echo "sha=$resolved" >> "$GITHUB_OUTPUT"
 
       - name: Run promotion gate
         id: gate
@@ -127,7 +137,8 @@ jobs:
       # dispatch of a non-head commit with `allow_backfill: false` is refused
       # as superseded (a clean no-op with an operator hint) rather than moving
       # aliases backwards. `allow_backfill: true` is the deliberate override
-      # that exempts the run from the tip check.
+      # that exempts the run from the tip check; it still publishes only the
+      # immutable `nightly-<sha>` tag (see the `tags:` input below).
       - name: Check target is still main head
         id: tip
         if: ${{ github.event_name == 'workflow_run' || inputs.allow_backfill != true }}
@@ -184,9 +195,14 @@ jobs:
       # every tip-checked promotion so the merge job can fail closed if `main`
       # moved again while the build was running.
       expected_main_sha: ${{ needs.gate.outputs.expected_main_sha }}
+      # A deliberate backfill (`allow_backfill=true`) must not roll the shared
+      # `main` / `nightly` aliases backwards, so those two tags are disabled
+      # for a backfill; it publishes only the immutable SHA-scoped
+      # `nightly-<sha>` tag. For `workflow_run` and normal dispatches the
+      # expression is empty/false, so all three tags are published.
       tags: |
-        type=raw,value=main
-        type=raw,value=nightly
+        type=raw,value=main,enable=${{ inputs.allow_backfill != true }}
+        type=raw,value=nightly,enable=${{ inputs.allow_backfill != true }}
         type=raw,value=nightly-${{ needs.gate.outputs.sha }}
     permissions:
       contents: read

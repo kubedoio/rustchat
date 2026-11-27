@@ -27,9 +27,12 @@ on:
       tags:
         description: 'Metadata tags (multiline string for docker/metadata-action)'
         type: string
+        # Immutable-only default: callers that need the rolling X.Y / latest
+        # aliases must pass an explicitly gated `tags` input (see release.yml).
+        # scripts/check-alias-policy.sh rejects any workflow_call default that
+        # would emit a moving release alias.
         default: |
           type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
       timeout-minutes:
         description: 'Job timeout in minutes'
         type: number

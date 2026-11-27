@@ -51,10 +51,26 @@ produced by `docker-publish.yml` on push are **not** promoted aliases.
 Promotions also serialize through a workflow-level concurrency group, and a
 `workflow_run` promotion whose target is no longer the head of `main` exits
 successfully without moving any alias (the newer commit is responsible for the
-aliases); explicit `workflow_dispatch` backfills are exempt from the tip check.
-The release/promotion alias policy is guarded statically by
-`scripts/check-alias-policy.sh`, which runs in the `validate` job of the
-Release workflow.
+aliases); explicit `workflow_dispatch` backfills are exempt from the tip check
+but publish only the immutable `nightly-<sha>` tag, never the shared `main` /
+`nightly` aliases. The release/promotion alias policy is guarded statically by
+`scripts/check-alias-policy.sh`.
+
+### Workflow lint (PR level)
+
+Every pull request runs the `Workflow Lint` job in `ci.yml`, which is part of
+the required `CI Complete` check. It runs three guards against the workflow
+sources:
+
+| Step | Guard |
+|---|---|
+| `actionlint -no-color` | GitHub Actions syntax/semantics (pinned via `taiki-e/install-action`) |
+| `scripts/check-alias-policy.sh` | allowlisted `release.yml` / `promote.yml` tag sets plus a repo-wide scan for ungated or dynamic moving release aliases in `tags:` / `flavor:` inputs |
+| `scripts/test-alias-policy.sh` | positive/negative regression cases for the policy checker itself |
+
+The Release workflow's `validate` job re-runs `scripts/check-alias-policy.sh`
+against the exact tagged commit, so a bypass that lands through a direct push
+to a tag still fails the release gate.
 
 ## Release gate
 

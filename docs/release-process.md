@@ -118,8 +118,10 @@ while the images were building.
 default the main-tip check still applies, so dispatching an older commit exits
 as superseded with a step summary that tells the operator to set
 `allow_backfill=true`. That input is the only deliberate override of the tip
-check; use it only to re-publish a specific commit, never to roll an alias back
-unintentionally.
+check. A backfill publishes **only** the immutable `nightly-<sha>` tag — it
+never repoints the shared `main` or `nightly` aliases, so re-publishing an older
+commit cannot roll either alias backwards. Use it only to re-publish a specific
+commit, never as a substitute for normal promotion.
 
 ## Release Gate
 
@@ -306,7 +308,7 @@ To automate retention, consider enabling GitHub's built-in package retention or 
 
 ## Automation Notes
 
-- **Development image promotion:** Triggered by the post-merge `Integration Tests` workflow completing on `main` (and by manual dispatch). Advances `main`/`nightly`/`nightly-<sha>` only while the target is still `main` head, unless a backfill is explicitly requested.
+- **Development image promotion:** Triggered by the post-merge `Integration Tests` workflow completing on `main` (and by manual dispatch). Advances `main`/`nightly`/`nightly-<sha>` only while the target is still `main` head. A manual `allow_backfill=true` dispatch is limited to the immutable `nightly-<sha>` tag and never moves the shared aliases.
 - **Nightly:** The scheduled 02:00 UTC run is a full CI run on `main`; it no longer publishes images.
 - **Stable:** Triggered only by pushing a `v*.*.*` tag. No automatic stable releases.
 - **Dependabot** may open PRs for security fixes. These should be merged and released as patch versions promptly.
