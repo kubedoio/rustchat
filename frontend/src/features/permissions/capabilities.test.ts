@@ -68,6 +68,8 @@ describe('permission capabilities', () => {
     teamStore.members = []
 
     const module = await import('./capabilities')
+    // Clear the module-level cache after mocks reset and before this test's
+    // instances are created, so snapshots cannot leak across tests.
     module.clearChannelPermissionCache()
   })
 
@@ -75,8 +77,6 @@ describe('permission capabilities', () => {
     for (const scope of testScopes.splice(0)) {
       scope.stop()
     }
-
-    vi.clearAllMocks()
   })
 
   it('allows team creation only for team-managing roles', async () => {
@@ -193,8 +193,7 @@ describe('permission capabilities', () => {
     expect(canManageChannel.value).toBe(false)
   })
 
-  it('handles API failures gracefully and allows retry via cache clear or channel change', async () => {
-    // Setup: API fails
+  it('handles API failures without retrying until the channel changes', async () => {
     getMembersMock.mockRejectedValue(new Error('Network Error'))
 
     const { useChannelManagementPermission } = await import('./capabilities')
@@ -205,16 +204,20 @@ describe('permission capabilities', () => {
       )
     )
 
-    // After flush: should have attempted to load but failed. The watcher can
-    // legitimately retry after the cache records the failure, so only assert
-    // that the failing channel was requested.
+    // A failed load is terminal for the same inputs: recording the failure
+    // snapshot must not trigger the watcher into another request.
     await flushPromises()
-    expect(getMembersMock).toHaveBeenCalled()
+    expect(getMembersMock).toHaveBeenCalledTimes(1)
     expect(getMembersMock).toHaveBeenCalledWith('channel-fail')
     expect(isLoading.value).toBe(false)
     expect(canManageChannel.value).toBe(false)
 
-    // Now simulate recovery: clear cache and change to a new channel with successful API
+    await flushPromises()
+    await nextTick()
+    expect(getMembersMock).toHaveBeenCalledTimes(1)
+
+    // Now simulate recovery: clear the cache and use a new channel with a
+    // successful API. The existing failed watcher must not refetch.
     const module = await import('./capabilities')
     module.clearChannelPermissionCache()
 
@@ -234,11 +237,13 @@ describe('permission capabilities', () => {
     await flushPromises()
     expect(getMembersMock).toHaveBeenCalledWith('channel-recovered')
     expect(canManageRecovered.value).toBe(true)
+    expect(getMembersMock.mock.calls.filter(call => call[0] === 'channel-fail')).toHaveLength(1)
   })
 
   it('disposes watchers with their effect scope so stale instances cannot fire later', async () => {
     getMembersMock.mockResolvedValue({ data: [] })
-    const { useChannelManagementPermission } = await import('./capabilities')
+    const { useChannelManagementPermission, clearChannelPermissionCache } =
+      await import('./capabilities')
 
     // Simulate the watcher owned by an earlier test that has now finished.
     const previousTestScope = effectScope()
@@ -255,6 +260,9 @@ describe('permission capabilities', () => {
     expect(getMembersMock).toHaveBeenCalledWith('channel-previous')
 
     previousTestScope.stop()
+    // Drop the successful snapshot so a leaked watcher would have to refetch
+    // instead of hitting the `loaded` early-return.
+    clearChannelPermissionCache()
 
     // The next test creates its own instance. Mutating the shared stores below
     // must only be seen by the live instance, never by the stopped one.
@@ -272,7 +280,7 @@ describe('permission capabilities', () => {
     authStore.user = { id: 'user-2', role: 'member' }
     await flushPromises()
 
-    expect(getMembersMock).toHaveBeenCalledTimes(2)
-    expect(getMembersMock.mock.calls).toEqual([['channel-previous'], ['channel-current']])
+    expect(getMembersMock.mock.calls.filter(call => call[0] === 'channel-previous')).toHaveLength(1)
+    expect(getMembersMock).toHaveBeenLastCalledWith('channel-current')
   })
 })
