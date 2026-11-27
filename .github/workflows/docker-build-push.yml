@@ -50,6 +50,14 @@ on:
         description: 'Optional Docker target for the backend image'
         type: string
         default: ''
+      expected_main_sha:
+        description: >-
+          When set, the merge job re-resolves `main` immediately before
+          publishing and fails closed unless it still points at this SHA.
+          Used by promote.yml to close the tip-check-to-push race; every
+          other caller leaves it empty and is unaffected.
+        type: string
+        default: ''
 
 env:
   REGISTRY: ghcr.io
@@ -262,11 +270,16 @@ jobs:
         env:
           REPOSITORY: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.image_suffix }}
           # Multi-line outputs must reach the script via env, never via raw
-          # ${{ }} interpolation inside run: — newlines in an unquoted
-          # interpolation split command substitutions into separate
+          # workflow-expression interpolation inside run: — newlines in an
+          # unquoted interpolation split command substitutions into separate
           # commands (observed live: only the first tag was applied and
           # the remaining tag strings were executed as commands).
           TAGS: ${{ steps.meta.outputs.tags }}
+          # TOCTOU guard inputs (empty unless promote.yml set them). The
+          # repository and SHA reach the shell only through the environment.
+          REPO: ${{ github.repository }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           shopt -s inherit_errexit
@@ -313,4 +326,22 @@ jobs:
             exit 1
           fi
           echo "Applying $((${#tag_args[@]} / 2)) tag(s) to ${#refs[@]} platform digest(s)"
+          # TOCTOU guard (M1): the caller's tip check proves the target was
+          # `main` head before the build started, but a promotion can run for
+          # over an hour. Re-resolve `main` immediately before aliases are
+          # published and fail closed if it moved: a stale promotion must never
+          # overwrite aliases already advanced by a newer commit. Only
+          # promote.yml sets EXPECTED_MAIN_SHA; other callers skip this.
+          if [ -n "${EXPECTED_MAIN_SHA}" ]; then
+            current_main="$(gh api "repos/${REPO}/commits/main" --jq .sha)"
+            if [ -z "${current_main}" ]; then
+              echo "ERROR: could not resolve the current main head; refusing to publish moving aliases." >&2
+              exit 1
+            fi
+            if [ "${current_main}" != "${EXPECTED_MAIN_SHA}" ]; then
+              echo "ERROR: main moved to ${current_main} while this promotion was building (expected ${EXPECTED_MAIN_SHA}); refusing to move aliases backwards." >&2
+              exit 1
+            fi
+            echo "main still points at ${EXPECTED_MAIN_SHA}; proceeding."
+          fi
           docker buildx imagetools create "${tag_args[@]}" "${refs[@]}"
