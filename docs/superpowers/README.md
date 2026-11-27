@@ -2,7 +2,7 @@
 
 Working area for the plan-first agent/contributor workflow described in
 [`docs/development/agent-model.md`](../development/agent-model.md) and
-[`AGENTS.md`](../../AGENTS.md).
+[`AGENTS.md`](https://github.com/kubedoio/rustchat/blob/main/AGENTS.md).
 
 This is not product architecture documentation. Durable design decisions belong
 in `docs/adr/`; released/operational documentation lives under its respective
@@ -18,8 +18,9 @@ in `docs/adr/`; released/operational documentation lives under its respective
 Both directories are empty apart from `.gitkeep` in this snapshot. The
 `.gitkeep` files preserve the layout referenced by
 `.governance/agent-contracts.yml`, `.governance/protected-paths.yml`, and
-[`AGENTS.md`](../../AGENTS.md). The `compat-agent` contract permits analysis
-output in these directories, but not production code.
+[`AGENTS.md`](https://github.com/kubedoio/rustchat/blob/main/AGENTS.md). The
+`compat-agent` contract permits analysis output in these directories, but not
+production code.
 
 Historical superpowers material formerly archived under
 `docs/archive/superpowers/` was removed from the public tree during the
