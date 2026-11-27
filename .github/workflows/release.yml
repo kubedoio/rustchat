@@ -5,6 +5,15 @@ on:
     tags:
       - 'v*.*.*'
 
+# Stable releases move the same per-service rolling aliases (`X.Y`, `latest`),
+# so two tags pushed close together must never interleave their alias pushes
+# (the older one could win after the newer one). Serialize all release runs;
+# `cancel-in-progress: false` queues an overlapping run instead of aborting an
+# in-flight one between manifest pushes.
+concurrency:
+  group: release-moving-aliases
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -229,14 +238,19 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          version="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=${version}" >> "$GITHUB_OUTPUT"
           echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-          # Mirror the docker-release tag policy: rolling aliases exist only
-          # for stable tags, so prerelease notes must not advertise `latest`.
+          # Mirror the docker-release tag policy: rolling aliases (the `X.Y`
+          # minor line and `latest`) exist only for stable tags, so prerelease
+          # notes must advertise neither. For a stable `X.Y.Z` tag the notes
+          # list the immutable version, the rolling `X.Y` minor tag, and
+          # `latest`; a prerelease lists only its exact version.
           if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
             echo "ALIAS_TAGS=" >> "$GITHUB_OUTPUT"
           else
-            echo "ALIAS_TAGS=, \`latest\`" >> "$GITHUB_OUTPUT"
+            minor="${version%.*}"
+            echo "ALIAS_TAGS=, \`${minor}\`, \`latest\`" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Extract changelog section
