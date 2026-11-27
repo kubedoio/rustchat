@@ -116,6 +116,15 @@ describe('BaseModal', () => {
       expect(getDialog().getAttribute('aria-label')).toBe('Dialog')
     })
 
+    it('never emits an empty aria-label for whitespace-only names', () => {
+      mountModal(
+        { modelValue: true, title: '', ariaLabel: '   ' },
+        { header: () => h('h2', 'Header') }
+      )
+
+      expect(getDialog().getAttribute('aria-label')).toBe('Dialog')
+    })
+
     it('uses the title as accessible name when a custom header replaces the title', () => {
       mountModal(
         { modelValue: true, title: 'Delete User' },
@@ -214,6 +223,33 @@ describe('BaseModal', () => {
       expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
       expect(wrapper.emitted('close')).toHaveLength(1)
     })
+
+    it('closes when the backdrop is clicked', async () => {
+      const wrapper = mountModal({ modelValue: true, title: 'Settings' })
+
+      const backdrop = getDialog().previousElementSibling as HTMLElement
+      backdrop.click()
+      await nextTick()
+
+      expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
+      expect(wrapper.emitted('close')).toHaveLength(1)
+    })
+
+    it('does not let Escape reach document-level listeners', async () => {
+      const wrapper = mountModal({ modelValue: true, title: 'Settings' })
+      const documentListener = vi.fn()
+      document.addEventListener('keydown', documentListener)
+
+      try {
+        dispatchKeydown(getDialog(), 'Escape')
+        await nextTick()
+
+        expect(documentListener).not.toHaveBeenCalled()
+        expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
+      } finally {
+        document.removeEventListener('keydown', documentListener)
+      }
+    })
   })
 
   describe('focus management', () => {
@@ -267,6 +303,76 @@ describe('BaseModal', () => {
       wrappers.splice(wrappers.indexOf(wrapper), 1)
 
       expect(document.activeElement).toBe(trigger)
+    })
+
+    it('does not throw when the trigger was removed before focus restore', async () => {
+      const trigger = document.createElement('button')
+      document.body.appendChild(trigger)
+      trigger.focus()
+
+      const wrapper = mountModal({ modelValue: true, title: 'Settings' })
+      await nextTick()
+      await nextTick()
+      expect(getDialog().contains(document.activeElement)).toBe(true)
+
+      trigger.remove()
+
+      await wrapper.setProps({ modelValue: false })
+      await nextTick()
+      await nextTick()
+
+      expect(document.activeElement).not.toBe(trigger)
+    })
+
+    it('restores focus through a nested modal chain', async () => {
+      const trigger = document.createElement('button')
+      document.body.appendChild(trigger)
+      trigger.focus()
+
+      const outer = mountModal(
+        { modelValue: true, title: 'Outer' },
+        { default: () => h('button', { 'data-testid': 'outer-action' }, 'Outer action') }
+      )
+      await nextTick()
+      await nextTick()
+      expect(getDialog().contains(document.activeElement)).toBe(true)
+
+      const inner = mountModal(
+        { modelValue: true, title: 'Inner' },
+        { default: () => h('button', { 'data-testid': 'inner-action' }, 'Inner action') }
+      )
+      await nextTick()
+      await nextTick()
+
+      const innerDialog = document.querySelectorAll<HTMLElement>('[role="dialog"]')[1]
+      expect(innerDialog.contains(document.activeElement)).toBe(true)
+
+      await inner.setProps({ modelValue: false })
+      await nextTick()
+      await nextTick()
+      expect(getDialog().contains(document.activeElement)).toBe(true)
+
+      await outer.setProps({ modelValue: false })
+      await nextTick()
+      await nextTick()
+      expect(document.activeElement).toBe(trigger)
+    })
+
+    it('ignores autofocus on a disabled element and focuses the first focusable', async () => {
+      mountModal(
+        { modelValue: true, title: 'Settings', hideClose: true },
+        {
+          default: () =>
+            h('div', [
+              h('input', { autofocus: true, disabled: true }),
+              h('button', { 'data-testid': 'fallback' }, 'Fallback'),
+            ]),
+        }
+      )
+      await nextTick()
+      await nextTick()
+
+      expect(document.activeElement?.getAttribute('data-testid')).toBe('fallback')
     })
   })
 
@@ -331,6 +437,23 @@ describe('BaseModal', () => {
 
       expect(event.defaultPrevented).toBe(true)
       expect(document.activeElement).toBe(dialog)
+    })
+
+    it('intercepts Tab when focus is outside the dialog', async () => {
+      mountWithButtons()
+      await nextTick()
+
+      const outside = document.createElement('button')
+      outside.textContent = 'Outside'
+      document.body.appendChild(outside)
+      outside.focus()
+      expect(document.activeElement).toBe(outside)
+
+      const event = dispatchKeydown(document.body, 'Tab')
+      await nextTick()
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(document.activeElement).toBe(firstButton())
     })
   })
 

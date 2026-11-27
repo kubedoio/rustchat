@@ -48,7 +48,7 @@ const titleId = `base-modal-title-${++modalInstanceCount}`
 const hasDefaultTitle = computed(() => Boolean(props.title) && !slots.header)
 const labelledBy = computed(() => (hasDefaultTitle.value ? titleId : undefined))
 const ariaLabel = computed(() =>
-  hasDefaultTitle.value ? undefined : (props.ariaLabel ?? props.title ?? 'Dialog')
+  hasDefaultTitle.value ? undefined : props.ariaLabel?.trim() || props.title?.trim() || 'Dialog'
 )
 
 const sizeClasses: Record<string, string> = {
@@ -110,6 +110,9 @@ function getFocusableElements(): HTMLElement[] {
     if (element.hasAttribute('disabled') || element.hasAttribute('hidden')) return false
     if (element.getAttribute('aria-hidden') === 'true') return false
     if (element.closest('[inert]')) return false
+    // `checkVisibility` is not implemented by jsdom; guard on its presence
+    // rather than using `getClientRects()`, which is always empty there.
+    if (typeof element.checkVisibility === 'function' && !element.checkVisibility()) return false
     return true
   })
 }
@@ -118,8 +121,9 @@ function focusInitialElement() {
   const root = dialogRef.value
   if (!root) return
 
-  const autofocus = root.querySelector<HTMLElement>('[autofocus]')
-  const target = autofocus ?? getFocusableElements()[0] ?? root
+  const focusable = getFocusableElements()
+  const autofocus = focusable.find(element => element.hasAttribute('autofocus'))
+  const target = autofocus ?? focusable[0] ?? root
   target.focus()
 }
 
@@ -131,17 +135,46 @@ function restoreFocus() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Document-level keyboard listener
+// ---------------------------------------------------------------------------
+// The dialog container is not guaranteed to own focus (focus may sit on
+// `document.body`), so Tab and Escape are handled at the document level while
+// this modal is open. Nested modals: only the topmost dialog reacts.
+let keydownListening = false
+
+function isTopmostDialog(): boolean {
+  const root = dialogRef.value
+  if (!root) return false
+  const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')
+  return dialogs.length > 0 && dialogs[dialogs.length - 1] === root
+}
+
+function attachKeydownListener() {
+  if (keydownListening) return
+  document.addEventListener('keydown', onKeydown)
+  keydownListening = true
+}
+
+function detachKeydownListener() {
+  if (!keydownListening) return
+  document.removeEventListener('keydown', onKeydown)
+  keydownListening = false
+}
+
 watch(
   () => props.modelValue,
   async isOpen => {
     if (isOpen) {
       previouslyFocused = document.activeElement as HTMLElement | null
       lockBodyScroll()
+      attachKeydownListener()
       await nextTick()
       focusInitialElement()
       return
     }
 
+    detachKeydownListener()
     unlockBodyScroll()
     await nextTick()
     restoreFocus()
@@ -150,6 +183,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  detachKeydownListener()
   unlockBodyScroll()
   // Only move focus back if focus is still inside this dialog; otherwise a
   // newer dialog (or the user) owns it.
@@ -173,11 +207,18 @@ function onKeydown(event: KeyboardEvent) {
   // composition, where Escape only cancels the composition.
   if (event.defaultPrevented || event.isComposing) return
 
+  // A later modal in the DOM is stacked on top of this one and owns keyboard
+  // interaction; do not intercept its events.
+  if (!isTopmostDialog()) return
+
   if (event.key === 'Escape') {
     // Escape always closes, even when `hideClose` hides the close button:
     // keyboard users still need a way out, and `hideClose` expresses a visual
-    // preference rather than disabling dismissal.
+    // preference rather than disabling dismissal. Stop the event so document
+    // and window listeners do not also act on the dismissal.
     event.preventDefault()
+    event.stopPropagation()
+    event.stopImmediatePropagation()
     close()
     return
   }
@@ -233,7 +274,6 @@ function onKeydown(event: KeyboardEvent) {
           'relative bg-bg-surface-1 rounded-xl shadow-xl w-full flex flex-col max-h-[90vh]',
           sizeClasses[size],
         ]"
-        @keydown="onKeydown"
       >
         <!-- Default header (title + close) -->
         <div
