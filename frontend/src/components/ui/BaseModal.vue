@@ -112,7 +112,12 @@ function getFocusableElements(): HTMLElement[] {
     if (element.closest('[inert]')) return false
     // `checkVisibility` is not implemented by jsdom; guard on its presence
     // rather than using `getClientRects()`, which is always empty there.
-    if (typeof element.checkVisibility === 'function' && !element.checkVisibility()) return false
+    if (
+      typeof element.checkVisibility === 'function' &&
+      !element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+    ) {
+      return false
+    }
     return true
   })
 }
@@ -203,6 +208,13 @@ function close() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  // Contract for overlays nested inside a modal (mention picker, emoji picker,
+  // editor toolbars, …): the topmost modal closes on Escape. An overlay that
+  // wants to consume Escape must either call `preventDefault()` before the
+  // event reaches this handler — the modal respects it via `defaultPrevented`
+  // below — or listen for keydown on its own element and stop it there.
+  // Otherwise the modal's document-level listener sees the event and dismisses.
+
   // Respect child handlers (e.g. an editor consuming Tab or Escape) and IME
   // composition, where Escape only cancels the composition.
   if (event.defaultPrevented || event.isComposing) return
@@ -217,7 +229,6 @@ function onKeydown(event: KeyboardEvent) {
     // preference rather than disabling dismissal. Stop the event so document
     // and window listeners do not also act on the dismissal.
     event.preventDefault()
-    event.stopPropagation()
     event.stopImmediatePropagation()
     close()
     return

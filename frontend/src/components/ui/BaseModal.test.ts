@@ -305,7 +305,7 @@ describe('BaseModal', () => {
       expect(document.activeElement).toBe(trigger)
     })
 
-    it('does not throw when the trigger was removed before focus restore', async () => {
+    it('does not throw or move focus when the trigger was removed before restore', async () => {
       const trigger = document.createElement('button')
       document.body.appendChild(trigger)
       trigger.focus()
