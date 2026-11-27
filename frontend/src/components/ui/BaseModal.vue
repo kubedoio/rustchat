@@ -1,14 +1,36 @@
+<script lang="ts">
+// Module-level state shared by every BaseModal instance. In `<script setup>`
+// top-level bindings are per-instance, so shared state lives in this block.
+
+// Stable, unique id per mounted instance (the app is client-rendered only).
+let modalInstanceCount = 0
+
+// A module-level counter keeps nested modals safe: only the first open modal
+// captures the original overflow value, and only the last close restores it.
+let scrollLockCount = 0
+let savedBodyOverflow = ''
+</script>
+
 <script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, ref, useSlots, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 
 interface Props {
   modelValue: boolean
+  /** Rendered as the default header and used as the dialog's accessible name. */
   title?: string
+  /**
+   * Accessible name used when no `title` is rendered (no title prop, or a custom
+   * `header` slot is supplied). Falls back to "Dialog" when omitted.
+   */
+  ariaLabel?: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   hideClose?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  title: undefined,
+  ariaLabel: undefined,
   size: 'md',
   hideClose: false,
 })
@@ -18,6 +40,16 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+const slots = useSlots()
+const dialogRef = ref<HTMLElement | null>(null)
+const titleId = `base-modal-title-${++modalInstanceCount}`
+
+const hasDefaultTitle = computed(() => Boolean(props.title) && !slots.header)
+const labelledBy = computed(() => (hasDefaultTitle.value ? titleId : undefined))
+const ariaLabel = computed(() =>
+  hasDefaultTitle.value ? undefined : (props.ariaLabel ?? 'Dialog')
+)
+
 const sizeClasses: Record<string, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
@@ -25,33 +57,193 @@ const sizeClasses: Record<string, string> = {
   xl: 'max-w-2xl',
 }
 
+// ---------------------------------------------------------------------------
+// Scroll locking
+// ---------------------------------------------------------------------------
+let scrollLocked = false
+
+function lockBodyScroll() {
+  if (scrollLocked) return
+  if (scrollLockCount === 0) {
+    savedBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  }
+  scrollLockCount += 1
+  scrollLocked = true
+}
+
+function unlockBodyScroll() {
+  if (!scrollLocked) return
+  scrollLocked = false
+  scrollLockCount = Math.max(0, scrollLockCount - 1)
+  if (scrollLockCount === 0) {
+    document.body.style.overflow = savedBodyOverflow
+    savedBodyOverflow = ''
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Focus management
+// ---------------------------------------------------------------------------
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'area[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'iframe',
+  'object',
+  'embed',
+  '[contenteditable]:not([contenteditable="false"])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+let previouslyFocused: HTMLElement | null = null
+
+function getFocusableElements(): HTMLElement[] {
+  const root = dialogRef.value
+  if (!root) return []
+
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(element => {
+    if (element.hasAttribute('disabled') || element.hasAttribute('hidden')) return false
+    if (element.getAttribute('aria-hidden') === 'true') return false
+    if (element.closest('[inert]')) return false
+    return true
+  })
+}
+
+function focusInitialElement() {
+  const root = dialogRef.value
+  if (!root) return
+
+  const autofocus = root.querySelector<HTMLElement>('[autofocus]')
+  const target = autofocus ?? getFocusableElements()[0] ?? root
+  target.focus()
+}
+
+function restoreFocus() {
+  const target = previouslyFocused
+  previouslyFocused = null
+  if (target?.isConnected && typeof target.focus === 'function') {
+    target.focus()
+  }
+}
+
+watch(
+  () => props.modelValue,
+  async isOpen => {
+    if (isOpen) {
+      previouslyFocused = document.activeElement as HTMLElement | null
+      lockBodyScroll()
+      await nextTick()
+      focusInitialElement()
+      return
+    }
+
+    unlockBodyScroll()
+    await nextTick()
+    restoreFocus()
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  unlockBodyScroll()
+  // Only move focus back if focus is still inside this dialog; otherwise a
+  // newer dialog (or the user) owns it.
+  if (dialogRef.value?.contains(document.activeElement)) {
+    restoreFocus()
+  } else {
+    previouslyFocused = null
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Keyboard behavior
+// ---------------------------------------------------------------------------
 function close() {
   emit('update:modelValue', false)
   emit('close')
+}
+
+function onKeydown(event: KeyboardEvent) {
+  // Respect child handlers (e.g. an editor consuming Tab or Escape) and IME
+  // composition, where Escape only cancels the composition.
+  if (event.defaultPrevented || event.isComposing) return
+
+  if (event.key === 'Escape') {
+    // Escape always closes, even when `hideClose` hides the close button:
+    // keyboard users still need a way out, and `hideClose` expresses a visual
+    // preference rather than disabling dismissal.
+    event.preventDefault()
+    close()
+    return
+  }
+
+  if (event.key !== 'Tab') return
+
+  const root = dialogRef.value
+  if (!root) return
+
+  const focusable = getFocusableElements()
+
+  if (focusable.length === 0) {
+    event.preventDefault()
+    root.focus()
+    return
+  }
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement
+  const focusIsInside = root.contains(active)
+
+  if (event.shiftKey) {
+    if (!focusIsInside || active === first || active === root) {
+      event.preventDefault()
+      last.focus()
+    }
+    return
+  }
+
+  if (!focusIsInside || active === last) {
+    event.preventDefault()
+    first.focus()
+  }
 }
 </script>
 
 <template>
   <Teleport to="body">
     <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <!-- Backdrop -->
-      <div class="fixed inset-0 bg-black/50" @click="close"></div>
+      <!-- Backdrop: decorative, not exposed to assistive technology. -->
+      <div aria-hidden="true" class="fixed inset-0 bg-black/50" @click="close"></div>
 
       <!-- Modal container -->
       <div
+        ref="dialogRef"
+        role="dialog"
+        aria-modal="true"
+        :aria-labelledby="labelledBy"
+        :aria-label="ariaLabel"
+        tabindex="-1"
         :class="[
           'relative bg-bg-surface-1 rounded-xl shadow-xl w-full flex flex-col max-h-[90vh]',
           sizeClasses[size],
         ]"
+        @keydown="onKeydown"
       >
         <!-- Default header (title + close) -->
         <div
           v-if="title && !$slots.header"
           class="flex items-center justify-between px-5 py-4 border-b border-border-1"
         >
-          <h3 class="text-sm font-bold text-text-1">{{ title }}</h3>
+          <h3 :id="titleId" class="text-sm font-bold text-text-1">{{ title }}</h3>
           <button
             v-if="!hideClose"
+            type="button"
+            aria-label="Close dialog"
             class="p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="close"
           >
