@@ -29,6 +29,7 @@ run_agg_expect() {
   local actual=0
   env "$@" "${AGG}" \
     DETECT_CHANGES_RESULT SECURITY_REGRESSION_GUARDS_RESULT \
+    WORKFLOW_LINT_RESULT \
     BACKEND_CHECK_RESULT FRONTEND_CHECK_RESULT FRONTEND_E2E_RESULT \
     PUSH_PROXY_CHECK_RESULT DOCKER_VALIDATE_RESULT BUILD_RELEASE_RESULT \
     REPO_INTEGRITY_RESULT MIGRATION_MATRIX_RESULT BACKUP_RESTORE_RESULT \
@@ -39,6 +40,7 @@ run_agg_expect() {
 # Mirrors the full ci-complete member set in .github/workflows/ci.yml so a
 # mis-wiring of any single member (not just BUILD_RELEASE_RESULT) is caught.
 ALL_RESULTS=(DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
+  WORKFLOW_LINT_RESULT=success \
   BACKEND_CHECK_RESULT=success FRONTEND_CHECK_RESULT=success \
   FRONTEND_E2E_RESULT=success PUSH_PROXY_CHECK_RESULT=success \
   DOCKER_VALIDATE_RESULT=success BUILD_RELEASE_RESULT=success \
@@ -49,14 +51,25 @@ run_agg_expect 0 "aggregate: all members success" "${ALL_RESULTS[@]}"
 
 run_agg_expect 0 "aggregate: conditional jobs skipped is acceptable" \
   DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
+  WORKFLOW_LINT_RESULT=success \
   BACKEND_CHECK_RESULT=skipped FRONTEND_CHECK_RESULT=skipped \
   FRONTEND_E2E_RESULT=skipped PUSH_PROXY_CHECK_RESULT=skipped \
   DOCKER_VALIDATE_RESULT=skipped BUILD_RELEASE_RESULT=skipped \
   REPO_INTEGRITY_RESULT=success MIGRATION_MATRIX_RESULT=skipped \
   BACKUP_RESTORE_RESULT=skipped
 
+run_agg_expect 1 "aggregate: workflow-lint failure blocks CI Complete" \
+  DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
+  WORKFLOW_LINT_RESULT=failure \
+  BACKEND_CHECK_RESULT=success FRONTEND_CHECK_RESULT=success \
+  FRONTEND_E2E_RESULT=success PUSH_PROXY_CHECK_RESULT=success \
+  DOCKER_VALIDATE_RESULT=success BUILD_RELEASE_RESULT=success \
+  REPO_INTEGRITY_RESULT=success MIGRATION_MATRIX_RESULT=success \
+  BACKUP_RESTORE_RESULT=success
+
 run_agg_expect 1 "aggregate: one required backend failure blocks CI Complete" \
   DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
+  WORKFLOW_LINT_RESULT=success \
   BACKEND_CHECK_RESULT=failure FRONTEND_CHECK_RESULT=success \
   FRONTEND_E2E_RESULT=success PUSH_PROXY_CHECK_RESULT=success \
   DOCKER_VALIDATE_RESULT=success BUILD_RELEASE_RESULT=success \
@@ -65,6 +78,7 @@ run_agg_expect 1 "aggregate: one required backend failure blocks CI Complete" \
 
 run_agg_expect 1 "aggregate: missing required member is a wiring failure" \
   DETECT_CHANGES_RESULT=success SECURITY_REGRESSION_GUARDS_RESULT=success \
+  WORKFLOW_LINT_RESULT=success \
   BACKEND_CHECK_RESULT=success FRONTEND_CHECK_RESULT=success \
   FRONTEND_E2E_RESULT=success PUSH_PROXY_CHECK_RESULT=success \
   DOCKER_VALIDATE_RESULT=success REPO_INTEGRITY_RESULT=success \
@@ -194,10 +208,15 @@ esac
 SH
 chmod +x "${MP_FIXTURE_DIR}/http.sh"
 
+mp_rc=0
 env GITHUB_TOKEN=test PROMOTION_GATE_HTTP="${MP_FIXTURE_DIR}/http.sh" \
   "${PROMO}" --repo org/repo --sha abc --token test "${REQ[@]}" \
-  >/dev/null 2>&1 && ok "promotion: required checks split across 2 pages -> promotion allowed" \
-  || bad "promotion: required checks split across 2 pages (exit $?)"
+  >/dev/null 2>&1 || mp_rc=$?
+if [[ "${mp_rc}" -eq 0 ]]; then
+  ok "promotion: required checks split across 2 pages -> promotion allowed"
+else
+  bad "promotion: required checks split across 2 pages (exit ${mp_rc})"
+fi
 
 # Negative: a failing check on page 2 must still be detected as a failure
 # (not misreported as "no check-run found").
@@ -210,10 +229,15 @@ for r in d["check_runs"]:
         r["conclusion"] = "failure"
 json.dump(d, open(p, "w"))
 PY
+mp_rc=0
 env GITHUB_TOKEN=test PROMOTION_GATE_HTTP="${MP_FIXTURE_DIR}/http.sh" \
   "${PROMO}" --repo org/repo --sha abc --token test "${REQ[@]}" \
-  >/dev/null 2>&1 && bad "promotion: page-2 failure blocked promotion (exit 0)" \
-  || ok "promotion: page-2 failure blocks promotion"
+  >/dev/null 2>&1 || mp_rc=$?
+if [[ "${mp_rc}" -eq 0 ]]; then
+  bad "promotion: page-2 failure blocked promotion (exit 0)"
+else
+  ok "promotion: page-2 failure blocks promotion"
+fi
 
 # ---------- 4. Promotion gate bounded wait mode (--wait) ----------
 # The promote workflow triggers via workflow_run as soon as Integration Tests

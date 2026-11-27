@@ -286,6 +286,34 @@ jobs:
       - name: Run image digest recording tests
         run: scripts/test-record-image-digests.sh
 
+  # Workflow-source gate: actionlint catches invalid syntax/expressions in the
+  # GitHub Actions workflow files (an empty `${{ }}` inside a `run:` block is
+  # evaluated at startup and fails the whole workflow with zero jobs), and the
+  # alias-policy script plus its self-test guard the release/promotion tag
+  # contract. This is a separate job so a lint failure is never masked by the
+  # security regression guards.
+  workflow-lint:
+    name: Workflow Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install actionlint
+        run: |
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      - name: Lint workflows
+        run: actionlint -no-color
+
+      - name: Check release alias policy
+        run: bash scripts/check-alias-policy.sh
+
+      - name: Test release alias policy checks
+        run: bash scripts/test-alias-policy.sh
+
   push-proxy-check:
     name: Push Proxy Check
     needs: detect-changes
@@ -547,7 +575,7 @@ jobs:
   ci-complete:
     name: CI Complete
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    needs: [detect-changes, security-regression-guards, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release, repo-integrity, migration-matrix, backup-restore]
+    needs: [detect-changes, security-regression-guards, workflow-lint, backend-check, frontend-check, frontend-e2e, push-proxy-check, docker-validate, build-release, repo-integrity, migration-matrix, backup-restore]
     if: always()
     timeout-minutes: 5
     steps:
@@ -558,6 +586,7 @@ jobs:
         env:
           DETECT_CHANGES_RESULT: ${{ needs.detect-changes.result }}
           SECURITY_REGRESSION_GUARDS_RESULT: ${{ needs.security-regression-guards.result }}
+          WORKFLOW_LINT_RESULT: ${{ needs.workflow-lint.result }}
           BACKEND_CHECK_RESULT: ${{ needs.backend-check.result }}
           FRONTEND_CHECK_RESULT: ${{ needs.frontend-check.result }}
           FRONTEND_E2E_RESULT: ${{ needs.frontend-e2e.result }}
@@ -571,6 +600,7 @@ jobs:
           scripts/ci-aggregate.sh
           DETECT_CHANGES_RESULT
           SECURITY_REGRESSION_GUARDS_RESULT
+          WORKFLOW_LINT_RESULT
           BACKEND_CHECK_RESULT
           FRONTEND_CHECK_RESULT
           FRONTEND_E2E_RESULT
