@@ -72,6 +72,34 @@ jobs:
               - 'scripts/backup-restore-check.sh'
               - '.github/workflows/ci.yml'
 
+  # Workflow-source gate: actionlint catches invalid syntax/expressions in the
+  # GitHub Actions workflow files (an empty `${{ }}` inside a `run:` block is
+  # evaluated at startup and fails the whole workflow with zero jobs), and the
+  # alias-policy script plus its self-test guard the release/promotion tag
+  # contract. This is a separate job so a lint failure is never masked by the
+  # security regression guards.
+  workflow-lint:
+    name: Workflow Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install actionlint
+        run: |
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      - name: Lint workflows
+        run: actionlint -no-color
+
+      - name: Check release alias policy
+        run: bash scripts/check-alias-policy.sh
+
+      - name: Test release alias policy checks
+        run: bash scripts/test-alias-policy.sh
+
   backend-check:
     name: Backend Check
     needs: detect-changes
@@ -285,34 +313,6 @@ jobs:
 
       - name: Run image digest recording tests
         run: scripts/test-record-image-digests.sh
-
-  # Workflow-source gate: actionlint catches invalid syntax/expressions in the
-  # GitHub Actions workflow files (an empty `${{ }}` inside a `run:` block is
-  # evaluated at startup and fails the whole workflow with zero jobs), and the
-  # alias-policy script plus its self-test guard the release/promotion tag
-  # contract. This is a separate job so a lint failure is never masked by the
-  # security regression guards.
-  workflow-lint:
-    name: Workflow Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Install actionlint
-        run: |
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-
-      - name: Lint workflows
-        run: actionlint -no-color
-
-      - name: Check release alias policy
-        run: bash scripts/check-alias-policy.sh
-
-      - name: Test release alias policy checks
-        run: bash scripts/test-alias-policy.sh
 
   push-proxy-check:
     name: Push Proxy Check
