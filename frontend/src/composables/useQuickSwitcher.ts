@@ -72,6 +72,12 @@ export function useQuickSwitcher() {
   })
 
   function open() {
+    // Pages outside AppShell (/admin, /playbooks, /profile) never mount the
+    // team rail, so lazily load teams here. `loading` guards against repeated
+    // fetches from rapid shortcut presses.
+    if (teamStore.teams.length === 0 && !teamStore.loading) {
+      void teamStore.fetchTeams()
+    }
     isOpen.value = true
   }
   function close() {

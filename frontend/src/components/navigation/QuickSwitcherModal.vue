@@ -3,6 +3,9 @@
     <div
       v-if="isOpen"
       class="fixed inset-0 z-[60] flex items-start justify-center pt-[20vh] bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Quick switcher"
       @click="emit('close')"
     >
       <div class="w-full max-w-lg mx-4 bg-white rounded-xl shadow-2xl overflow-hidden" @click.stop>

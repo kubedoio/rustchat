@@ -92,9 +92,28 @@ describe('QuickSwitcherHost', () => {
     wrapper.unmount()
   })
 
-  it('unregisters its global shortcut listener on unmount', async () => {
+  it('ignores Shift+Cmd+K', async () => {
     const wrapper = await mountHost()
+
+    pressShortcut({ key: 'k', ctrlKey: true, shiftKey: true })
+    await nextTick()
+
+    expect(quickSwitcher.toggle).not.toHaveBeenCalled()
+    expect(wrapper.findAll('[role="dialog"]')).toHaveLength(0)
+
     wrapper.unmount()
+  })
+
+  it('closes and unregisters on unmount so it cannot reopen after logout', async () => {
+    quickSwitcher.isOpen.value = true
+    const wrapper = await mountHost()
+    await nextTick()
+    expect(wrapper.findAll('[role="dialog"]')).toHaveLength(1)
+
+    wrapper.unmount()
+
+    expect(quickSwitcher.close).toHaveBeenCalledTimes(1)
+    expect(quickSwitcher.isOpen.value).toBe(false)
 
     pressShortcut({ key: 'k', ctrlKey: true })
 

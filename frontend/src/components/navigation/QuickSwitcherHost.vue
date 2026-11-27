@@ -16,7 +16,9 @@ const router = useRouter()
 const quickSwitcher = useQuickSwitcher()
 
 function handleKeydown(e: KeyboardEvent) {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+  // Shift+Cmd/Ctrl+K is intentionally not the switcher shortcut. Keep the
+  // branch case-sensitive with respect to Shift so it cannot reopen here.
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k') {
     e.preventDefault()
     quickSwitcher.toggle()
     return
@@ -39,6 +41,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // Module-level `isOpen` outlives this component (logout, inactive tab,
+  // route swaps). Reset it before detaching so the switcher cannot come back
+  // open for the next identity/session.
+  quickSwitcher.close()
   document.removeEventListener('keydown', handleKeydown)
 })
 </script>
