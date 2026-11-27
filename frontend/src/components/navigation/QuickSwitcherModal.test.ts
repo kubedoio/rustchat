@@ -99,6 +99,42 @@ describe('QuickSwitcherModal', () => {
     }
   })
 
+  it('traps Tab when focus was lost to the document body', async () => {
+    const { input } = await mountOpen()
+
+    // Clicking non-focusable dialog chrome blurs the input to <body>; the
+    // document-level guard must still pull focus back instead of letting Tab
+    // walk into the page behind the overlay.
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    expect(document.activeElement).toBe(document.body)
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    document.body.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('stops trapping Tab after the dialog closes', async () => {
+    const { wrapper } = await mountOpen()
+
+    await wrapper.setProps({ isOpen: false })
+    await nextTick()
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    document.body.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(false)
+  })
+
   it('does not throw when unmounted while open and still restores focus', async () => {
     const trigger = createTrigger()
     const wrapper = mount(QuickSwitcherModal, {

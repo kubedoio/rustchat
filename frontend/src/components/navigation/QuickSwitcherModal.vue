@@ -95,6 +95,7 @@ const query = ref('')
 const selectedIndex = ref(0)
 const inputRef = ref<HTMLInputElement>()
 let previouslyFocused: HTMLElement | null = null
+let tabGuardListening = false
 
 const filteredItems = computed((): QSItem[] => {
   if (!query.value) return []
@@ -119,11 +120,13 @@ watch(
       previouslyFocused = getFocusedElement()
       query.value = ''
       selectedIndex.value = 0
+      attachTabGuard()
       await nextTick()
       inputRef.value?.focus()
       return
     }
 
+    detachTabGuard()
     restoreFocus()
   }
 )
@@ -131,6 +134,7 @@ watch(
 // The modal can be torn down while still open (logout, route swap, host
 // unmount); hand focus back instead of leaking it to <body>.
 onBeforeUnmount(() => {
+  detachTabGuard()
   if (props.isOpen) restoreFocus()
   previouslyFocused = null
 })
@@ -152,16 +156,29 @@ function selectItem(item: QSItem) {
   emit('close')
 }
 
-function handleKeydown(e: KeyboardEvent) {
-  // Result rows are non-focusable, so the search input is the only tab stop.
-  // Keep Tab/Shift+Tab inside the aria-modal dialog instead of letting focus
-  // escape to the page behind the overlay.
-  if (e.key === 'Tab') {
-    e.preventDefault()
-    inputRef.value?.focus()
-    return
-  }
+// Result rows are non-focusable, so the search input is the only tab stop.
+// Guard Tab at the document level (capture) rather than on the input: clicking
+// non-focusable dialog chrome (footer, list padding) blurs the input to
+// <body>, and an input-local handler would never see the following Tab.
+function onDocumentKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Tab' || !props.isOpen) return
+  e.preventDefault()
+  inputRef.value?.focus()
+}
 
+function attachTabGuard() {
+  if (tabGuardListening) return
+  document.addEventListener('keydown', onDocumentKeydown, true)
+  tabGuardListening = true
+}
+
+function detachTabGuard() {
+  if (!tabGuardListening) return
+  document.removeEventListener('keydown', onDocumentKeydown, true)
+  tabGuardListening = false
+}
+
+function handleKeydown(e: KeyboardEvent) {
   const items = displayedItems.value
   if (!items.length) return
 
