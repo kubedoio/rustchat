@@ -49,6 +49,7 @@ const mocks = vi.hoisted(() => {
     addActivity: vi.fn(),
     markActivityRead: vi.fn(),
     markAllActivitiesRead: vi.fn(),
+    filter: null as string | null,
   }
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn(), register: vi.fn() }
   return {
@@ -211,6 +212,7 @@ describe('useWebSocket', () => {
     mocks.authStore.logout.mockResolvedValue(undefined)
     mocks.channelStore.currentChannelId = null
     mocks.channelStore.channels = []
+    mocks.activityStore.filter = null
     mocks.messageStore.messagesByChannel = {}
     mocks.messageStore.addOptimisticMessage.mockImplementation((msg: Record<string, unknown>) => {
       const channelId = msg.channelId as string
@@ -837,6 +839,59 @@ describe('useWebSocket', () => {
       read: false,
       createdAt: new Date(payload.created_at),
     })
+  })
+
+  it('drops realtime activity_created events that do not match the active filter', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    const sock = FakeWebSocket.instances[0]!
+    openSocket(sock)
+
+    const basePayload = {
+      type: 'mention',
+      actor_id: '22222222-2222-4222-8222-222222222222',
+      actor_username: 'bob',
+      channel_id: '33333333-3333-4333-8333-333333333333',
+      channel_name: 'general',
+      team_id: '44444444-4444-4444-8444-444444444444',
+      team_name: 'Engineering',
+      post_id: '55555555-5555-4555-8555-555555555555',
+      message_text: 'hey @alice',
+      read: false,
+      created_at: '2026-11-27T10:00:00.000Z',
+    }
+
+    mocks.activityStore.filter = 'mention'
+
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_created',
+      // A reaction activity must not leak into a mention-filtered feed.
+      data: { ...basePayload, id: 'activity-reaction', type: 'reaction' },
+    })
+    expect(mocks.activityStore.addActivity).not.toHaveBeenCalled()
+
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_created',
+      data: { ...basePayload, id: 'activity-mention', type: 'mention' },
+    })
+    expect(mocks.activityStore.addActivity).toHaveBeenCalledTimes(1)
+    expect(mocks.activityStore.addActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'activity-mention', type: 'mention' })
+    )
+
+    // No active filter: every activity type is accepted again.
+    mocks.activityStore.filter = null
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_created',
+      data: { ...basePayload, id: 'activity-reaction-unfiltered', type: 'reaction' },
+    })
+    expect(mocks.activityStore.addActivity).toHaveBeenCalledTimes(2)
+    expect(mocks.activityStore.addActivity).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'activity-reaction-unfiltered', type: 'reaction' })
+    )
   })
 
   it('ignores malformed activity_created payloads instead of adding broken entries', async () => {

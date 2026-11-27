@@ -876,7 +876,13 @@ export function useWebSocket() {
         const activityPayload = normalizeWsActivityPayload(envelope.data)
         if (activityPayload) {
           // addActivity increments the unread counter for unread entries.
-          activityStore.addActivity(transformActivity(activityPayload))
+          const activity = transformActivity(activityPayload)
+          // Respect the feed's active filter: a realtime event for another
+          // type must not leak into a filtered feed.
+          const activeFilter = activityStore.filter
+          if (!activeFilter || activeFilter === activity.type) {
+            activityStore.addActivity(activity)
+          }
         }
         break
       }
