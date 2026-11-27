@@ -16,6 +16,13 @@ name: Promote Moving Aliases
 # failures and failing with a timeout if a check never settles. Waiting
 # strengthens RI-C03 compliance — aliases still advance only when the full
 # promotion-gate set is green for the exact commit.
+#
+# Even with a green gate, a run is only allowed to move aliases while its
+# target is still the head of `main`: promotions serialize through a
+# workflow-level concurrency group, and a superseded `workflow_run` target
+# exits cleanly without touching any alias (explicit `workflow_dispatch`
+# backfills are exempt). See the `concurrency` and `Check target is still
+# main head` comments below.
 
 on:
   workflow_run:
@@ -28,6 +35,18 @@ on:
         description: 'Commit SHA to promote (default: current main head)'
         type: string
         required: false
+
+# Promotions serialize: two runs for two different `main` commits must never
+# interleave alias pushes, otherwise a slow run for an older commit could
+# overwrite aliases advanced by a newer one. `cancel-in-progress: false` keeps
+# an in-flight promotion from being aborted between manifest pushes (which
+# would leave a partial alias set); overlapping runs queue instead.
+# GitHub retains only the most recent *pending* run per group, and the
+# main-tip check in the gate job turns every superseded run into a clean
+# no-op, so dropping an older queued run is safe.
+concurrency:
+  group: promote-moving-aliases
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -42,6 +61,7 @@ jobs:
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
       allowed: ${{ steps.gate.outputs.allowed }}
+      superseded: ${{ steps.tip.outputs.superseded }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -86,10 +106,50 @@ jobs:
             exit 1
           fi
 
+      # Defense in depth beyond the promotion gate: the gate proves the target
+      # commit is *healthy*, not that it is still `main`'s head. When two
+      # merges land close together, the run for the older commit can arrive
+      # here after the newer one and would move `main`/`nightly` backwards.
+      # A superseded target exits successfully with `superseded=true` so the
+      # build never runs and no alias is pushed.
+      #
+      # Only `workflow_run` runs are checked: `workflow_dispatch` is an
+      # explicit backfill request for the supplied SHA and must not be
+      # skipped.
+      - name: Check target is still main head
+        id: tip
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TARGET_SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # Repository and SHA reach the shell through the environment, never
+          # through raw ${{ }} interpolation into the program text, and the
+          # API call is fully quoted.
+          current_main="$(gh api "repos/${REPO}/commits/main" --jq .sha)"
+          if [[ -z "${current_main}" ]]; then
+            echo "ERROR: could not resolve the current main head; refusing to promote." >&2
+            exit 1
+          fi
+          if [[ "${current_main}" != "${TARGET_SHA}" ]]; then
+            echo "Target ${TARGET_SHA} is superseded by main head ${current_main}; skipping alias promotion (not a failure)."
+            {
+              echo "### Promotion skipped"
+              echo ""
+              echo "Target commit \`${TARGET_SHA}\` is no longer the tip of \`main\` (\`${current_main}\`)."
+              echo "The newer commit advances the moving aliases; this run is a clean no-op."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "superseded=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-push:
     name: Promote moving aliases
     needs: gate
-    if: needs.gate.outputs.allowed == 'true'
+    if: needs.gate.outputs.allowed == 'true' && needs.gate.outputs.superseded != 'true'
     uses: ./.github/workflows/docker-build-push.yml
     with:
       push: true

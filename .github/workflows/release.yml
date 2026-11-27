@@ -105,6 +105,12 @@ jobs:
           fi
           echo "CHANGELOG.md section [${version}] has content"
 
+      # Static guard for the alias policy documented in
+      # docs/release-process.md: prereleases must never move `latest` or the
+      # rolling `X.Y` tag, and moving-alias promotions must serialize.
+      - name: Check release alias policy
+        run: scripts/check-alias-policy.sh
+
   docker-release:
     name: Build and push release images
     needs: [validate, gate]
@@ -113,10 +119,20 @@ jobs:
       push: true
       runner: ubuntu-latest
       platforms: linux/amd64,linux/arm64
+      # Only stable releases own the rolling aliases. The immutable
+      # `{{version}}` tag is always published (so an RC such as
+      # v0.5.1-rc.1 still produces 0.5.1-rc.1), while `{{major}}.{{minor}}`
+      # and `latest` are enabled only when the tag carries no prerelease
+      # suffix (anything containing `-`, e.g. `-rc.1`). metadata-action
+      # evaluates `enable=` per tag, so a prerelease run simply omits the
+      # alias tags instead of moving them.
+      #
+      # Regression guard: scripts/check-alias-policy.sh (run by `validate`)
+      # fails if these `enable=` gates are removed.
       tags: |
         type=semver,pattern={{version}}
-        type=semver,pattern={{major}}.{{minor}}
-        type=raw,value=latest
+        type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
+        type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       timeout-minutes: 120
     permissions:
       contents: read
@@ -215,6 +231,13 @@ jobs:
         run: |
           echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          # Mirror the docker-release tag policy: rolling aliases exist only
+          # for stable tags, so prerelease notes must not advertise `latest`.
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            echo "ALIAS_TAGS=" >> "$GITHUB_OUTPUT"
+          else
+            echo "ALIAS_TAGS=, \`latest\`" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Extract changelog section
         id: changelog
@@ -249,9 +272,9 @@ jobs:
 
             | Image | Tags |
             |-------|------|
-            | `${{ env.IMAGE_PREFIX }}-backend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
-            | `${{ env.IMAGE_PREFIX }}-frontend` | `${{ steps.version.outputs.VERSION }}`, `latest` |
-            | `${{ env.IMAGE_PREFIX }}-push-proxy` | `${{ steps.version.outputs.VERSION }}`, `latest` |
+            | `${{ env.IMAGE_PREFIX }}-backend` | `${{ steps.version.outputs.VERSION }}`${{ steps.version.outputs.ALIAS_TAGS }} |
+            | `${{ env.IMAGE_PREFIX }}-frontend` | `${{ steps.version.outputs.VERSION }}`${{ steps.version.outputs.ALIAS_TAGS }} |
+            | `${{ env.IMAGE_PREFIX }}-push-proxy` | `${{ steps.version.outputs.VERSION }}`${{ steps.version.outputs.ALIAS_TAGS }} |
 
             Immutable digests for every published tag and SPDX SBOMs for each
             image are attached to this release (`image-digests-*.txt`,

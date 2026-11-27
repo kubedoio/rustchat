@@ -48,6 +48,14 @@ against the exact commit and refuses to advance any moving alias unless every
 promotion-required check is completed and green. SHA-scoped diagnostic images
 produced by `docker-publish.yml` on push are **not** promoted aliases.
 
+Promotions also serialize through a workflow-level concurrency group, and a
+`workflow_run` promotion whose target is no longer the head of `main` exits
+successfully without moving any alias (the newer commit is responsible for the
+aliases); explicit `workflow_dispatch` backfills are exempt from the tip check.
+The release/promotion alias policy is guarded statically by
+`scripts/check-alias-policy.sh`, which runs in the `validate` job of the
+Release workflow.
+
 ## Release gate
 
 Required before a stable or release-candidate artifact is published from the
@@ -60,6 +68,7 @@ exact candidate commit. Enforced by `.github/workflows/release.yml`:
 | `dco-check` | provenance |
 | `Backend Integration Tests` | post-merge integration health |
 | version/changelog validation | VERSION/Cargo.toml/package.json/CHANGELOG agreement |
+| alias policy (`scripts/check-alias-policy.sh`) | prereleases cannot move `X.Y`/`latest`; promotions serialize |
 | migration upgrade matrix (RI-C07, P006) | empty→HEAD and latest-stable→HEAD readiness |
 | Buzz deterministic compatibility (RI-C08, P007) | external-protocol compatibility record |
 

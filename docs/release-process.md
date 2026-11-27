@@ -32,9 +32,13 @@ Stable releases are created from Git tags matching `v*.*.*` (e.g., `v0.3.6`). Th
 | `vX.Y` | `v0.3` | Rolling minor — receives latest patch in this minor line |
 | `latest` | `latest` | Always points to the most recent stable release |
 
+The two rolling aliases (`vX.Y` and `latest`) are updated **only** by stable
+`vX.Y.Z` tags; prereleases never move them (see
+[Release Candidates](#release-candidates)).
+
 **What happens when a stable tag is pushed:**
 1. The `Release` workflow triggers
-2. Validation checks run (VERSION file, Cargo.toml, package.json, CHANGELOG.md)
+2. Validation checks run (VERSION file, Cargo.toml, package.json, CHANGELOG.md, alias policy)
 3. Multi-arch container images (`linux/amd64`, `linux/arm64`) are built and pushed to GHCR
 4. The `image-evidence` job resolves the immutable digest of every published tag, verifies the `X.Y` and `latest` aliases point at the same manifest, and generates SPDX SBOMs from the published images
 5. The digest record and SBOMs are attached to the GitHub Release as assets (`image-digests-<version>.txt`, `sbom-<service>-<version>.spdx.json`)
@@ -45,9 +49,10 @@ Stable releases are created from Git tags matching `v*.*.*` (e.g., `v0.3.6`). Th
 Pre-release tags with a suffix trigger release candidate builds:
 
 - Tag format: `v0.4.0-rc.1`, `v0.4.0-rc.2`
-- Container images are published with the exact RC tag
+- Only the exact RC tag is published (e.g. `0.4.0-rc.1`)
+- Neither `latest` nor the rolling `X.Y` alias (`0.4`) is created or moved —
+  both keep pointing at the most recent stable release
 - GitHub Release is marked as **pre-release**
-- The `latest` tag is **not** updated
 
 RCs are useful for testing significant changes before declaring them stable.
 
