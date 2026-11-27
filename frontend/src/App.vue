@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import ToastManager from './components/ui/ToastManager.vue'
 import ConnectionStatusBar from './components/ui/ConnectionStatusBar.vue'
 import ConnectionLostModal from './components/ui/ConnectionLostModal.vue'
-import CommandPalette from './components/ui/CommandPalette.vue'
 import SettingsModal from './components/settings/SettingsModal.vue'
 import TermsAcceptanceModal from './components/modals/TermsAcceptanceModal.vue'
 import { useToast } from './composables/useToast'
@@ -16,6 +15,12 @@ import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
 import ActiveCall from './components/calls/ActiveCall.vue'
 import IncomingCallModal from './components/calls/IncomingCallModal.vue'
 import { useConfigStore } from './features/config'
+
+// Lazily loaded: the quick switcher pulls in the team/channel stores, which
+// should not be part of the authenticated shell's initial payload.
+const QuickSwitcherHost = defineAsyncComponent(
+  () => import('./components/navigation/QuickSwitcherHost.vue')
+)
 
 const toastManagerRef = ref(null)
 const { register } = useToast()
@@ -87,7 +92,7 @@ watch(
     @refresh="handleRefreshPage"
   />
 
-  <CommandPalette v-if="isActiveTab" />
+  <QuickSwitcherHost v-if="authStore.isAuthenticated && isActiveTab" />
   <SettingsModal v-if="isActiveTab" :is-open="ui.isSettingsOpen" @close="ui.closeSettings()" />
   <ActiveCall v-if="isActiveTab" />
   <IncomingCallModal v-if="isActiveTab" />

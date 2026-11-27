@@ -8,6 +8,8 @@ import { usePresenceStore } from '../features/presence'
 import type { PresenceStatus } from '../core/entities/User'
 import { useUnreadStore } from '@/features/unreads/stores/unreadStore'
 import { useChannelStore } from '@/features/channels/stores/channelStore'
+import { useActivityStore } from '@/features/activity/stores/activityStore'
+import { transformActivity } from '@/features/activity/activityMapper'
 import { useToast } from './useToast'
 import { postsApi, type ChannelUnreadAt, type Post } from '../api/posts'
 import type { Channel } from '../api/channels'
@@ -346,6 +348,59 @@ function normalizeWsPresence(value: unknown): PresenceStatus {
   return 'offline'
 }
 
+/**
+ * Validate an `activity_created` payload. The backend normally sends the full
+ * snake_case ActivityResponse; it may also send a minimal fallback when the
+ * joined lookup fails, which cannot be rendered and is ignored.
+ */
+function normalizeWsActivityPayload(data: unknown): Record<string, unknown> | null {
+  if (!data || typeof data !== 'object') {
+    return null
+  }
+
+  const dataObj = data as Record<string, unknown>
+  const candidate =
+    dataObj.activity && typeof dataObj.activity === 'object'
+      ? (dataObj.activity as Record<string, unknown>)
+      : dataObj
+
+  if (
+    typeof candidate.id !== 'string' ||
+    !candidate.id ||
+    typeof candidate.type !== 'string' ||
+    !candidate.type ||
+    typeof candidate.created_at !== 'string' ||
+    !candidate.created_at
+  ) {
+    return null
+  }
+
+  return candidate
+}
+
+/**
+ * Accept the shapes emitted for `activity_read`:
+ * `{ activity_ids: [...] }`, a single `{ activity_id }` / `{ id }`, or `{ ids }`.
+ */
+function extractActivityReadIds(data: Record<string, unknown>): string[] {
+  const candidates = [data.activity_ids, data.activityIds, data.ids, data.activity_id, data.id]
+  const ids = new Set<string>()
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      for (const value of candidate) {
+        if (typeof value === 'string' && value) {
+          ids.add(value)
+        }
+      }
+    } else if (typeof candidate === 'string' && candidate) {
+      ids.add(candidate)
+    }
+  }
+
+  return [...ids]
+}
+
 // Raw status data from WebSocket
 interface RawStatusData {
   user_id?: unknown
@@ -369,6 +424,7 @@ export function useWebSocket() {
   const presenceStore = usePresenceStore()
   const unreadStore = useUnreadStore()
   const channelStore = useChannelStore()
+  const activityStore = useActivityStore()
   const toast = useToast()
 
   function applyInitialLoadSnapshot(data: unknown) {
@@ -812,6 +868,30 @@ export function useWebSocket() {
           if (channel) {
             channelStore.addChannel(channel)
           }
+        }
+        break
+      }
+
+      case 'activity_created': {
+        const activityPayload = normalizeWsActivityPayload(envelope.data)
+        if (activityPayload) {
+          // addActivity increments the unread counter for unread entries.
+          activityStore.addActivity(transformActivity(activityPayload))
+        }
+        break
+      }
+
+      case 'activity_read': {
+        if (!envelope.data || typeof envelope.data !== 'object') {
+          break
+        }
+        const dataObj = envelope.data as Record<string, unknown>
+        if (dataObj.all_read === true) {
+          activityStore.markAllActivitiesRead()
+          break
+        }
+        for (const activityId of extractActivityReadIds(dataObj)) {
+          activityStore.markActivityRead(activityId)
         }
         break
       }
