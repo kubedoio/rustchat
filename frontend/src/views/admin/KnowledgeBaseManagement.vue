@@ -281,6 +281,8 @@ async function confirmDeleteKnowledgeBase() {
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Delete Knowledge Base dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="closeDeleteModal"
           >

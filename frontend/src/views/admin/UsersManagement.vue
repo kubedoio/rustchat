@@ -556,6 +556,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Set Password dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="showPasswordModal = false"
           >
@@ -645,6 +647,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Delete User dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="closeDeleteModal"
           >
@@ -741,6 +745,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Wipe User dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="closeWipeModal"
           >
@@ -816,6 +822,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Re-sync Memberships dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="closeResyncModal"
           >
