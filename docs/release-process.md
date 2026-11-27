@@ -32,9 +32,16 @@ Stable releases are created from Git tags matching `v*.*.*` (e.g., `v0.3.6`). Th
 | `vX.Y` | `v0.3` | Rolling minor — receives latest patch in this minor line |
 | `latest` | `latest` | Always points to the most recent stable release |
 
+The two rolling aliases (`vX.Y` and `latest`) are updated **only** by stable
+`vX.Y.Z` tags; prereleases never move them (see
+[Release Candidates](#release-candidates)). Stable release runs share the
+`release-moving-aliases` concurrency group with `cancel-in-progress: false`, so
+two tags pushed close together serialize their per-service alias pushes instead
+of interleaving them.
+
 **What happens when a stable tag is pushed:**
 1. The `Release` workflow triggers
-2. Validation checks run (VERSION file, Cargo.toml, package.json, CHANGELOG.md)
+2. Validation checks run (VERSION file, Cargo.toml, package.json, CHANGELOG.md, alias policy)
 3. Multi-arch container images (`linux/amd64`, `linux/arm64`) are built and pushed to GHCR
 4. The `image-evidence` job resolves the immutable digest of every published tag, verifies the `X.Y` and `latest` aliases point at the same manifest, and generates SPDX SBOMs from the published images
 5. The digest record and SBOMs are attached to the GitHub Release as assets (`image-digests-<version>.txt`, `sbom-<service>-<version>.spdx.json`)
@@ -45,25 +52,48 @@ Stable releases are created from Git tags matching `v*.*.*` (e.g., `v0.3.6`). Th
 Pre-release tags with a suffix trigger release candidate builds:
 
 - Tag format: `v0.4.0-rc.1`, `v0.4.0-rc.2`
-- Container images are published with the exact RC tag
+- Only the exact RC tag is published (e.g. `0.4.0-rc.1`)
+- Neither `latest` nor the rolling `X.Y` alias (`0.4`) is created or moved —
+  both keep pointing at the most recent stable release
 - GitHub Release is marked as **pre-release**
-- The `latest` tag is **not** updated
 
 RCs are useful for testing significant changes before declaring them stable.
 
-### Nightly Builds
+### Development Images (`main`, `nightly`, `nightly-<sha>`)
 
-Nightly images are built automatically from the `main` branch.
+Development images are built from the `main` branch by the promotion workflow,
+not on a calendar schedule.
 
 | Tag | Example | Behavior |
 |-----|---------|----------|
-| `nightly` | `nightly` | Rolling — overwritten every night |
-| `nightly-YYYYMMDD` | `nightly-20260427` | Date-stamped — know exactly when it was built |
-| `nightly-SHA` | `nightly-a1b2c3d` | Commit-stamped — know exactly which commit |
+| `main` | `main` | Rolling — points at the most recently promoted `main` commit |
+| `nightly` | `nightly` | Rolling — same target as `main`; overwritten on every promotion (not "every night") |
+| `nightly-<sha>` | `nightly-a1b2c3d` | Commit-stamped — identifies the exact promoted commit |
 
-**Important:** Nightly images are **not stable**. They are built from the latest `main` commit and may contain incomplete features or regressions. Use them only for testing and feedback.
+There is **no** `nightly-YYYYMMDD` tag: development images are not produced on a
+calendar schedule.
 
-Nightly builds **do not** create GitHub Releases and **do not** update the `latest` tag.
+**Only promotable commits get a `nightly-<sha>` image.** The moving aliases
+advance only when the [promotion-gate check set](development/ci-gates.md)
+(which includes the post-merge `Backend Integration Tests`) is green for the
+exact commit **and** that commit is still the head of `main` when promotion runs
+(RI-C03). A commit that fails a required post-merge integration check is not
+promoted. A commit that was superseded by a newer merge, or whose queued
+promotion run was replaced (GitHub keeps only one pending run per concurrency
+group), is a clean no-op and is **not** rebuilt — so it never gets a
+`nightly-<sha>` image. That is deliberate: a superseded promotion must not spend
+an hour building an image whose aliases can never be published.
+
+Every `main` commit still has a non-promoted, immutable diagnostic image
+published by `docker-publish.yml`, tagged `sha-<full-sha>`. Use that image to
+inspect a commit that was not promoted.
+
+**Important:** Nightly images are **not stable**. They are built from a recent
+`main` commit and may contain incomplete features or regressions. Use them only
+for testing and feedback.
+
+Nightly builds **do not** create GitHub Releases and **do not** update the
+`latest` tag.
 
 **Moving-alias promotion gate:** the `main`, `nightly`, and `nightly-*` moving
 aliases are advanced by `.github/workflows/promote.yml` **only** after the
@@ -71,6 +101,27 @@ aliases are advanced by `.github/workflows/promote.yml` **only** after the
 post-merge `Backend Integration Tests`) is green for the exact `main` commit
 (RI-C03). A commit that fails a required post-merge integration check is not
 promoted; only its non-promoted, SHA-scoped diagnostic image exists.
+
+**Serialization and the main-tip check.** Promotions run in the
+`promote-moving-aliases` concurrency group with `cancel-in-progress: false`, so
+overlapping runs queue instead of interrupting an in-flight alias push. GitHub
+keeps only **one pending run per concurrency group**: when several promotions
+queue up, an older queued run can be replaced by a newer one (a queued
+`workflow_dispatch` is replaceable in the same way). Every run re-checks that
+its target is still the head of `main`; a superseded run exits successfully
+without building or pushing anything. Once the tip check passes, the expected
+SHA is passed into the reusable build workflow, which re-resolves `main`
+immediately before publishing each manifest and fails closed if `main` moved
+while the images were building.
+
+**Manual backfills.** `promote.yml` can be dispatched with a `sha` input. By
+default the main-tip check still applies, so dispatching an older commit exits
+as superseded with a step summary that tells the operator to set
+`allow_backfill=true`. That input is the only deliberate override of the tip
+check. A backfill publishes **only** the immutable `nightly-<sha>` tag — it
+never repoints the shared `main` or `nightly` aliases, so re-publishing an older
+commit cannot roll either alias backwards. Use it only to re-publish a specific
+commit, never as a substitute for normal promotion.
 
 ## Release Gate
 
@@ -257,6 +308,7 @@ To automate retention, consider enabling GitHub's built-in package retention or 
 
 ## Automation Notes
 
-- **Nightly:** Runs automatically at 02:00 UTC daily. Can also be triggered manually with a reason.
+- **Development image promotion:** Triggered by the post-merge `Integration Tests` workflow completing on `main` (and by manual dispatch). Advances `main`/`nightly`/`nightly-<sha>` only while the target is still `main` head. A manual `allow_backfill=true` dispatch is limited to the immutable `nightly-<sha>` tag and never moves the shared aliases.
+- **Nightly:** The scheduled 02:00 UTC run is a full CI run on `main`; it no longer publishes images.
 - **Stable:** Triggered only by pushing a `v*.*.*` tag. No automatic stable releases.
 - **Dependabot** may open PRs for security fixes. These should be merged and released as patch versions promptly.

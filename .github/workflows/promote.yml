@@ -16,6 +16,17 @@ name: Promote Moving Aliases
 # failures and failing with a timeout if a check never settles. Waiting
 # strengthens RI-C03 compliance — aliases still advance only when the full
 # promotion-gate set is green for the exact commit.
+#
+# Even with a green gate, a run is only allowed to move aliases while its
+# target is still the head of `main`: promotions serialize through a
+# workflow-level concurrency group, and a superseded target exits cleanly
+# without touching any alias. `workflow_dispatch` follows the same rule so a
+# stale dispatch can never move aliases backwards; an operator who deliberately
+# wants to re-publish an older commit must set `allow_backfill: true`, which is
+# the only way to bypass the tip check and publishes only the immutable
+# `nightly-<sha>` tag (never the shared `main` / `nightly` aliases). See the
+# `concurrency`, `Check target is still main head` and `build-and-push` tag
+# comments below.
 
 on:
   workflow_run:
@@ -28,6 +39,23 @@ on:
         description: 'Commit SHA to promote (default: current main head)'
         type: string
         required: false
+      allow_backfill:
+        description: 'Allow promoting a commit that is not the current main head (intentional backfill)'
+        type: boolean
+        default: false
+
+# Promotions serialize: two runs for two different `main` commits must never
+# interleave alias pushes, otherwise a slow run for an older commit could
+# overwrite aliases advanced by a newer one. `cancel-in-progress: false` keeps
+# an in-flight promotion from being aborted between manifest pushes (which
+# would leave a partial alias set); overlapping runs queue instead.
+# GitHub retains only the most recent *pending* run per concurrency group, so a
+# queued run (including a queued `workflow_dispatch`) can be replaced by a newer
+# one; the main-tip check turns every superseded run into a clean no-op, which
+# makes dropping an older queued run safe.
+concurrency:
+  group: promote-moving-aliases
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -42,14 +70,17 @@ jobs:
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
       allowed: ${{ steps.gate.outputs.allowed }}
+      superseded: ${{ steps.tip.outputs.superseded }}
+      expected_main_sha: ${{ steps.tip.outputs.expected_main_sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Resolve target commit
         id: resolve
-        # All interpolations flow through env: no raw ${{ }} inside run:.
-        # (The dispatch sha is owner-supplied; env passing keeps any
-        # future input value from being executed as script content.)
+        # All interpolations flow through env: no raw workflow-expression
+        # interpolation inside run:. (The dispatch sha is owner-supplied;
+        # env passing keeps any future input value from being executed as
+        # script content.)
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_SHA: ${{ inputs.sha }}
@@ -57,12 +88,20 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_SHA" ]]; then
-            echo "sha=$INPUT_SHA" >> "$GITHUB_OUTPUT"
+            resolved="$INPUT_SHA"
           elif [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            echo "sha=$WORKFLOW_RUN_SHA" >> "$GITHUB_OUTPUT"
+            resolved="$WORKFLOW_RUN_SHA"
           else
-            echo "sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+            resolved="$COMMIT_SHA"
           fi
+          # A commit SHA is interpolated into the moving-alias tag list below;
+          # reject anything that is not a full 40-character hex SHA so an
+          # owner-supplied dispatch input cannot inject tag-list lines.
+          if [[ ! "$resolved" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: resolved target '$resolved' is not a full 40-character commit SHA" >&2
+            exit 1
+          fi
+          echo "sha=$resolved" >> "$GITHUB_OUTPUT"
 
       - name: Run promotion gate
         id: gate
@@ -86,19 +125,84 @@ jobs:
             exit 1
           fi
 
+      # Defense in depth beyond the promotion gate: the gate proves the target
+      # commit is *healthy*, not that it is still `main`'s head. When two
+      # merges land close together, the run for the older commit can arrive
+      # here after the newer one and would move `main`/`nightly` backwards.
+      # A superseded target exits successfully with `superseded=true` so the
+      # build never runs and no alias is pushed.
+      #
+      # The check applies to every `workflow_run` promotion and to every
+      # `workflow_dispatch` that did not explicitly opt into a backfill. A
+      # dispatch of a non-head commit with `allow_backfill: false` is refused
+      # as superseded (a clean no-op with an operator hint) rather than moving
+      # aliases backwards. `allow_backfill: true` is the deliberate override
+      # that exempts the run from the tip check; it still publishes only the
+      # immutable `nightly-<sha>` tag (see the `tags:` input below).
+      - name: Check target is still main head
+        id: tip
+        if: ${{ github.event_name == 'workflow_run' || inputs.allow_backfill != true }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TARGET_SHA: ${{ steps.resolve.outputs.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          # Repository and SHA reach the shell through the environment, never
+          # through raw workflow-expression interpolation into the program
+          # text, and the API call is fully quoted.
+          current_main="$(gh api "repos/${REPO}/commits/main" --jq .sha)"
+          if [[ -z "${current_main}" ]]; then
+            echo "ERROR: could not resolve the current main head; refusing to promote." >&2
+            exit 1
+          fi
+          if [[ "${current_main}" != "${TARGET_SHA}" ]]; then
+            echo "Target ${TARGET_SHA} is superseded by main head ${current_main}; skipping alias promotion (not a failure)."
+            {
+              echo "### Promotion skipped"
+              echo ""
+              echo "Target commit \`${TARGET_SHA}\` is no longer the tip of \`main\` (\`${current_main}\`)."
+              if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+                echo "This was a \`workflow_dispatch\` for a specific commit. If this"
+                echo "backfill is intentional, re-run the dispatch with"
+                echo "\`allow_backfill=true\` to bypass the tip check."
+              else
+                echo "The newer commit advances the moving aliases; this run is a clean no-op."
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+            # No tip guarantee -> the build job must not enforce one either.
+            echo "expected_main_sha=" >> "$GITHUB_OUTPUT"
+          else
+            echo "superseded=false" >> "$GITHUB_OUTPUT"
+            # The expected head is handed to docker-build-push.yml so the
+            # merge job can re-verify it immediately before publishing.
+            echo "expected_main_sha=${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-push:
     name: Promote moving aliases
     needs: gate
-    if: needs.gate.outputs.allowed == 'true'
+    if: needs.gate.outputs.allowed == 'true' && needs.gate.outputs.superseded != 'true'
     uses: ./.github/workflows/docker-build-push.yml
     with:
       push: true
       runner: ubuntu-latest
       platforms: linux/amd64,linux/arm64
       timeout-minutes: 120
+      # Empty for an explicit backfill (no tip guarantee); set by the gate for
+      # every tip-checked promotion so the merge job can fail closed if `main`
+      # moved again while the build was running.
+      expected_main_sha: ${{ needs.gate.outputs.expected_main_sha }}
+      # A deliberate backfill (`allow_backfill=true`) must not roll the shared
+      # `main` / `nightly` aliases backwards, so those two tags are disabled
+      # for a backfill; it publishes only the immutable SHA-scoped
+      # `nightly-<sha>` tag. For `workflow_run` and normal dispatches the
+      # expression is empty/false, so all three tags are published.
       tags: |
-        type=raw,value=main
-        type=raw,value=nightly
+        type=raw,value=main,enable=${{ inputs.allow_backfill != true }}
+        type=raw,value=nightly,enable=${{ inputs.allow_backfill != true }}
         type=raw,value=nightly-${{ needs.gate.outputs.sha }}
     permissions:
       contents: read
