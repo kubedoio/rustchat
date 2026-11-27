@@ -110,11 +110,25 @@ for operators in `docs/operations/runbook.md`.
 ```bash
 # Deterministic negative tests for failure propagation (RI-C01/RI-C03):
 scripts/test-gate-propagation.sh
+
+# Database-free migration-matrix diagnostic regression test (exit-code contract):
+scripts/test-migration-matrix-diagnostics.sh
 ```
 
 This harness runs in CI as part of the `Security Regression Guards` job on
 every run, so a regression in the aggregate or promotion-gate logic fails the
 `CI Complete` required check.
+
+The same job runs `scripts/test-migration-matrix-diagnostics.sh`, a
+database-free regression test for the migration matrix's schema-diff
+diagnostics. A fake `pg_dump` serving fixtures proves that schema differences
+exit 1 with a bounded unified diff, `pg_dump` failures are reported explicitly,
+PostgreSQL 18 `\restrict`/`transaction_timeout` dump noise is normalized, and
+the old `diff | head` pipeline would surface its raw SIGPIPE/pipe status
+(141/2) rather than being masked as a generic `fail()` exit 1. Static checks
+cover both `scripts/migration-matrix.sh` and `scripts/lib/schema-diff.sh`, and
+the `migrations` path filter runs the DB-backed `Migration Matrix` job when
+either file changes.
 
 ## Change procedure
 

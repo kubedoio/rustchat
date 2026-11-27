@@ -66,6 +66,8 @@ jobs:
             migrations:
               - 'backend/migrations/**'
               - 'scripts/migration-matrix.sh'
+              - 'scripts/lib/schema-diff.sh'
+              - 'scripts/test-migration-matrix-diagnostics.sh'
               - '.github/workflows/ci.yml'
             backup:
               - 'backend/migrations/**'
@@ -315,6 +317,9 @@ jobs:
 
       - name: Run image digest recording tests
         run: scripts/test-record-image-digests.sh
+
+      - name: Run migration matrix diagnostics tests
+        run: scripts/test-migration-matrix-diagnostics.sh
 
   push-proxy-check:
     name: Push Proxy Check

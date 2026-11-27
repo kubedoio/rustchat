@@ -42,6 +42,13 @@ fi
 # the repo root, so an absolute MIGRATIONS_DIR must not be passed verbatim
 # (it would match nothing and silently disable the append-only guard).
 MIGRATIONS_RELPATH="$(realpath --relative-to="${REPO_ROOT}" "${MIGRATIONS_DIR}")"
+# git archive prefixes archived paths with the repo-relative directory, so the
+# number of components to strip equals the depth of MIGRATIONS_RELPATH (2 for
+# the default backend/migrations). Deriving it keeps custom MIGRATIONS_DIR
+# values from silently extracting into nested directories (and applying every
+# migration to an empty upgrade database).
+IFS='/' read -r -a MIGRATIONS_PATH_PARTS <<< "${MIGRATIONS_RELPATH}"
+MIGRATIONS_STRIP_COMPONENTS="${#MIGRATIONS_PATH_PARTS[@]}"
 BASE_TAG="${MIGRATION_MATRIX_TAG:-v0.4.1}"
 # Commit of ${BASE_TAG} (v0.4.1). Used when the tag ref is absent — e.g.
 # fork PR checkouts that do not inherit upstream tags created after the
@@ -65,6 +72,11 @@ trap 'rm -rf "${WORK_DIR}"; ${PSQL[@]} postgres -c "DROP DATABASE IF EXISTS \"${
 fail() { echo "migration-matrix: FAIL: $*" >&2; exit 1; }
 note() { echo "migration-matrix: $*"; }
 
+# Shared schema-dump normalization and bounded diff diagnostics. Extracted so
+# the diagnostic path can be regression-tested without a database.
+# shellcheck source=lib/schema-diff.sh
+source "${SCRIPT_DIR}/lib/schema-diff.sh"
+
 [[ -d "${MIGRATIONS_DIR}" ]] || fail "migrations dir not found: ${MIGRATIONS_DIR}"
 if git -C "${REPO_ROOT}" rev-parse --verify --quiet "${BASE_TAG}^{commit}" >/dev/null; then
   BASE_REF="${BASE_TAG}"
@@ -86,9 +98,16 @@ note "base ref for upgrade path: ${BASE_REF}"
 # Guard: migrations must be append-only since the base tag (RI-C07 prohibits
 # rewriting previously applied migrations; sqlx checksums would reject it).
 # ---------------------------------------------------------------------------
-CHANGE_STAT="$(git -C "${REPO_ROOT}" diff --name-status "${BASE_REF}" HEAD -- "${MIGRATIONS_RELPATH}" | awk '{print $1}' | sort -u | tr -d '\n')"
+CHANGES="$(git -C "${REPO_ROOT}" diff --name-status "${BASE_REF}" HEAD -- "${MIGRATIONS_RELPATH}")" \
+  || fail "failed to compare migrations between ${BASE_REF} and HEAD"
+CHANGE_STAT="$(printf '%s\n' "${CHANGES}" | awk '{print $1}' | sort -u | tr -d '\n')"
 if [[ -n "${CHANGE_STAT}" && "${CHANGE_STAT}" != "A" ]]; then
-  fail "migrations were modified or deleted since ${BASE_REF} (only additions are allowed): $(git -C "${REPO_ROOT}" diff --name-status "${BASE_REF}" HEAD -- "${MIGRATIONS_RELPATH}" | grep -v '^A' | head -5)"
+  # Bounded in a variable: `git diff | grep | head` inside the fail message
+  # would be subject to pipefail, so head closing the pipe could replace the
+  # intended exit status with SIGPIPE/broken pipe.
+  VIOLATIONS="$(printf '%s\n' "${CHANGES}" | sed -n '/^[^A]/p' | sed -n '1,5p')"
+  VIOLATIONS="${VIOLATIONS//$'\n'/; }"
+  fail "migrations were modified or deleted since ${BASE_REF} (only additions are allowed): ${VIOLATIONS}"
 fi
 note "PASS append-only history: no migration modified/deleted since ${BASE_REF}"
 
@@ -108,7 +127,14 @@ note "PASS empty-to-head: all $(ls "${MIGRATIONS_DIR}"/*.sql | wc -l) migrations
 TAG_DIR="${WORK_DIR}/tag_migrations"
 mkdir -p "${TAG_DIR}"
 git -C "${REPO_ROOT}" archive "${BASE_REF}" "${MIGRATIONS_RELPATH}" \
-  | tar -x --strip-components=2 -C "${TAG_DIR}"
+  | tar -x --strip-components="${MIGRATIONS_STRIP_COMPONENTS}" -C "${TAG_DIR}" \
+  || fail "failed to extract base-tag migrations from ${BASE_REF}"
+# A wrong --strip-components extracts into nested directories, leaving
+# ${TAG_DIR}/*.sql empty; the upgrade path would then apply every migration on
+# top of an empty database and silently prove nothing. Fail loudly instead.
+if ! compgen -G "${TAG_DIR}/*.sql" >/dev/null; then
+  fail "no base-tag migrations extracted from ${BASE_REF} (${MIGRATIONS_RELPATH}; strip-components=${MIGRATIONS_STRIP_COMPONENTS})"
+fi
 
 ${PSQL[@]} postgres -c "CREATE DATABASE \"${UPGRADE_DB}\";" >/dev/null
 for f in $(ls "${TAG_DIR}"/*.sql | sort); do
@@ -116,7 +142,7 @@ for f in $(ls "${TAG_DIR}"/*.sql | sort); do
     || fail "stable->HEAD: base-tag migration failed: $(basename "$f")"
 done
 BASE_COUNT=$(ls "${TAG_DIR}"/*.sql | wc -l)
-note "stable schema applied: ${BASE_COUNT} migrations from ${BASE_TAG}"
+note "stable schema applied: ${BASE_COUNT} migrations from ${BASE_REF}"
 
 # Apply only migrations added since the base tag (what sqlx migrate run does).
 NEW_COUNT=0
@@ -134,13 +160,15 @@ note "PASS latest-stable-schema-to-head: ${NEW_COUNT} new migrations applied cle
 # Path 3: migrated readiness — both paths converge and expose the columns the
 # repositories actually query (spot checks on historically divergent tables).
 # ---------------------------------------------------------------------------
-pg_dump --schema-only "${EMPTY_DB}" | grep -vE '^\\(un)?restrict ' > "${WORK_DIR}/schema_empty.sql"
-pg_dump --schema-only "${UPGRADE_DB}" | grep -vE '^\\(un)?restrict ' > "${WORK_DIR}/schema_upgrade.sql"
-if ! diff -q "${WORK_DIR}/schema_empty.sql" "${WORK_DIR}/schema_upgrade.sql" >/dev/null; then
-  diff "${WORK_DIR}/schema_empty.sql" "${WORK_DIR}/schema_upgrade.sql" | head -40 >&2
-  fail "migrated-readiness: schemas from empty->HEAD and ${BASE_TAG}->HEAD differ"
-fi
-note "PASS converged schema: empty->HEAD and ${BASE_TAG}->HEAD are identical"
+# Dumps are normalized by schema_dump (lib/schema-diff.sh) before comparison:
+# pg_dump writes to a file with explicit failure handling, the PG18 per-dump
+# \restrict/\unrestrict tokens are filtered, and the unified diff is written
+# to a file and bounded with sed instead of `diff | head` under pipefail.
+schema_dump "${EMPTY_DB}" "${WORK_DIR}/schema_empty.sql"
+schema_dump "${UPGRADE_DB}" "${WORK_DIR}/schema_upgrade.sql"
+assert_schemas_identical "${WORK_DIR}/schema_empty.sql" \
+  "${WORK_DIR}/schema_upgrade.sql" "${WORK_DIR}/schema.diff" "migrated-readiness"
+note "PASS converged schema: empty->HEAD and ${BASE_REF}->HEAD are identical"
 
 # Readiness spot checks: table:column pairs the repositories depend on. These
 # tables were created by divergent historical migrations; the compat
@@ -161,7 +189,8 @@ for db in "${EMPTY_DB}" "${UPGRADE_DB}"; do
     table="${check%%:*}"
     column="${check##*:}"
     found="$(${PSQL[@]} "$db" -tAc \
-      "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='${table}' AND column_name='${column}';")"
+      "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='${table}' AND column_name='${column}';")" \
+      || fail "migrated-readiness: column check query failed for ${table}.${column} (${db})"
     [[ "${found}" == "1" ]] \
       || fail "migrated-readiness: ${db} is missing ${table}.${column} (repository queries would break)"
   done
