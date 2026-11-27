@@ -59,7 +59,7 @@ LABEL org.opencontainers.image.title="rustchat-backend" \
       org.opencontainers.image.version=$VERSION \
       org.opencontainers.image.created=$BUILD_DATE \
       org.opencontainers.image.revision=$VCS_REF \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apk add --no-cache ca-certificates libgcc wget
 
