@@ -17,10 +17,12 @@ in `docs/adr/`; released/operational documentation lives under its respective
 
 Both directories are empty apart from `.gitkeep` in this snapshot. The
 `.gitkeep` files preserve the layout referenced by
-`.governance/agent-contracts.yml`, `.governance/protected-paths.yml`, and
+`.governance/agent-contracts.yml` and
 [`AGENTS.md`](https://github.com/kubedoio/rustchat/blob/main/AGENTS.md). The
-`compat-agent` contract permits analysis output in these directories, but not
-production code.
+`compat-agent` contract permits analysis output in both `specs/**` and
+`plans/**`, but not production code. Separately,
+`.governance/protected-paths.yml` auto-elevates changes to `specs/**` only;
+`plans/**` is not a protected path.
 
 Historical superpowers material formerly archived under
 `docs/archive/superpowers/` was removed from the public tree during the

@@ -212,6 +212,7 @@ Response includes:
 - Redis connectivity
 - S3 connectivity
 - Migration state
+- Email outbox lag/pressure (`email_outbox`)
 - WebSocket connection counts
 
 ---
