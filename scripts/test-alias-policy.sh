@@ -241,17 +241,53 @@ EOF
 }
 
 # Append a job that bypasses metadata-action and hands a plain moving Docker
-# tag reference to docker/build-push-action.
+# tag reference to docker/build-push-action. Defaults to `:latest`; pass the
+# tag component to exercise `main` / `nightly` / `edge` forms.
 append_plain_tag_job() {
-  local file="$1"
-  cat >>"${file}" <<'EOF'
+  local file="$1" tag="${2:-latest}"
+  cat >>"${file}" <<EOF
   alias-policy-plain:
     runs-on: ubuntu-latest
     steps:
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           tags: |
-            ghcr.io/example/image:latest
+            ghcr.io/example/image:${tag}
+EOF
+}
+
+# Append a metadata-action job with an arbitrary tags block, used for the
+# `type=ref,event=branch`, `type=edge`, literal `value=main`/`value=nightly`
+# and `type=ref,event=pr` cases.
+append_metadata_tag_job() {
+  local file="$1" tag="$2"
+  cat >>"${file}" <<EOF
+  alias-policy-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/workflows/docker-build-push.yml
+        with:
+          tags: |
+            ${tag}
+EOF
+}
+
+# Append a job whose env/outputs happen to use `tags`/`flavor` as plain key
+# names. Only action inputs (`with:`) and reusable-workflow inputs (`inputs:`)
+# are emitters, so these unrelated keys must not fail the policy check.
+append_unrelated_tags_job() {
+  local file="$1"
+  cat >>"${file}" <<'EOF'
+  alias-policy-unrelated:
+    runs-on: ubuntu-latest
+    env:
+      tags: latest
+      flavor: latest=true
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+    steps:
+      - id: meta
+        run: echo "tags=latest" >> "$GITHUB_OUTPUT"
 EOF
 }
 
@@ -389,6 +425,34 @@ f="$(new_fixture plain-latest-tag)"
 append_plain_tag_job "${f}/.github/workflows/release.yml"
 expect_fail "plain-latest-tag" "a plain :latest Docker tag in another job is rejected" "moving release alias"
 
+f="$(new_fixture ref-branch-tag)"
+# `type=ref,event=branch` produces a tag named after the branch, which moves.
+append_metadata_tag_job "${f}/.github/workflows/release.yml" "type=ref,event=branch"
+expect_fail "ref-branch-tag" "a branch-ref tag in another job is rejected" "moving release alias"
+
+f="$(new_fixture edge-tag)"
+# `type=edge` produces the moving `edge` alias.
+append_metadata_tag_job "${f}/.github/workflows/release.yml" "type=edge"
+expect_fail "edge-tag" "an edge tag in another job is rejected" "moving release alias"
+
+f="$(new_fixture raw-main-extra)"
+# A literal `main` raw tag is a moving alias even outside promote.yml.
+append_metadata_tag_job "${f}/.github/workflows/release.yml" "type=raw,value=main"
+expect_fail "raw-main-extra" "a literal main raw tag in another job is rejected" "moving release alias"
+
+f="$(new_fixture plain-nightly-tag)"
+# Plain Docker references can also target the development aliases directly.
+append_plain_tag_job "${f}/.github/workflows/release.yml" "nightly"
+expect_fail "plain-nightly-tag" "a plain :nightly Docker tag in another job is rejected" "moving release alias"
+
+f="$(new_fixture raw-nightly-extra)"
+append_metadata_tag_job "${f}/.github/workflows/release.yml" "type=raw,value=nightly"
+expect_fail "raw-nightly-extra" "a literal nightly raw tag in another job is rejected" "moving release alias"
+
+f="$(new_fixture plain-main-tag)"
+append_plain_tag_job "${f}/.github/workflows/release.yml" "main"
+expect_fail "plain-main-tag" "a plain :main Docker tag in another job is rejected" "moving release alias"
+
 f="$(new_fixture promote-backfill-gate-removed)"
 # The promote allowlist keeps the backfill restriction explicit: dropping the
 # gate that disables main/nightly for a backfill must fail the policy check.
@@ -418,6 +482,22 @@ mutate_line "${f}/.github/workflows/docker-build-push.yml" \
 insert_lines_after "${f}/.github/workflows/docker-build-push.yml" \
   "flavor: |" "  latest=true"
 expect_fail "flavor-block-latest" "flavor block with latest=true is rejected" "moving-alias metadata flavor"
+
+f="$(new_fixture flavor-inline-duplicate)"
+# metadata-action csv-parses `flavor`, so a later `latest=true` wins over
+# `latest=false`; a repeated attribute must be rejected even when the first
+# occurrence looks like an explicit opt-out.
+insert_lines_after "${f}/.github/workflows/docker-build-push.yml" \
+  "tags: \${{ inputs.tags }}" "flavor: latest=false,latest=true"
+expect_fail "flavor-inline-duplicate" "an inline flavor with latest=false,latest=true is rejected" "repeats attribute"
+
+f="$(new_fixture flavor-block-duplicate)"
+# Same duplicate-attribute bypass in the block form of flavor.
+mutate_line "${f}/.github/workflows/docker-build-push.yml" \
+  "tags: \${{ inputs.tags }}" "flavor: |"
+insert_lines_after "${f}/.github/workflows/docker-build-push.yml" \
+  "flavor: |" "  latest=false,latest=true"
+expect_fail "flavor-block-duplicate" "a flavor block with latest=false,latest=true is rejected" "repeats attribute"
 
 f="$(new_fixture input-default-latest)"
 # (d) The reusable workflow's tags input default must stay immutable as well.
@@ -528,6 +608,17 @@ f="$(new_fixture extra-immutable-job)"
 # tags; an ungated moving alias there is a negative case above.
 append_decoy_job "${f}/.github/workflows/release.yml" "type=sha,format=long"
 expect_pass "extra-immutable-job" "an immutable tags block outside docker-release is allowed"
+
+f="$(new_fixture unrelated-tags-key)"
+# `env`/`outputs` keys named tags/flavor are unrelated to action inputs; they
+# must not fail with a misleading moving-alias message.
+append_unrelated_tags_job "${f}/.github/workflows/release.yml"
+expect_pass "unrelated-tags-key" "unrelated tags/flavor env and output keys are allowed"
+
+f="$(new_fixture ref-pr-tag)"
+# `type=ref,event=pr` is a per-PR immutable tag; only branch refs move aliases.
+append_metadata_tag_job "${f}/.github/workflows/release.yml" "type=ref,event=pr"
+expect_pass "ref-pr-tag" "a PR ref tag in another job is still allowed"
 
 # ---------- totals ----------
 

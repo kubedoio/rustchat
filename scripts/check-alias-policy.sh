@@ -33,13 +33,16 @@ set -euo pipefail
 #   2. `promote.yml`'s `build-and-push` tag input is allowlisted too, which
 #      keeps the backfill restriction (`main`/`nightly` disabled when
 #      `allow_backfill=true`) visible and prevents extra release aliases.
-#   3. Every workflow file is scanned for moving release aliases in `tags:` /
-#      `flavor:` inputs (literal `latest`, literal `X.Y` / `X`, `{{major}}`
-#      patterns, `type=match`, `flavor: latest=true`). Outside the two
-#      allowlisted blocks, only `docker-build-push.yml` may use dynamic
-#      (`${{ ... }}`) values; YAML anchors/aliases are always rejected. Every
-#      other emitter — including `docker-build-push.yml`'s workflow_call
-#      defaults — must stay immutable.
+#   3. Every workflow file is scanned for moving release aliases in action /
+#      reusable-workflow `tags:` / `flavor:` inputs (literal `latest`, `main`,
+#      `nightly`, `edge`, literal `X.Y` / `X`, `{{major}}` patterns,
+#      `type=match`, `type=edge`, `type=ref,event=branch`, and
+#      `flavor: latest=true`). Outside the two allowlisted blocks, only
+#      `docker-build-push.yml` may use dynamic (`${{ ... }}`) values; YAML
+#      anchors/aliases are always rejected. Every other emitter — including
+#      `docker-build-push.yml`'s workflow_call defaults — must stay immutable.
+#      Unrelated `tags`/`flavor` keys (e.g. under `env:` or `outputs:`) are
+#      not inputs and are ignored.
 #
 # Exit status: 0 when every check passes, 1 with a `FAIL:` line otherwise.
 #
@@ -210,14 +213,40 @@ duplicate_attr_key() {
 }
 
 # True when a metadata-action `flavor` value would produce/move a `latest`
-# tag (`latest=true`, `suffix=-latest`, ...). `latest=false` is the explicit
-# opt-out and is allowed.
+# tag. metadata-action csv-parses the value (`key=value,key=value`) and the
+# later duplicate wins, so `latest=false,latest=true` must not be mistaken for
+# an opt-out. Any `latest` attribute whose value is not literally `false` is
+# treated as moving, as is a `suffix`/`prefix` containing `latest`.
 flavor_is_moving() {
-  local v="$1"
-  v="${v//\"/}"; v="${v//\'/}"
-  v="${v//[[:space:]]/}"
-  v="$(printf '%s' "${v}" | tr '[:upper:]' '[:lower:]')"
-  [[ "${v}" == *latest* && "${v}" != *latest=false* ]]
+  local v="$1" attr key value
+  v="$(trim "${v}")"
+  if [[ "${v}" == \"*\" || "${v}" == \'*\' ]]; then
+    v="${v:1:${#v}-2}"
+  fi
+  while IFS= read -r attr; do
+    attr="$(trim "${attr}")"
+    [[ -z "${attr}" ]] && continue
+    if [[ "${attr}" == *=* ]]; then
+      key="$(trim "${attr%%=*}")"
+      value="$(trim "${attr#*=}")"
+    else
+      key="${attr}"
+      value=""
+    fi
+    key="${key//\"/}"; key="${key//\'/}"
+    value="${value//\"/}"; value="${value//\'/}"
+    key="$(printf '%s' "${key}" | tr '[:upper:]' '[:lower:]')"
+    value="$(printf '%s' "${value}" | tr '[:upper:]' '[:lower:]')"
+    case "${key}" in
+      latest)
+        [[ "${value}" != "false" ]] && return 0
+        ;;
+      suffix | prefix)
+        [[ "${value}" == *latest* ]] && return 0
+        ;;
+    esac
+  done < <(split_tag_attrs "${v}")
+  return 1
 }
 
 # True when a tags/flavor value uses YAML indirection (anchor `&`, alias `*`
@@ -237,17 +266,20 @@ has_expression() {
 }
 
 # True when one effective `tags:` line emits a moving release alias:
-# literal `latest`, a literal major / major.minor value (`0`, `0.5`, `v0.5`),
-# any `{{major}}` pattern, or a `type=match` source (which can synthesise
-# arbitrary aliases such as `\d+\.\d+`).
+# literal `latest`, `main`, `nightly` or `edge`, a literal major / major.minor
+# value (`0`, `0.5`, `v0.5`), any `{{major}}` pattern, a `type=match` source
+# (which can synthesise arbitrary aliases such as `\d+\.\d+`), a `type=edge`
+# or `type=ref,event=branch` source, or a moving metadata `flavor`.
 line_is_moving_alias() {
-  local line="$1" attr key value plain
+  local line="$1" attr key value plain tag_type="" tag_event=""
   [[ "${line}" == *'{{major}}'* ]] && return 0
   # Plain Docker tag references (docker/build-push-action `tags:` input):
-  #   ghcr.io/org/image:latest, image:0.5
+  #   ghcr.io/org/image:latest, image:0.5, image:main, image:nightly
   plain="${line##*:}"
   plain="$(trim "${plain}")"
-  [[ "${plain}" == "latest" ]] && return 0
+  case "${plain}" in
+    latest | main | nightly | edge) return 0 ;;
+  esac
   [[ "${plain}" =~ ^v?[0-9]+(\.[0-9]+)?$ ]] && return 0
   while IFS= read -r attr; do
     attr="$(trim "${attr}")"
@@ -263,10 +295,18 @@ line_is_moving_alias() {
     value="${value#\'}"; value="${value%\'}"
     case "${key}" in
       type)
-        [[ "${value}" == "match" ]] && return 0
+        case "${value}" in
+          match | edge) return 0 ;;
+          ref) tag_type="ref" ;;
+        esac
+        ;;
+      event)
+        [[ "${value}" == "branch" ]] && tag_event="branch"
         ;;
       value)
-        [[ "${value}" == "latest" ]] && return 0
+        case "${value}" in
+          latest | main | nightly | edge) return 0 ;;
+        esac
         [[ "${value}" =~ ^v?[0-9]+(\.[0-9]+)?$ ]] && return 0
         ;;
       flavor)
@@ -274,6 +314,7 @@ line_is_moving_alias() {
         ;;
     esac
   done < <(split_tag_attrs "${line}")
+  [[ "${tag_type}" == "ref" && "${tag_event}" == "branch" ]] && return 0
   return 1
 }
 
@@ -309,6 +350,10 @@ extract_tag_inputs() {
       if (t ~ /^{/) return "{"
       if (t ~ /^\[/ && t ~ /\{/) return "["
       return ""
+    }
+    function path_has(k,    i) {
+      for (i = 1; i <= depth; i++) if (stack_key[i] == k) return 1
+      return 0
     }
     BEGIN { depth = 0; in_scalar = 0; scalar_indent = 0; scalar_job = ""; scalar_key = ""; scalar_kind = "" }
     {
@@ -362,7 +407,11 @@ extract_tag_inputs() {
 
       rel_job = ""
       rel_key = ""
-      if (depth >= 2 && stack_key[1] == "jobs" && (key == "tags" || key == "flavor")) {
+      # Only action inputs (`with:`) and reusable-workflow inputs (`inputs:`)
+      # are alias emitters. An unrelated `tags`/`flavor` key under `env:`,
+      # `outputs:`, etc. must not produce a misleading policy failure.
+      if (depth >= 2 && stack_key[1] == "jobs" && path_has("with") &&
+          (key == "tags" || key == "flavor")) {
         rel_job = stack_key[2]
         rel_key = key
       }
@@ -536,6 +585,10 @@ for workflow_file in "${workflow_files[@]}"; do
             ((global_alias_failures++)) || true
           fi
         else
+          if ! dup="$(duplicate_attr_key "${value}")"; then
+            fail "$(record_label "${job}" "${key}" "${file_label}") ${key} value repeats attribute '${dup}': ${value}"
+            ((global_alias_failures++)) || true
+          fi
           if has_expression "${value}" && [[ "${workflow_file}" != "${DOCKER_BUILD_PUSH_YML}" ]]; then
             fail "$(record_label "${job}" "${key}" "${file_label}") uses a dynamic flavor value outside docker-build-push.yml: ${value}"
             ((global_alias_failures++)) || true
@@ -548,7 +601,7 @@ for workflow_file in "${workflow_files[@]}"; do
         ;;
       block:*)
         if ! dup="$(duplicate_attr_key "${value}")"; then
-          fail "$(record_label "${job}" "${key}" "${file_label}") tag line repeats attribute '${dup}': ${value}"
+          fail "$(record_label "${job}" "${key}" "${file_label}") ${key} value repeats attribute '${dup}': ${value}"
           ((global_alias_failures++)) || true
         fi
         if ((is_docker_release_tags)); then
@@ -564,39 +617,6 @@ for workflow_file in "${workflow_files[@]}"; do
         elif [[ "${key}" == "flavor" ]] && flavor_is_moving "${value}"; then
           fail "$(record_label "${job}" "${key}" "${file_label}") sets a moving-alias metadata flavor: ${value}"
           ((global_alias_failures++)) || true
-        fi
-        continue
-        ;;
-      input-default:*)
-        if [[ "${kind}" == "input-default:>" ]]; then
-          fail "$(record_label "${job}" "${key}" "${file_label}") uses a folded (>) default; use a literal (|) default so every tag is explicit"
-          ((global_alias_failures++)) || true
-          continue
-        fi
-        if [[ "${kind}" == "input-default:inline" ]] && yaml_indirection "${value}"; then
-          fail "$(record_label "${job}" "${key}" "${file_label}") uses YAML anchor/alias indirection: ${value}"
-          ((global_alias_failures++)) || true
-          continue
-        fi
-        if has_expression "${value}" && [[ "${workflow_file}" != "${DOCKER_BUILD_PUSH_YML}" ]]; then
-          fail "$(record_label "${job}" "${key}" "${file_label}") uses a dynamic default outside docker-build-push.yml: ${value}"
-          ((global_alias_failures++)) || true
-          continue
-        fi
-        if [[ "${key}" == "tags" ]]; then
-          if ! dup="$(duplicate_attr_key "${value}")"; then
-            fail "$(record_label "${job}" "${key}" "${file_label}") tag line repeats attribute '${dup}': ${value}"
-            ((global_alias_failures++)) || true
-          fi
-          if line_is_moving_alias "${value}"; then
-            fail "$(record_label "${job}" "${key}" "${file_label}") emits a moving release alias: ${value}"
-            ((global_alias_failures++)) || true
-          fi
-        else
-          if flavor_is_moving "${value}"; then
-            fail "$(record_label "${job}" "${key}" "${file_label}") sets a moving-alias metadata flavor: ${value}"
-            ((global_alias_failures++)) || true
-          fi
         fi
         continue
         ;;

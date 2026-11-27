@@ -64,7 +64,7 @@ sources:
 
 | Step | Guard |
 |---|---|
-| `actionlint -no-color` | GitHub Actions syntax/semantics (pinned via `taiki-e/install-action`) |
+| `actionlint -no-color` | GitHub Actions syntax/semantics (`go install ...@v1.7.12`, immutable via the Go module proxy/sumdb) |
 | `scripts/check-alias-policy.sh` | allowlisted `release.yml` / `promote.yml` tag sets plus a repo-wide scan for ungated or dynamic moving release aliases in `tags:` / `flavor:` inputs |
 | `scripts/test-alias-policy.sh` | positive/negative regression cases for the policy checker itself |
 
