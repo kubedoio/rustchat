@@ -283,4 +283,26 @@ describe('GlobalHeader', () => {
 
     expect(wrapper.text()).toContain('Admin Console')
   })
+
+  it('does not register its own Cmd+K handler (QuickSwitcherHost owns the shortcut)', async () => {
+    const GlobalHeader = (await import('./GlobalHeader.vue')).default
+
+    const wrapper = mount(GlobalHeader, {
+      global: {
+        stubs: {
+          SearchModal: true,
+          QuickSwitcherModal: true,
+          SetStatusModal: true,
+          RcAvatar: true,
+          NotificationsDropdown: true,
+          ActivityFeed: true,
+        },
+      },
+    })
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
+
+    expect(quickSwitcher.toggle).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
 })

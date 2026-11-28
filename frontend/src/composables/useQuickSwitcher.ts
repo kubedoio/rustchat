@@ -72,13 +72,26 @@ export function useQuickSwitcher() {
   })
 
   function open() {
+    // Pages outside AppShell (/admin, /playbooks, /profile) never mount the
+    // team rail, so lazily load teams here. `loading` guards against repeated
+    // fetches from rapid shortcut presses.
+    if (teamStore.teams.length === 0 && !teamStore.loading) {
+      void teamStore.fetchTeams()
+    }
     isOpen.value = true
   }
   function close() {
     isOpen.value = false
   }
   function toggle() {
-    isOpen.value = !isOpen.value
+    // Delegate to open/close so the Cmd+K path (which only calls toggle from
+    // QuickSwitcherHost) shares the lazy team fetch instead of flipping the
+    // flag directly.
+    if (isOpen.value) {
+      close()
+    } else {
+      open()
+    }
   }
 
   function addRecentItem(id: string) {

@@ -45,6 +45,12 @@ const mocks = vi.hoisted(() => {
     currentChannelId: null as string | null,
     channels: [] as Array<{ id: string; name: string }>,
   }
+  const activityStore = {
+    addActivity: vi.fn(),
+    markActivityRead: vi.fn(),
+    markAllActivitiesRead: vi.fn(),
+    filter: null as string | null,
+  }
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn(), register: vi.fn() }
   return {
     authStore,
@@ -52,6 +58,7 @@ const mocks = vi.hoisted(() => {
     presenceStore,
     unreadStore,
     channelStore,
+    activityStore,
     toast,
     postsApiCreate: vi.fn(),
     postToMessage: vi.fn(),
@@ -77,6 +84,9 @@ vi.mock('@/features/unreads/stores/unreadStore', () => ({
 }))
 vi.mock('@/features/channels/stores/channelStore', () => ({
   useChannelStore: () => mocks.channelStore,
+}))
+vi.mock('@/features/activity/stores/activityStore', () => ({
+  useActivityStore: () => mocks.activityStore,
 }))
 vi.mock('./useToast', () => ({
   useToast: () => mocks.toast,
@@ -202,6 +212,7 @@ describe('useWebSocket', () => {
     mocks.authStore.logout.mockResolvedValue(undefined)
     mocks.channelStore.currentChannelId = null
     mocks.channelStore.channels = []
+    mocks.activityStore.filter = null
     mocks.messageStore.messagesByChannel = {}
     mocks.messageStore.addOptimisticMessage.mockImplementation((msg: Record<string, unknown>) => {
       const channelId = msg.channelId as string
@@ -782,6 +793,162 @@ describe('useWebSocket', () => {
     expect(ws.reconnectAttempt.value).toBe(1)
     vi.advanceTimersByTime(reconnectDelay(1))
     expect(FakeWebSocket.instances).toHaveLength(3)
+  })
+
+  it('adds activity_created events to the activity store using the shared mapper', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    const sock = FakeWebSocket.instances[0]!
+    openSocket(sock)
+
+    const payload = {
+      id: '11111111-1111-4111-8111-111111111111',
+      type: 'mention',
+      actor_id: '22222222-2222-4222-8222-222222222222',
+      actor_username: 'bob',
+      actor_avatar_url: '/bob.png',
+      channel_id: '33333333-3333-4333-8333-333333333333',
+      channel_name: 'general',
+      team_id: '44444444-4444-4444-8444-444444444444',
+      team_name: 'Engineering',
+      post_id: '55555555-5555-4555-8555-555555555555',
+      root_id: '66666666-6666-4666-8666-666666666666',
+      message_text: 'hey @alice',
+      reaction: 'thumbsup',
+      read: false,
+      created_at: '2026-11-27T10:00:00.000Z',
+    }
+
+    sock.emitServerMessage({ type: 'event', event: 'activity_created', data: payload })
+
+    expect(mocks.activityStore.addActivity).toHaveBeenCalledTimes(1)
+    expect(mocks.activityStore.addActivity).toHaveBeenCalledWith({
+      id: payload.id,
+      type: 'mention',
+      actorId: payload.actor_id,
+      actorUsername: 'bob',
+      actorAvatarUrl: '/bob.png',
+      channelId: payload.channel_id,
+      channelName: 'general',
+      teamId: payload.team_id,
+      teamName: 'Engineering',
+      postId: payload.post_id,
+      rootId: payload.root_id,
+      message: 'hey @alice',
+      reaction: 'thumbsup',
+      read: false,
+      createdAt: new Date(payload.created_at),
+    })
+  })
+
+  it('drops realtime activity_created events that do not match the active filter', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    const sock = FakeWebSocket.instances[0]!
+    openSocket(sock)
+
+    const basePayload = {
+      type: 'mention',
+      actor_id: '22222222-2222-4222-8222-222222222222',
+      actor_username: 'bob',
+      channel_id: '33333333-3333-4333-8333-333333333333',
+      channel_name: 'general',
+      team_id: '44444444-4444-4444-8444-444444444444',
+      team_name: 'Engineering',
+      post_id: '55555555-5555-4555-8555-555555555555',
+      message_text: 'hey @alice',
+      read: false,
+      created_at: '2026-11-27T10:00:00.000Z',
+    }
+
+    mocks.activityStore.filter = 'mention'
+
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_created',
+      // A reaction activity must not leak into a mention-filtered feed.
+      data: { ...basePayload, id: 'activity-reaction', type: 'reaction' },
+    })
+    expect(mocks.activityStore.addActivity).not.toHaveBeenCalled()
+
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_created',
+      data: { ...basePayload, id: 'activity-mention', type: 'mention' },
+    })
+    expect(mocks.activityStore.addActivity).toHaveBeenCalledTimes(1)
+    expect(mocks.activityStore.addActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'activity-mention', type: 'mention' })
+    )
+
+    // No active filter: every activity type is accepted again.
+    mocks.activityStore.filter = null
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_created',
+      data: { ...basePayload, id: 'activity-reaction-unfiltered', type: 'reaction' },
+    })
+    expect(mocks.activityStore.addActivity).toHaveBeenCalledTimes(2)
+    expect(mocks.activityStore.addActivity).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'activity-reaction-unfiltered', type: 'reaction' })
+    )
+  })
+
+  it('ignores malformed activity_created payloads instead of adding broken entries', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    const sock = FakeWebSocket.instances[0]!
+    openSocket(sock)
+
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_created',
+      data: { activity_id: 'activity-1', user_id: 'user-1', type: 'mention' },
+    })
+    sock.emitServerMessage({ type: 'event', event: 'activity_created', data: null })
+
+    expect(mocks.activityStore.addActivity).not.toHaveBeenCalled()
+  })
+
+  it('marks activities read from activity_read single-id and list payloads', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    const sock = FakeWebSocket.instances[0]!
+    openSocket(sock)
+
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_read',
+      data: { activity_ids: ['activity-1', 'activity-2', 'activity-1'] },
+    })
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_read',
+      data: { activity_id: 'activity-3' },
+    })
+
+    expect(mocks.activityStore.markActivityRead.mock.calls).toEqual([
+      ['activity-1'],
+      ['activity-2'],
+      ['activity-3'],
+    ])
+    expect(mocks.activityStore.markAllActivitiesRead).not.toHaveBeenCalled()
+  })
+
+  it('marks every activity read when activity_read carries all_read', async () => {
+    const ws = await useFreshWebSocket()
+    ws.connect()
+    const sock = FakeWebSocket.instances[0]!
+    openSocket(sock)
+
+    sock.emitServerMessage({
+      type: 'event',
+      event: 'activity_read',
+      data: { all_read: true },
+    })
+
+    expect(mocks.activityStore.markAllActivitiesRead).toHaveBeenCalledTimes(1)
+    expect(mocks.activityStore.markActivityRead).not.toHaveBeenCalled()
   })
 
   it('sends typing, stop-typing, and presence commands as actions', async () => {

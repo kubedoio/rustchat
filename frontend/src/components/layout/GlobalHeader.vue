@@ -18,9 +18,6 @@ import {
 import { useAuthStore } from '../../features/auth/stores/authStore'
 import { useUIStore } from '../../features/ui/stores/uiStore'
 import SearchModal from '../modals/SearchModal.vue'
-import QuickSwitcherModal from '../navigation/QuickSwitcherModal.vue'
-import { useQuickSwitcher } from '../../composables/useQuickSwitcher'
-import type { QuickSwitcherItem } from '../../composables/useQuickSwitcher'
 import SetStatusModal from '../modals/SetStatusModal.vue'
 import RcAvatar from '../ui/RcAvatar.vue'
 import NotificationsDropdown from './NotificationsDropdown.vue'
@@ -63,7 +60,6 @@ const connectionDotClass = computed(() => {
 })
 
 const showSearch = ref(false)
-const quickSwitcher = useQuickSwitcher()
 const showUserMenu = ref(false)
 const showSetStatus = ref(false)
 const showNotifications = ref(false)
@@ -78,18 +74,10 @@ if (auth.user) {
   })
 }
 
-// Keyboard shortcut for search
+// Keyboard shortcut for search. Cmd/Ctrl+K is owned globally by
+// QuickSwitcherHost so it also works on pages without this header.
 function handleKeydown(e: KeyboardEvent) {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault()
-    quickSwitcher.toggle()
-  }
   if (e.key === 'Escape') {
-    if (quickSwitcher.isOpen.value) {
-      e.stopPropagation()
-      quickSwitcher.close()
-      return
-    }
     showSearch.value = false
     showUserMenu.value = false
     showDndSubmenu.value = false
@@ -191,12 +179,6 @@ const currentTeamLabel = computed(() => {
 
 function openActivityFeed() {
   activityService.openFeed()
-}
-
-function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
-  quickSwitcher.addRecentItem(item.id)
-  router.push(item.to)
-  quickSwitcher.close()
 }
 </script>
 
@@ -492,15 +474,6 @@ function handleQuickSwitcherSelect(item: QuickSwitcherItem) {
 
     <!-- Search Modal -->
     <SearchModal :show="showSearch" @close="showSearch = false" />
-
-    <!-- Quick Switcher Modal -->
-    <QuickSwitcherModal
-      :is-open="quickSwitcher.isOpen.value"
-      :items="quickSwitcher.allItems.value"
-      :recent-items="quickSwitcher.recentItems.value"
-      @select="handleQuickSwitcherSelect"
-      @close="quickSwitcher.close()"
-    />
 
     <!-- Set Status Modal -->
     <SetStatusModal :show="showSetStatus" @close="showSetStatus = false" />

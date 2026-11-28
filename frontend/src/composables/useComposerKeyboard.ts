@@ -99,7 +99,10 @@ export function useComposerKeyboard(options: UseComposerKeyboardOptions) {
 
   function handleKeydown(event: KeyboardEvent) {
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'k') {
+      // The composer owns Cmd/Ctrl+K while focused: stop the event here so the
+      // document-level QuickSwitcherHost does not open a second overlay.
       event.preventDefault()
+      event.stopPropagation()
       options.onOpenCommandMenu()
       return
     }
