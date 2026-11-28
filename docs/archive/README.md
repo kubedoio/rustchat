@@ -37,8 +37,10 @@ Postcard migration plan (dependency security update).
 - Plan for replacing `bincode` with `postcard`
 - Risk assessment and verification steps
 
-### [superpowers/](./superpowers/)
-Historical spec and plan files from superpowers development model.
+### superpowers/ (removed)
+The historical spec and plan files formerly archived here were removed from the
+public tree during the public-promotion cleanup. New specs and plans use the
+working layout at [`../superpowers/`](../superpowers/).
 
 ---
 

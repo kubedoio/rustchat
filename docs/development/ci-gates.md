@@ -86,11 +86,12 @@ exact candidate commit. Enforced by `.github/workflows/release.yml`:
 | version/changelog validation | VERSION/Cargo.toml/package.json/CHANGELOG agreement |
 | alias policy (`scripts/check-alias-policy.sh`) | prereleases cannot move `X.Y`/`latest`; promotions serialize |
 | migration upgrade matrix (RI-C07, P006) | empty→HEAD and latest-stable→HEAD readiness |
-| Buzz deterministic compatibility (RI-C08, P007) | external-protocol compatibility record |
+| Buzz deterministic compatibility (RI-C08, P007) | **Planned — not yet enforced in the release gate.** No Buzz compatibility job exists in `release.yml` or `ci.yml` at this revision. |
 
-Release-only checks (migration matrix, Buzz compatibility, backup/restore) are
-activated by their phases. The migration matrix (RI-C07) is now a required CI
-job: `Migration Matrix` in `ci.yml` runs `scripts/migration-matrix.sh` on every
+Migration/recovery evidence (RI-C07, P006) is continuously proven by jobs in
+`ci.yml` that feed the required `CI Complete` check. The migration matrix
+(RI-C07) is now a required CI job: `Migration Matrix` in `ci.yml` runs
+`scripts/migration-matrix.sh` on every
 change to `backend/migrations/**`, proving empty→HEAD and
 latest-published-stable→HEAD convergence with repository-critical column
 readiness checks.
@@ -104,6 +105,12 @@ restores it into a fresh database, and asserts that schema objects, sqlx
 migration bookkeeping, row counts, content checksums, and referential
 integrity are identical after the round trip — the same procedure documented
 for operators in `docs/operations/runbook.md`.
+
+Buzz deterministic compatibility (RI-C08, P007) is **planned but not yet
+enforced**: at this revision neither `release.yml` nor `ci.yml` contains a Buzz
+compatibility job, so the release gate above can pass without one. Activating
+RI-C08 requires a future workflow change plus matching updates to this document
+and `docs/github-protection.md` under the change procedure below.
 
 ## Verification
 

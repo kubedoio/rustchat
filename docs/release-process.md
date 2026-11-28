@@ -126,9 +126,10 @@ commit, never as a substitute for normal promotion.
 ## Release Gate
 
 A `v*.*.*` tag publishes only the **exact** tagged commit, and only after the
-[release-gate set](development/ci-gates.md) is satisfied for that commit
-(CI Complete, Security Complete, dco-check, Backend Integration Tests, plus
-version/changelog validation, the migration matrix, and Buzz compatibility).
+[release-gate set](development/ci-gates.md) is satisfied for that commit:
+`CI Complete`, `Security Complete`, `dco-check`, `Backend Integration Tests`,
+plus version/changelog validation and the migration matrix. Buzz deterministic
+compatibility (RI-C08/P007) is **planned and not yet enforced**.
 
 ## Maintainer Release Checklist
 
