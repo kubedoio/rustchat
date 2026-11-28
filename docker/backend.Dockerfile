@@ -55,11 +55,11 @@ ARG VCS_REF
 
 LABEL org.opencontainers.image.title="rustchat-backend" \
       org.opencontainers.image.description="Rustchat Backend Server" \
-      org.opencontainers.image.source="https://github.com/rustchat/rustchat" \
+      org.opencontainers.image.source="https://github.com/kubedoio/rustchat" \
       org.opencontainers.image.version=$VERSION \
       org.opencontainers.image.created=$BUILD_DATE \
       org.opencontainers.image.revision=$VCS_REF \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apk add --no-cache ca-certificates libgcc wget
 

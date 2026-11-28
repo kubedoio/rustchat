@@ -6,7 +6,7 @@ rust-version = "1.95"
 authors = ["rustchat contributors"]
 description = "Self-hosted, enterprise-ready team collaboration platform"
 license = "Apache-2.0"
-repository = "https://github.com/rustchat/rustchat"
+repository = "https://github.com/kubedoio/rustchat"
 
 [dependencies]
 # Async runtime
