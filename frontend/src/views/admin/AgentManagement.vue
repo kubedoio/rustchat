@@ -266,7 +266,13 @@ async function confirmDeleteAgent() {
     />
 
     <!-- Delete Modal -->
-    <BaseModal v-if="deletingAgent" v-model="showDeleteModal" size="md" @close="closeDeleteModal">
+    <BaseModal
+      v-if="deletingAgent"
+      v-model="showDeleteModal"
+      size="md"
+      aria-label="Delete Agent"
+      @close="closeDeleteModal"
+    >
       <template #header>
         <div class="flex items-start justify-between p-5 border-b border-border-1">
           <div class="flex items-start gap-3">
@@ -281,6 +287,8 @@ async function confirmDeleteAgent() {
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Delete Agent dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="closeDeleteModal"
           >

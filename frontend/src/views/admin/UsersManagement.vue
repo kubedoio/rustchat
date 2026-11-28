@@ -543,7 +543,7 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
     />
 
     <!-- Set Password Modal -->
-    <BaseModal v-if="passwordUser" v-model="showPasswordModal" size="md">
+    <BaseModal v-if="passwordUser" v-model="showPasswordModal" size="md" aria-label="Set Password">
       <template #header>
         <div class="flex items-center justify-between px-5 py-4 border-b border-border-1">
           <div class="flex items-center gap-2.5">
@@ -556,6 +556,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Set Password dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="showPasswordModal = false"
           >
@@ -624,7 +626,13 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
     </BaseModal>
 
     <!-- Delete Modal -->
-    <BaseModal v-if="deletingUser" v-model="showDeleteModal" size="lg" @close="closeDeleteModal">
+    <BaseModal
+      v-if="deletingUser"
+      v-model="showDeleteModal"
+      size="lg"
+      aria-label="Delete User"
+      @close="closeDeleteModal"
+    >
       <template #header>
         <div class="flex items-start justify-between p-5 border-b border-border-1">
           <div class="flex items-start gap-3">
@@ -639,6 +647,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Delete User dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="closeDeleteModal"
           >
@@ -714,7 +724,13 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
     </BaseModal>
 
     <!-- Wipe User Modal -->
-    <BaseModal v-if="wipingUser" v-model="showWipeModal" size="lg" @close="closeWipeModal">
+    <BaseModal
+      v-if="wipingUser"
+      v-model="showWipeModal"
+      size="lg"
+      aria-label="Wipe User"
+      @close="closeWipeModal"
+    >
       <template #header>
         <div class="flex items-start justify-between p-5 border-b border-border-1">
           <div class="flex items-start gap-3">
@@ -729,6 +745,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Wipe User dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="closeWipeModal"
           >
@@ -783,7 +801,13 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
     </BaseModal>
 
     <!-- Re-sync Membership Modal -->
-    <BaseModal v-if="resyncingUser" v-model="showResyncModal" size="lg" @close="closeResyncModal">
+    <BaseModal
+      v-if="resyncingUser"
+      v-model="showResyncModal"
+      size="lg"
+      aria-label="Re-sync Memberships"
+      @close="closeResyncModal"
+    >
       <template #header>
         <div class="flex items-start justify-between p-5 border-b border-border-1">
           <div class="flex items-start gap-3">
@@ -798,6 +822,8 @@ const isDeleted = (user: AdminUser) => Boolean(user.deleted_at)
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close Re-sync Memberships dialog"
             class="text-text-4 hover:text-text-2 p-1 hover:bg-bg-surface-2 rounded-lg transition-colors"
             @click="closeResyncModal"
           >
